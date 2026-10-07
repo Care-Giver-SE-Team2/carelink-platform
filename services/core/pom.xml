@@ -181,7 +181,7 @@
 			  before this runs - see Dockerfile.
 			-->
 			<resource>
-				<directory>${project.basedir}/../docs/api</directory>
+				<directory>${project.basedir}/../../docs/api</directory>
 				<targetPath>static</targetPath>
 				<includes>
 					<include>openapi.yaml</include>

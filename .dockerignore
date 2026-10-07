@@ -5,7 +5,7 @@
 .git
 .github
 # Design documents are not build inputs, except docs/api/, which the backend build
-# copies onto the classpath (see Dockerfile and backend/pom.xml). Anything new under
+# copies onto the classpath (see build/Dockerfile and services/core/pom.xml). Anything new under
 # docs/api/ is allowed through automatically; do not narrow this to single files.
 docs/**
 !docs/api/**

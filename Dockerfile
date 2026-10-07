@@ -1,6 +1,6 @@
-# CareLink single image: the front-end build output is packaged into the backend jar,
-# so one container runs the whole application. This matches the monolithic backend the
-# proposal describes, and keeps a staging deployment down to a single service.
+# All-in-one local image: the front-end build output is packaged into the core jar, so one
+# container runs the whole application. Used by docker-compose.yml and the caregiver demo.
+# Cloud images are built per service from build/Dockerfile; the front end is served from S3.
 
 # ---------- 1. Build the front end ----------
 FROM node:22-alpine AS frontend
@@ -14,13 +14,13 @@ RUN npm run build
 FROM eclipse-temurin:25-jdk AS backend
 WORKDIR /src
 # Copy only the pom and wrapper first so the dependency layer stays cacheable
-COPY backend/.mvn/ .mvn/
-COPY backend/mvnw backend/pom.xml ./
+COPY services/core/.mvn/ .mvn/
+COPY services/core/mvnw services/core/pom.xml ./
 RUN chmod +x mvnw && ./mvnw -B -ntp dependency:go-offline
-COPY backend/src ./src
+COPY services/core/src ./src
 # Put the front-end output in static so Spring serves it directly
 COPY --from=frontend /app/dist ./src/main/resources/static
-# The hand-written OpenAPI contract lives at repo root, not in backend/; the pom
+# The hand-written OpenAPI contract lives at repo root, not in services/core/; the pom
 # resolves it via a relative path (../docs/api), so it must land one level above WORKDIR.
 # Both the final contract and the superseded draft are copied - the pom picks up
 # whichever of the two it's configured to include.

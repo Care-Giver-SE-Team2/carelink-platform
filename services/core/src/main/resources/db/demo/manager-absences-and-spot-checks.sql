@@ -9,7 +9,7 @@
 -- it uses, the same way:
 --
 --   ssh -i ~/.ssh/care-link.pem ubuntu@HOST 'sudo /opt/carelink/load-demo-data.sh' \
---       < backend/src/main/resources/db/demo/manager-absences-and-spot-checks.sql
+--       < services/core/src/main/resources/db/demo/manager-absences-and-spot-checks.sql
 --
 -- WHAT IT LAYS OUT, dated from the day it is loaded (D):
 --

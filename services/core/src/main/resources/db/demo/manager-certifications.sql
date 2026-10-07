@@ -5,7 +5,7 @@
 -- NOT A FLYWAY MIGRATION (no V prefix), for the reasons given at the top of
 -- demo-seed.sql. Load it after V11 has run, the same way:
 --
---   mysql -h127.0.0.1 -ucarelink -p carelink < backend/src/main/resources/db/demo/manager-certifications.sql
+--   mysql -h127.0.0.1 -ucarelink -p carelink < services/core/src/main/resources/db/demo/manager-certifications.sql
 --
 -- Six caregivers and their certificates, dated relative to today so the
 -- register always shows the same picture: two submissions waiting for review

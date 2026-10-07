@@ -8,7 +8,7 @@ $demoArgs=@('compose','--project-name','carelink-caregiver-demo','-f',$demoCompo
 $demoCount="SELECT COUNT(*) FROM caregiver c JOIN app_user u ON u.id=c.user_id WHERE u.username IN ('demo-cg-a','demo-cg-b');" | & docker @demoArgs -N -B
 if ($LASTEXITCODE -ne 0 -or ($demoCount -join '').Trim() -ne '2') { throw 'Start scripts/start-caregiver-demo.ps1 before loading schedule scenarios.' }
 if ($Stage -eq 'Reset') {
-    Get-Content -LiteralPath (Join-Path $demoRoot 'backend/src/main/resources/db/demo/caregiver-slice3.sql') -Raw -Encoding UTF8 | & docker @demoArgs
+    Get-Content -LiteralPath (Join-Path $demoRoot 'services/core/src/main/resources/db/demo/caregiver-slice3.sql') -Raw -Encoding UTF8 | & docker @demoArgs
     if ($LASTEXITCODE -ne 0) { throw 'Demo seed failed; no stage update attempted.' }
 }
 $demoReady="SELECT COUNT(*) FROM visit v JOIN elder e ON e.id=v.elder_id WHERE e.full_name='Demo3 Elder Lin' AND v.service_type IN ('DEMO3_CHANGE','DEMO3_CONTROL');" | & docker @demoArgs -N -B

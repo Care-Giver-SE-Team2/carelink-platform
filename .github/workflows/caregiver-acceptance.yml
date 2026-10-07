@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'backend/**'
+      - 'services/core/**'
       - 'frontend/**'
       - 'scripts/*caregiver*'
       - 'deploy/caregiver-demo/**'
@@ -31,7 +31,7 @@ jobs:
           java-version: '25'
           cache: maven
       - name: Unit, architecture and full real MySQL integration suite
-        working-directory: backend
+        working-directory: services/core
         run: ./mvnw -B -ntp clean verify -Pintegration
       - name: Retain test and coverage evidence
         if: always()
@@ -39,7 +39,7 @@ jobs:
         with:
           name: cg01-mysql-acceptance
           path: |
-            backend/target/surefire-reports/
-            backend/target/failsafe-reports/
-            backend/target/site/jacoco/
+            services/core/target/surefire-reports/
+            services/core/target/failsafe-reports/
+            services/core/target/site/jacoco/
           retention-days: 7

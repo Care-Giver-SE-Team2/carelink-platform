@@ -5,7 +5,7 @@
 -- NOT A FLYWAY MIGRATION (no V prefix), for the reasons given at the top of
 -- demo-seed.sql. Load it the same way:
 --
---   mysql -h127.0.0.1 -ucarelink -p carelink < backend/src/main/resources/db/demo/manager-applications.sql
+--   mysql -h127.0.0.1 -ucarelink -p carelink < services/core/src/main/resources/db/demo/manager-applications.sql
 --
 -- Five family applications waiting for an answer, submitted 3 hours to 4 days
 -- ago so the response countdown shows every state, and a spread of checks:

@@ -4,7 +4,7 @@ param([switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 $demoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $demoCompose = Join-Path $demoRoot 'deploy/caregiver-demo/compose.yml'
-$demoSeed = Join-Path $demoRoot 'backend/src/main/resources/db/demo/caregiver-slice1.sql'
+$demoSeed = Join-Path $demoRoot 'services/core/src/main/resources/db/demo/caregiver-slice1.sql'
 & docker info --format '{{.ServerVersion}}'
 if ($LASTEXITCODE -ne 0) { throw 'Start Docker Desktop (Linux containers), then try again.' }
 $demoArgs = @('compose', '--project-name', 'carelink-caregiver-demo', '-f', $demoCompose, 'up', '-d', '--wait', '--wait-timeout', '240')
