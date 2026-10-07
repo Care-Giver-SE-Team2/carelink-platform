@@ -1,0 +1,110 @@
+name: Service pipeline
+
+# The pipeline every service goes through. ci.yml calls it once for each service a commit
+# touched and passes only the service's name; the steps, and the scripts they run, are the
+# same for every service, so a new service gets the whole pipeline by existing.
+#
+#   1 Build  2 Tests  3 SonarCloud  4 Dependency scan  5 Image
+#
+# Steps 6 to 10 (push to ECR, which scans the image; deploy to staging; smoke test and ZAP
+# baseline scan; manual approval; deploy the same image to demo) are added here once the AWS
+# account and the cluster exist.
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: The service's directory name under services/
+        required: true
+        type: string
+    secrets:
+      SONAR_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  service:
+    name: Build, test, scan, image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write          # to publish scan findings to the Security tab
+    env:
+      SERVICE: ${{ inputs.service }}
+      IMAGE_TAG: ${{ github.sha }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0                # Sonar needs the full history to attribute code
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven                  # caching ~/.m2 keeps the build within minutes
+
+      - name: 1. Build
+        run: scripts/build.sh "$SERVICE" compile
+
+      # Unit tests, the ArchUnit layering rules and the MySQL integration tests
+      # (Testcontainers), so the coverage Sonar receives includes both kinds of test
+      - name: 2. Tests
+        run: scripts/build.sh "$SERVICE" test
+
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-${{ inputs.service }}
+          path: services/${{ inputs.service }}/target/site/jacoco/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # Static analysis shares this job with the build: a separate job would repeat it.
+      # One SonarCloud project per service, keyed <SONAR_PROJECT_PREFIX>_<service>.
+      - name: 3. SonarCloud analysis and quality gate
+        if: env.SONAR_TOKEN != ''
+        run: >
+          ./mvnw -B -ntp -f "services/$SERVICE/pom.xml" sonar:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.organization=${{ vars.SONAR_ORG }}
+          -Dsonar.projectKey=${{ vars.SONAR_PROJECT_PREFIX }}_${{ inputs.service }}
+          -Dsonar.qualitygate.wait=true
+
+      - name: 3. SonarCloud (not configured)
+        if: env.SONAR_TOKEN == ''
+        run: echo "::notice title=SonarCloud skipped::Add the SONAR_TOKEN secret and the SONAR_ORG and SONAR_PROJECT_PREFIX variables to turn the analysis on."
+
+      # Trivy rather than OWASP Dependency-Check: Dependency-Check rebuilds the whole NVD
+      # database on every stateless runner (hours); Trivy downloads a published one.
+      # Offline: Trivy reads the poms from the local Maven repository, which steps 1 and 2
+      # have just filled, instead of asking Maven Central for each one again. Central answers
+      # such bursts with 429 Too Many Requests, which would fail the scan at random.
+      - name: 4. Dependency scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          TRIVY_OFFLINE_SCAN: 'true'
+        with:
+          scan-type: fs
+          scan-ref: services/${{ inputs.service }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: 1                  # a HIGH or CRITICAL finding fails the pipeline
+          ignore-unfixed: true          # no fix available means nothing to act on today
+          format: sarif
+          output: trivy-${{ inputs.service }}.sarif
+
+      - name: Publish dependency findings to the Security tab
+        if: always() && hashFiles(format('trivy-{0}.sarif', inputs.service)) != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ inputs.service }}.sarif
+          category: trivy-${{ inputs.service }}
+
+      - name: 5. Image
+        run: scripts/build.sh "$SERVICE" image

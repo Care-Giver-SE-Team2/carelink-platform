@@ -1,0 +1,176 @@
+name: CI
+
+# The entry point of the pipeline. It works out which services a commit touched and runs the
+# shared service pipeline (service.yml) once for each of them. A change to anything the
+# services share (the parent pom, build/, charts/, libs/, docs/api/, the build script, these
+# two workflows) runs it for every service. The front end and the secret scan cover the whole
+# repository and run alongside.
+#
+# "Quality gate" is the one check branch protection requires: it passes when nothing that
+# ran has failed, however many services ran.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 18 * * *'              # 18:00 UTC = 02:00 Singapore: new CVEs in old dependencies
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      services: ${{ steps.pick.outputs.services }}
+      frontend: ${{ steps.pick.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Pick the services to build
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          all=$(for pom in services/*/pom.xml; do basename "$(dirname "$pom")"; done)
+          # No usable base commit (manual or nightly run, first push, force push): everything
+          if [ "$EVENT" = workflow_dispatch ] || [ "$EVENT" = schedule ] \
+             || ! git cat-file -e "${BASE:-none}^{commit}" 2>/dev/null; then
+            changed=$(git ls-files)
+          else
+            changed=$(git diff --name-only "$BASE" HEAD)
+          fi
+          shared='^(pom\.xml|mvnw|\.mvn/|build/|charts/|libs/|docs/api/|scripts/build\.sh|\.github/workflows/(ci|service)\.yml)'
+          if grep -qE "$shared" <<<"$changed"; then
+            picked=$all
+          else
+            picked=$(for s in $all; do grep -q "^services/$s/" <<<"$changed" && echo "$s"; done || true)
+          fi
+          services=$(printf '%s\n' "$picked" | jq -Rsc 'split("\n") | map(select(length > 0))')
+          frontend=$(grep -qE '^(frontend/|\.github/workflows/ci\.yml)' <<<"$changed" && echo true || echo false)
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "services: $services  front end: $frontend"
+
+  service:
+    name: Service
+    needs: changes
+    if: needs.changes.outputs.services != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/service.yml
+    with:
+      service: ${{ matrix.service }}
+    secrets: inherit
+
+  frontend:
+    name: Front end lint, unit tests, build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Unit tests with coverage
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0                # scan the history, not just the working tree
+
+      # The official image, run directly: the gitleaks Action needs a licence for
+      # organisation repositories
+      - name: gitleaks
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            zricethezav/gitleaks:latest detect \
+            --source=/repo --redact --verbose \
+            --report-format=sarif --report-path=/repo/gitleaks.sarif
+
+      - name: Keep the scan report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          retention-days: 7
+          if-no-files-found: ignore
+
+  gate:
+    name: Quality gate
+    needs: [changes, service, frontend, secret-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record the results
+        env:
+          SERVICES: ${{ needs.changes.outputs.services }}
+          SERVICE_RESULT: ${{ needs.service.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          SECRETS_RESULT: ${{ needs.secret-scan.result }}
+        run: |
+          {
+            echo "### Quality gate"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| Services $SERVICES | $SERVICE_RESULT |"
+            echo "| Front end | $FRONTEND_RESULT |"
+            echo "| Secret scanning | $SECRETS_RESULT |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if anything that ran failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
