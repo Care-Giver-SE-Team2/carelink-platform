@@ -1,5 +1,6 @@
 package sg.nus.carelink.incident.infrastructure.schedule;
 
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +27,7 @@ class EscalationScheduler {
 		this.scan = scan;
 	}
 
+	@SchedulerLock(name = "incident.escalation-sweep", lockAtMostFor = "PT5M", lockAtLeastFor = "PT50S")
 	@Scheduled(
 			fixedDelayString = "${carelink.escalation.scan-interval:PT60S}",
 			initialDelayString = "${carelink.escalation.scan-initial-delay:PT30S}")

@@ -1,0 +1,18 @@
+# Settings that make core run as one of several replicas. Spring Boot reads this file on top of
+# application.yml (classpath:/config/ comes after classpath:/), so the application's own settings
+# stay in application.yml and these stay here.
+#
+# The Redis address comes from the environment: SPRING_DATA_REDIS_HOST and SPRING_DATA_REDIS_PORT
+# (default localhost:6379). docker-compose.yml sets them for a local run; in the cluster the
+# deployment's environment does.
+spring:
+  data:
+    redis:
+      repositories:
+        # Redis holds sessions only; every repository in core is a JPA repository
+        enabled: false
+  session:
+    data:
+      redis:
+        # The same namespace in every service, so a login made through core is seen by all of them
+        namespace: carelink:session

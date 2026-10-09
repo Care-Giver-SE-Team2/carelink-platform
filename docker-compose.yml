@@ -55,10 +55,14 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
       DB_USER: carelink
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
+      # Logins are kept in Redis, so any replica can serve any signed-in user
+      SPRING_DATA_REDIS_HOST: redis
     ports:
       - "8080:8080"
     healthcheck:

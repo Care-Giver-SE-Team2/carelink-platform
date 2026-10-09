@@ -36,6 +36,7 @@
 		<dependency.check.version>13.0.0</dependency.check.version>
 		<sonar.version>5.7.0.6970</sonar.version>
 		<testcontainers.version>2.0.5</testcontainers.version>
+		<shedlock.version>7.10.1</shedlock.version>
 		<!--
 		  Security fixes that Spring Boot 4.1.1 does not manage yet. The dependency scan
 		  found fixable CRITICAL CVEs in Tomcat 11.0.24 and HIGH ones in Jackson 3.1.5;
@@ -83,6 +84,17 @@
 				<groupId>com.tngtech.archunit</groupId>
 				<artifactId>archunit-junit5</artifactId>
 				<version>${archunit.version}</version>
+			</dependency>
+			<!-- One replica at a time runs each scheduled job (see the services' SchedulerLocks) -->
+			<dependency>
+				<groupId>net.javacrumbs.shedlock</groupId>
+				<artifactId>shedlock-spring</artifactId>
+				<version>${shedlock.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>net.javacrumbs.shedlock</groupId>
+				<artifactId>shedlock-provider-jdbc-template</artifactId>
+				<version>${shedlock.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -53,6 +54,7 @@ class RosterScheduler {
 	 * Every minute by default: any visit that has reached its start time with nobody
 	 * assigned becomes an exception, with an incident in the manager's queue.
 	 */
+	@SchedulerLock(name = "rostering.uncovered-visits", lockAtMostFor = "PT5M", lockAtLeastFor = "PT50S")
 	@Scheduled(
 			fixedDelayString = "${carelink.roster.uncovered-scan-interval:PT60S}",
 			initialDelayString = "${carelink.roster.uncovered-scan-initial-delay:PT30S}")
@@ -76,6 +78,7 @@ class RosterScheduler {
 	 * Every 15 minutes by default: a visit on approved leave that starts within a day and is
 	 * still with the caregiver who is away gets an incident, once, so a manager re-rosters it.
 	 */
+	@SchedulerLock(name = "rostering.leave-reminders", lockAtMostFor = "PT15M", lockAtLeastFor = "PT14M")
 	@Scheduled(
 			fixedDelayString = "${carelink.roster.leave-reminder-interval:PT15M}",
 			initialDelayString = "${carelink.roster.leave-reminder-initial-delay:PT2M}")
@@ -95,6 +98,7 @@ class RosterScheduler {
 		}
 	}
 
+	@SchedulerLock(name = "rostering.nightly-refresh", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
 	@Scheduled(
 			cron = "${carelink.roster.schedule-cron:0 0 0 * * *}",
 			zone = "${carelink.roster.schedule-zone:Asia/Singapore}")
@@ -102,6 +106,7 @@ class RosterScheduler {
 		refreshAllElders();
 	}
 
+	@SchedulerLock(name = "rostering.nightly-refresh", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
 	@EventListener(ApplicationReadyEvent.class)
 	void catchUpOnStartup() {
 		refreshAllElders();
