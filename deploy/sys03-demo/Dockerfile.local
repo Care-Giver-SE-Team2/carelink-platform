@@ -1,4 +1,0 @@
-# Cached runtime fallback for the isolated Windows demo only.
-# Build backend and frontend into the jar first; CI uses the production Dockerfile.
-FROM carelink:caregiver-demo
-COPY --chown=1001:1001 backend/target/backend-0.0.1-SNAPSHOT.jar /app/app.jar

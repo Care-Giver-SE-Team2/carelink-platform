@@ -56,7 +56,7 @@ unfamiliar on purpose: it makes people look up what belongs there. Business rule
 ## 2. Layout
 
 ```
-backend/src/main/java/sg/nus/carelink/
+services/core/src/main/java/sg/nus/carelink/
 ├─ CareLinkApplication.java
 │
 ├─ shared/                   common concerns, owned by no single module
@@ -284,7 +284,7 @@ declared on the method with `@PreAuthorize("hasRole('MANAGER')")`.
 
 ## 5. The build enforces this
 
-`backend/src/test/java/sg/nus/carelink/architecture/LayerDependencyTest.java` (ArchUnit)
+`services/core/src/test/java/sg/nus/carelink/architecture/LayerDependencyTest.java` (ArchUnit)
 runs in the fast stage and takes seconds.
 
 | Rule | What it stops |
@@ -336,8 +336,8 @@ holds files from several authors, but no two people edit the same file.
 
 ## 7. In one sentence
 
-> Your code lives in four places: `backend/.../<your module>/`,
-> `backend/src/test/.../<your module>/`, `frontend/src/features/<your module>/`, and
+> Your code lives in four places: `services/core/.../<your module>/`,
+> `services/core/src/test/.../<your module>/`, `frontend/src/features/<your module>/`, and
 > `frontend/src/routes/<role>/<your page>.tsx`.
 >
 > Before touching `shared/` or changing the schema, say so in the group chat.

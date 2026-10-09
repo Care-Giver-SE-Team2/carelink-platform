@@ -1,5 +1,0 @@
-# Optional offline fallback. Requires a freshly built jar containing frontend/dist assets.
-services:
-  backend:
-    build:
-      dockerfile: deploy/sys03-demo/Dockerfile.local

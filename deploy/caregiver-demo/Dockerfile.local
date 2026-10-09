@@ -1,4 +1,0 @@
-# Offline fallback: rebuild the executable jar locally, preserving this cached runtime.
-# This is only for the isolated demo; CI still builds the normal production Dockerfile.
-FROM carelink:caregiver-demo
-COPY --chown=1001:1001 backend/target/backend-0.0.1-SNAPSHOT.jar /app/app.jar

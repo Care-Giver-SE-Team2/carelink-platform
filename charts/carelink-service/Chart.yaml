@@ -1,0 +1,5 @@
+apiVersion: v2
+name: carelink-service
+description: The chart every CareLink service is deployed with; a service supplies only its values file
+type: application
+version: 0.1.0

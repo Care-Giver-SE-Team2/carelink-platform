@@ -1,14 +1,15 @@
-**/node_modules
-**/target
-**/dist
-**/coverage
-.git
-.github
-# Design documents are not build inputs, except docs/api/, which the backend build
-# copies onto the classpath (see Dockerfile and backend/pom.xml). Anything new under
+# The build context of build/Dockerfile, written as an allow-list: only what the image build
+# reads is sent to Docker. Everything else (front end, charts, docs, .git) stays out.
+*
+!pom.xml
+!mvnw
+!.mvn/
+!services/
+!libs/
+!build/entrypoint.sh
+# docs/api/ is copied onto core's classpath (see services/core/pom.xml). Anything new under
 # docs/api/ is allowed through automatically; do not narrow this to single files.
-docs/**
-!docs/api/**
-*.md
-zap-out
-reports
+!docs/api/
+
+# Build output from a local build would otherwise be copied in with the sources
+**/target

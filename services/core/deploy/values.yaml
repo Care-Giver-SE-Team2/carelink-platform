@@ -1,0 +1,14 @@
+# core in the cluster. Anything not set here comes from charts/carelink-service/values.yaml.
+# Two replicas, one per availability zone, both behind the load balancer. core is not
+# autoscaled: its load is low and steady; the services split out of it are the ones that scale.
+replicaCount: 2
+
+autoscaling:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 768Mi
+  limits:
+    memory: 1Gi

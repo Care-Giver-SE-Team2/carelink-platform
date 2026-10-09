@@ -1,15 +1,26 @@
+# The local environment behind scripts/run.sh. The services run from the images
+# scripts/build.sh builds, the same images the cloud runs; the managed cloud services are
+# stood in for locally:
+#   mysql       RDS for MySQL
+#   redis       ElastiCache for Redis
+#   localstack  SQS and SNS
+# Passwords come from .env, which scripts/run.sh writes on first run and git ignores.
+#
+# A new service gets an entry like core's: its image, what it depends on, its settings.
+name: carelink
+
 services:
-  db:
+  mysql:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-devroot}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?run scripts/run.sh, which writes .env}
       MYSQL_DATABASE: carelink
       MYSQL_USER: carelink
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-devpass}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
     # Ping over TCP, not the socket: while MySQL initialises it runs a temporary
     # server that answers on the socket only, so a socket ping reports "healthy"
-    # seconds before the real server accepts connections and the backend then
-    # dies with "Communications link failure" (seen once in the pipeline).
+    # seconds before the real server accepts connections and the service then
+    # dies with "Communications link failure".
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --protocol=tcp -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 5s
@@ -17,36 +28,45 @@ services:
       retries: 24
       start_period: 20s
     volumes:
-      - carelink-db-data:/var/lib/mysql
-    networks: [carelink]
+      - mysql-data:/var/lib/mysql
 
-  backend:
-    # Builds locally by default. In CI, CARELINK_IMAGE names the image the pipeline
-    # already built, so every environment deploys the same artefact and nothing is
-    # rebuilt at deployment time.
-    image: ${CARELINK_IMAGE:-carelink:local}
-    build:
-      context: .
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  localstack:
+    # Pinned: 4.14.0 is the last image that starts without a LocalStack account. Later
+    # images exit at start-up unless LOCALSTACK_AUTH_TOKEN is set.
+    image: localstack/localstack:4.14.0
+    environment:
+      SERVICES: sqs,sns
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  core:
+    image: ${IMAGE_PREFIX:-carelink}/core:${IMAGE_TAG:-local}
     depends_on:
-      db:
+      mysql:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:mysql://db:3306/carelink?connectionTimeZone=Asia/Singapore
+      DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
       DB_USER: carelink
-      DB_PASSWORD: ${MYSQL_PASSWORD:-devpass}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
       interval: 5s
       timeout: 3s
-      retries: 30
-    networks: [carelink]
-
-# The network name is fixed so ZAP can join the same network by a known name
-networks:
-  carelink:
-    name: carelink-net
+      retries: 60
+      start_period: 20s
 
 volumes:
-  carelink-db-data:
+  mysql-data:

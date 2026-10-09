@@ -1,8 +1,0 @@
-[Unit]
-Description=CareLink: pull the staging image and roll the stack if it changed
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/opt/carelink/carelink-update.sh

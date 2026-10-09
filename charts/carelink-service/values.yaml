@@ -1,0 +1,51 @@
+# Defaults for every service. A service overrides only what differs, in its own
+# services/<name>/deploy/values.yaml; scripts/deploy.sh sets image.repository and image.tag.
+# A change to these defaults or to the templates reaches every service, so it goes through review.
+
+image:
+  repository: ""   # <ECR registry>/carelink/<service>, set by scripts/deploy.sh
+  tag: ""          # the commit the image was built from, set by scripts/deploy.sh
+  pullPolicy: IfNotPresent
+
+# Two replicas, spread over the two availability zones (topologySpreadConstraints in
+# templates/deployment.yaml), so losing one node or one zone leaves the service running.
+replicaCount: 2
+
+# Horizontal Pod Autoscaler on CPU. While it is on, it owns the replica count.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 768Mi
+  limits:
+    memory: 1Gi
+
+# Settings for the service as environment variables (NAME: value). Secrets never go here:
+# envFromSecret names a Kubernetes Secret whose keys become environment variables.
+env: {}
+envFromSecret: ""
+
+containerPort: 8080
+
+# Spring Boot's own probe groups
+probes:
+  liveness: /actuator/health/liveness
+  readiness: /actuator/health/readiness
+  # Allowance for a cold start (Flyway, then Spring): startupFailureThreshold x 5 s
+  startupFailureThreshold: 36
+
+# A node drain or a cluster upgrade never takes away the last running replica. Rendered only
+# when the service runs more than one replica; with one, a drain could never finish.
+podDisruptionBudget:
+  minAvailable: 1
+
+shutdown:
+  # Keep serving while the load balancer stops sending new requests to the pod
+  preStopSeconds: 10
+  # Must exceed preStopSeconds plus the graceful shutdown in build/entrypoint.sh (20 s)
+  terminationGracePeriodSeconds: 40
