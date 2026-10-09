@@ -8,12 +8,12 @@
 -- elders (Lim Boon Huat, Tan Siew Lan), its caregivers (demo-fam-cg-ming,
 -- demo-fam-cg-siti) and its visits. Then:
 --
---   mysql -h127.0.0.1 -ucarelink -pcarelink carelink < backend/src/main/resources/db/demo/family-changes-spot-checks.sql
+--   mysql -h127.0.0.1 -ucarelink -pcarelink carelink < services/core/src/main/resources/db/demo/family-changes-spot-checks.sql
 --
 -- or, against the compose database:
 --
 --   docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" carelink' \
---       < backend/src/main/resources/db/demo/family-changes-spot-checks.sql
+--       < services/core/src/main/resources/db/demo/family-changes-spot-checks.sql
 --
 -- Sign in as demo-fam-wei (Demo#2026) and open Visit changes and Spot checks.
 --

@@ -7,12 +7,12 @@
 -- backend has started once (so Flyway has built the schema):
 --
 --   docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" carelink' \
---       < backend/src/main/resources/db/demo/family-portal.sql
+--       < services/core/src/main/resources/db/demo/family-portal.sql
 --
 -- If the backend runs from ./mvnw against a MySQL installed on this machine
 -- (application.yml's default localhost:3306), load it there instead:
 --
---   mysql -h127.0.0.1 -ucarelink -pcarelink carelink < backend/src/main/resources/db/demo/family-portal.sql
+--   mysql -h127.0.0.1 -ucarelink -pcarelink carelink < services/core/src/main/resources/db/demo/family-portal.sql
 --
 -- Every account below shares the demo password  Demo#2026  (bcrypt, as in
 -- demo-seed.sql). Sign in from the landing page; FAMILY accounts land on /family.

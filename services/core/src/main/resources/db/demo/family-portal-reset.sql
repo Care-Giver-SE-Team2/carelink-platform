@@ -7,12 +7,12 @@
 -- to rebuild them around today:
 --
 --   docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" carelink' \
---       < backend/src/main/resources/db/demo/family-portal-reset.sql
+--       < services/core/src/main/resources/db/demo/family-portal-reset.sql
 --
 -- If the backend runs from ./mvnw against a MySQL installed on this machine
 -- (application.yml's default localhost:3306), load it there instead:
 --
---   mysql -h127.0.0.1 -ucarelink -pcarelink carelink < backend/src/main/resources/db/demo/family-portal-reset.sql
+--   mysql -h127.0.0.1 -ucarelink -pcarelink carelink < services/core/src/main/resources/db/demo/family-portal-reset.sql
 --
 -- Removes only the visits (and what hangs off them), reports and caregiver
 -- credentials belonging to the two demo elders and two demo caregivers.
