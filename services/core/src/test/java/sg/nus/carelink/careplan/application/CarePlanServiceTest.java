@@ -2,6 +2,7 @@ package sg.nus.carelink.careplan.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,6 +48,21 @@ class CarePlanServiceTest {
 	@Test
 	void isEmptyForAnUnknownId() {
 		assertThat(service.findCarePlan(999L)).isEmpty();
+	}
+
+	@Test
+	void listsAnEldersVersionsNewestFirst() {
+		CarePlan first = service.createDraft(42L, 7L);
+		service.publish(first.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
+				null, "Vital-sign check", List.of(new VisitInput("Mon", EIGHT, 15)), CarePlanNode.EvidenceType.READING)));
+		service.createDraft(42L, 7L);
+		service.createDraft(43L, 7L);
+
+		assertThat(service.findVersions(42L))
+				.extracting(CarePlan::version, CarePlan::status)
+				.containsExactly(
+						tuple(2, CarePlan.Status.DRAFT),
+						tuple(1, CarePlan.Status.PUBLISHED));
 	}
 
 	@Test

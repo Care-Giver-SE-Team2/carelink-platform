@@ -4,7 +4,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 150px repeat(var(--hours), minmax(0, 1fr));
+  grid-template-columns: 150px repeat(var(--slots), minmax(0, 1fr));
   border-bottom: 1px solid var(--text);
 }
 
@@ -34,8 +34,15 @@
   color: var(--text-faint);
 }
 
-.cover {
-  color: var(--accent);
+/* Approved leave: the day's hours are hatched. */
+.onLeave {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--border-light) 6px 7px);
+}
+
+.leave {
+  display: inline-block;
+  margin-top: 4px;
+  text-decoration: none;
 }
 
 .hour {

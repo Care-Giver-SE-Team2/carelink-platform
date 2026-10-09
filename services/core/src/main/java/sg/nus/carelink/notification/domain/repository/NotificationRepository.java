@@ -6,8 +6,8 @@ import sg.nus.carelink.notification.domain.model.Notification;
 
 /**
  * Port for notification: what the application layer may ask of storage, in domain terms.
- * Implemented by infrastructure.persistence.adapter.NotificationRepositoryAdapter. Add finders as
- * the use cases need them; identity.domain.repository.AppUserRepository is the template.
+ * Implemented by infrastructure.persistence.adapter.NotificationRepositoryAdapter. The inbox,
+ * which reads across other modules' tables, has its own port, NotificationInbox.
  */
 public interface NotificationRepository {
 

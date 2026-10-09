@@ -1,0 +1,27 @@
+.page {
+  composes: page from '../components/FamilyScreen.module.css';
+  display: grid;
+  gap: 20px;
+}
+.band { composes: band from '../components/FamilyScreen.module.css'; }
+.band h1, .band p { margin: 0; }
+.eyebrow { color: var(--fm-accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.card { padding: 20px; border: 1px solid var(--fm-line-card); border-radius: 18px; background: var(--fm-card); display: grid; gap: 14px; }
+.card h2 { margin: 0; }
+.request { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--fm-line-row); }
+.request:first-of-type { border-top: 0; }
+.request p { margin: 4px 0 0; }
+dl { display: grid; gap: 6px; margin: 0; }
+dl div { display: flex; justify-content: space-between; gap: 16px; }
+dt { color: var(--fm-muted); } dd { margin: 0; font-weight: 700; text-align: right; }
+.actions { display: flex; gap: 10px; }
+.actions button { min-height: 42px; padding: 8px 16px; border-radius: 12px; border: 1px solid var(--fm-accent); background: var(--fm-accent); color: white; font-weight: 750; }
+.actions .reject { background: white; color: #a12828; border-color: #c66; }
+.error { padding: 14px; border: 1px solid #c66; border-radius: 14px; background: #fff3f3; color: #8b1d1d; }
+.muted { color: var(--fm-muted); }
+/* Desktop: the single 640px column sits centred under the header, not against the rail. */
+@media (min-width: 900px) { .page > :not(.band) { width: 100%; margin-inline: auto; } }
+.form { display: grid; gap: 12px; }
+.form label { display: grid; gap: 6px; font-weight: 700; }
+.form select, .form input, .form textarea { min-height: 42px; padding: 8px 12px; border: 1px solid var(--fm-line-card); border-radius: 12px; font: inherit; font-weight: 400; }
+.form textarea { min-height: 84px; resize: vertical; }

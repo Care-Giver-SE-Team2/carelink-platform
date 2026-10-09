@@ -1,23 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Link, Navigate } from 'react-router-dom'
 import { ApiError } from '../../../shared/api/client'
-import { FamilySignIn } from '../components/FamilySignIn'
 import styles from './IntakeForm.module.css'
 
 /**
- * Explains submission failures and offers sign-in or a separate list check.
+ * Explains submission failures and offers a separate list check. A lost session returns to the
+ * landing page, the only sign-in screen.
  * @param failure Failed request and whether the application POST was started
- * @param onSignedIn Clears the error without submitting the application again
  * @author Wang Zhili
  */
 export function IntakeSubmissionFeedback({
   failure,
-  onSignedIn,
 }: {
   failure: { error: unknown; sent: boolean }
-  onSignedIn: () => void
 }) {
-  const [signIn, setSignIn] = useState(false)
   const summary = useRef<HTMLDivElement>(null)
   useEffect(() => {
     summary.current?.focus()
@@ -30,9 +26,8 @@ export function IntakeSubmissionFeedback({
   const alreadyApplied = status === 409 && conflictCode(failure.error) === 'APPLICATION_ALREADY_SUBMITTED'
   const alreadyRegistered = status === 409 && !alreadyApplied
   const uncertain = failure.sent && !session && !permission && !validation && status !== 409
-  const title = session
-    ? 'Sign in to submit'
-    : permission
+  if (session) return <Navigate to="/" replace />
+  const title = permission
       ? 'Submission not permitted'
       : alreadyApplied
         ? 'Application already submitted'
@@ -43,9 +38,7 @@ export function IntakeSubmissionFeedback({
             : validation
               ? 'Check your application'
               : 'Unable to prepare submission'
-  const message = session
-    ? 'Your session has ended. Sign in, review your entries and submit again. Your entries are still in this form.'
-    : permission
+  const message = permission
       ? 'Your session protection or family permissions may have changed. Sign in again, or contact your care team. Your entries have been kept.'
       : alreadyApplied
         ? 'You already have an application for this person waiting for review, so this one was not sent. You can follow its progress in your applications.'
@@ -68,9 +61,8 @@ export function IntakeSubmissionFeedback({
             Check my applications (new tab)
           </Link>
         )}
-        {permission && !signIn && <button onClick={() => setSignIn(true)}>Sign in again</button>}
+        {permission && <Link to="/">Sign in again</Link>}
       </div>
-      {(session || signIn) && <FamilySignIn onSignedIn={onSignedIn} />}
     </div>
   )
 }

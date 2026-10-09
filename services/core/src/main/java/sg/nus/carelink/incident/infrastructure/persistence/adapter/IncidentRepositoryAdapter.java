@@ -50,6 +50,12 @@ class IncidentRepositoryAdapter implements IncidentRepository {
 		return jpa.findById(id).map(IncidentMapper::toDomain);
 	}
 
+    @Override
+    public PageSlice<Incident> findCaregiverReports(Long actor, Long visit, int page, int size) {
+        var rows = jpa.findCaregiverReports(actor, IncidentJpaEntity.Source.CAREGIVER, visit, PageRequest.of(page, size));
+        return new PageSlice<>(rows.getContent().stream().map(IncidentMapper::toDomain).toList(), page, size, rows.getTotalElements());
+    }
+
 	@Override
 	public Incident save(Incident incident) {
 		return IncidentMapper.toDomain(jpa.save(IncidentMapper.toEntity(incident)));

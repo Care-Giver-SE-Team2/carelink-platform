@@ -43,6 +43,360 @@ tags:
   - name: Spot checks
     description: Home service spot checks with the family's consent and the caregiver's answer (UC-MG08, with the former UC-FM07).
 paths:
+  /family/service-applications:
+    post:
+      tags: [Intake]
+      summary: Apply for care services for an already-bound elder (FM01)
+      operationId: submitFamilyServiceApplication
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        Requires CSRF, an enabled FAMILY account and a current ACTIVE, unexpired FULL binding.
+        The session determines the applicant. The server loads the existing elder and copies only
+        basic details into an immutable snapshot; the caller cannot supply ownership, snapshot,
+        review state or timestamps. Full name, home address and a six-digit postal code must be
+        saved in My elders first. Other profile fields remain optional and are copied as recorded.
+        At least one service need is required. Service text is trimmed and exact duplicates removed.
+        Supports BATHING, VITALS and other described needs, as in the existing family form.
+        Each accepted POST creates a distinct SUBMITTED request in care_service_application.
+        Does not create an elder, account or care plan and is not consumed by the legacy intake approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FamilyServiceApplicationCreate'}
+            example: {elderId: 1, careNeeds: [BATHING, VITALS], notes: 'Morning visits preferred.'}
+      responses:
+        '201':
+          description: Transaction committed; the application is submitted and awaiting review.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FamilyServiceApplication'}
+        '400': {description: Invalid JSON types, unexpected fields or invalid input limits.}
+        '401': {description: Authentication required.}
+        '403': {description: CSRF failure, disabled family account or no current FULL binding.}
+        '404': {description: Elder profile missing.}
+        '409': {description: 'ELDER_PROFILE_INCOMPLETE; complete the saved name, address and six-digit postal code first.'}
+        '500': {description: Persistence failed; submission success is not reported.}
+    get:
+      tags: [Intake]
+      summary: List the current family's readable service applications
+      operationId: listFamilyServiceApplications
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        Both applicant ownership and current readable elder bindings are applied before counting
+        and pagination. FULL and READ_ONLY may read; revoked, rejected, pending or expired bindings
+        cannot expose saved snapshots. Sorted by createdAt descending, then id descending.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 0, maximum: 2147483647, default: 0}}
+        - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        '200':
+          description: Owned applications with current read access; empty when none match.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FamilyServiceApplicationPage'}
+        '400': {description: Invalid pagination.}
+        '401': {description: Authentication required.}
+        '403': {description: Enabled family account and profile required.}
+  /family/service-applications/{id}:
+    get:
+      tags: [Intake]
+      summary: Read an owned service application and its original profile snapshot
+      operationId: getFamilyServiceApplication
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      description: >-
+        Requires applicant ownership and a current readable binding to this elder. A later change
+        to the elder's profile does not rewrite the submitted snapshot. Another family cannot read
+        this application even if they are also bound to the same elder.
+      responses:
+        '200':
+          description: Original submitted data, including an explicit UTC creation timestamp.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FamilyServiceApplication'}
+        '401': {description: Authentication required.}
+        '403': {description: Current readable binding or enabled family account unavailable.}
+        '404': {description: Application missing or owned by another family.}
+  /family/elders:
+    get:
+      tags: [Elders]
+      summary: List the family's currently bound elders and basic details
+      operationId: listFamilyElderProfiles
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        Enabled FAMILY account required. Only ACTIVE, unexpired FULL or READ_ONLY bindings are included.
+        Returns basic profiles in elder ID order; account IDs and internal clinical/care fields are excluded.
+      responses:
+        '200':
+          description: Bound elder profiles; an empty array when none are readable.
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/FamilyElderProfile'}}
+        '401': {description: Authentication required.}
+        '403': {description: Enabled family account and family profile required.}
+  /family/elders/{elderId}:
+    parameters:
+      - {name: elderId, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+    get:
+      tags: [Elders]
+      summary: Read basic details of a currently bound elder
+      operationId: getFamilyElderProfile
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Basic details with the current binding access scope.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FamilyElderProfile'}
+        '401': {description: Authentication required.}
+        '403': {description: No current readable binding or enabled family account.}
+        '404': {description: Elder profile missing.}
+    put:
+      tags: [Elders]
+      summary: Maintain basic details of an elder with a FULL binding
+      operationId: updateFamilyElderProfile
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        Requires CSRF and a current ACTIVE, unexpired FULL binding, rechecked on every save.
+        Replaces only the listed basic details; omitted/null optional fields are cleared and blank text
+        is normalized to null. A name is required, other details may be completed gradually.
+        Never creates an elder, login or binding. Account linkage, medical notes, sector,
+        continuity preference and care plans are not editable. Address changes do not reassign
+        service sectors or existing visits; service coverage remains a manager responsibility.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FamilyElderBasicDetails'}
+      responses:
+        '200':
+          description: Saved basic details and current access scope.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FamilyElderProfile'}
+        '400': {description: Invalid name, field length, date, postcode or enum value.}
+        '401': {description: Authentication required.}
+        '403': {description: CSRF failure or no current writable FULL binding.}
+        '404': {description: Elder profile missing; no record is created.}
+  /incidents:
+    post:
+      tags: [Incidents]
+      summary: Submit a caregiver incident report (CG04)
+      operationId: reportCaregiverIncident
+      x-status: implemented
+      x-implemented-roles: [CAREGIVER]
+      security: [{sessionCookie: []}]
+      description: >-
+        Requires CSRF. Actor and elder are derived from the authenticated caregiver and current visit assignment.
+        Open work pauses to EXCEPTION; terminal visits retain their state. SCHEDULED reports require the start
+        time to have been reached. A UUID identifies one immutable command; equal retries return the original
+        report without new notifications. Receipt status is read live; visitVersion identifies the original write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaregiverIncidentCommand'}
+      responses:
+        '201':
+          description: Report created and routed through MG05 in the same transaction.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverIncidentResult'}
+        '200':
+          description: An identical successful command replayed; no additional business effects.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverIncidentResult'}
+        '400': {description: Invalid request body.}
+        '401': {description: Authentication required.}
+        '403': {description: 'Wrong role, CSRF failure or no longer assigned.'}
+        '404': {description: Visit not found.}
+        '409': {description: State/version/command conflict; refresh before creating a different command.}
+        '503': {description: Storage unavailable; reconcile saved results before retrying the same command.}
+  /caregivers/me/incidents:
+    get:
+      tags: [Caregivers, Incidents]
+      summary: Read reports submitted by this caregiver account
+      operationId: getOwnCaregiverIncidentReports
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: Only source CAREGIVER and reportedByUserId equal to the session account; historical ownership survives visit reassignment. Sorted reportedAt/id descending.
+      parameters:
+        - {name: visitId, in: query, schema: {type: integer, format: int64, minimum: 1}}
+        - {name: page, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        '200':
+          description: Safe own-report page, never a manager queue.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/CaregiverIncidentView'}}
+                  page: {type: integer}
+                  size: {type: integer}
+                  totalElements: {type: integer, format: int64}
+        '400': {description: Invalid page or visit filter.}
+        '401': {description: Authentication required.}
+        '403': {description: Enabled caregiver account required.}
+  /caregivers/me/incidents/{id}:
+    get:
+      tags: [Caregivers, Incidents]
+      summary: Read a safe receipt for an incident this account reported
+      operationId: getOwnCaregiverIncidentReport
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64}}
+      responses:
+        '200':
+          description: Own report with live incident status, no responder identities or internal logs.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverIncidentView'}
+        '401': {description: Authentication required.}
+        '403': {description: Enabled caregiver account required.}
+        '404': {description: Missing or not submitted by this account; same unavailable response.}
+  /visits/{visitId}/health-records:
+    parameters:
+      - $ref: '#/components/parameters/VisitId'
+    post:
+      tags: [Visits]
+      summary: Record measured vital signs and a caregiver health observation (CG03)
+      operationId: recordCaregiverHealth
+      x-status: implemented
+      x-implemented-roles: [CAREGIVER]
+      security: [{sessionCookie: []}]
+      description: >-
+        Requires CSRF, current assignment, a checked-in IN_PROGRESS visit and expectedVersion.
+        Saves one immutable batch, all supplied readings, the latest visit health summary, a parent
+        version increment and command receipt in one transaction. Blood pressure values are paired;
+        pulse and temperature may be absent. If no readings were measured, explain why in healthNote.
+        ATTENTION and MEDICAL_REVIEW require a note. Units, actor and Singapore recording time are
+        server-selected. Replays retain the original key and payload and do not append readings.
+        Normalise equal numeric values, including temperature 36.7/36.70, to the same command.
+        No clinical threshold evaluation, incident notification, check-out or completion is implied.
+        A valid original receipt may be replayed after the visit pauses, while assignment remains valid.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaregiverHealthCommand'}
+      responses:
+        '201':
+          description: Measurement and observation saved atomically.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverHealthResult'}
+        '200':
+          description: Original successful command replayed without further writes.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverHealthResult'}
+        '400': {description: Invalid measurement format or incomplete observation.}
+        '401': {description: Authentication required.}
+        '403': {description: Wrong role, assignment or CSRF token.}
+        '404': {description: Visit not found.}
+        '409': {description: State, version or command key conflict.}
+        '503': {description: Storage unavailable; check saved results before retrying the original command.}
+    get:
+      tags: [Visits]
+      summary: Read current-assignment health history
+      operationId: getCaregiverHealthHistory
+      x-status: implemented
+      x-implemented-roles: [CAREGIVER]
+      security: [{sessionCookie: []}]
+      description: >-
+        Current assigned caregiver only; cancelled visits are unavailable. Newest recordedAt/id first.
+        Includes only real batches recorded since V20, not legacy demo readings without a batch.
+        Does not expose recording staff IDs, command hashes or internal audit entries.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+        - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 10}}
+      responses:
+        '200':
+          description: Assigned visit's paged health records.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverHealthPage'}
+        '400': {description: Invalid pagination.}
+        '401': {description: Authentication required.}
+        '403': {description: Wrong role or not currently assigned.}
+        '404': {description: Visit not found.}
+        '409': {description: Visit cancelled.}
+  /visits/{visitId}/check-in:
+    parameters:
+      - $ref: '#/components/parameters/VisitId'
+    post:
+      tags: [Visits]
+      summary: Record arrival and start assigned service (CG03 basics)
+      operationId: caregiverVisitCheckIn
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        CAREGIVER only, CSRF required. Within configured early arrival (default 30 minutes) through scheduledEnd
+        or Singapore day end. One transaction initializes only assigned plan-version tasks and records two APPLIED
+        transitions SCHEDULED to ARRIVED to IN_PROGRESS. checkedInAt is server time. Manual location is explicitly
+        unverified; GPS is device-supplied and no geofence is applied. No check-out or SYS03 scheduler is implemented.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaregiverCheckInCommand'}
+      responses:
+        '200':
+          description: Saved command result, or original result on identical replay; reload work-pack for current state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverExecutionResult'}
+        '400': {description: Invalid location or command fields.}
+        '401': {description: Authentication required.}
+        '403': {description: 'CSRF, role or current assignment rejected.'}
+        '404': {description: Visit not found.}
+        '409': {description: 'Window, plan, state, version or command conflict. Authorized rejected state attempts are logged.'}
+        '503': {description: Storage unavailable; check results before retry.}
+  /visits/{visitId}/tasks/{taskId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/VisitId'
+      - {name: taskId, in: path, required: true, schema: {type: integer, format: int64}}
+    post:
+      tags: [Visits]
+      summary: Record an assigned task result (CG03 basics)
+      operationId: caregiverVisitTaskResult
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        CAREGIVER only, CSRF required, current assignment and IN_PROGRESS required. PENDING can become DONE,
+        SKIPPED or REFUSED once. Only DONE sets completedAt and counts as completed; other results require a
+        factual reason and retain null completedAt. Every write advances the parent Visit version. No task result
+        completes the Visit. Identical successful commands replay without new timestamps; parent/task ownership
+        is checked server-side, not selected through a client projection parameter.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaregiverTaskResultCommand'}
+      responses:
+        '200':
+          description: Original successful command result; reload tasks/work-pack for current state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverExecutionResult'}
+        '400': {description: Invalid result or missing reason.}
+        '401': {description: Authentication required.}
+        '403': {description: 'Role, CSRF or assignment rejected.'}
+        '404': {description: Visit or task not found in this visit.}
+        '409': {description: 'State, version, task terminal result or command conflict.'}
+        '503': {description: Storage unavailable; check results before retry.}
   /caregivers/me:
     get:
       tags: [Caregivers]
@@ -97,7 +451,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/CaregiverSchedule'}
-        '400': {description: Invalid, partial, reversed or over-31-day date range.}
+        '400': {description: 'Invalid, partial, reversed or over-31-day date range.'}
         '401': {description: No authenticated session.}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -1086,12 +1440,12 @@ paths:
       tags:
       - Visits
       summary: List visit tasks for the current role
-      x-status: draft
+      x-status: implemented
       x-family-status: implemented
-      x-implemented-roles: [FAMILY]
+      x-implemented-roles: [FAMILY, CAREGIVER]
       description: >-
-        Implemented for FAMILY only. The caregiver task projection remains specified but unimplemented
-        on this endpoint; other roles currently receive 403. The existing caregiver work-pack is separate.
+        Implemented for FAMILY and CAREGIVER. Caregivers read their currently assigned work-pack task projection;
+        cancelled visits are unavailable. Other roles receive 403. FAMILY retains its existing field whitelist.
         Each family request independently validates the visit's actual elder and current binding before
         reading its tasks, even when the task list is empty. An absent visit returns 404; an existing visit
         outside current family access returns 403; invalid visit ID syntax returns 400. Access outcomes
@@ -1124,8 +1478,8 @@ paths:
         '200':
           description: >-
             The implemented FAMILY response contains FamilyVisitTaskView items in task ID order.
-            The original VisitTask array remains specified for caregivers, whose implementation on this
-            endpoint is pending. Client role or projection parameters cannot select internal fields.
+            CAREGIVER receives VisitTask items after current assignment checks.
+            Client role or projection parameters cannot select internal fields.
           content:
             application/json:
               schema:
@@ -1252,6 +1606,54 @@ paths:
         elder care record.
       x-family-response-schema:
         $ref: '#/components/schemas/FamilyReportPage'
+  /reports/generate:
+    post:
+      tags:
+        - Reports
+      summary: Generate a period's reports (UC-MG07)
+      x-status: implemented
+      x-implemented-roles: [MANAGER]
+      operationId: generateReports
+      description: >-
+        One run reads an elder's period once, stores it as the run's basis (facts and numbers),
+        and files three versions assembled from it - FAMILY, REGULATOR and INTERNAL - with the
+        same sections in the same order and each reader's own filtering rules. Omit elderId for
+        every elder with a visit in the period, which is what the weekly schedule does. A period
+        already on file is returned as it is (idempotent), never generated again. Unclosed visits
+        do not block generation: the reports say dataComplete false and name each gap (2a).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [periodStart, periodEnd]
+              properties:
+                elderId:
+                  type: integer
+                  format: int64
+                  description: One elder; omit for every elder with a visit in the period.
+                periodStart:
+                  type: string
+                  format: date
+                periodEnd:
+                  type: string
+                  format: date
+      responses:
+        '202':
+          description: Every report now on file for the period, three per elder, FAMILY first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Report'
+        '400':
+          description: A period that ends before it starts, or a missing date.
+        '404':
+          description: The elder does not exist.
+      security:
+        - sessionCookie: []
   /reports/{id}:
     parameters:
       - name: id
@@ -1329,6 +1731,55 @@ paths:
       operationId: getReport
       x-family-response-schema:
         $ref: '#/components/schemas/FamilyReportDetail'
+  /reports/{id}/amendments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    post:
+      tags:
+        - Reports
+      summary: Append a correction or a follow-up to a filed report (UC-MG07 5a)
+      x-status: implemented
+      x-implemented-roles: [MANAGER]
+      operationId: appendReportAmendment
+      description: >-
+        The only change a filed report accepts. The report's own text is never edited; the note is
+        stored beside it, dated and signed. A CORRECTION says the report was wrong or missing
+        something; a FOLLOW_UP records what was done about something it reported. A note sent
+        without a kind is a correction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                kind:
+                  $ref: '#/components/schemas/ReportAmendmentKind'
+      responses:
+        '201':
+          description: The stored note.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportAmendment'
+        '400':
+          description: An empty note, one over 1000 characters, or a kind that does not exist.
+        '404':
+          description: The report does not exist.
+        '409':
+          description: The note breaks a rule of the report (code REPORT_AMENDMENT_NOTE_REQUIRED or REPORT_AMENDMENT_TOO_LONG).
+      security:
+        - sessionCookie: []
   /reports/{id}/export:
     parameters:
       - name: id
@@ -1497,53 +1948,14 @@ paths:
         Who reported it, who responded, every notification attempt, and when the bound family member
         acknowledged it — this is the query that replaces the three-day chat-log reconstruction.
 
-
-
-        For FAMILY, authorise access using the authenticated family identity, an ACTIVE and unexpired
-        binding to the actual incident elder, and the applicable access scope. Derive the current
-        familyMemberId from the session; the caller cannot choose another family member. The existence,
-        delivery success or read state of a notification is not an authorisation condition. An otherwise
-        authorised family member may read the incident and record their own view or acknowledgement even
-        if no IN_APP notification exists or notification creation/delivery failed. Urgent alerts cannot
-        be disabled through optional subscription preferences; that rule never overrides binding/access
-        checks. The response window starts with the first successful urgent IN_APP notification creation
-        for this incident/recipient and uses the configured interval (default two hours); further
-        notices, polling and email retries do not reset it. GET /incidents/{id} returns acknowledgeBy,
-        which is null when no response window has been established. A missing or failed notification
-        does not block reading, viewing or acknowledging the incident. Later notification creation must
-        preserve any already-recorded acknowledgement and must not restart waiting reminders for that
-        family member. This recipient window is independent of manager incident status, respondBy and
-        escalation. A family response contains safe incident facts, handling status and only the current
-        family member's acknowledgement. Exclude raw coordinates, playbook, internal logs,
-        responder/reporter user IDs and other recipients' acknowledgements. A GET is an access audit
-        event, not proof of an explicit view or acknowledgement. The family page records a successful
-        display with POST /incidents/{id}/view. Authorised non-family roles retain the full original
-        incident timeline.
-
-
-        Family callers are identified from the authenticated session, never a caller-supplied
-        familyMemberId. For family callers, care resources require an ACTIVE binding to their actual
-        elder, with no revocation and no elapsed expiresAt, and the applicable access scope at request
-        time. Revocation/expiry takes effect on subsequent reads and writes, including historical
-        content. Reading a family care resource records the caller, resource and server access time in
-        the internal audit trail. Read access alone does not imply explicit acknowledgement.
-        FULL/READ_ONLY do not imply different clinical field sets: both may use the family read
-        projections below; an authorised family member may record their own incident
-        view/acknowledgement under either scope because those commands record that family member's
-        response, not a change to the elder care record. Notification read commands separately require
-        ownership of the notification; no notification record is required for these incident operations.
+        Family reads use GET /family/incidents/{id}; this endpoint remains MANAGER-only.
       responses:
         '200':
-          description: >-
-            Family response uses the explicitly listed family schema. Other roles retain the original
-            response schema; the server chooses by authenticated role, never by a client projection
-            flag.
+          description: The manager incident detail and full handling timeline.
           content:
             application/json:
               schema:
-                anyOf:
-                  - $ref: '#/components/schemas/FamilyIncidentDetail'
-                  - $ref: '#/components/schemas/IncidentDetail'
+                $ref: '#/components/schemas/IncidentDetail'
         '401':
           $ref: '#/components/responses/FamilyUnauthorized'
         '403':
@@ -1551,12 +1963,68 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
       x-contract-status: specified
-      x-family-use-cases:
-        - UC-FM05
-      x-family-owner: Member 4 (FM01-FM05 behaviour); source data remains with its assigned owner.
       security:
         - sessionCookie: []
       operationId: getIncident
+  /family/incidents/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    get:
+      tags:
+        - Incidents
+      summary: Get the current family's safe incident detail
+      operationId: getFamilyIncident
+      x-status: implemented
+      x-implemented-roles: [FAMILY]
+      x-family-status: implemented
+      x-contract-status: specified
+      x-family-use-cases: [UC-FM05]
+      x-family-owner: Member 4 (FM01-FM05 behaviour); source data remains with its assigned owner.
+      security:
+        - sessionCookie: []
+      description: >-
+        UC-FM05. Resolve the current family profile from an enabled account with the current
+        FAMILY role. Require an ACTIVE, unexpired binding to the actual incident elder.
+        FULL and READ_ONLY both permit this read. Recheck authorization on every request;
+        client familyMemberId, elderId or projection parameters cannot select another identity
+        or override the incident's elder. A notification is not required for access.
+        Return safe incident facts, global handling status and only this family's receipt;
+        exclude raw coordinates, location text, staff account IDs, playbook, internal timeline
+        and other family receipts. Times include the Singapore +08:00 offset.
+        A missing receipt returns an empty projection with the current familyMemberId and
+        null id, viewedAt, acknowledgedAt and responseNote. GET never inserts or updates a
+        receipt, marks a notification read or changes incident handling. Record the account,
+        incident, outcome and server access time in the internal audit; an audit outage
+        returns 503 without care content. An absent incident returns 404 and inaccessible
+        incident returns 403. The manager's original GET /incidents/{id} remains separate.
+        acknowledgeBy is this family's immutable response deadline established by the FM05
+        Observer's first successful urgent IN_APP message creation (default two hours).
+        It is null without an FM05 window, even when a legacy notification exists; never copy
+        manager respondBy. The consumer is implemented; production event hookup and old family
+        generator handoff remain pending. POST /incidents/{id}/view records a successful display;
+        POST /incidents/{id}/acknowledge records explicit acknowledgement. Neither marks a notification read.
+      responses:
+        '200':
+          description: Safe incident detail and only the current family's acknowledgement.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyIncidentDetail'
+        '400':
+          $ref: '#/components/responses/FamilyValidationError'
+        '401':
+          $ref: '#/components/responses/FamilyUnauthorized'
+        '403':
+          $ref: '#/components/responses/FamilyForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FamilyAuditUnavailable'
       x-family-response-schema:
         $ref: '#/components/schemas/FamilyIncidentDetail'
   /incidents/{id}/view:
@@ -1578,13 +2046,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FamilyIncidentAcknowledgement'
+        '400':
+          $ref: '#/components/responses/FamilyValidationError'
         '401':
           $ref: '#/components/responses/FamilyUnauthorized'
         '403':
           $ref: '#/components/responses/FamilyForbidden'
         '404':
           $ref: '#/components/responses/FamilyNotFound'
-      x-status: draft
+        '500':
+          description: Receipt storage failed; the receipt and success audit are rolled back.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          $ref: '#/components/responses/FamilyAuditUnavailable'
+      x-status: implemented
+      x-implemented-roles: [FAMILY]
+      x-family-status: implemented
       x-contract-status: specified
       x-use-cases:
         - UC-FM05
@@ -1593,6 +2073,15 @@ paths:
         - sessionCookie: []
       operationId: familyPostIncidentsIdView
       description: >-
+        Implemented for FAMILY with current account, profile and binding authorization.
+        A successful command commits its receipt and success audit together. A storage failure
+        rolls both back and returns 500; an audit outage returns 503 without accepting the
+        receipt. Denied and failed application commands are audited after rollback, without
+        care content or responseNote. Timestamps include Singapore +08:00. No notification
+        is required. Personal windows are established only by the FM05 Observer, independently
+        of these commands. Waiting reminders are not implemented.
+        Send no JSON request body; a supplied body returns 400.
+
         For FAMILY, authorise access using the authenticated family identity, an ACTIVE and unexpired
         binding to the actual incident elder, and the applicable access scope. Derive the current
         familyMemberId from the session; the caller cannot choose another family member. The existence,
@@ -1602,8 +2091,8 @@ paths:
         be disabled through optional subscription preferences; that rule never overrides binding/access
         checks. The response window starts with the first successful urgent IN_APP notification creation
         for this incident/recipient and uses the configured interval (default two hours); further
-        notices, polling and email retries do not reset it. GET /incidents/{id} returns acknowledgeBy,
-        which is null when no response window has been established. A missing or failed notification
+        notices, polling and email retries do not reset it. GET /family/incidents/{id} returns
+        acknowledgeBy, which is null when no response window has been established. A missing or failed notification
         does not block reading, viewing or acknowledging the incident. Later notification creation must
         preserve any already-recorded acknowledgement and must not restart waiting reminders for that
         family member. This recipient window is independent of manager incident status, respondBy and
@@ -1656,8 +2145,21 @@ paths:
       tags:
         - Incidents
       summary: Acknowledge an urgent alert
-      x-status: draft
+      x-status: implemented
+      x-implemented-roles: [FAMILY]
+      x-family-status: implemented
       description: >-
+        Implemented for FAMILY with current account, profile and binding authorization.
+        A successful command commits its receipt and success audit together. A storage failure
+        rolls both back and returns 500; an audit outage returns 503 without accepting the
+        receipt. Denied and failed application commands are audited after rollback, without
+        care content or responseNote. Timestamps include Singapore +08:00. No notification
+        is required. Personal windows are established only by the FM05 Observer, independently
+        of these commands. Waiting reminders are not implemented.
+        An absent body, empty object or null responseNote means no note. Preserve the
+        first note, including null or empty text; do not trim it. Accept only a string
+        or null responseNote up to 255 characters; reject unknown fields and other types.
+
         For FAMILY, authorise access using the authenticated family identity, an ACTIVE and unexpired
         binding to the actual incident elder, and the applicable access scope. Derive the current
         familyMemberId from the session; the caller cannot choose another family member. The existence,
@@ -1667,8 +2169,8 @@ paths:
         be disabled through optional subscription preferences; that rule never overrides binding/access
         checks. The response window starts with the first successful urgent IN_APP notification creation
         for this incident/recipient and uses the configured interval (default two hours); further
-        notices, polling and email retries do not reset it. GET /incidents/{id} returns acknowledgeBy,
-        which is null when no response window has been established. A missing or failed notification
+        notices, polling and email retries do not reset it. GET /family/incidents/{id} returns
+        acknowledgeBy, which is null when no response window has been established. A missing or failed notification
         does not block reading, viewing or acknowledging the incident. Later notification creation must
         preserve any already-recorded acknowledgement and must not restart waiting reminders for that
         family member. This recipient window is independent of manager incident status, respondBy and
@@ -1676,7 +2178,7 @@ paths:
         characters. Atomically create/update one record per incident/family pair. The first accepted
         request fixes acknowledgedAt and responseNote; repeated/concurrent requests return 200 with the
         original values, even if a retry carries a different note. The command does not fabricate
-        viewedAt or mark another notification read. Acknowledgement stops further waiting reminders for
+        viewedAt or mark another notification read. Once waiting reminders are implemented, acknowledgement stops further waiting reminders for
         this recipient only. Late acknowledgements, including after incident resolution, are recorded at
         their true server time while access remains valid; they do not undo prior escalation, alter
         incident.status, resolve the incident or stop the manager escalation chain.
@@ -1719,6 +2221,14 @@ paths:
           $ref: '#/components/responses/FamilyForbidden'
         '404':
           $ref: '#/components/responses/FamilyNotFound'
+        '500':
+          description: Receipt storage failed; the receipt and success audit are rolled back.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          $ref: '#/components/responses/FamilyAuditUnavailable'
       x-contract-status: specified
       x-use-cases:
         - UC-FM05
@@ -1741,7 +2251,7 @@ paths:
       tags:
         - Notifications
       summary: My notification inbox
-      x-status: draft
+      x-status: implemented
       description: >-
         In-application and email only; there is no push infrastructure, so this is a pull inbox.
 
@@ -1759,9 +2269,21 @@ paths:
         introduced here. Other account roles retain the original notification response/filter
         behaviour.
 
+        Implementation: every role reads its own messages through this operation and gets the
+        FamilyNotification shape (FAMILY callers additionally under the binding rule above). It is a
+        pull inbox: the caller's currently authorized PENDING in-app rows are delivered (SENT,
+        sentAt set) when their client asks for the inbox or its unread count, so SENT and READ are
+        the only statuses shown.
+        The unread count and "mark all read" are the two operations under /notifications/me below.
 
-        Family callers are identified from the authenticated session, never a caller-supplied
-        familyMemberId. For family callers, care resources require an ACTIVE binding to their actual
+
+        Identity comes from the authenticated session, never a caller-supplied familyMemberId.
+        Each self-inbox operation rechecks current account enablement and roles before mutation;
+        disabled/deleted accounts or a revoked FAMILY session role return 403. Current FAMILY accounts
+        use family scope even in multi-role or older staff sessions. Only notifications with both
+        resource type and resource ID absent are account-only; unknown or unresolved care resources
+        are excluded from delivery, paging, counts and read operations. For family callers, care
+        resources require an ACTIVE binding to their actual
         elder, with no revocation and no elapsed expiresAt, and the applicable access scope at request
         time. Revocation/expiry takes effect on subsequent reads and writes, including historical
         content. Reading a family care resource records the caller, resource and server access time in
@@ -1820,6 +2342,70 @@ paths:
       operationId: listMyNotifications
       x-family-response-schema:
         $ref: '#/components/schemas/FamilyNotificationPage'
+  /notifications/me/unread-count:
+    get:
+      tags:
+        - Notifications
+      summary: How many of my messages are unread
+      description: >-
+        What the bell in every client's header shows, polled. Delivers the caller's PENDING in-app
+        messages first, then counts the SENT ones the caller may see - for a FAMILY caller, under the
+        same current account/role and resource/binding rule as /notifications/me. Only visible rows
+        are delivered; sentAt uses Singapore business time regardless of the Clock zone. Not audited:
+        it returns a number, no care content.
+      operationId: countMyUnreadNotifications
+      x-status: implemented
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unread]
+                properties:
+                  unread: {type: integer, format: int64, minimum: 0}
+        '401':
+          $ref: '#/components/responses/FamilyUnauthorized'
+        '403':
+          $ref: '#/components/responses/FamilyForbidden'
+  /notifications/me/read-all:
+    post:
+      tags:
+        - Notifications
+      summary: Mark all my messages read
+      description: >-
+        Every SENT message the caller may see becomes READ at the server's time; one already READ keeps
+        its first readAt. Current account/role and resource/binding authorization is rechecked as in
+        /notifications/me. Excluded messages are neither delivered nor marked read. Server times use
+        Singapore business time. Same CSRF requirement as the other state-changing calls.
+      operationId: markAllMyNotificationsRead
+      x-status: implemented
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: X-XSRF-TOKEN
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: How many were marked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updated]
+                properties:
+                  updated: {type: integer, minimum: 0}
+        '401':
+          $ref: '#/components/responses/FamilyUnauthorized'
+        '403':
+          $ref: '#/components/responses/FamilyForbidden'
   /notifications/{id}/read:
     parameters:
       - name: id
@@ -1832,7 +2418,7 @@ paths:
       tags:
         - Notifications
       summary: Mark a notification read
-      x-status: draft
+      x-status: implemented
       responses:
         '200':
           description: >-
@@ -1868,8 +2454,13 @@ paths:
         retain their existing notification read behaviour.
 
 
-        Family callers are identified from the authenticated session, never a caller-supplied
-        familyMemberId. For family callers, care resources require an ACTIVE binding to their actual
+        Identity comes from the authenticated session, never a caller-supplied familyMemberId.
+        Each self-inbox operation rechecks current account enablement and roles before mutation;
+        disabled/deleted accounts or a revoked FAMILY session role return 403. Current FAMILY accounts
+        use family scope even in multi-role or older staff sessions. Only notifications with both
+        resource type and resource ID absent are account-only; unknown or unresolved care resources
+        are excluded from delivery, paging, counts and read operations. For family callers, care
+        resources require an ACTIVE binding to their actual
         elder, with no revocation and no elapsed expiresAt, and the applicable access scope at request
         time. Revocation/expiry takes effect on subsequent reads and writes, including historical
         content. Reading a family care resource records the caller, resource and server access time in
@@ -2490,6 +3081,208 @@ paths:
         - sessionCookie: []
 components:
   schemas:
+    FamilyServiceApplicationCreate:
+      type: object
+      additionalProperties: false
+      required: [elderId, careNeeds]
+      properties:
+        elderId: {type: integer, format: int64, minimum: 1}
+        careNeeds:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {type: string, minLength: 1, maxLength: 100}
+        notes: {type: string, nullable: true, maxLength: 2000}
+    FamilyServiceApplication:
+      type: object
+      required: [id, elderId, elderSnapshot, careNeeds, status, createdAt]
+      properties:
+        id: {type: integer, format: int64}
+        elderId: {type: integer, format: int64}
+        elderSnapshot: {$ref: '#/components/schemas/FamilyElderBasicDetails'}
+        careNeeds: {type: array, items: {type: string}}
+        notes: {type: string, nullable: true}
+        status: {type: string, enum: [SUBMITTED]}
+        createdAt: {type: string, format: date-time, description: 'Submission time with UTC offset.'}
+    FamilyServiceApplicationPage:
+      type: object
+      required: [items, page, size, totalElements]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/FamilyServiceApplication'}}
+        page: {type: integer}
+        size: {type: integer}
+        totalElements: {type: integer, format: int64}
+    FamilyElderBasicDetails:
+      type: object
+      required: [fullName]
+      properties:
+        fullName: {type: string, minLength: 1, maxLength: 100}
+        gender: {type: string, nullable: true, enum: [MALE, FEMALE, OTHER]}
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+          description: Must not be later than today.
+        phone: {type: string, nullable: true, maxLength: 20}
+        address: {type: string, nullable: true, maxLength: 255}
+        postalCode: {type: string, nullable: true, pattern: '^[0-9]{6}$'}
+        preferredDialects: {type: string, nullable: true, maxLength: 100}
+        livesAlone: {type: boolean, nullable: true}
+        mobilityLevel: {type: string, nullable: true, enum: [INDEPENDENT, ASSISTIVE_CANE, WHEELCHAIR_BEDBOUND]}
+    FamilyElderProfile:
+      allOf:
+        - {$ref: '#/components/schemas/FamilyElderBasicDetails'}
+        - type: object
+          required: [id, accessScope]
+          properties:
+            id: {type: integer, format: int64}
+            accessScope: {type: string, enum: [FULL, READ_ONLY]}
+    CaregiverCommandIdentity:
+      type: object
+      required: [expectedVersion, clientRequestId]
+      properties:
+        expectedVersion: {type: integer, minimum: 0}
+        clientRequestId: {type: string, format: uuid, description: Immutable command key; retain original payload and key when the result is unknown.}
+    CaregiverIncidentCommand:
+      allOf:
+        - $ref: '#/components/schemas/CaregiverCommandIdentity'
+        - type: object
+          required: [visitId, category, severity, description]
+          properties:
+            visitId: {type: integer, format: int64, minimum: 1}
+            category: {type: string, enum: [SOS, MEDICAL, FALL, SERVICE, OTHER]}
+            severity: {type: string, enum: [LOW, MEDIUM, HIGH]}
+            description: {type: string, minLength: 1, maxLength: 2000, description: Observed facts and actions; no diagnosis.}
+    CaregiverIncidentReport:
+      type: object
+      required: [id, visitId, category, severity, description, status, reportedAt]
+      properties:
+        id: {type: integer, format: int64}
+        visitId: {type: integer, format: int64}
+        category: {type: string, enum: [SOS, MEDICAL, FALL, SERVICE, OTHER]}
+        severity: {type: string, enum: [LOW, MEDIUM, HIGH]}
+        description: {type: string}
+        status: {type: string, enum: [OPEN, ACKNOWLEDGED, IN_PROGRESS, RESOLVED, UNRESOLVED_ESCALATED]}
+        reportedAt: {type: string, description: Singapore local date-time}
+        respondBy: {type: string, nullable: true, description: Singapore local date-time; a deadline is not confirmation of take-over.}
+        resolvedAt: {type: string, nullable: true, description: Singapore local date-time}
+    CaregiverIncidentView:
+      type: object
+      required: [report, clientRequestId]
+      properties:
+        report: {$ref: '#/components/schemas/CaregiverIncidentReport'}
+        clientRequestId: {type: string, format: uuid, nullable: true}
+    CaregiverIncidentResult:
+      allOf:
+        - $ref: '#/components/schemas/CaregiverIncidentView'
+        - type: object
+          required: [visitVersion, replayed]
+          properties:
+            visitVersion: {type: integer}
+            replayed: {type: boolean}
+    CaregiverCheckInCommand:
+      allOf:
+        - $ref: '#/components/schemas/CaregiverCommandIdentity'
+        - type: object
+          required: [locationSource]
+          description: GPS requires coordinates and nonnegative finite accuracy, without note; MANUAL_LOCATION_NOTE requires a nonblank note without GPS fields.
+          properties:
+            locationSource: {type: string, enum: [GPS, MANUAL_LOCATION_NOTE]}
+            latitude: {type: number, minimum: -90, maximum: 90}
+            longitude: {type: number, minimum: -180, maximum: 180}
+            accuracy: {type: number, minimum: 0}
+            locationNote: {type: string, maxLength: 500}
+            clientCapturedAt: {type: string, format: date-time, description: Optional ISO instant; cannot override server check-in time.}
+    CaregiverTaskResultCommand:
+      allOf:
+        - $ref: '#/components/schemas/CaregiverCommandIdentity'
+        - type: object
+          required: [status]
+          properties:
+            status: {type: string, enum: [DONE, SKIPPED, REFUSED]}
+            outcome: {type: string, maxLength: 255, nullable: true}
+            caregiverNote: {type: string, maxLength: 500, nullable: true, description: Nonblank factual reason required for SKIPPED or REFUSED.}
+    CaregiverHealthFlag:
+      type: string
+      enum: [NO_CONCERN, ATTENTION, MEDICAL_REVIEW]
+      description: Caregiver observation; NO_CONCERN means no concern marked, not a clinical normality assessment.
+    CaregiverHealthObservation:
+      type: object
+      required: [healthFlag, healthNote]
+      properties:
+        healthFlag:
+          type: string
+          enum: [NO_CONCERN, ATTENTION, MEDICAL_REVIEW, null]
+          nullable: true
+          description: Null means not yet recorded; never default old visits to NO_CONCERN.
+        healthNote: {type: string, nullable: true, maxLength: 1000}
+    CaregiverHealthCommand:
+      allOf:
+        - $ref: '#/components/schemas/CaregiverCommandIdentity'
+        - type: object
+          required: [healthFlag]
+          properties:
+            systolic: {type: integer, nullable: true, minimum: 1, maximum: 999999, description: mmHg; supply together with diastolic.}
+            diastolic: {type: integer, nullable: true, minimum: 1, maximum: 999999, description: mmHg; supply together with systolic.}
+            pulse: {type: integer, nullable: true, minimum: 1, maximum: 999999, description: bpm.}
+            temperature: {type: number, nullable: true, minimum: 0.01, maximum: 999999.99, multipleOf: 0.01, description: Celsius; bounds are storage limits, not clinical limits.}
+            healthFlag: {$ref: '#/components/schemas/CaregiverHealthFlag'}
+            healthNote: {type: string, nullable: true, maxLength: 1000, description: Nonblank for a concern or when no reading was measured.}
+    CaregiverHealthRecord:
+      type: object
+      required: [id, visitId, healthFlag, healthNote, recordedAt, readings]
+      properties:
+        id: {type: integer, format: int64}
+        visitId: {type: integer, format: int64}
+        healthFlag: {$ref: '#/components/schemas/CaregiverHealthFlag'}
+        healthNote: {type: string, nullable: true}
+        recordedAt: {type: string, description: Server-generated Singapore local date-time.}
+        readings:
+          type: array
+          maxItems: 4
+          items:
+            type: object
+            required: [metric, value, unit]
+            properties:
+              metric: {type: string, enum: [systolic, diastolic, pulse, temperature]}
+              value: {type: number}
+              unit: {type: string, enum: [mmHg, bpm, °C]}
+    CaregiverHealthResult:
+      type: object
+      required: [record, visitVersion, replayed]
+      properties:
+        record: {$ref: '#/components/schemas/CaregiverHealthRecord'}
+        visitVersion: {type: integer, description: Original saved version; reload the work pack for the current version.}
+        replayed: {type: boolean}
+    CaregiverHealthPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/CaregiverHealthRecord'}}
+        page: {type: integer}
+        size: {type: integer}
+        total: {type: integer, format: int64}
+    CaregiverExecutionResult:
+      type: object
+      required: [visitId, visitVersion, savedState, taskId, replayed]
+      properties:
+        visitId: {type: integer, format: int64}
+        visitVersion: {type: integer, description: 'Version of the original command, not necessarily current version on replay.'}
+        savedState: {type: string, nullable: true, description: Original saved state; null for a task replay.}
+        taskId: {type: integer, format: int64, nullable: true}
+        replayed: {type: boolean}
+    CaregiverExecutionContext:
+      type: object
+      properties:
+        allowedActions: {type: array, items: {type: string, enum: [CHECK_IN, TASK_RESULT, HEALTH_RECORD, REPORT_INCIDENT]}}
+        blockedReason: {type: string, nullable: true}
+        serverNow: {type: string, description: Singapore local date-time}
+        checkInOpensAt: {type: string, description: Singapore local date-time}
+        checkInClosesAt: {type: string, description: Singapore local date-time}
+        checkedInAt: {type: string, nullable: true}
+        checkedOutAt: {type: string, nullable: true}
+        lateArrival: {type: boolean}
+        locationSource: {type: string, nullable: true, enum: [GPS, MANUAL_LOCATION_NOTE]}
     CaregiverSelfProfile:
       type: object
       required: [id, userId, fullName, status]
@@ -2549,6 +3342,8 @@ components:
       type: object
       required: [visit, elder, carePlanId, carePlanVersion, serviceInstructions, tasks, requiredEvidenceKinds]
       properties:
+        healthObservation: {$ref: '#/components/schemas/CaregiverHealthObservation'}
+        execution: {$ref: '#/components/schemas/CaregiverExecutionContext'}
         visit: {$ref: '#/components/schemas/CaregiverAssignedVisit'}
         elder:
           type: object
@@ -3222,8 +4017,9 @@ components:
           format: date-time
           nullable: true
           description: >-
-            When the current state must have advanced by; the missed-check-in scan infers an exception from this
-            passing unattended.
+            Optional deadline for other visit states. SYS03 uses scheduledStart plus the configured
+            late-arrival threshold, not this field; its alert transitions SCHEDULED to EXCEPTION and blocks check-in,
+            including refreshed requests. Resolving the Incident does not reopen the Visit.
         assignmentHistory:
           type: array
           description: Previous and current caregiver assignments, including replacement status, reason and assignment times.
@@ -3473,6 +4269,16 @@ components:
           type: string
           format: date-time
           nullable: true
+        basisId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Manager responses. The basis the report was assembled from; null for a report filed before V19.
+        metrics:
+          allOf:
+            - $ref: '#/components/schemas/ReportMetrics'
+          nullable: true
+          description: Manager responses. That basis's numbers, the same for the three readers' versions of a period.
     FamilyReportDetail:
       type: object
       additionalProperties: false
@@ -3555,17 +4361,28 @@ components:
       type: object
       additionalProperties: false
       properties:
+        key:
+          type: string
+          description: Stable chapter key, derived from its title for legacy reports.
         title:
           type: string
           minLength: 1
         body:
           type: string
+        figures:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFigure'
+        series:
+          type: array
+          description: FAMILY daily ranges only; never individual timestamped readings from other audiences.
+          items:
+            $ref: '#/components/schemas/ReportSeries'
       description: >-
-        Family-filtered text. Caregiver identity is name only, no staff performance, vital signs are
-        ranges rather than raw readings, and other elders are excluded.
-      required:
-        - title
-        - body
+        Saved FAMILY chapters including Overview, Services and Ratings and spot checks.
+        No internal basis, staff identifiers, medical notes or inspection findings are exposed.
+        Legacy reports retain their original text with empty figures and series.
+      required: [key, title, body, figures, series]
     FamilyReportAmendment:
       type: object
       additionalProperties: false
@@ -3574,16 +4391,17 @@ components:
           type: integer
           format: int64
           minimum: 1
+        kind:
+          type: string
+          enum: [CORRECTION, FOLLOW_UP]
+          description: Older notes default to CORRECTION.
         note:
           type: string
         createdAt:
           type: string
           format: date-time
-      description: A family-safe correction; internal author account identifiers are not exposed.
-      required:
-        - id
-        - note
-        - createdAt
+      description: A family-safe correction or follow-up; internal author identifiers are not exposed.
+      required: [id, kind, note, createdAt]
     ReportDetail:
       allOf:
         - $ref: '#/components/schemas/Report'
@@ -3606,16 +4424,119 @@ components:
       required:
         - title
         - body
+      description: >-
+        Every version has seven sections in this order - Overview, Services, Service completion,
+        Vital signs, Observations, Incidents, Ratings and spot checks. Reports filed before V19
+        have the middle four only, and read back with figures and series empty.
       properties:
+        key:
+          type: string
+          description: Made from the title - overview, services, service-completion, vital-signs, observations, incidents, ratings-and-spot-checks.
+          example: vital-signs
         title:
           type: string
           example: Service completion
         body:
           type: string
+          description: Plain text, one item per line; an incident's timeline steps are indented by two spaces.
+        figures:
+          type: array
+          description: The numbers the section states, filtered for the reader as the text is.
+          items:
+            $ref: '#/components/schemas/ReportFigure'
+        series:
+          type: array
+          description: Vital signs only - one per metric. FAMILY has a point per day (that day's range); REGULATOR and INTERNAL have every reading.
+          items:
+            $ref: '#/components/schemas/ReportSeries'
+    ReportFigure:
+      type: object
+      required: [key, label, value]
+      properties:
+        key:
+          type: string
+          example: visits
+        label:
+          type: string
+          example: Visits carried out
+        value:
+          type: number
+          example: 2
+        outOf:
+          type: number
+          nullable: true
+          example: 3
+        unit:
+          type: string
+          nullable: true
+          description: '"%" for a rate; null otherwise.'
+    ReportSeries:
+      type: object
+      required: [key, label, points]
+      properties:
+        key:
+          type: string
+          example: systolic
+        label:
+          type: string
+          example: Systolic
+        unit:
+          type: string
+          nullable: true
+          example: mmHg
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportPoint'
+    ReportPoint:
+      type: object
+      required: [at, low, high, flagged]
+      properties:
+        at:
+          type: string
+          description: ISO-8601 local date-time for a reading ("2026-09-14T09:10"), or a date for a day's range ("2026-09-14").
+        low:
+          type: number
+        high:
+          type: number
+          description: Equal to low for a single reading.
+        flagged:
+          type: boolean
+          description: A reading behind the point was flagged out of range when it was entered.
+    ReportMetrics:
+      type: object
+      required: [visitsPlanned, visitsCompleted, vitalsOutOfRange, incidentCount, ratingCount, dataComplete]
+      properties:
+        visitsPlanned:
+          type: integer
+          description: Visits of the period that were not cancelled.
+        visitsCompleted:
+          type: integer
+          description: Of those, the ones carried out - COMPLETED, VERIFIED or AUTO_CLOSED.
+        fulfilmentRate:
+          type: number
+          nullable: true
+          description: visitsCompleted out of visitsPlanned in percent, two places; null when nothing was planned.
+        vitalsOutOfRange:
+          type: integer
+        incidentCount:
+          type: integer
+        averageElderRating:
+          type: number
+          nullable: true
+          description: Mean of the elder's visit ratings (UC-EL01), two places; null without any.
+        ratingCount:
+          type: integer
+        dataComplete:
+          type: boolean
+    ReportAmendmentKind:
+      type: string
+      enum: [CORRECTION, FOLLOW_UP]
     ReportAmendment:
       type: object
       required:
         - id
+        - kind
         - note
         - authorUserId
         - createdAt
@@ -3623,6 +4544,8 @@ components:
         id:
           type: integer
           format: int64
+        kind:
+          $ref: '#/components/schemas/ReportAmendmentKind'
         note:
           type: string
         authorUserId:
@@ -3721,8 +4644,9 @@ components:
           format: date-time
           nullable: true
           description: >-
-            This family member response deadline: first successfully created urgent IN_APP notification
-            for this incident/family member plus the configured window (default two hours). Null when no
+            Null without an FM05 personal window; legacy notifications do not establish one.
+            The family member response deadline: first successfully created urgent IN_APP
+            notification for this incident/family member plus the configured window (default two hours). Null when no
             response window was established, including when notification creation has not succeeded;
             null does not prevent an authorised read, view or acknowledgement. Stable across polling,
             email retries and further notifications for the same incident. Never the manager respondBy
@@ -3749,9 +4673,14 @@ components:
         - acknowledgement
     IncidentSource:
       type: string
+      description: >-
+        SYSTEM_MISSED_CHECKIN includes unassigned/leave-related system events and SYS03 assigned-but-overdue
+        check-in alerts. SYS03 has an independent once-per-Visit durable trigger, defaults to strictly more than
+        ten minutes after scheduledStart within a 24-hour lookback, and does not change Visit status.
       enum:
         - CAREGIVER
         - ELDER_SOS
+        - ELDER_SERVICE_DISPUTE
         - SYSTEM_MISSED_CHECKIN
     IncidentCategory:
       type: string
@@ -4202,7 +5131,7 @@ components:
         name: {type: string}
         rank: {type: integer, nullable: true, description: 1 for the best suggestion; null when excluded.}
         score: {type: number, nullable: true}
-        reason: {type: string, nullable: true, description: The match reason, or why a hard rule excluded them.}
+        reason: {type: string, nullable: true, description: 'The match reason, or why a hard rule excluded them.'}
         outcome: {type: string, enum: [SELECTED, SUGGESTED, EXCLUDED]}
         excludedBy: {type: string, nullable: true}
         checks:

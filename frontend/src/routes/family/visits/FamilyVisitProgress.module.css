@@ -1,52 +1,66 @@
 .progressPage {
-  overflow-wrap: anywhere;
+  composes: page from '../components/FamilyScreen.module.css';
 }
 .navigation {
+  composes: band from '../components/FamilyScreen.module.css';
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 24px;
+}
+.navigation button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
 }
 .navigation a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 500;
   text-decoration: none;
+  color: var(--fm-muted);
 }
 .hero {
-  margin-bottom: 26px;
+  composes: band from '../components/FamilyScreen.module.css';
 }
 .hero > p:last-child {
-  color: #60776f;
-  font-size: 14px;
-  margin-top: 12px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+  margin-top: 6px;
 }
 .eyebrow {
-  color: #48786b;
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 1.8px;
-  margin-bottom: 12px !important;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--fm-accent);
+  margin-bottom: 8px !important;
 }
 .sections {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 .section {
   min-width: 0;
-  background: white;
-  border: 1px solid #dfe9e4;
+  background: var(--fm-card);
+  border: 1px solid var(--fm-line-card);
   border-radius: 18px;
-  padding: 22px;
+  padding: 16px;
 }
-.sections > .section:first-child {
-  background: #edf5f1;
-}
-.section > h2 {
-  margin-bottom: 18px;
+/* Section label inside the card; two classes so it outranks the portal-wide `.portal h2`. */
+.section.section > h2 {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--fm-accent);
 }
 .section > button {
   margin: 4px;
@@ -59,90 +73,133 @@
   flex-wrap: wrap;
 }
 .overview > strong {
-  font-size: 20px;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 .reference {
-  color: #60776f;
-  font-size: 12px;
-  margin-top: 8px !important;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+  margin-top: 6px !important;
+  font-variant-numeric: tabular-nums;
 }
 .badge {
   display: inline-block;
   flex-shrink: 0;
-  font-size: 12px;
-  padding: 4px 9px;
-  border-radius: 7px;
-  color: #356c59;
-  background: #e1eee7;
+  border: 1px solid var(--fm-accent-tint);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--fm-accent);
+  background: var(--fm-accent-tint);
 }
-.badge[data-status='PENDING'], .badge[data-status='ARRIVED'], .badge[data-status='IN_PROGRESS'] {
-  color: #79591d;
-  background: #fff2d3;
+.badge[data-status='DONE'],
+.badge[data-status='COMPLETED'],
+.badge[data-status='VERIFIED'] {
+  color: var(--fm-good);
 }
-.badge[data-status='REFUSED'], .badge[data-status='EXCEPTION'] {
-  color: #943d31;
-  background: #fceae6;
+.badge[data-status='PENDING'],
+.badge[data-status='ARRIVED'],
+.badge[data-status='IN_PROGRESS'] {
+  color: var(--fm-pending);
+  background: var(--fm-pending-tint);
+  border-color: var(--fm-pending-line);
 }
-.badge[data-status='SKIPPED'], .badge[data-status='CANCELLED'], .badge[data-status='AUTO_CLOSED'] {
-  color: #58645e;
-  background: #e8edeb;
+.badge[data-status='REFUSED'],
+.badge[data-status='EXCEPTION'] {
+  color: var(--fm-urgent);
+  background: var(--fm-urgent-tint);
+  border-color: var(--fm-urgent-line);
 }
+.badge[data-status='SKIPPED'],
+.badge[data-status='CANCELLED'],
+.badge[data-status='AUTO_CLOSED'] {
+  color: var(--fm-muted);
+  background: var(--fm-note);
+  border-color: var(--fm-note);
+}
+/* Key-value rows under a card line, as in the live-visit card. */
 .facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin: 22px 0;
+  display: flex;
+  flex-direction: column;
+  margin: 14px 0 12px;
+  border-top: 1px solid var(--fm-line-card);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.facts > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--fm-line-row);
 }
 .facts dt {
-  color: #60776f;
-  font-size: 12px;
-  margin-bottom: 5px;
+  color: var(--fm-muted);
+  flex: none;
 }
 .facts dd {
   margin: 0;
-  font-size: 14px;
+  text-align: right;
 }
 .timestamp {
-  color: #60776f;
-  font-size: 12px;
-  margin-top: 16px !important;
+  color: var(--fm-faint);
+  font-size: 12.5px;
+  margin-top: 10px !important;
+  font-variant-numeric: tabular-nums;
 }
+/* Timeline rows: time first in the faint colour, then the event. */
 .timeline {
   list-style: none;
   margin: 0;
-  padding: 0 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  font-size: 13.5px;
 }
 .timeline li {
-  border-left: 2px solid #cadfd4;
-  padding: 0 0 22px 20px;
-  position: relative;
+  display: flex;
+  gap: 12px;
 }
-.timeline li::before {
-  content: '';
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  top: 6px;
-  left: -6px;
-  border-radius: 50%;
-  background: #27816d;
-}
-.timeline li:last-child {
-  padding-bottom: 0;
-}
-.timeline li > time {
-  color: #60776f;
-  font-size: 12px;
+.timeline li > time,
+.timeline li > span {
+  order: -1;
+  flex: none;
+  color: var(--fm-faint);
 }
 .taskCount {
-  font-weight: 650;
+  font-weight: 600;
+  font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
 }
 .completion {
+  appearance: none;
   display: block;
   width: 100%;
-  height: 8px;
-  margin: 12px 0 20px;
-  accent-color: #27816d;
+  height: 6px;
+  margin: 10px 0 6px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--fm-line-card);
+  overflow: hidden;
+}
+.completion::-webkit-progress-bar {
+  background: var(--fm-line-card);
+  border-radius: 99px;
+}
+.completion::-webkit-progress-value {
+  background: var(--fm-accent);
+  border-radius: 99px;
+}
+.completion::-moz-progress-bar {
+  background: var(--fm-accent);
+  border-radius: 99px;
 }
 .tasks {
   list-style: none;
@@ -150,55 +207,65 @@
   padding: 0;
 }
 .tasks li {
-  border-top: 1px solid #e4ece7;
-  padding: 16px 0;
+  border-bottom: 1px solid var(--fm-line-row);
+  padding: 11px 0;
 }
-.tasks li:last-child {
-  padding-bottom: 0;
+/* Task status reads as a coloured word in the row, not a pill. */
+.tasks .badge {
+  padding: 0;
+  border: 0;
+  background: none;
 }
 .taskHeading {
   display: flex;
-  align-items: start;
+  align-items: baseline;
   gap: 12px;
   justify-content: space-between;
 }
 .taskHeading strong {
   min-width: 0;
-  font-weight: 550;
+  font-size: 14.5px;
+  font-weight: 400;
   white-space: pre-wrap;
 }
+.tasks .timestamp {
+  margin-top: 3px !important;
+}
 .empty {
-  color: #60776f;
-  margin: 12px 0 18px !important;
-  font-size: 14px;
+  color: var(--fm-muted);
+  margin: 8px 0 12px !important;
+  font-size: 13.5px;
+}
+/* Paused or unavailable updates: a waiting note above the cards. */
+.progressPage > .empty {
+  margin: 0 0 12px !important;
+  padding: 12px 13px;
+  border: 1px solid var(--fm-pending-line);
+  border-radius: 14px;
+  background: var(--fm-pending-tint);
+  color: var(--fm-pending);
 }
 .sectionError {
-  color: #7c4c25;
-  font-size: 14px;
-  margin-bottom: 16px;
+  color: var(--fm-pending);
+  font-size: 13.5px;
+  margin-bottom: 12px;
 }
 .sectionError button {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .note {
-  color: #60776f;
-  font-size: 12px;
+  color: var(--fm-faint);
+  font-size: 12.5px;
   text-align: center;
 }
 .loading {
-  color: #60776f;
+  color: var(--fm-muted);
+  font-size: 13.5px;
   min-height: 190px;
   display: grid;
   place-items: center;
 }
 @media (max-width: 400px) {
-  .section {
-    padding: 18px;
-  }
-  .facts {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
   .taskHeading {
     flex-wrap: wrap;
   }

@@ -1,0 +1,147 @@
+.page {
+  composes: page from '../components/FamilyScreen.module.css';
+}
+.header {
+  composes: band from '../components/FamilyScreen.module.css';
+}
+.header > p:last-child {
+  margin-top: 8px;
+  color: var(--fm-muted);
+  font-size: 14px;
+}
+.header > a {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--fm-accent);
+  text-decoration: none;
+}
+.eyebrow {
+  color: var(--fm-accent);
+  font-size: 12px !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.content {
+  display: grid;
+  gap: 18px;
+  padding-block: 18px;
+}
+.list {
+  display: grid;
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.card {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+}
+.card p {
+  margin-block: 10px;
+}
+.card a,
+.actions a {
+  color: var(--fm-accent);
+  font-weight: 600;
+}
+.card > a {
+  display: inline-block;
+  margin-top: 14px;
+}
+.cardHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pill {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+  font-size: 12px;
+}
+.meta {
+  color: var(--fm-muted);
+  font-size: 14px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.details {
+  margin: 16px 0 22px;
+}
+.details > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(0, 1.5fr);
+  gap: 16px;
+  border-bottom: 1px solid var(--fm-line-row);
+  padding-block: 12px;
+  font-size: 14px;
+}
+.details dt {
+  color: var(--fm-muted);
+}
+.details dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.fields {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 22px 0;
+  border: 0;
+  min-width: 0;
+}
+.field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 12px;
+  color: var(--fm-ink);
+  background: var(--fm-card);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  color-scheme: light;
+}
+.notice {
+  color: var(--fm-accent);
+}
+.error {
+  color: var(--fm-urgent);
+}
+@media (min-width: 600px) {
+  .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 900px) {
+  .page > .content {
+    max-width: 840px;
+  }
+  .list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,48 +1,95 @@
 .intro {
-  font-size: 13px;
-  color: #60776f;
-  margin-bottom: 24px !important;
+  font-size: 13.5px;
+  color: var(--fm-muted);
+  background: var(--fm-accent-tint);
+  border-radius: 14px;
+  padding: 12px 13px;
+  margin-bottom: 18px !important;
+}
+/* Phone: one column. The side wrapper dissolves, so the intro leads and next steps and submit follow the sections. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.side {
+  display: contents;
+}
+.side > .intro {
+  order: -1;
+  margin-bottom: 6px !important;
+}
+.form > .errorSummary {
+  margin-bottom: 0;
+}
+/* What happens next: a white card like the form sections, its heading styled like theirs. */
+.next {
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 16px;
+}
+.side .next h2 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--fm-accent);
+}
+.next ol {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding-left: 20px;
+  font-size: 13.5px;
+  color: var(--fm-muted);
+}
+.next li::marker {
+  color: var(--fm-accent);
+  font-weight: 600;
 }
 .form .controls {
   display: grid;
-  gap: 18px;
+  gap: 12px;
   border: 0;
   padding: 0;
   margin: 0;
   min-width: 0;
 }
 .section {
-  border: 1px solid #dfe9e4;
+  border: 1px solid var(--fm-line-card);
   border-radius: 18px;
-  background: white;
-  padding: 22px;
+  background: var(--fm-card);
+  padding: 16px 16px 18px;
 }
 .sectionHeading {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-bottom: 18px;
-  margin-bottom: 22px;
-  border-bottom: 1px solid #edf1ee;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--fm-line-row);
 }
-.sectionHeading h2 {
-  font-size: 17px;
+/* Two classes so it outranks the portal-wide `.portal h2` regardless of stylesheet order. */
+.section .sectionHeading h2 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--fm-accent);
 }
 .sectionHeading > span {
-  display: grid;
-  place-items: center;
-  background: #edf5ef;
-  color: #427560;
-  width: 27px;
-  height: 27px;
-  border-radius: 8px;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fm-faint);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 .field {
   display: grid;
-  gap: 8px;
-  margin-top: 20px;
+  gap: 7px;
+  margin-top: 16px;
   min-width: 0;
 }
 .labelRow {
@@ -53,27 +100,27 @@
 }
 .labelRow label,
 .choices legend {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 .labelRow span,
 .choices legend span {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 400;
-  color: #647a6e;
+  color: var(--fm-faint);
 }
 .form input:not([type='checkbox']),
 .form textarea,
 .form select {
-  min-height: 48px;
+  min-height: 50px;
   min-width: 0;
-  border: 1px solid #c8dbcf;
-  border-radius: 10px;
-  padding: 10px 13px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  padding: 12px 14px;
   font: inherit;
   font-size: 16px;
-  color: #203a36;
-  background: #fcfdfc;
+  color: var(--fm-ink);
+  background: var(--fm-card);
   width: 100%;
 }
 .form textarea {
@@ -81,115 +128,127 @@
 }
 .form input::placeholder,
 .form textarea::placeholder {
-  color: #798b80;
+  color: var(--fm-faint);
   font-size: 14px;
-}
-.form textarea:focus-visible,
-.form select:focus-visible {
-  outline: 3px solid #14947f;
-  outline-offset: 3px;
 }
 .row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
 .choices {
   border: 0;
   padding: 0;
-  margin: 24px 0 0;
+  margin: 18px 0 0;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 .choices legend {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .choices legend span {
   margin-left: 8px;
 }
+/* Option card: rounded-square marker, filled accent when chosen. */
 .choices label {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-  border: 1px solid #dce8e0;
-  border-radius: 10px;
-  padding: 12px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 13px;
   font-size: 14px;
-  min-height: 48px;
+  font-weight: 600;
+  min-height: 50px;
   cursor: pointer;
 }
-.choices label:has(input:checked) {
-  background: #edf6ef;
-  border-color: #649c82;
-}
 .choices input {
-  width: 18px;
-  height: 18px;
-  accent-color: #176a59;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--fm-faint);
+  border-radius: 7px;
+  background: var(--fm-card);
   flex-shrink: 0;
+  cursor: pointer;
+}
+.choices input:checked {
+  border-color: var(--fm-accent);
+  background: var(--fm-accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.5l3.2 3L15 6.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
 }
 .hint {
-  font-size: 12px;
-  color: #63796e;
+  font-size: 12.5px;
+  color: var(--fm-faint);
 }
 .errorSummary {
-  border: 1px solid #e5b9ac;
-  border-radius: 12px;
-  padding: 16px;
-  background: #fff3ec;
-  color: #8d392f;
-  font-size: 14px;
-  margin-bottom: 20px;
+  border: 1px solid var(--fm-urgent-line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: var(--fm-urgent-tint);
+  color: var(--fm-urgent);
+  font-size: 13.5px;
+  margin-bottom: 12px;
 }
 .fieldError {
-  color: #a3453c;
-  font-size: 12px;
+  color: var(--fm-urgent);
+  font-size: 12.5px;
 }
 .feedback {
-  margin-bottom: 22px;
+  margin-bottom: 12px;
 }
 .errorSummary h2 {
-  font-size: 17px;
-  margin-bottom: 8px;
+  font-size: 15px;
+  margin-bottom: 6px;
 }
 .errorSummary p {
-  margin-top: 8px;
+  margin-top: 6px;
+  color: var(--fm-ink);
 }
 .errorSummary a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  margin-top: 8px;
+  margin-top: 6px;
   font-weight: 600;
+  color: var(--fm-accent);
 }
 .errorSummary button {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .form [aria-invalid='true'] {
-  border-color: #b64e41 !important;
+  border-color: var(--fm-urgent) !important;
 }
 .submitArea {
   text-align: center;
   display: grid;
-  gap: 12px;
-  margin-top: 4px;
+  gap: 11px;
+  margin-top: 8px;
 }
 .submitArea p {
-  color: #5b7567;
-  font-size: 12px;
+  order: 1;
+  color: var(--fm-faint);
+  font-size: 12.5px;
 }
 .submitArea button {
   width: 100%;
   margin-top: 0 !important;
 }
 .submitArea a {
+  order: 2;
   display: grid;
   place-items: center;
   min-height: 44px;
-  font-size: 13px;
+  font-size: 13.5px;
+  font-weight: 500;
   text-decoration: none;
-  color: #526f60;
+  color: var(--fm-muted);
 }
 .srOnly {
   position: absolute;
@@ -200,11 +259,59 @@
   white-space: nowrap;
 }
 @media (max-width: 400px) {
-  .section {
-    padding: 18px;
-  }
   .row {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+}
+/* Desktop: two columns; the primary button stops being full width (except in the side column). */
+@media (min-width: 900px) {
+  /*
+   * Form sections on the left; intro, next steps and submit on the right, kept in view. Same ratio,
+   * gap and centred 1120px block as the other two-column tabs. !important lifts the shared
+   * single-column 640px cap (FamilyScreen's `.page > :not(.band)`), which is as specific and may load later.
+   */
+  .form,
+  .feedback {
+    max-width: 1120px !important;
+    margin-inline: auto !important;
+  }
+  .form {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    column-gap: 24px;
+    align-items: start;
+  }
+  .form > .errorSummary,
+  .form > .controls {
+    grid-column: 1;
+  }
+  .side {
+    display: grid;
+    gap: 12px;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    position: sticky;
+    top: 26px;
+  }
+  .side > .intro {
+    margin-bottom: 0 !important;
+  }
+  .submitArea {
+    justify-items: start;
+    text-align: left;
+  }
+  .submitArea button {
+    width: auto;
+    min-width: 240px;
+    padding-inline: 28px;
+  }
+  .side .submitArea {
+    justify-items: stretch;
+    text-align: center;
+  }
+  .side .submitArea button {
+    width: 100%;
+    min-width: 0;
   }
 }

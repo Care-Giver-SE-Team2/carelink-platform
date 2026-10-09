@@ -20,7 +20,7 @@ final class VitalSignMapper {
 				e.getValue(),
 				e.getUnit(),
 				e.isOutOfRange(),
-				e.getRecordedAt());
+				e.getRecordedAt(), e.getHealthRecordId());
 	}
 
 	static VitalSignJpaEntity toEntity(VitalSign d) {
@@ -32,6 +32,7 @@ final class VitalSignMapper {
 		e.setUnit(d.unit());
 		e.setOutOfRange(d.outOfRange());
 		e.setRecordedAt(d.recordedAt());
+        e.setHealthRecordId(d.healthRecordId());
 		return e;
 	}
 }

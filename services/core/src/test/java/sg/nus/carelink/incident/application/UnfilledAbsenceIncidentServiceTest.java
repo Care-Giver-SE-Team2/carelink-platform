@@ -14,6 +14,7 @@ import sg.nus.carelink.incident.support.InMemoryIncidentLogRepository;
 import sg.nus.carelink.incident.support.InMemoryIncidentRepository;
 import sg.nus.carelink.incident.support.IncidentFixtures;
 import sg.nus.carelink.incident.support.RecordingAlert;
+import sg.nus.carelink.incident.support.RecordingIncidentFamilyEvents;
 
 /**
  * UC-MG04 exception 3a: a visit an absence vacated that nobody can take becomes an incident with
@@ -30,7 +31,7 @@ class UnfilledAbsenceIncidentServiceTest {
 	@BeforeEach
 	void setUp() {
 		EscalationService escalation = new EscalationService(incidents, timeline,
-				FakeManagerDirectory.with(IncidentFixtures.ALICE, IncidentFixtures.BEN), new RecordingAlert(),
+				FakeManagerDirectory.with(IncidentFixtures.ALICE, IncidentFixtures.BEN), new RecordingAlert(), new RecordingIncidentFamilyEvents(),
 				EscalationPolicy.defaults(), clock);
 		service = new IncidentService(incidents, timeline, escalation, clock);
 	}

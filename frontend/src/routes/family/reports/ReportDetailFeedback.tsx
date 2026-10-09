@@ -1,17 +1,14 @@
-import { useState } from 'react'
+import { Link, Navigate } from 'react-router-dom'
 import { ApiError } from '../../../shared/api/client'
-import { FamilySignIn } from '../components/FamilySignIn'
 import styles from './FamilyReports.module.css'
 
 /** Recovers access to the same report; server errors never become report text.
  * @author Wang Zhili
  */
 export function ReportDetailFeedback({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const [signIn, setSignIn] = useState(false)
   const status = error instanceof ApiError ? error.status : undefined
-  if (status === 401 || signIn) {
-    return <FamilySignIn onSignedIn={onRetry} description="Sign in with your family account to continue reading this report." />
-  }
+  // The landing page is the only sign-in screen.
+  if (status === 401) return <Navigate to="/" replace />
   const forbidden = status === 403
   const missing = status === 404
   const invalid = status === 400
@@ -22,6 +19,6 @@ export function ReportDetailFeedback({ error, onRetry }: { error: unknown; onRet
       : invalid ? 'Check the report link or return to your reports.'
       : 'The report could not be loaded. Check your connection and try again.'}</p>
     {!missing && !invalid && <button onClick={onRetry}>Try again</button>}
-    {forbidden && <button onClick={() => setSignIn(true)}>Sign in with another account</button>}
+    {forbidden && <Link to="/">Sign in with another account</Link>}
   </section>
 }

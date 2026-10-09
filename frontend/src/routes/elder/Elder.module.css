@@ -107,21 +107,6 @@
   gap: 8px;
 }
 
-/* ---- extra services ---- */
-
-.requestPreview {
-  margin: 0;
-  font: 400 var(--note)/1.5 var(--font);
-  color: var(--text);
-}
-
-.requestAudience {
-  margin: 9px 0 0;
-  font: 400 var(--note-small)/1.6 var(--font);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-}
-
 /* ---- emergency: help is coming (one column at every size; the shell sets the gutter) ---- */
 
 .helpTitle {

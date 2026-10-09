@@ -63,11 +63,14 @@ class SpotCheckRepositoryAdapterTest {
 		when(jpa.findByCaregiverIdOrderByProposedTimeDescIdDesc(3L)).thenReturn(List.of(row, row));
 		when(jpa.findByOutcomeAndCheckedAtGreaterThanEqual(SpotCheckJpaEntity.Outcome.COMPLETED, since))
 				.thenReturn(List.of(row));
+		when(jpa.findByApprovalStatusAndOutcomeIsNull(SpotCheckJpaEntity.ApprovalStatus.PENDING_APPROVAL))
+				.thenReturn(List.of(row));
 
 		assertThat(adapter.findAll()).hasSize(1);
 		assertThat(adapter.findByElderIds(Set.of(2L))).hasSize(1);
 		assertThat(adapter.findByElderIds(Set.of())).isEmpty();
 		assertThat(adapter.findByCaregiverId(3L)).hasSize(2);
 		assertThat(adapter.findConcludedSince(since)).extracting(SpotCheck::id).containsExactly(7L);
+		assertThat(adapter.findAwaitingConsent()).extracting(SpotCheck::id).containsExactly(7L);
 	}
 }

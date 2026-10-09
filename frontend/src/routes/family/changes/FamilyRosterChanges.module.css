@@ -1,155 +1,324 @@
-/* Visit changes: the family portal's palette and shapes, as on the weekly schedule. */
-
-.changes {
-  overflow-wrap: anywhere;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
+/*
+ * Visit changes and spot checks: white header band, then labelled white cards on the tinted page,
+ * as on Schedule and Account. Shared by both pages, which have the same shape.
+ */
+.page {
+  composes: page from '../components/FamilyScreen.module.css';
 }
 
-.hero > p:last-child {
-  margin-top: 12px;
-  color: #60776f;
-  font-size: 14px;
+.hero {
+  composes: band from '../components/FamilyScreen.module.css';
+}
+
+.eyebrow,
+.label {
+  color: var(--fm-accent);
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  line-height: 1.2 !important;
+  text-transform: uppercase;
 }
 
 .eyebrow {
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 1.8px;
-  color: #48786b;
-  margin-bottom: 12px;
+  margin-bottom: 8px !important;
 }
 
-.heading {
-  font-size: 17px;
-  margin-bottom: 12px;
+.meta {
+  margin-top: 6px !important;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+  text-wrap: pretty;
 }
 
+/* Desktop: the shared two-column split (same position as the other tabs); stacked on a phone. */
+.split {
+  composes: split from '../components/FamilyScreen.module.css';
+}
+
+.column {
+  min-width: 0;
+}
+
+.column + .column {
+  padding-top: 22px;
+}
+
+/* Nothing waiting: a quiet white card where the requests would be. */
+.caughtUp {
+  margin-top: 12px !important;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  padding: 18px 16px;
+  background: var(--fm-card);
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+
+.note {
+  margin-top: 6px !important;
+  color: var(--fm-faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Loading, empty and error: one centred white card, as on Schedule. */
 .state {
-  padding: 20px;
-  background: #e7f1ed;
-  border: 1px solid #d3e4db;
+  border: 1px solid var(--fm-line-card);
   border-radius: 18px;
-  color: #36574d;
+  padding: 28px 20px;
+  background: var(--fm-card);
+  text-align: center;
 }
 
-.card {
-  padding: 20px;
-  margin-bottom: 14px;
-  background: white;
-  border: 1px solid #d3e4db;
-  border-radius: 18px;
+.state p {
+  margin-top: 8px !important;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+
+.state button {
+  margin-top: 18px;
+}
+
+.loading {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
-  color: #203a36;
+  min-height: 190px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
 }
 
-.when {
-  font-weight: 700;
-  font-size: 16px;
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--fm-line-control);
+  border-top-color: var(--fm-accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
 }
 
-.deadline {
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+/* One request waiting for an answer: what changed, then each way to answer, divided by row lines. */
+.card {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  padding: 18px 16px;
+  background: var(--fm-card);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rowTitle {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowSub {
+  margin-top: 3px !important;
+  color: var(--fm-muted);
   font-size: 13px;
-  font-weight: 650;
-  color: #8c6c1f;
+  line-height: 1.4;
+}
+
+.body {
+  color: var(--fm-secondary);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+/* Answer-by time: the amber pending pill. */
+.deadline {
+  justify-self: start;
+  border: 1px solid var(--fm-pending-line);
+  border-radius: 999px;
+  background: var(--fm-pending-tint);
+  padding: 6px 10px;
+  color: var(--fm-pending);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 
 .block {
-  padding-top: 12px;
-  border-top: 1px solid #e3ece8;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 10px;
+  border-top: 1px solid var(--fm-line-row);
+  padding-top: 14px;
 }
 
 .block fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
   border: 0;
   padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
-.block legend,
-.block > label {
-  font-size: 12px;
-  font-weight: 650;
-  color: #496d60;
-  margin-bottom: 6px;
+.fieldLabel {
+  padding: 0;
+  color: var(--fm-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Caregiver choices: rows in one bordered list; the chosen row takes the accent tint. */
+.options {
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 .option {
   display: flex;
-  gap: 10px;
   align-items: flex-start;
-  padding: 10px 12px;
-  border: 1px solid #cadbd7;
-  border-radius: 12px;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.option + .option {
+  border-top: 1px solid var(--fm-line-row);
+}
+
+.option:has(input:checked) {
+  background: var(--fm-accent-tint);
+}
+
+.option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--fm-accent);
 }
 
 .option span {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 2px;
+  min-width: 0;
+}
+
+.option strong {
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .option small {
-  color: #60776f;
+  color: var(--fm-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 .inline {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
 .inline input {
-  min-height: 46px;
-  padding: 10px 12px;
-  border: 1px solid #cadbd7;
-  border-radius: 12px;
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: var(--fm-card);
+  color: var(--fm-ink);
+  color-scheme: light;
   font: inherit;
-  color: #203a36;
-  background: white;
+  font-size: 15px;
 }
 
-.quiet {
-  background: transparent;
-  color: #36574d;
-  border: 1px solid #cadbd7;
+.inline button {
+  flex: none;
+}
+
+/* Outranks the portal's secondary button. */
+.card .primary {
+  width: 100%;
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
+  color: #fff;
+  font-size: 14px;
+}
+
+.card .primary:not(:disabled):hover {
+  background: var(--fm-accent-strong);
+}
+
+.card .primary:disabled {
+  border-color: var(--fm-disabled);
+  background: var(--fm-disabled);
+  color: #fff;
+}
+
+.card .quiet {
+  width: 100%;
+  color: var(--fm-secondary);
 }
 
 .error {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #fbf1ef;
-  color: #a13f30;
+  color: var(--fm-urgent);
+  font-size: 13px;
 }
 
-.history {
+/* Settled requests: rows in one white card, as on Account. */
+.list {
   list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  margin: 12px 0 0;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  padding: 2px 16px;
+  background: var(--fm-card);
 }
 
-.history li {
-  padding: 14px 16px;
-  background: #f6faf8;
-  border: 1px solid #e0ebe6;
-  border-radius: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.list li {
+  padding: 14px 0;
 }
 
-.history span {
-  color: #4f6b62;
-  font-size: 14px;
+.list li + li {
+  border-top: 1px solid var(--fm-line-row);
+}
+
+@media (min-width: 900px) {
+  .column + .column {
+    padding-top: 0;
+  }
+
+  .eyebrow,
+  .label {
+    font-size: 12px !important;
+  }
+
+  /* A lone message (loading, error, nothing yet) sits centred under the header, not against the rail. */
+  .page > .state {
+    margin-inline: auto;
+  }
 }

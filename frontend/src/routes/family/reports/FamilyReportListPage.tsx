@@ -3,6 +3,8 @@ import { useFamilyReportPage } from '../../../features/reports/useFamilyReportPa
 import { generatedByLabels, reportPeriod, statusLabels } from '../../../features/reports/presentation'
 import { ReportListFeedback } from './ReportListFeedback'
 import styles from './FamilyReports.module.css'
+import { useSelectedElder } from '../components/selectedElder'
+import { useIsDesktop } from '../components/useIsDesktop'
 
 /**
  * Shows family report metadata for the selected elder, with server-side pagination.
@@ -15,6 +17,8 @@ export function FamilyReportListPage() {
   const candidatePage = Number(params.get('page') ?? 0)
   const page = Number.isInteger(candidatePage) && candidatePage >= 0 && candidatePage <= 2147483647 ? candidatePage : 0
   const { resource, refresh } = useFamilyReportPage({ elderId, page })
+  const { setElderId } = useSelectedElder()
+  const desktop = useIsDesktop()
   const data = resource.status === 'success' ? resource.data : null
   const reports = data?.reports
   const pages = reports ? Math.ceil(reports.totalElements / reports.size) : 0
@@ -39,34 +43,42 @@ export function FamilyReportListPage() {
 
   return (
     <div className={styles.reports}>
-      <section className={styles.hero}>
-        <p className={styles.eyebrow}>YOUR FAMILY'S CARE</p>
-        <h1>Care reports</h1>
-        <p className={styles.intro}>Follow the care recorded for your loved one, one report at a time.</p>
-        <Link className={styles.readLink} to={`/family/reports/weekly${listParams.size ? `?${listParams}` : ''}`}>Read by week</Link>
-      </section>
+      <header className={styles.hero}>
+        <div>
+          <p className={styles.eyebrow}>{data?.elders.find((elder) => elder.id === data.selectedElderId)?.fullName ?? "Your family's care"}</p>
+          <h1>Care reports</h1>
+          <p className={styles.intro}>Every filed report, newest first.</p>
+        </div>
+        <Link className={desktop ? styles.headerAction : styles.readLink} to={`/family/reports/weekly${listParams.size ? `?${listParams}` : ''}`}>Read by week</Link>
+      </header>
       {resource.status === 'loading' && <p className={styles.loading} role="status">Loading your reports…</p>}
       {resource.status === 'error' && <ReportListFeedback error={resource.error} onRetry={refresh} onResetAccess={resetAccess} />}
       {data && <>
-        <div className={styles.toolbar}>
-          {data.elders.length > 0 && <div className={styles.elderPicker}>
+        {/* Phone only: on desktop the elder is chosen in the side rail. Refresh sits on the report count row. */}
+        {data.elders.length > 0 && !desktop && <div className={styles.toolbar}>
+          <div className={styles.elderPicker}>
             <label htmlFor="report-elder">Care for</label>
             <select id="report-elder" value={data.selectedElderId ?? ''}
-              onChange={(event) => changePage(0, Number(event.target.value))}>
+              onChange={(event) => { setElderId(Number(event.target.value)); changePage(0, Number(event.target.value)) }}>
               {data.elders.map((elder) => <option key={elder.id} value={elder.id}>{elder.fullName}</option>)}
             </select>
-          </div>}
-          <button onClick={reload}>Refresh</button>
-        </div>
+          </div>
+        </div>}
+        {data.elders.length === 0 && <div className={styles.refreshBar}>
+          <button className={styles.refresh} onClick={reload}>Refresh</button>
+        </div>}
         {data.elders.length === 0 && <section className={styles.state}>
           <h2>No linked elders yet</h2>
           <p>Your care reports will be available once a family binding is active. Contact your care team if you need help with access.</p>
-          <Link to="/family/intake">View my applications</Link>
+          <Link to="/family/service-applications">View my applications</Link>
         </section>}
         {reports && <>
           <div className={styles.summary}>
-            <strong>{reports.totalElements} {reports.totalElements === 1 ? 'report' : 'reports'}</strong>
-            {reports.items.length > 0 && <span>Showing {reports.page * reports.size + 1}–{reports.page * reports.size + reports.items.length} of {reports.totalElements}</span>}
+            <div className={styles.summaryText}>
+              <strong>{reports.totalElements} {reports.totalElements === 1 ? 'report' : 'reports'}</strong>
+              {reports.items.length > 0 && <span>Showing {reports.page * reports.size + 1}–{reports.page * reports.size + reports.items.length} of {reports.totalElements}</span>}
+            </div>
+            <button className={styles.refresh} onClick={reload}>Refresh</button>
           </div>
           {reports.items.length === 0 ? <section className={styles.state}>
             <h2>{page > 0 ? 'No reports on this page' : 'No care reports yet'}</h2>

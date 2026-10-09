@@ -25,6 +25,7 @@ final class ReportMapper {
 		return new Report(
 				e.getId(),
 				e.getElderId(),
+				e.getBasisId(),
 				e.getGeneratedByUserId(),
 				Report.Audience.valueOf(e.getAudience().name()),
 				new ReportPeriod(e.getPeriodStart(), e.getPeriodEnd()),
@@ -38,6 +39,7 @@ final class ReportMapper {
 		ReportJpaEntity e = new ReportJpaEntity();
 		e.setId(d.id());
 		e.setElderId(d.elderId());
+		e.setBasisId(d.basisId());
 		e.setGeneratedByUserId(d.generatedByUserId());
 		e.setAudience(ReportJpaEntity.Audience.valueOf(d.audience().name()));
 		e.setPeriodStart(d.period().start());

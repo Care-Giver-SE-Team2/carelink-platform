@@ -1,5 +1,14 @@
 import { ApiError } from '../../shared/api/client'
-import type { ReportAudience, ReportGeneratedBy, ReportStatus } from './types'
+import type {
+  ReportAmendmentKind,
+  ReportAudience,
+  ReportFigure,
+  ReportGeneratedBy,
+  ReportMetrics,
+  ReportPoint,
+  ReportSection,
+  ReportStatus,
+} from './types'
 
 /**
  * Everything the report screens display but do not fetch: labels, the date
@@ -20,9 +29,14 @@ export const audienceLabels: Record<ReportAudience, string> = {
 
 /** What each reader's version leaves out, in a line; shown so nobody has to open three reports to find out. */
 export const audienceNotes: Record<ReportAudience, string> = {
-  FAMILY: 'Caregivers by name, vital signs as ranges, with the medical disclaimer',
-  REGULATOR: 'The full record with caregivers by number; notes counted, not quoted',
-  INTERNAL: 'Everything, names included',
+  FAMILY: 'Caregivers by name, vital signs as ranges, no medical notes or inspection findings, with the medical disclaimer',
+  REGULATOR: 'The full record with the elder and caregivers by number; notes, comments and findings counted, not quoted',
+  INTERNAL: 'Everything, names, medical notes and findings included',
+}
+
+export const amendmentKindLabels: Record<ReportAmendmentKind, string> = {
+  CORRECTION: 'Correction',
+  FOLLOW_UP: 'Follow-up',
 }
 
 export const statusLabels: Record<ReportStatus, string> = {
@@ -185,4 +199,153 @@ export function problemDetail(error: unknown): string {
   }
 
   return error.message
+}
+
+/**
+ * A number as the report wrote it: no trailing zeros, no thousands separator.
+ * @param value 66.67, 3.5, 2
+ * @return "66.67", "3.5", "2"
+ */
+export function reportNumber(value: number): string {
+  return String(Number(value.toFixed(2)))
+}
+
+/**
+ * One figure in words.
+ * @param figure A count, a share of a total or a percentage
+ * @return "2 of 3", "66.67%", "1"
+ */
+export function figureText(figure: ReportFigure): string {
+  if (figure.unit === '%') return reportNumber(figure.value) + '%'
+  if (figure.outOf !== null) return `${reportNumber(figure.value)} of ${reportNumber(figure.outOf)}`
+  return reportNumber(figure.value)
+}
+
+/**
+ * The basis's numbers in one line for a row of the list.
+ * @param metrics The numbers, or nothing for a report filed before bases were kept
+ * @return "2 of 3 visits (66.67%) · 1 incident · rated 3.5", or a dash
+ */
+export function metricsLine(metrics: ReportMetrics | null | undefined): string {
+  if (!metrics) return '—'
+  const visits =
+    metrics.visitsPlanned === 0
+      ? 'no visits planned'
+      : `${metrics.visitsCompleted} of ${metrics.visitsPlanned} visits` +
+        (metrics.fulfilmentRate === null ? '' : ` (${reportNumber(metrics.fulfilmentRate)}%)`)
+  const incidents = `${metrics.incidentCount} ${metrics.incidentCount === 1 ? 'incident' : 'incidents'}`
+  const rating = metrics.averageElderRating === null ? 'not rated' : `rated ${reportNumber(metrics.averageElderRating)}`
+  return [visits, incidents, rating].join(' · ')
+}
+
+/** Where a series' points sit in a small chart, in the chart's own units. */
+export interface SparklineShape {
+  /** SVG path through the middle of each point. */
+  line: string
+  points: { x: number; low: number; high: number; mid: number; flagged: boolean }[]
+  min: number
+  max: number
+}
+
+/**
+ * Lays a series out in a small chart: points evenly spaced left to right in
+ * the order they were taken, values scaled between the lowest and the highest
+ * of the series. A point that is a day's range keeps both ends, so the chart
+ * can draw it as a bar rather than pretending to a single reading.
+ * @param points Oldest first
+ * @param width Chart width
+ * @param height Chart height
+ * @param pad Space kept clear at every edge
+ * @return The line and each point's position, or null with nothing to draw
+ */
+export function sparkline(points: ReportPoint[], width: number, height: number, pad = 4): SparklineShape | null {
+  if (points.length === 0) return null
+  const min = Math.min(...points.map((point) => point.low))
+  const max = Math.max(...points.map((point) => point.high))
+  const span = max - min
+  const y = (value: number) => (span === 0 ? height / 2 : pad + ((max - value) / span) * (height - 2 * pad))
+  const step = points.length === 1 ? 0 : (width - 2 * pad) / (points.length - 1)
+  const placed = points.map((point, index) => ({
+    x: points.length === 1 ? width / 2 : pad + index * step,
+    low: y(point.low),
+    high: y(point.high),
+    mid: y((point.low + point.high) / 2),
+    flagged: point.flagged,
+  }))
+  const line = placed.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.mid.toFixed(1)}`).join(' ')
+  return { line, points: placed, min, max }
+}
+
+/**
+ * The key a section is found by. Sections filed before keys existed have none,
+ * and get the one the backend would make from the title.
+ * @param section A section of a report
+ * @return "vital-signs", "ratings-and-spot-checks"
+ */
+export function sectionKey(section: Pick<ReportSection, 'key' | 'title'>): string {
+  if (section.key) return section.key
+  return section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/** How a status reads at a glance: done, waiting, wrong, or neither. */
+export type ReportTone = 'ok' | 'warn' | 'bad' | 'neutral'
+
+/** One line of a section body, split into what a row shows. */
+export interface ReportLine {
+  /** The line as the report wrote it. */
+  text: string
+  /** A timeline step under the line before it. */
+  nested: boolean
+  /** "Tue 15 Sep 10:15", "Mon 14 Sep" or "14 Sep – 20 Sep", when the line has one. */
+  time: string | null
+  /** The other parts, in the report's order, without the time and the status. */
+  parts: string[]
+  /** The part that says how the thing stands, when there is one. */
+  status: { text: string; tone: ReportTone } | null
+}
+
+const DAY_PART = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)( \d{2}:\d{2})?$/
+const SPAN_PART = /^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) – \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/
+
+/*
+ * The states the report's sections write, as the assemblers word them
+ * (ReportAssembler and the three readers' versions). A part has to be one of
+ * these whole; "evidence 2 of 2 verified" is not "verified".
+ */
+const STATUSES: [RegExp, ReportTone][] = [
+  [/^(verified|done|approved|meets the standard)$/, 'ok'],
+  [/^resolved( .+)?$/i, 'ok'],
+  [/^approved and booked( as visit \d+)?$/, 'ok'],
+  [/ took the visit$/, 'ok'],
+  [/^replaced by .+$/, 'ok'],
+  [/^(scheduled|caregiver arrived|in progress|awaiting the elder's confirmation|planned)$/, 'warn'],
+  [/^(still being followed up|waiting for the family's choice|awaiting the family|awaiting the family's approval|awaiting the family's consent)$/, 'warn'],
+  [/^(OPEN|UNRESOLVED_ESCALATED)$/, 'bad'],
+  [/^(ACKNOWLEDGED|IN_PROGRESS)$/, 'warn'],
+  [/^(ended in an exception|needs improvement|the caregiver did not turn up|no replacement found yet|uncovered|out of range)$/, 'bad'],
+  [/^(cancelled|cancelled at the family's request|closed without the elder's confirmation|declined|declined by the family|withdrawn|called off|skipped|skipped at the family's request|moved to another time)$/, 'neutral'],
+  [/^rescheduled( with .+)?$/, 'neutral'],
+]
+
+/**
+ * Splits a body line on the report's own separator, " · ", into the time it
+ * happened, the state it ended in, and everything else. A line the report wrote
+ * as a sentence comes back with no time, one part and no status, so a screen
+ * can show it as it is.
+ * @param line A line of a section body, as sectionLines gives it
+ * @return The line in parts
+ */
+export function reportLine(line: { text: string; nested: boolean }): ReportLine {
+  const all = line.text.split(' · ')
+  const timeAt = all.findIndex((part) => DAY_PART.test(part) || SPAN_PART.test(part))
+  const rest = timeAt < 0 ? all : all.filter((_, index) => index !== timeAt)
+  let status: ReportLine['status'] = null
+  const parts: string[] = []
+  for (const part of rest) {
+    const match: [RegExp, ReportTone] | undefined =
+      status === null && rest.length > 1 ? STATUSES.find(([pattern]) => pattern.test(part)) : undefined
+    if (match) status = { text: part, tone: match[1] }
+    else parts.push(part)
+  }
+  return { text: line.text, nested: line.nested, time: timeAt < 0 ? null : all[timeAt], parts, status }
 }

@@ -11,15 +11,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.visit.domain.model.Visit;
 import sg.nus.carelink.visit.domain.repository.VisitRepository;
+import sg.nus.carelink.visit.domain.repository.VisitCommandRepository;
 
 @Service
 @Transactional
 class VisitSchedulingService implements VisitScheduling {
 
 	private final VisitRepository visits;
+	private final VisitCommandRepository commands;
 
-	VisitSchedulingService(VisitRepository visits) {
+	VisitSchedulingService(VisitRepository visits, VisitCommandRepository commands) {
 		this.visits = visits;
+		this.commands = commands;
 	}
 
 	@Override
@@ -53,9 +56,19 @@ class VisitSchedulingService implements VisitScheduling {
 	public int cancelUntouchedFrom(Long carePlanId, LocalDateTime from) {
 		List<Visit> untouched = visits.findByCarePlanIdStartingFrom(carePlanId, from).stream()
 				.filter(Visit::hasNotStarted)
+				.sorted(java.util.Comparator.comparing(Visit::id))
 				.toList();
-		untouched.forEach(visit -> visits.save(visit.cancelled()));
-		return untouched.size();
+		int cancelled = 0;
+		// Plan refresh runs AFTER the plan commits. Lock/re-read avoids leaving a stopped
+		// plan's visits open when SYS03 advances their version between selection and save.
+		for (Visit candidate : untouched) {
+			var current = commands.lock(candidate.id()).filter(Visit::hasNotStarted);
+			if (current.isPresent()) {
+				commands.save(current.get().cancelled());
+				cancelled++;
+			}
+		}
+		return cancelled;
 	}
 
 	@Override

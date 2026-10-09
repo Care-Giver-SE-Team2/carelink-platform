@@ -110,8 +110,10 @@
   color: var(--danger);
 }
 
-.coverText {
-  color: var(--accent);
+/* Approved leave: hatched, matching the Day view. */
+.onLeave,
+.onLeave:hover {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--border-light) 6px 7px);
 }
 
 .track {

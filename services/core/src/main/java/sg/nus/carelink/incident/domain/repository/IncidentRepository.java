@@ -17,6 +17,8 @@ public interface IncidentRepository {
 
 	Optional<Incident> findById(Long id);
 
+    PageSlice<Incident> findCaregiverReports(Long actorUserId, Long visitId, int page, int size);
+
 	Incident save(Incident incident);
 
 	/**

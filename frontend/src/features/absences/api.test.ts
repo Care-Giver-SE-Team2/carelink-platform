@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   approveAbsence,
+  assignCaregiver,
   confirmCoverage,
   decideChange,
   getAbsence,
@@ -96,6 +97,12 @@ describe('absence writes', () => {
     request = lastRequest(fetchMock)
     expect(request.url).toBe('/api/absences/4/rerostering-runs')
     expect(JSON.parse(String(request.init.body))).toEqual({ objective: 'EVEN_WORKLOAD' })
+
+    await assignCaregiver(4, 100, 10)
+    request = lastRequest(fetchMock)
+    expect(request.url).toBe('/api/absences/4/changes/100/assignment')
+    expect(request.init.method).toBe('POST')
+    expect(JSON.parse(String(request.init.body))).toEqual({ caregiverId: 10 })
 
     await confirmCoverage(4)
     expect(lastRequest(fetchMock).url).toBe('/api/absences/4/coverage-confirmation')

@@ -15,7 +15,9 @@ import sg.nus.carelink.visit.domain.repository.VisitRepository;
  * <p>The application service is exercised without Spring or a database.
  */
 class InMemoryVisitRepository
-        implements VisitRepository {
+        implements VisitRepository, sg.nus.carelink.visit.domain.repository.VisitCommandRepository {
+
+    @Override public Optional<Visit> lock(Long id) { return findById(id); }
 
     private final Map<Long, Visit> rows =
             new HashMap<>();

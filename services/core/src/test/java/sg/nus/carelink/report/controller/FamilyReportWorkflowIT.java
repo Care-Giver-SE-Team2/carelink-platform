@@ -155,7 +155,7 @@ class FamilyReportWorkflowIT {
 					.isEqualTo("Tue 22 Sep 10:00 · Fall reported · Slipped in the bathroom, no injury. · resolved Tue 22 Sep 10:30");
 			assertThat(detail.path("createdAt").asString()).isEqualTo("2026-09-28T00:30:00+08:00");
 			assertThat(detail.path("disclaimer").asString()).isEqualTo(DISCLAIMER);
-			assertThat(detail.toString()).doesNotContain("Manager Private", "INTERNAL-ONLY", "out of range", "OTHER-FAMILY");
+			assertThat(detail.toString()).doesNotContain("Manager Private", "INTERNAL-ONLY", "basisId", "metrics", "authorUserId", "OTHER-FAMILY");
 			var summary = getJson(family, "/api/elders/101/weekly-summary?weekStart=2026-09-21");
 			assertThat(summary.path("reportId").longValue()).isEqualTo(reportId);
 			assertThat(summary.path("periodStart").asString()).isEqualTo("2026-09-21");

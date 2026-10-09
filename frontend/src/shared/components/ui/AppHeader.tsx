@@ -58,13 +58,14 @@ export function AppHeaderUser({ name, roleLabel }: AppHeaderUserInfo) {
  * Top bar for every role's client; only the user's `roleLabel` differs between them.
  * `contextLine` defaults to a live "Today · <date> · <time>" clock; a page can replace it
  * with a breadcrumb. `trailing` replaces the user block with page-specific status (which
- * can include an AppHeaderUser of its own).
+ * can include an AppHeaderUser of its own). `notifications` (the bell) stays whatever `trailing` is.
  */
 export function AppHeader({
   product = 'CareLink',
   contextLine,
   user,
   trailing,
+  notifications,
   onLogout,
 }: {
   product?: string
@@ -72,6 +73,7 @@ export function AppHeader({
   /** Undefined while the session is still loading. */
   user?: AppHeaderUserInfo
   trailing?: ReactNode
+  notifications?: ReactNode
   onLogout: () => void
 }) {
   return (
@@ -81,6 +83,7 @@ export function AppHeader({
         <span className={styles.context}>{contextLine ?? <LiveClock />}</span>
       </div>
       <div className={styles.right}>
+        {notifications}
         {trailing ?? (user && <AppHeaderUser {...user} />)}
         <button type="button" className={styles.logout} onClick={onLogout}>
           Log out

@@ -92,6 +92,20 @@ public record AbsenceReport(
 				Objects.requireNonNull(managerUserId, "managerUserId"));
 	}
 
+	/**
+	 * The confirmation no longer holds: the nightly roster only looks a fortnight ahead, so visits
+	 * on the absence's later days can appear after a manager confirmed the earlier ones. The
+	 * absence goes back to needing re-rostering and a fresh confirmation.
+	 */
+	public AbsenceReport coverageReopened() {
+		return new AbsenceReport(id, caregiverId, reviewedByUserId, type, startDate, endDate, reason, status,
+				createdAt, updatedAt, null, null);
+	}
+
+	public boolean isCoverageConfirmed() {
+		return coverageConfirmedAt != null;
+	}
+
 	public boolean isApproved() {
 		return status == Status.APPROVED;
 	}

@@ -7,6 +7,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import sg.nus.carelink.rostering.application.AbsenceCoverageService;
+import sg.nus.carelink.rostering.application.LeaveCoverService;
+import sg.nus.carelink.rostering.application.LeaveReminderService;
 import sg.nus.carelink.rostering.application.RecurringRosterService;
 import sg.nus.carelink.rostering.application.UncoveredVisitService;
 
@@ -14,12 +17,16 @@ import sg.nus.carelink.rostering.application.UncoveredVisitService;
  * The nightly trigger of UC-MG03: rolls every elder's visit window forward a day, so a plan
  * published once keeps producing visits. It also runs once at start-up, so plans published
  * before this feature existed, or while the application was down over the nightly run, get
- * their visits straight away instead of at the next 02:30. What each refresh does is decided in
+ * their visits straight away instead of at the next midnight. What each refresh does is decided in
  * {@link RecurringRosterService}; this file is the only one that knows a timer is involved.
+ * Each elder's refresh is followed by {@link LeaveCoverService}: visits it gave to a primary
+ * caregiver who is on leave go to whoever already covers the elder for that absence.
+ * After the refresh, absences whose coverage was confirmed are checked again, since the refresh
+ * may have put new visits on their days; any it did are re-rostered ({@link AbsenceCoverageService}).
  *
  * <p>Each elder is refreshed in a transaction of their own, so one elder's failure is logged
  * and skipped rather than holding back everyone else's visits; the next run tries again.
- * Early morning in Singapore by default ({@code carelink.roster.schedule-cron},
+ * Midnight in Singapore by default ({@code carelink.roster.schedule-cron},
  * {@code carelink.roster.schedule-zone}); a cron of {@code -} switches the run off.
  */
 @Component
@@ -29,10 +36,17 @@ class RosterScheduler {
 
 	private final RecurringRosterService roster;
 	private final UncoveredVisitService uncovered;
+	private final AbsenceCoverageService coverage;
+	private final LeaveCoverService leaveCover;
+	private final LeaveReminderService leaveReminders;
 
-	RosterScheduler(RecurringRosterService roster, UncoveredVisitService uncovered) {
+	RosterScheduler(RecurringRosterService roster, UncoveredVisitService uncovered, AbsenceCoverageService coverage,
+			LeaveCoverService leaveCover, LeaveReminderService leaveReminders) {
 		this.roster = roster;
 		this.uncovered = uncovered;
+		this.coverage = coverage;
+		this.leaveCover = leaveCover;
+		this.leaveReminders = leaveReminders;
 	}
 
 	/**
@@ -58,8 +72,31 @@ class RosterScheduler {
 		}
 	}
 
+	/**
+	 * Every 15 minutes by default: a visit on approved leave that starts within a day and is
+	 * still with the caregiver who is away gets an incident, once, so a manager re-rosters it.
+	 */
 	@Scheduled(
-			cron = "${carelink.roster.schedule-cron:0 30 2 * * *}",
+			fixedDelayString = "${carelink.roster.leave-reminder-interval:PT15M}",
+			initialDelayString = "${carelink.roster.leave-reminder-initial-delay:PT2M}")
+	void remindOfLeaveVisits() {
+		int raised = 0;
+		for (var due : leaveReminders.dueStillOnLeave()) {
+			try {
+				if (leaveReminders.remind(due)) {
+					raised++;
+				}
+			} catch (RuntimeException failure) {
+				log.error("Could not raise the leave reminder for visit {}", due.visitId(), failure);
+			}
+		}
+		if (raised > 0) {
+			log.info("Visits on leave still not re-rostered, incidents raised: {}", raised);
+		}
+	}
+
+	@Scheduled(
+			cron = "${carelink.roster.schedule-cron:0 0 0 * * *}",
 			zone = "${carelink.roster.schedule-zone:Asia/Singapore}")
 	void refreshNightly() {
 		refreshAllElders();
@@ -73,6 +110,7 @@ class RosterScheduler {
 	private void refreshAllElders() {
 		int created = 0;
 		int cancelled = 0;
+		int covered = 0;
 		for (Long elderId : roster.eldersToRefresh()) {
 			try {
 				var refresh = roster.refreshElder(elderId);
@@ -80,8 +118,33 @@ class RosterScheduler {
 				cancelled += refresh.cancelled();
 			} catch (RuntimeException failure) {
 				log.error("Roster refresh failed for elder {}", elderId, failure);
+				continue;
+			}
+			try {
+				covered += leaveCover.continueCover(elderId);
+			} catch (RuntimeException failure) {
+				log.error("Could not give elder {}'s visits on leave days to their cover", elderId, failure);
 			}
 		}
-		log.info("Roster refresh: {} visits created, {} cancelled", created, cancelled);
+		log.info("Roster refresh: {} visits created, {} cancelled, {} given to a cover during leave", created, cancelled,
+				covered);
+		recheckConfirmedAbsences();
+	}
+
+	/** The refresh may have put new visits on the days of an absence a manager already confirmed. */
+	private void recheckConfirmedAbsences() {
+		int reopened = 0;
+		for (Long absenceId : coverage.confirmedAbsencesStillAhead()) {
+			try {
+				if (coverage.rerosterAddedVisits(absenceId)) {
+					reopened++;
+				}
+			} catch (RuntimeException failure) {
+				log.error("Could not recheck coverage of absence {}", absenceId, failure);
+			}
+		}
+		if (reopened > 0) {
+			log.info("Absences with added visits re-rostered and reopened for review: {}", reopened);
+		}
 	}
 }

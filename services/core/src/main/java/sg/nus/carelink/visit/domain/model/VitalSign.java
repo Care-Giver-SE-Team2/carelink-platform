@@ -19,5 +19,9 @@ public record VitalSign(
 		BigDecimal value,
 		String unit,
 		boolean outOfRange,
-		LocalDateTime recordedAt) {
+		LocalDateTime recordedAt,
+        Long healthRecordId) {
+    public VitalSign(Long id, Long visitId, String metric, BigDecimal value, String unit, boolean outOfRange, LocalDateTime recordedAt) {
+        this(id, visitId, metric, value, unit, outOfRange, recordedAt, null);
+    }
 }

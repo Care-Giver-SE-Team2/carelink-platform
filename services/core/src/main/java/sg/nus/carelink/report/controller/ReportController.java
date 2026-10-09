@@ -2,6 +2,7 @@ package sg.nus.carelink.report.controller;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,9 +27,12 @@ import sg.nus.carelink.report.controller.dto.FamilyReportPageResponse;
 import sg.nus.carelink.report.controller.dto.ReportRequests;
 import sg.nus.carelink.report.controller.dto.ReportResponses;
 import sg.nus.carelink.report.domain.model.Report;
+import sg.nus.carelink.report.domain.model.ReportMetrics;
+import sg.nus.carelink.report.domain.model.ReportPage;
 
 /**
- * HTTP for UC-MG07: generate the period's reports, list them, read one, append a correction.
+ * HTTP for UC-MG07: generate the period's reports, list them, read one, append a correction or
+ * a follow-up.
  *
  * <p>Presentation only - HTTP in, HTTP out, status codes. Talks to application services, never
  * to a repository (ArchUnit enforces it). The paths are the ones drafted in
@@ -72,9 +76,9 @@ public class ReportController {
 			Principal principal) {
 
 		Long requestedBy = identity.require(principal.getName()).id();
-		return service.generate(body.elderId(), body.periodStart(), body.periodEnd(), requestedBy).stream()
-				.map(ReportResponses.ReportView::of)
-				.toList();
+		List<Report> filed = service.generate(body.elderId(), body.periodStart(), body.periodEnd(), requestedBy);
+		Map<Long, ReportMetrics> metrics = service.metricsFor(filed);
+		return filed.stream().map(report -> ReportResponses.ReportView.of(report, metrics)).toList();
 	}
 
 	/** Lists the authenticated role's report projection; family scope comes only from the session. */
@@ -94,7 +98,8 @@ public class ReportController {
 			}
 			return FamilyReportPageResponse.of(familyReports.page(authentication.getName(), elderId, audience, page, size));
 		}
-		return ReportResponses.Page.of(service.page(elderId, audience, page, size));
+		ReportPage found = service.page(elderId, audience, page, size);
+		return ReportResponses.Page.of(found, service.metricsFor(found.items()));
 	}
 
 	/** One report: its sections, its disclaimer if it has one, and every correction. */
@@ -104,10 +109,14 @@ public class ReportController {
 		if (authentication.getAuthorities().stream().anyMatch(role -> role.getAuthority().equals("ROLE_FAMILY"))) {
 			return FamilyReportDetailResponse.of(familyReports.findDetail(authentication.getName(), id));
 		}
-		return ReportResponses.Detail.of(service.findDetail(id));
+		Report report = service.findDetail(id);
+		return ReportResponses.Detail.of(report, service.metricsFor(List.of(report)));
 	}
 
-	/** The one change a filed report accepts: a dated, signed correction appended to it. */
+	/**
+	 * The one change a filed report accepts: a dated, signed note appended to it - a correction,
+	 * or a follow-up on something it recorded.
+	 */
 	@PostMapping("/{id}/amendments")
 	@ResponseStatus(HttpStatus.CREATED)
 	@PreAuthorize("hasRole('MANAGER')")
@@ -117,6 +126,6 @@ public class ReportController {
 			Principal principal) {
 
 		Long author = identity.require(principal.getName()).id();
-		return ReportResponses.Amendment.of(service.amend(id, body.note(), author));
+		return ReportResponses.Amendment.of(service.amend(id, body.kindOrCorrection(), body.note(), author));
 	}
 }

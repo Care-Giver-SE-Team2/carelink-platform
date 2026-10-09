@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 
 import {
   approveAbsence,
+  assignCaregiver,
   confirmCoverage,
   rejectAbsence,
   rerosterAbsence,
@@ -159,7 +160,12 @@ export default function AbsenceDetail() {
                 <h2 className={styles.sectionTitle}>Vacated visits ({data.changes.length})</h2>
                 <ul className={styles.cards}>
                   {data.changes.map((change) => (
-                    <ChangeCard key={change.id} change={change} />
+                    <ChangeCard
+                      key={change.id}
+                      change={change}
+                      working={working}
+                      onAssign={(caregiverId) => act(() => assignCaregiver(id, change.id, caregiverId))}
+                    />
                   ))}
                 </ul>
               </section>
@@ -187,8 +193,20 @@ function Header({ data }: { data: AbsenceCase }) {
   )
 }
 
-/** One vacated visit: where it stands, and every candidate the search considered. */
-function ChangeCard({ change }: { change: ChangeView }) {
+/**
+ * One vacated visit: where it stands, and every candidate the search considered.
+ * Where the manager may hand-pick, each candidate who passed every rule can be
+ * put on the visit; the server checks them again against the roster as it is now.
+ */
+function ChangeCard({
+  change,
+  working,
+  onAssign,
+}: {
+  change: ChangeView
+  working: boolean
+  onAssign: (caregiverId: number) => void
+}) {
   return (
     <li className={styles.card}>
       <div className={styles.cardHead}>
@@ -225,6 +243,7 @@ function ChangeCard({ change }: { change: ChangeView }) {
               <th>Candidate</th>
               <th>Score</th>
               <th>Why</th>
+              {change.managerMayAssign && <th aria-label="Assign" />}
             </tr>
           </thead>
           <tbody>
@@ -251,6 +270,21 @@ function ChangeCard({ change }: { change: ChangeView }) {
                     </ul>
                   </details>
                 </td>
+                {change.managerMayAssign && (
+                  <td>
+                    {candidate.outcome === 'SUGGESTED' && (
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        disabled={working}
+                        aria-label={`Assign ${candidate.name}`}
+                        onClick={() => onAssign(candidate.caregiverId)}
+                      >
+                        Assign
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -44,3 +44,25 @@ export function revokeFamilyBinding(
     },
   )
 }
+/** Family-facing incoming binding requests and decisions. */
+export interface IncomingFamilyBinding {
+  id: number
+  elderId: number
+  elderName: string
+  relationship: string
+  primaryContact: boolean
+  accessScope: 'FULL' | 'READ_ONLY'
+  status: 'PENDING_CONFIRMATION' | 'ACTIVE' | 'REJECTED' | 'REVOKED'
+  confirmedAt: string | null
+  createdAt: string | null
+}
+
+export function getIncomingFamilyBindings(): Promise<IncomingFamilyBinding[]> {
+  return api<IncomingFamilyBinding[]>('/family/family-bindings')
+}
+
+export function decideIncomingFamilyBinding(bindingId: number, approve: boolean): Promise<IncomingFamilyBinding> {
+  return api<IncomingFamilyBinding>(`/family/family-bindings/${bindingId}/decision`, {
+    method: 'POST', body: JSON.stringify({ approve }),
+  })
+}

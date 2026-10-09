@@ -14,7 +14,6 @@ const LEGEND: LegendItem[] = [
   { label: 'assigned', swatch: 'assigned' },
   { label: 'closed', swatch: 'closed' },
   { label: 'exception', swatch: 'exception' },
-  { label: 'needs cover', swatch: 'needs_cover' },
 ]
 
 /**

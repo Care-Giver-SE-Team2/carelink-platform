@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import sg.nus.carelink.report.domain.model.ReportAmendment;
+
 /**
  * The request bodies of UC-MG07, kept together because they are two small shapes read by one
  * controller.
@@ -38,10 +40,25 @@ public final class ReportRequests {
 		}
 	}
 
-	/** Body of {@code POST /api/reports/{id}/amendments}. */
+	/**
+	 * Body of {@code POST /api/reports/{id}/amendments}.
+	 *
+	 * @param kind CORRECTION or FOLLOW_UP; a note sent without one is a correction, which is
+	 *             what every note was before follow-ups existed
+	 */
 	public record Amend(
 			@NotBlank(message = "note is required")
 			@Size(max = 1000, message = "note must be at most 1000 characters")
-			String note) {
+			String note,
+
+			ReportAmendment.Kind kind) {
+
+		public Amend(String note) {
+			this(note, null);
+		}
+
+		public ReportAmendment.Kind kindOrCorrection() {
+			return kind == null ? ReportAmendment.Kind.CORRECTION : kind;
+		}
 	}
 }

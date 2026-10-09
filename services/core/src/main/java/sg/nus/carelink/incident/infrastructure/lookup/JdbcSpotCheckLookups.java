@@ -37,6 +37,13 @@ class JdbcSpotCheckLookups implements SpotCheckLookups {
 
 	private static final String FAMILY_MEMBER = "select id from family_member where user_id = :userId";
 
+	/** The family's asks are the notifications the alert wrote: the request, and any reminders. */
+	private static final String LAST_ASKED = """
+			select max(created_at) from notification
+			where resource_type = 'SPOT_CHECK' and resource_id = :checkId
+			  and event_type in ('SPOT_CHECK_REQUESTED', 'SPOT_CHECK_REMINDER')
+			""";
+
 	private final JdbcClient jdbc;
 
 	JdbcSpotCheckLookups(JdbcClient jdbc) {
@@ -61,6 +68,12 @@ class JdbcSpotCheckLookups implements SpotCheckLookups {
 	@Override
 	public Optional<Long> familyMemberIdOf(Long userId) {
 		return jdbc.sql(FAMILY_MEMBER).param("userId", userId).query(Long.class).optional();
+	}
+
+	@Override
+	public Optional<LocalDateTime> lastAskedAt(Long checkId) {
+		return Optional.ofNullable(jdbc.sql(LAST_ASKED).param("checkId", checkId).query(Timestamp.class).single())
+				.map(Timestamp::toLocalDateTime);
 	}
 
 	private static VisitFacts visitFacts(ResultSet rs, int row) throws SQLException {

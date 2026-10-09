@@ -40,5 +40,5 @@ export function useIntakeSubmission() {
     }
   }
 
-  return { state, submit, dismissError: () => setState({ status: 'idle' }) }
+  return { state, submit }
 }

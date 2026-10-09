@@ -14,6 +14,7 @@ import sg.nus.carelink.incident.support.IncidentFixtures;
 import sg.nus.carelink.incident.support.InMemoryIncidentLogRepository;
 import sg.nus.carelink.incident.support.InMemoryIncidentRepository;
 import sg.nus.carelink.incident.support.RecordingAlert;
+import sg.nus.carelink.incident.support.RecordingIncidentFamilyEvents;
 
 /**
  * UC-SYS02: the scan that turns an expired countdown into an escalation.
@@ -28,6 +29,7 @@ class EscalationScanServiceTest {
 	private final InMemoryIncidentRepository incidents = new InMemoryIncidentRepository();
 	private final InMemoryIncidentLogRepository timeline = new InMemoryIncidentLogRepository();
 	private final RecordingAlert alert = new RecordingAlert();
+	private final RecordingIncidentFamilyEvents familyEvents = new RecordingIncidentFamilyEvents();
 	private final FakeManagerDirectory directory =
 			FakeManagerDirectory.with(IncidentFixtures.ALICE, IncidentFixtures.BEN);
 
@@ -108,6 +110,10 @@ class EscalationScanServiceTest {
 		assertThat(after.status()).isEqualTo(Incident.Status.UNRESOLVED_ESCALATED);
 		assertThat(after.resolvedAt()).isNull();
 		assertThat(timeline.actionsFor(raised.id())).contains("CHAIN_EXHAUSTED");
+		assertThat(familyEvents.events()).extracting(event -> event.type().name())
+				.containsExactly("INCIDENT_RAISED", "INCIDENT_UNRESOLVED");
+		assertThat(scanAt(RAISED_AT.plusHours(3)).sweep()).isZero();
+		assertThat(familyEvents.events()).hasSize(2);
 	}
 
 	@Test
@@ -130,7 +136,7 @@ class EscalationScanServiceTest {
 	private IncidentService serviceAt(LocalDateTime moment) {
 		Clock clock = IncidentFixtures.clockAt(moment);
 		EscalationService escalation =
-				new EscalationService(incidents, timeline, directory, alert, EscalationPolicy.defaults(), clock);
+				new EscalationService(incidents, timeline, directory, alert, familyEvents, EscalationPolicy.defaults(), clock);
 		return new IncidentService(incidents, timeline, escalation, clock);
 	}
 
@@ -140,6 +146,6 @@ class EscalationScanServiceTest {
 
 	private EscalationService escalationAt(LocalDateTime moment) {
 		return new EscalationService(
-				incidents, timeline, directory, alert, EscalationPolicy.defaults(), IncidentFixtures.clockAt(moment));
+				incidents, timeline, directory, alert, familyEvents, EscalationPolicy.defaults(), IncidentFixtures.clockAt(moment));
 	}
 }

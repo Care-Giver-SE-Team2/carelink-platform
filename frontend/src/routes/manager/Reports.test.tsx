@@ -121,13 +121,59 @@ function json(body: unknown, status = 200) {
   })
 }
 
-type Amendment = { id: number; note: string; authorUserId: number; createdAt: string }
+type Amendment = { id: number; kind?: string; note: string; authorUserId: number; createdAt: string }
+
+/**
+ * A report filed since sections carried their numbers and readings: the
+ * internal version as ReportControllerTest serialises it, shortened.
+ */
+const WITH_FIGURES = [
+  {
+    key: 'overview',
+    title: 'Overview',
+    body: 'Tan Ah Mei · 85 years old · female · walks with a cane · lives alone\nVisits: 2 of 3 carried out (66.67%).',
+    figures: [
+      { key: 'visits', label: 'Visits carried out', value: 2, outOf: 3, unit: null },
+      { key: 'fulfilment', label: 'Fulfilment', value: 66.67, outOf: null, unit: '%' },
+      { key: 'rating', label: 'Average visit rating', value: 3.5, outOf: 5, unit: null },
+    ],
+    series: [],
+  },
+  {
+    key: 'vital-signs',
+    title: 'Vital signs',
+    body: 'Mon 14 Sep 09:10 · visit 11 · Systolic 128 mmHg\nWed 16 Sep 09:10 · visit 12 · Systolic 142 mmHg · out of range',
+    figures: [],
+    series: [
+      {
+        key: 'systolic',
+        label: 'Systolic',
+        unit: 'mmHg',
+        points: [
+          { at: '2026-09-14T09:10', low: 128, high: 128, flagged: false },
+          { at: '2026-09-16T09:10', low: 142, high: 142, flagged: true },
+        ],
+      },
+    ],
+  },
+]
+
+const METRICS = {
+  visitsPlanned: 3,
+  visitsCompleted: 2,
+  fulfilmentRate: 66.67,
+  vitalsOutOfRange: 1,
+  incidentCount: 1,
+  averageElderRating: 3.5,
+  ratingCount: 2,
+  dataComplete: false,
+}
 
 /**
  * A stand-in for the report module that remembers what it has filed and what
  * has been appended, so every read after a write returns the new state.
  */
-function createServer(options: { alreadyFiled?: boolean; listStatus?: number } = {}) {
+function createServer(options: { alreadyFiled?: boolean; listStatus?: number; withFigures?: boolean } = {}) {
   const filed = new Map<number, { summary: ReturnType<typeof summary>; amendments: Amendment[] }>()
 
   function file(createdAt: string) {
@@ -145,6 +191,16 @@ function createServer(options: { alreadyFiled?: boolean; listStatus?: number } =
       authorUserId: 11,
       createdAt: '2026-09-21T09:30:00',
     })
+    if (options.withFigures) {
+      filed.forEach((entry) => Object.assign(entry.summary, { basisId: 8, metrics: METRICS }))
+      filed.get(42)?.amendments.push({
+        id: 2,
+        kind: 'FOLLOW_UP',
+        note: 'Grab bar fitted on Thursday.',
+        authorUserId: 11,
+        createdAt: '2026-09-24T15:00:00',
+      })
+    }
   }
 
   const fetchMock = vi.fn().mockImplementation((input: string, init: RequestInit = {}) => {
@@ -207,7 +263,7 @@ function createServer(options: { alreadyFiled?: boolean; listStatus?: number } =
         )
       }
       const entry = filed.get(Number(amend[1]))
-      const stored = { id: 7, note: body.note, authorUserId: 11, createdAt: '2026-09-24T11:25:02.118000000' }
+      const stored = { id: 7, kind: body.kind, note: body.note, authorUserId: 11, createdAt: '2026-09-24T11:25:02.118000000' }
       entry?.amendments.push(stored)
       return Promise.resolve(json(stored, 201))
     }
@@ -223,7 +279,9 @@ function createServer(options: { alreadyFiled?: boolean; listStatus?: number } =
       return Promise.resolve(
         json({
           ...entry.summary,
-          sections: SECTIONS[entry.summary.audience],
+          sections: options.withFigures && entry.summary.audience === 'INTERNAL'
+            ? WITH_FIGURES
+            : SECTIONS[entry.summary.audience],
           disclaimer: entry.summary.audience === 'FAMILY' ? DISCLAIMER : null,
           amendments: entry.amendments,
         }),
@@ -348,6 +406,19 @@ describe('the report list', () => {
     expect(refusal).not.toHaveTextContent('Request failed with status 400.')
   })
 
+  it("shows each row's numbers from its basis, and a dash for a report without one", async () => {
+    createServer({ alreadyFiled: true, withFigures: true })
+    openConsole('/manager/reports')
+
+    const rows = await screen.findAllByRole('row')
+    expect(within(rows[1]).getByText('2 of 3 visits (66.67%) · 1 incident · rated 3.5')).toBeInTheDocument()
+    cleanup()
+
+    createServer({ alreadyFiled: true })
+    openConsole('/manager/reports')
+    expect(within((await screen.findAllByRole('row'))[1]).getByText('—')).toBeInTheDocument()
+  })
+
   it('narrows the list to one reader', async () => {
     createServer({ alreadyFiled: true })
     openConsole('/manager/reports')
@@ -385,14 +456,14 @@ describe('one report', () => {
       'Vital signs',
       'Observations',
       'Incidents',
-      'Corrections — appended, never edited',
+      'Corrections and follow-ups — appended, never edited',
     ])
     expect(
       within(screen.getByRole('region', { name: 'Data incomplete' })).getByText('Visit 13 on 2026-09-18 not closed'),
     ).toBeInTheDocument()
     expect(screen.getByText('Systolic 128–142 mmHg')).toBeInTheDocument()
     expect(screen.getByText(DISCLAIMER)).toBeInTheDocument()
-    expect(screen.getByText('No corrections have been appended.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing has been appended.')).toBeInTheDocument()
   })
 
   it('shows the internal version without a disclaimer, the timeline under its incident, and its corrections', async () => {
@@ -401,11 +472,32 @@ describe('one report', () => {
 
     expect(await screen.findByText('Internal report — Elder #1')).toBeInTheDocument()
     expect(screen.queryByText(DISCLAIMER)).not.toBeInTheDocument()
-    expect(
-      screen.getByText('Tue 15 Sep 10:21 · CLAIMED · Ben Lim (demo-ben) · taken over; countdown stopped'),
-    ).toBeInTheDocument()
+
+    const incidents = screen.getByRole('region', { name: 'Incidents' })
+    expect(within(incidents).getByText('RESOLVED')).toHaveAttribute('data-tone', 'ok')
+    expect(within(incidents).getByText('incident 2')).toBeInTheDocument()
+    const steps = [...incidents.querySelectorAll('ol li')].map((step) => step.textContent)
+    expect(steps).toEqual([
+      'Tue 15 Sep 10:21CLAIMED · Ben Lim (demo-ben) · taken over; countdown stopped',
+      'Resolution: HANDLED_ON_SITE :: No injury. Bathroom grab bar to be fitted this week.',
+    ])
     expect(screen.getByText('Visit 13 was cancelled by the family.')).toBeInTheDocument()
     expect(screen.getByText('21 Sep 2026 09:30 · user #11')).toBeInTheDocument()
+  })
+
+  it('lays visits out as rows with their state, and the notes as quotes', async () => {
+    createServer({ alreadyFiled: true })
+    openConsole('/manager/reports/42')
+
+    const visits = await screen.findByRole('region', { name: 'Service completion' })
+    expect(within(visits).getByText('3 visits: 1 scheduled, 2 verified.')).toBeInTheDocument()
+    expect(within(visits).getByText('Mon 14 Sep 09:00')).toBeInTheDocument()
+    expect(within(visits).getByText('verified')).toHaveAttribute('data-tone', 'ok')
+    expect(within(visits).getByText('Daniel Goh (caregiver #3) · evidence 2 of 2 verified')).toBeInTheDocument()
+
+    const notes = screen.getByRole('region', { name: 'Observations' })
+    expect(within(notes).getByText('Mon 14 Sep 09:00 · visit 11 · Daniel Goh (caregiver #3) · Mobility')).toBeInTheDocument()
+    expect(within(notes).getByText('Walked to the void deck with the cane, steady on her feet.')).toBeInTheDocument()
   })
 
   it('appends a correction and reads the report again rather than adding it on screen', async () => {
@@ -426,6 +518,7 @@ describe('one report', () => {
     const appended = requestsTo(fetchMock, /\/api\/reports\/40\/amendments$/, 'POST')
     expect(JSON.parse(String(appended[0][1].body))).toEqual({
       note: 'Grace was in hospital on Friday; the visit was not due.',
+      kind: 'CORRECTION',
     })
     expect(new Headers(appended[0][1].headers).get('X-XSRF-TOKEN')).toBe('manager-token')
     expect(requestsTo(fetchMock, /\/api\/reports\/40$/)).toHaveLength(2)
@@ -443,6 +536,50 @@ describe('one report', () => {
     expect(refusal).toHaveTextContent('Request validation failed — note: note is required')
     expect(refusal).not.toHaveTextContent('Request failed with status 400.')
     expect(screen.getByText('Family report — Elder #1')).toBeInTheDocument()
+  })
+
+  it("shows a section's numbers above its text and its readings as a chart", async () => {
+    createServer({ alreadyFiled: true, withFigures: true })
+    openConsole('/manager/reports/42')
+
+    const overview = await screen.findByRole('region', { name: 'Overview' })
+    const visits = within(overview).getByRole('group', { name: 'Visits carried out: 2 of 3' })
+    expect(within(visits).getByText('66.67% as planned')).toBeInTheDocument()
+    expect(within(overview).getByRole('group', { name: 'Average visit rating: 3.5 of 5' })).toBeInTheDocument()
+    expect(within(overview).queryByRole('group', { name: /^Fulfilment/ })).not.toBeInTheDocument()
+    expect(within(overview).getByText('Tan Ah Mei · 85 years old · female · walks with a cane · lives alone')).toBeInTheDocument()
+
+    const vitals = screen.getByRole('region', { name: 'Vital signs' })
+    expect(within(vitals).getByRole('img', { name: 'Systolic: 2 points, 128–142 mmHg, 1 out of range' })).toBeInTheDocument()
+    expect(within(vitals).getByText('128–142 mmHg')).toBeInTheDocument()
+    expect(within(vitals).getByText('1 point out of range')).toBeInTheDocument()
+    expect(within(vitals).getByText('Every reading (2)')).toBeInTheDocument()
+    expect(within(vitals).getByText('Wed 16 Sep 09:10 · visit 12 · Systolic 142 mmHg · out of range')).toHaveAttribute(
+      'data-flagged',
+      'true',
+    )
+  })
+
+  it('tells a follow-up from a correction and appends one', async () => {
+    const fetchMock = createServer({ alreadyFiled: true, withFigures: true })
+    openConsole('/manager/reports/42')
+    const user = userEvent.setup()
+
+    await screen.findByText('Internal report — Elder #1')
+    expect(screen.getByText('Grab bar fitted on Thursday.').parentElement).toHaveTextContent('Follow-up')
+    expect(screen.getByText('Visit 13 was cancelled by the family.').parentElement).toHaveTextContent('Correction')
+
+    await user.selectOptions(screen.getByLabelText('Kind of note'), 'FOLLOW_UP')
+    await user.type(screen.getByLabelText('Follow-up'), 'Family told about the new grab bar.')
+    await user.click(screen.getByRole('button', { name: 'Append follow-up' }))
+
+    expect(await screen.findByText('Family told about the new grab bar.')).toBeInTheDocument()
+    const appended = requestsTo(fetchMock, /\/api\/reports\/42\/amendments$/, 'POST')
+    expect(JSON.parse(String(appended[0][1].body))).toEqual({
+      note: 'Family told about the new grab bar.',
+      kind: 'FOLLOW_UP',
+    })
+    expect(screen.getByLabelText('Kind of note')).toHaveValue('CORRECTION')
   })
 
   it("shows the server's sentence for a report that does not exist", async () => {

@@ -24,6 +24,9 @@ public interface SpotCheckAlert {
 	/** The manager called the request off; the family hears it is not going ahead. */
 	void withdrawn(SpotCheck check, Names names);
 
+	/** The family has not answered; they are asked again. Silence is never taken as a yes. */
+	void reminded(SpotCheck check, Names names);
+
 	/** The words a message needs that the check itself does not hold. */
 	record Names(String elderName, String caregiverName) {
 	}

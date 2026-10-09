@@ -1,0 +1,28 @@
+.page { composes: page from '../components/FamilyScreen.module.css'; display: grid; gap: 20px; }
+.band { composes: band from '../components/FamilyScreen.module.css'; }
+.band h1, .band p { margin: 0; }
+.eyebrow { color: var(--fm-accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.card { padding: 20px; border: 1px solid var(--fm-line-card); border-radius: 18px; background: var(--fm-card); display: grid; gap: 16px; }
+.card h2 { margin: 0; }
+.field { display: grid; gap: 7px; font-weight: 700; }
+.field input, .field select, .field textarea { min-height: 42px; border: 1px solid var(--fm-line-card); border-radius: 10px; padding: 9px 11px; background: white; font: inherit; }
+.field textarea { min-height: 96px; resize: vertical; }
+.twoColumns, .scores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.scores { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.decisions { display: grid; gap: 9px; border: 1px solid var(--fm-line-card); border-radius: 12px; padding: 14px; }
+.decisions label { display: flex; gap: 9px; align-items: center; }
+.primary { min-height: 44px; width: fit-content; padding: 9px 18px; border: 1px solid var(--fm-accent); border-radius: 12px; background: var(--fm-accent); color: white; font-weight: 800; }
+.primary:disabled { opacity: .6; }
+.review { display: grid; gap: 10px; padding: 15px 0; border-top: 1px solid var(--fm-line-row); }
+.review:first-of-type { border-top: 0; }
+.review p { margin: 3px 0 0; }
+dl { display: grid; gap: 6px; margin: 0; }
+dl div { display: flex; justify-content: space-between; gap: 16px; }
+dt { color: var(--fm-muted); } dd { margin: 0; font-weight: 750; text-align: right; }
+.error, .success { padding: 14px; border-radius: 14px; }
+.error { border: 1px solid #c66; background: #fff3f3; color: #8b1d1d; }
+.success { border: 1px solid #72a982; background: #f0fbf3; color: #245d34; }
+.muted { color: var(--fm-muted); }
+@media (max-width: 680px) { .twoColumns, .scores { grid-template-columns: 1fr; } }
+/* Desktop: the single 640px column sits centred under the header, not against the rail. */
+@media (min-width: 900px) { .page > :not(.band) { width: 100%; margin-inline: auto; } }

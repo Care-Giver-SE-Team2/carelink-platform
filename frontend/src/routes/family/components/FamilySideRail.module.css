@@ -1,0 +1,163 @@
+/* Desktop side rail: white, card line on the right, pinned to the viewport while the main column scrolls. */
+.rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  border-right: 1px solid var(--fm-line-card);
+  background: var(--fm-card);
+  padding: 26px 16px 20px;
+  overflow-y: auto;
+}
+
+.wordmark {
+  padding: 0 10px;
+  color: var(--fm-accent) !important;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+/* Elder switcher: a native select laid over the card opens the platform picker. */
+.elder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 26px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.elder:has(.picker:hover) {
+  border-color: var(--fm-line-control);
+}
+
+.elder:has(.picker:focus-visible) {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 2px;
+}
+
+.label {
+  color: var(--fm-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.elderName {
+  margin-top: 7px !important;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.elderMeta {
+  margin-top: 2px !important;
+  color: var(--fm-muted);
+  font-size: 12.5px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.chevron {
+  color: var(--fm-muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.picker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 22px;
+}
+
+.nav a,
+.account {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+.nav a {
+  gap: 12px;
+  padding: 11px 12px;
+  color: var(--fm-muted);
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.nav svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.nav a:hover,
+.account:hover {
+  background: var(--fm-page);
+  color: var(--fm-ink);
+}
+
+.nav a[aria-current='page'],
+.account[aria-current='page'] {
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+  font-weight: 600;
+}
+
+.account {
+  gap: 11px;
+  margin-top: auto;
+  padding: 10px 12px;
+  color: var(--fm-ink) !important;
+}
+
+.avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.accountName {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.accountLabel {
+  display: block;
+  color: var(--fm-muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.3;
+}

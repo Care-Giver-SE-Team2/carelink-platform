@@ -57,7 +57,10 @@ function detailRequests(fetchMock: ReturnType<typeof installApi>) {
 function openSchedule() {
   return render(
     <MemoryRouter initialEntries={['/family/schedule']}>
-      <Routes><Route path="/family/*" element={<FamilyHome />} /></Routes>
+      <Routes>
+        <Route path="/" element={<h1>Landing</h1>} />
+        <Route path="/family/*" element={<FamilyHome />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -235,7 +238,7 @@ describe('Family caregiver details', () => {
     expect(await within(dialog).findByRole('button', { name: retry })).toBeInTheDocument()
     const retained = section === 'profile' ? qualification.credentialTypeName : profile.fullName
     expect(await within(dialog).findByText(retained)).toBeInTheDocument()
-    expect(screen.getByText('Tan Mei')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Tan Mei' })).toBeInTheDocument()
     expect(screen.getByText('Bathing assistance')).toBeInTheDocument()
     expect(screen.getByText(/Schedule checked/)).toBeInTheDocument()
     expect(within(dialog).queryByText('No public qualifications')).not.toBeInTheDocument()
@@ -292,13 +295,13 @@ describe('Family caregiver details', () => {
     const failed = path === profilePath ? pendingProfile : pendingQualifications
     const other = path === profilePath ? pendingQualifications : pendingProfile
     await act(async () => { failed.resolve(new Response(null, { status })) })
-    expect(await screen.findByRole('heading', { name: status === 401 ? 'Sign in to continue' : 'Schedule access unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: status === 401 ? 'Landing' : 'Schedule access unavailable' })).toBeInTheDocument()
     expectProtectedDataCleared()
     expect(detailRequests(fetchMock).find(([requestedPath]) => requestedPath !== path)?.[1].signal?.aborted).toBe(true)
 
     await act(async () => { other.resolve(json(path === profilePath ? [qualification] : profile)) })
     expectProtectedDataCleared()
-    expect(screen.getByRole('heading', { name: status === 401 ? 'Sign in to continue' : 'Schedule access unavailable' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: status === 401 ? 'Landing' : 'Schedule access unavailable' })).toBeInTheDocument()
   })
 
   it.each([401, 403])('removes already visible caregiver details and schedule data after a qualification refresh returns %s', async (status) => {
@@ -310,7 +313,7 @@ describe('Family caregiver details', () => {
     const dialog = await expectDetailsLoaded()
     accessLost = true
     await user.click(within(dialog).getByRole('button', { name: 'Refresh details' }))
-    expect(await screen.findByRole('heading', { name: status === 401 ? 'Sign in to continue' : 'Schedule access unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: status === 401 ? 'Landing' : 'Schedule access unavailable' })).toBeInTheDocument()
     expectProtectedDataCleared()
   })
 

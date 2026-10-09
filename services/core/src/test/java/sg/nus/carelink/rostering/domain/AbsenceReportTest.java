@@ -92,6 +92,19 @@ class AbsenceReportTest {
 	}
 
 	@Test
+	void aConfirmationCanBeWithdrawnAndGivenAgain() {
+		AbsenceReport confirmed = saved(AbsenceReport.recordedByManager(5L, AbsenceReport.Type.ANNUAL, TODAY,
+				TODAY.plusDays(20), null, 11L, TODAY)).coverageConfirmedBy(12L, TODAY.atTime(15, 0));
+		assertThat(confirmed.isCoverageConfirmed()).isTrue();
+
+		AbsenceReport reopened = confirmed.coverageReopened();
+		assertThat(reopened.isCoverageConfirmed()).isFalse();
+		assertThat(reopened.coverageConfirmedByUserId()).isNull();
+		assertThat(reopened.isApproved()).as("only the confirmation goes; the leave still stands").isTrue();
+		assertThat(reopened.coverageConfirmedBy(13L, TODAY.atTime(16, 0)).coverageConfirmedByUserId()).isEqualTo(13L);
+	}
+
+	@Test
 	void theWindowRunsFromTheFirstMidnightToTheMidnightAfterTheLastDay() {
 		AbsenceReport absence = AbsenceReport.recordedByManager(5L, AbsenceReport.Type.SICK, TODAY, TODAY.plusDays(1),
 				null, 11L, TODAY);

@@ -2002,7 +2002,8 @@ paths:
       tags:
       - Visits
       summary: Check in to start the visit
-      x-status: draft
+      x-status: implemented
+      x-superseded-by: openapi.yaml#/paths/~1visits~1{visitId}~1check-in/post
       description: 'UC-CG03. Legal only from `SCHEDULED`; any other current state is rejected with `409` and the attempt is
         still written to `visit_state_transition` as `REJECTED`.
 
@@ -2023,12 +2024,13 @@ paths:
       tags:
       - Visits
       summary: List visit tasks for the current role
-      x-status: draft
+      x-status: implemented
       x-family-status: implemented
-      x-implemented-roles: [FAMILY]
+      x-implemented-roles: [FAMILY, CAREGIVER]
+      x-superseded-by: openapi.yaml#/paths/~1visits~1{visitId}~1tasks/get
       description: >-
-        Implemented for FAMILY only. The caregiver task projection remains specified but unimplemented
-        on this endpoint; other roles currently receive 403. The existing caregiver work-pack is separate.
+        FAMILY and CAREGIVER projections are implemented in openapi.yaml. FAMILY keeps its existing whitelist;
+        CAREGIVER requires current assignment and an uncancelled visit. Other roles receive 403.
         Each family request independently validates the visit's actual elder and current binding before
         reading its tasks, even when the task list is empty. An absent visit returns 404; an existing visit
         outside current family access returns 403; invalid visit ID syntax returns 400. Access outcomes
@@ -2107,7 +2109,8 @@ paths:
       tags:
       - Visits
       summary: Mark a care-plan task done
-      x-status: draft
+      x-status: implemented
+      x-superseded-by: openapi.yaml#/paths/~1visits~1{visitId}~1tasks~1{taskId}~1complete/post
       requestBody:
         content:
           application/json:
@@ -2451,11 +2454,12 @@ paths:
       tags:
       - Incidents
       summary: Report a care exception
-      x-status: draft
-      description: 'UC-CG04. Also created automatically by the missed-check-in scheduled scan (`source: SYSTEM_MISSED_CHECKIN`)
-        — a visit nobody checked in for is converted into an exception rather than left to vanish.
-
-        '
+      x-status: implemented
+      x-superseded-by: openapi.yaml#/paths/~1incidents/post
+      description: >-
+        UC-CG04 caregiver HTTP reporting is implemented in openapi.yaml with server-derived identity/elder,
+        current visit assignment, version and UUID command receipt. This old body/response is superseded.
+        MG03 has an uncovered-visit scan; assigned-caregiver missed check-in SYS03 remains unimplemented.
       requestBody:
         required: true
         content:
@@ -2486,49 +2490,14 @@ paths:
         Who reported it, who responded, every notification attempt, and when the bound family member acknowledged
         it — this is the query that replaces the three-day chat-log reconstruction.
 
-
-
-        For FAMILY, authorise access using the authenticated family identity, an ACTIVE and unexpired binding to
-        the actual incident elder, and the applicable access scope. Derive the current familyMemberId from the
-        session; the caller cannot choose another family member. The existence, delivery success or read state of
-        a notification is not an authorisation condition. An otherwise authorised family member may read the
-        incident and record their own view or acknowledgement even if no IN_APP notification exists or
-        notification creation/delivery failed. Urgent alerts cannot be disabled through optional subscription
-        preferences; that rule never overrides binding/access checks. The response window starts with the first
-        successful urgent IN_APP notification creation for this incident/recipient and uses the configured
-        interval (default two hours); further notices, polling and email retries do not reset it. GET
-        /incidents/{id} returns acknowledgeBy, which is null when no response window has been established. A
-        missing or failed notification does not block reading, viewing or acknowledging the incident. Later
-        notification creation must preserve any already-recorded acknowledgement and must not restart waiting
-        reminders for that family member. This recipient window is independent of manager incident status,
-        respondBy and escalation. A family response contains safe incident facts, handling status and only the
-        current family member's acknowledgement. Exclude raw coordinates, playbook, internal logs,
-        responder/reporter user IDs and other recipients' acknowledgements. A GET is an access audit event, not
-        proof of an explicit view or acknowledgement. The family page records a successful display with POST
-        /incidents/{id}/view. Authorised non-family roles retain the full original incident timeline.
-
-
-        Family callers are identified from the authenticated session, never a caller-supplied familyMemberId. For
-        family callers, care resources require an ACTIVE binding to their actual elder, with no revocation and no
-        elapsed expiresAt, and the applicable access scope at request time. Revocation/expiry takes effect on
-        subsequent reads and writes, including historical content. Reading a family care resource records the
-        caller, resource and server access time in the internal audit trail. Read access alone does not imply
-        explicit acknowledgement. FULL/READ_ONLY do not imply different clinical field sets: both may use the
-        family read projections below; an authorised family member may record their own incident
-        view/acknowledgement under either scope because those commands record that family member's response, not a
-        change to the elder care record. Notification read commands separately require ownership of the
-        notification; no notification record is required for these incident operations.
+        Family reads use GET /family/incidents/{id}; this endpoint remains MANAGER-only.
       responses:
         '200':
-          description: >-
-            Family response uses the explicitly listed family schema. Other roles retain the original response
-            schema; the server chooses by authenticated role, never by a client projection flag.
+          description: The manager incident detail and full handling timeline.
           content:
             application/json:
               schema:
-                anyOf:
-                - $ref: '#/components/schemas/FamilyIncidentDetail'
-                - $ref: '#/components/schemas/IncidentDetail'
+                $ref: '#/components/schemas/IncidentDetail'
         '401':
           $ref: '#/components/responses/FamilyUnauthorized'
         '403':
@@ -2536,12 +2505,68 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
       x-contract-status: specified
-      x-family-use-cases:
-      - UC-FM05
-      x-family-owner: Member 4 (FM01-FM05 behaviour); source data remains with its assigned owner.
       security:
       - sessionCookie: []
       operationId: getIncident
+  /family/incidents/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    get:
+      tags:
+        - Incidents
+      summary: Get the current family's safe incident detail
+      operationId: getFamilyIncident
+      x-status: implemented
+      x-implemented-roles: [FAMILY]
+      x-family-status: implemented
+      x-contract-status: specified
+      x-family-use-cases: [UC-FM05]
+      x-family-owner: Member 4 (FM01-FM05 behaviour); source data remains with its assigned owner.
+      security:
+        - sessionCookie: []
+      description: >-
+        UC-FM05. Resolve the current family profile from an enabled account with the current
+        FAMILY role. Require an ACTIVE, unexpired binding to the actual incident elder.
+        FULL and READ_ONLY both permit this read. Recheck authorization on every request;
+        client familyMemberId, elderId or projection parameters cannot select another identity
+        or override the incident's elder. A notification is not required for access.
+        Return safe incident facts, global handling status and only this family's receipt;
+        exclude raw coordinates, location text, staff account IDs, playbook, internal timeline
+        and other family receipts. Times include the Singapore +08:00 offset.
+        A missing receipt returns an empty projection with the current familyMemberId and
+        null id, viewedAt, acknowledgedAt and responseNote. GET never inserts or updates a
+        receipt, marks a notification read or changes incident handling. Record the account,
+        incident, outcome and server access time in the internal audit; an audit outage
+        returns 503 without care content. An absent incident returns 404 and inaccessible
+        incident returns 403. The manager's original GET /incidents/{id} remains separate.
+        acknowledgeBy is this family's immutable response deadline established by the FM05
+        Observer's first successful urgent IN_APP message creation (default two hours).
+        It is null without an FM05 window, even when a legacy notification exists; never copy
+        manager respondBy. The consumer is implemented; production event hookup and old family
+        generator handoff remain pending. POST /incidents/{id}/view records a successful display;
+        POST /incidents/{id}/acknowledge records explicit acknowledgement. Neither marks a notification read.
+      responses:
+        '200':
+          description: Safe incident detail and only the current family's acknowledgement.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyIncidentDetail'
+        '400':
+          $ref: '#/components/responses/FamilyValidationError'
+        '401':
+          $ref: '#/components/responses/FamilyUnauthorized'
+        '403':
+          $ref: '#/components/responses/FamilyForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/FamilyAuditUnavailable'
       x-family-response-schema:
         $ref: '#/components/schemas/FamilyIncidentDetail'
   /incidents/{id}/claim:
@@ -2838,8 +2863,21 @@ paths:
       tags:
       - Incidents
       summary: Acknowledge an urgent alert
-      x-status: draft
+      x-status: implemented
+      x-implemented-roles: [FAMILY]
+      x-family-status: implemented
       description: >-
+        Implemented for FAMILY with current account, profile and binding authorization.
+        A successful command commits its receipt and success audit together. A storage failure
+        rolls both back and returns 500; an audit outage returns 503 without accepting the
+        receipt. Denied and failed application commands are audited after rollback, without
+        care content or responseNote. Timestamps include Singapore +08:00. No notification
+        is required. Personal windows are established only by the FM05 Observer, independently
+        of these commands. Waiting reminders are not implemented.
+        An absent body, empty object or null responseNote means no note. Preserve the
+        first note, including null or empty text; do not trim it. Accept only a string
+        or null responseNote up to 255 characters; reject unknown fields and other types.
+
         For FAMILY, authorise access using the authenticated family identity, an ACTIVE and unexpired binding to
         the actual incident elder, and the applicable access scope. Derive the current familyMemberId from the
         session; the caller cannot choose another family member. The existence, delivery success or read state of
@@ -2849,7 +2887,7 @@ paths:
         preferences; that rule never overrides binding/access checks. The response window starts with the first
         successful urgent IN_APP notification creation for this incident/recipient and uses the configured
         interval (default two hours); further notices, polling and email retries do not reset it. GET
-        /incidents/{id} returns acknowledgeBy, which is null when no response window has been established. A
+        /family/incidents/{id} returns acknowledgeBy, which is null when no response window has been established. A
         missing or failed notification does not block reading, viewing or acknowledging the incident. Later
         notification creation must preserve any already-recorded acknowledgement and must not restart waiting
         reminders for that family member. This recipient window is independent of manager incident status,
@@ -2857,7 +2895,7 @@ paths:
         characters. Atomically create/update one record per incident/family pair. The first accepted request fixes
         acknowledgedAt and responseNote; repeated/concurrent requests return 200 with the original values, even if
         a retry carries a different note. The command does not fabricate viewedAt or mark another notification
-        read. Acknowledgement stops further waiting reminders for this recipient only. Late acknowledgements,
+        read. Once waiting reminders are implemented, acknowledgement stops further waiting reminders for this recipient only. Late acknowledgements,
         including after incident resolution, are recorded at their true server time while access remains valid;
         they do not undo prior escalation, alter incident.status, resolve the incident or stop the manager
         escalation chain.
@@ -2899,6 +2937,14 @@ paths:
           $ref: '#/components/responses/FamilyForbidden'
         '404':
           $ref: '#/components/responses/FamilyNotFound'
+        '500':
+          description: Receipt storage failed; the receipt and success audit are rolled back.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          $ref: '#/components/responses/FamilyAuditUnavailable'
       x-contract-status: specified
       x-use-cases:
       - UC-FM05
@@ -3901,13 +3947,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FamilyIncidentAcknowledgement'
+        '400':
+          $ref: '#/components/responses/FamilyValidationError'
         '401':
           $ref: '#/components/responses/FamilyUnauthorized'
         '403':
           $ref: '#/components/responses/FamilyForbidden'
         '404':
           $ref: '#/components/responses/FamilyNotFound'
-      x-status: draft
+        '500':
+          description: Receipt storage failed; the receipt and success audit are rolled back.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          $ref: '#/components/responses/FamilyAuditUnavailable'
+      x-status: implemented
+      x-implemented-roles: [FAMILY]
+      x-family-status: implemented
       x-contract-status: specified
       x-use-cases:
       - UC-FM05
@@ -3916,6 +3974,15 @@ paths:
       - sessionCookie: []
       operationId: familyPostIncidentsIdView
       description: >-
+        Implemented for FAMILY with current account, profile and binding authorization.
+        A successful command commits its receipt and success audit together. A storage failure
+        rolls both back and returns 500; an audit outage returns 503 without accepting the
+        receipt. Denied and failed application commands are audited after rollback, without
+        care content or responseNote. Timestamps include Singapore +08:00. No notification
+        is required. Personal windows are established only by the FM05 Observer, independently
+        of these commands. Waiting reminders are not implemented.
+        Send no JSON request body; a supplied body returns 400.
+
         For FAMILY, authorise access using the authenticated family identity, an ACTIVE and unexpired binding to
         the actual incident elder, and the applicable access scope. Derive the current familyMemberId from the
         session; the caller cannot choose another family member. The existence, delivery success or read state
@@ -3925,7 +3992,7 @@ paths:
         preferences; that rule never overrides binding/access checks. The response window starts with the first
         successful urgent IN_APP notification creation for this incident/recipient and uses the configured
         interval (default two hours); further notices, polling and email retries do not reset it. GET
-        /incidents/{id} returns acknowledgeBy, which is null when no response window has been established. A
+        /family/incidents/{id} returns acknowledgeBy, which is null when no response window has been established. A
         missing or failed notification does not block reading, viewing or acknowledging the incident. Later
         notification creation must preserve any already-recorded acknowledgement and must not restart waiting
         reminders for that family member. This recipient window is independent of manager incident status,
@@ -5520,6 +5587,7 @@ components:
       enum:
       - CAREGIVER
       - ELDER_SOS
+      - ELDER_SERVICE_DISPUTE
       - SYSTEM_MISSED_CHECKIN
     IncidentCategory:
       type: string
@@ -6696,21 +6764,86 @@ components:
       - page
       - size
       - totalElements
+    ReportFigure:
+      type: object
+      required: [key, label, value]
+      properties:
+        key:
+          type: string
+          example: visits
+        label:
+          type: string
+          example: Visits carried out
+        value:
+          type: number
+          example: 2
+        outOf:
+          type: number
+          nullable: true
+          example: 3
+        unit:
+          type: string
+          nullable: true
+          description: '"%" for a rate; null otherwise.'
+    ReportSeries:
+      type: object
+      required: [key, label, points]
+      properties:
+        key:
+          type: string
+          example: systolic
+        label:
+          type: string
+          example: Systolic
+        unit:
+          type: string
+          nullable: true
+          example: mmHg
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportPoint'
+    ReportPoint:
+      type: object
+      required: [at, low, high, flagged]
+      properties:
+        at:
+          type: string
+          description: ISO-8601 local date-time for a reading ("2026-09-14T09:10"), or a date for a day's range ("2026-09-14").
+        low:
+          type: number
+        high:
+          type: number
+          description: Equal to low for a single reading.
+        flagged:
+          type: boolean
+          description: A reading behind the point was flagged out of range when it was entered.
     FamilyReportSection:
       type: object
       additionalProperties: false
       properties:
+        key:
+          type: string
+          description: Stable chapter key, derived from its title for legacy reports.
         title:
           type: string
           minLength: 1
         body:
           type: string
+        figures:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFigure'
+        series:
+          type: array
+          description: FAMILY daily ranges only; never individual timestamped readings from other audiences.
+          items:
+            $ref: '#/components/schemas/ReportSeries'
       description: >-
-        Family-filtered text. Caregiver identity is name only, no staff performance, vital signs are ranges rather
-        than raw readings, and other elders are excluded.
-      required:
-      - title
-      - body
+        Saved FAMILY chapters including Overview, Services and Ratings and spot checks.
+        No internal basis, staff identifiers, medical notes or inspection findings are exposed.
+        Legacy reports retain their original text with empty figures and series.
+      required: [key, title, body, figures, series]
     FamilyReportAmendment:
       type: object
       additionalProperties: false
@@ -6719,16 +6852,17 @@ components:
           type: integer
           format: int64
           minimum: 1
+        kind:
+          type: string
+          enum: [CORRECTION, FOLLOW_UP]
+          description: Older notes default to CORRECTION.
         note:
           type: string
         createdAt:
           type: string
           format: date-time
-      description: A family-safe correction; internal author account identifiers are not exposed.
-      required:
-      - id
-      - note
-      - createdAt
+      description: A family-safe correction or follow-up; internal author identifiers are not exposed.
+      required: [id, kind, note, createdAt]
     FamilyReportDetail:
       type: object
       additionalProperties: false
@@ -6935,8 +7069,9 @@ components:
           format: date-time
           nullable: true
           description: >-
-            This family member response deadline: first successfully created urgent IN_APP notification for this
-            incident/family member plus the configured window (default two hours). Null when no response window
+            Null without an FM05 personal window; legacy notifications do not establish one.
+            The family member response deadline: first successfully created urgent IN_APP notification
+            for this incident/family member plus the configured window (default two hours). Null when no response window
             was established, including when notification creation has not succeeded; null does not prevent an
             authorised read, view or acknowledgement. Stable across polling, email retries and further
             notifications for the same incident. Never the manager respondBy deadline. Later notification creation

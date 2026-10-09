@@ -18,6 +18,9 @@ class WebMvcConfig implements WebMvcConfigurer {
 	static final String LOGIN_PATH = "/api/auth/login";
 	/** CSRF token initialization is accessible before login. */
 	static final String CSRF_PATH = "/api/auth/csrf";
+	/** Family sign-up happens before there is an account. Mirrors the permitAll in SecurityConfig. */
+	static final String FAMILY_REGISTRATION_PATH = "/api/family-registrations";
+	static final String ELDER_REGISTRATION_PATH = "/api/elder-registrations";
 
 	private final RequestContextInterceptor requestContext;
 
@@ -26,7 +29,7 @@ class WebMvcConfig implements WebMvcConfigurer {
 	}
 
 	/**
-	 * Register API request context handling, excluding login and CSRF initialization.
+	 * Register API request context handling, excluding login, CSRF initialization and family sign-up.
 	 *
 	 * @param registry Spring MVC interceptor registry
 	 *
@@ -36,6 +39,6 @@ class WebMvcConfig implements WebMvcConfigurer {
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(requestContext)
 				.addPathPatterns(API_PATHS)
-				.excludePathPatterns(LOGIN_PATH, CSRF_PATH);
+				.excludePathPatterns(LOGIN_PATH, CSRF_PATH, FAMILY_REGISTRATION_PATH, ELDER_REGISTRATION_PATH);
 	}
 }

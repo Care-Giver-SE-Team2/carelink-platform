@@ -127,8 +127,20 @@ describe('report API writes', () => {
     const { url, init } = lastRequest(fetchMock)
     expect(url).toBe('/api/reports/40/amendments')
     expect(init.method).toBe('POST')
-    expect(JSON.parse(String(init.body))).toEqual({ note: 'Visit 13 was cancelled by the family.' })
+    expect(JSON.parse(String(init.body))).toEqual({ note: 'Visit 13 was cancelled by the family.', kind: 'CORRECTION' })
     expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('report-token')
     expect(stored.authorUserId).toBe(11)
+  })
+
+  it('appends a follow-up when asked to', async () => {
+    const fetchMock = stubFetch(
+      { id: 4, kind: 'FOLLOW_UP', note: 'Grab bar fitted.', authorUserId: 11, createdAt: '2026-09-24T15:00:00' },
+      201,
+    )
+
+    const stored = await appendAmendment(40, 'Grab bar fitted.', 'FOLLOW_UP')
+
+    expect(JSON.parse(String(lastRequest(fetchMock).init.body))).toEqual({ note: 'Grab bar fitted.', kind: 'FOLLOW_UP' })
+    expect(stored.kind).toBe('FOLLOW_UP')
   })
 })

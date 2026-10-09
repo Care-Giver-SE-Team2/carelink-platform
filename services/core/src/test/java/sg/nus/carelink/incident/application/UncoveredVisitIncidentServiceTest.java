@@ -14,6 +14,7 @@ import sg.nus.carelink.incident.support.InMemoryIncidentLogRepository;
 import sg.nus.carelink.incident.support.InMemoryIncidentRepository;
 import sg.nus.carelink.incident.support.IncidentFixtures;
 import sg.nus.carelink.incident.support.RecordingAlert;
+import sg.nus.carelink.incident.support.RecordingIncidentFamilyEvents;
 
 class UncoveredVisitIncidentServiceTest {
 
@@ -29,7 +30,7 @@ class UncoveredVisitIncidentServiceTest {
                 incidents,
                 timeline,
                 FakeManagerDirectory.with(IncidentFixtures.ALICE, IncidentFixtures.BEN),
-                new RecordingAlert(),
+                new RecordingAlert(), new RecordingIncidentFamilyEvents(),
                 EscalationPolicy.defaults(),
                 clock);
         service = new IncidentService(incidents, timeline, escalation, clock);

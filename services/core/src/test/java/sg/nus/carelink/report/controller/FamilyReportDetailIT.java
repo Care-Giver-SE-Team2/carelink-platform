@@ -244,7 +244,7 @@ class FamilyReportDetailIT {
 		assertThat(body.path("sections")).extracting(section -> section.path("title").asString())
 				.containsExactly("Service completion", "Vital signs", "Observations", "Incidents");
 		assertThat(body.path("sections")).allSatisfy(section ->
-				assertThat(section.propertyNames()).containsExactlyInAnyOrder("title", "body"));
+				assertThat(section.propertyNames()).containsExactlyInAnyOrder("key", "title", "body", "figures", "series"));
 		assertThat(body.path("sections").get(0).path("body").asString()).isEqualTo("Two visits completed by Mei.");
 		assertThat(body.path("sections").get(1).path("body").asString()).isEqualTo("Systolic 128–142 mmHg");
 		assertThat(body.path("sections").get(2).path("body").asString()).isEqualTo(observation);
@@ -255,7 +255,7 @@ class FamilyReportDetailIT {
 		assertThat(body.path("disclaimer").asString()).isEqualTo(DISCLAIMER);
 		assertThat(body.path("amendments")).extracting(note -> note.path("id").longValue()).containsExactly(501L, 502L, 500L);
 		assertThat(body.path("amendments")).allSatisfy(note ->
-				assertThat(note.propertyNames()).containsExactlyInAnyOrder("id", "note", "createdAt"));
+				assertThat(note.propertyNames()).containsExactlyInAnyOrder("id", "kind", "note", "createdAt"));
 		assertThat(body.path("amendments").get(0).path("note").asString()).isEqualTo("First correction: three laps, not two.");
 		assertThat(body.path("amendments").get(0).path("createdAt").asString()).isEqualTo("2026-09-28T01:00:00+08:00");
 		assertThat(readDetail(manager, 301)).isEqualTo(before);
@@ -272,6 +272,7 @@ class FamilyReportDetailIT {
 		jdbc.update("""
 				INSERT INTO vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at) VALUES
 				(701, 'systolic', 128, 'mmHg', false, '2026-09-14 09:10:00'),
+				(701, 'systolic', 136, 'mmHg', false, '2026-09-14 10:10:00'),
 				(702, 'systolic', 142, 'mmHg', true, '2026-09-16 09:10:00')
 				""");
 		jdbc.update("""
@@ -296,10 +297,21 @@ class FamilyReportDetailIT {
 		var session = loginAs("family-a");
 		var original = readDetail(session, familyId);
 		assertThat(original.path("sections")).extracting(section -> section.path("title").asString())
-				.containsExactly("Service completion", "Vital signs", "Observations", "Incidents");
-		assertThat(original.path("sections").get(0).path("body").asString()).contains("Mei").doesNotContain("#201");
-		assertThat(original.path("sections").get(1).path("body").asString()).isEqualTo("Systolic 128–142 mmHg");
-		assertThat(original.path("sections").get(2).path("body").asString()).contains("Mei: Walked two laps with a cane.");
+				.containsExactly("Overview", "Services", "Service completion", "Vital signs", "Observations", "Incidents", "Ratings and spot checks");
+		assertThat(original.path("sections").get(2).path("body").asString()).contains("Mei").doesNotContain("#201");
+		assertThat(original.path("sections").get(3).path("body").asString()).isEqualTo("Systolic 128–142 mmHg");
+		assertThat(original.path("sections").get(4).path("body").asString()).contains("Mei: Walked two laps with a cane.");
+		assertThat(original.path("sections").get(0).path("key").asString()).isEqualTo("overview");
+		assertThat(original.path("sections").get(0).path("figures").get(0).path("value").intValue()).isEqualTo(2);
+		var series = original.path("sections").get(3).path("series").get(0);
+		assertThat(series.path("key").asString()).isEqualTo("systolic");
+		assertThat(series.path("points")).hasSize(2);
+		assertThat(series.path("points").get(0).path("at").asString()).isEqualTo("2026-09-14");
+		assertThat(series.path("points").get(0).path("low").intValue()).isEqualTo(128);
+		assertThat(series.path("points").get(0).path("high").intValue()).isEqualTo(136);
+		assertThat(series.path("points").get(1).path("high").intValue()).isEqualTo(142);
+		assertThat(series.path("points").get(1).path("flagged").booleanValue()).isTrue();
+		assertThat(original.toString()).doesNotContain("basisId", "metrics", "authorUserId", "caregiverId");
 		assertThat(original.path("disclaimer").asString()).isEqualTo(DISCLAIMER);
 		assertThat(original.path("generatedBy").asString()).isEqualTo("TEMPLATE");
 		assertThat(original.path("amendments")).isEmpty();
@@ -312,6 +324,12 @@ class FamilyReportDetailIT {
 		assertThat(corrected.path("amendments").get(0).path("id")).isEqualTo(amendment.path("id"));
 		assertThat(corrected.path("amendments").get(0).path("note").asString()).isEqualTo("Correction: three laps were completed.");
 		assertThat(corrected.path("amendments").get(0).has("authorUserId")).isFalse();
+		assertThat(corrected.path("amendments").get(0).path("kind").asString()).isEqualTo("CORRECTION");
+		managerPost(manager, "/api/reports/" + familyId + "/amendments",
+				Map.of("kind", "FOLLOW_UP", "note", "Walking aid checked."), 201);
+		var followedUp = readDetail(session, familyId);
+		assertThat(followedUp.path("amendments").get(1).path("kind").asString()).isEqualTo("FOLLOW_UP");
+		assertThat(followedUp.path("sections")).isEqualTo(original.path("sections"));
 		assertThat(readDetail(manager, familyId).path("amendments").get(0).path("authorUserId").longValue()).isEqualTo(10L);
 	}
 

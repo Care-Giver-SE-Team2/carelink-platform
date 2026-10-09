@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { Link, Navigate } from 'react-router-dom'
 import { ApiError } from '../../../shared/api/client'
-import { FamilySignIn } from '../components/FamilySignIn'
 import styles from './FamilyIntake.module.css'
 
 /**
@@ -8,9 +7,9 @@ import styles from './FamilyIntake.module.css'
  * @author Wang Zhili
  */
 export function IntakeFeedback({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const [switchAccount, setSwitchAccount] = useState(false)
   const status = error instanceof ApiError ? error.status : undefined
-  if (status === 401 || switchAccount) return <FamilySignIn onSignedIn={onRetry} />
+  // The landing page is the only sign-in screen.
+  if (status === 401) return <Navigate to="/" replace />
   const title =
     status === 403
       ? 'Access unavailable'
@@ -33,9 +32,9 @@ export function IntakeFeedback({ error, onRetry }: { error: unknown; onRetry: ()
       <p>{message}</p>
       {status !== 400 && status !== 404 && <button onClick={onRetry}>Try again</button>}
       {status === 403 && (
-        <button className={styles.switchAccount} onClick={() => setSwitchAccount(true)}>
+        <Link className={styles.switchAccount} to="/">
           Sign in with another account
-        </button>
+        </Link>
       )}
     </section>
   )

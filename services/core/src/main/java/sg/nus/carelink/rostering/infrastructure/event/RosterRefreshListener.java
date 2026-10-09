@@ -7,6 +7,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import sg.nus.carelink.careplan.application.CarePlanScheduleChanged;
 import sg.nus.carelink.profile.application.PrimaryCaregiverChanged;
+import sg.nus.carelink.rostering.application.LeaveCoverService;
 import sg.nus.carelink.rostering.application.RecurringRosterService;
 
 /**
@@ -15,7 +16,9 @@ import sg.nus.carelink.rostering.application.RecurringRosterService;
  *
  * <p>Runs after the change commits, and each refresh commits on its own (see
  * {@link RecurringRosterService#refreshElder}), so a roster failure never undoes or fails the
- * manager's publish. It is logged instead, and the nightly run catches the elder up.
+ * manager's publish. It is logged instead, and the nightly run catches the elder up. Each
+ * refresh is followed by {@link LeaveCoverService}, so a visit it gave to a primary caregiver
+ * who is on leave goes to whoever already covers the elder, rather than waiting for midnight.
  */
 @Component
 class RosterRefreshListener {
@@ -23,9 +26,11 @@ class RosterRefreshListener {
 	private static final Logger log = LoggerFactory.getLogger(RosterRefreshListener.class);
 
 	private final RecurringRosterService roster;
+	private final LeaveCoverService leaveCover;
 
-	RosterRefreshListener(RecurringRosterService roster) {
+	RosterRefreshListener(RecurringRosterService roster, LeaveCoverService leaveCover) {
 		this.roster = roster;
+		this.leaveCover = leaveCover;
 	}
 
 	@TransactionalEventListener
@@ -43,6 +48,13 @@ class RosterRefreshListener {
 			roster.refreshElder(elderId);
 		} catch (RuntimeException failure) {
 			log.error("Roster refresh failed for elder {}; the nightly run will retry", elderId, failure);
+			return;
+		}
+		try {
+			leaveCover.continueCover(elderId);
+		} catch (RuntimeException failure) {
+			log.error("Could not give elder {}'s visits on leave days to their cover; the nightly run will retry",
+					elderId, failure);
 		}
 	}
 }

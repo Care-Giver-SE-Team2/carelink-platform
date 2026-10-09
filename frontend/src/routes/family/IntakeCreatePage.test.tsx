@@ -1,8 +1,20 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import FamilyHome from './index'
+import { IntakeCreatePage } from './intake/IntakeCreatePage'
+import { IntakeListPage } from './intake/IntakeListPage'
+import { IntakeDetailPage } from './intake/IntakeDetailPage'
+import { IntakeLayout } from './intake/IntakeLayout'
+
+// Retained component regression tests. The live /intake/new route now redirects to service applications.
+function LegacyIntakeRoutes() {
+  return <Routes><Route element={<IntakeLayout />}>
+    <Route path="intake" element={<IntakeListPage />} />
+    <Route path="intake/new" element={<IntakeCreatePage />} />
+    <Route path="intake/:id" element={<IntakeDetailPage />} />
+  </Route></Routes>
+}
 
 const savedApplication = {
   id: 23,
@@ -35,7 +47,8 @@ function openForm(path = '/family/intake/new') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/family/*" element={<FamilyHome />} />
+        <Route path="/" element={<h1>Landing</h1>} />
+        <Route path="/family/*" element={<LegacyIntakeRoutes />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -60,8 +73,7 @@ afterEach(() => {
 })
 
 describe('Family intake submission', () => {
-  it('signs in, submits an application and finds the same saved record in the list and detail', async () => {
-    let signedIn = false
+  it('submits an application and finds the same saved record in the list and detail', async () => {
     let submitted = false
 
     vi.stubGlobal(
@@ -70,27 +82,6 @@ describe('Family intake submission', () => {
         if (url.endsWith('/csrf')) {
           document.cookie = 'XSRF-TOKEN=workflow-token; path=/'
           return Promise.resolve(new Response(null))
-        }
-
-        if (url.endsWith('/login')) {
-          signedIn = true
-
-          return Promise.resolve(
-            json({
-              id: 1,
-              username: 'family_test',
-              displayName: 'Family',
-              roles: ['FAMILY'],
-            }),
-          )
-        }
-
-        if (!signedIn) {
-          return Promise.resolve(
-            new Response(null, {
-              status: 401,
-            }),
-          )
         }
 
         if (
@@ -120,33 +111,12 @@ describe('Family intake submission', () => {
 
     const user = userEvent.setup()
 
-    await user.type(
-      await screen.findByLabelText('Username'),
-      'family_test',
-    )
-
-    await user.type(
-      screen.getByLabelText('Password'),
-      'test-password',
-    )
-
     await user.click(
-      screen.getByRole('button', {
-        name: 'Sign in',
-      }),
-    )
-
-    await waitFor(() =>
-      expect(
-        screen.queryByLabelText('Password'),
-      ).not.toBeInTheDocument(),
-    )
-
-    await user.click(
-      screen.getByRole('link', {
+      await screen.findByRole('link', {
         name: 'New application',
       }),
     )
+
 
     await fillRequired()
 
@@ -463,162 +433,23 @@ describe('Family intake submission', () => {
     ).toBeInTheDocument()
   })
 
-  it('retains the form through session expiry and sign-in, requiring an explicit submission afterwards', async () => {
-    let signedIn = false
-
-    const fetchMock = vi
-      .fn()
-      .mockImplementation(
-        (url: string, init: RequestInit) => {
-          if (url.endsWith('/csrf')) {
-            document.cookie =
-              `XSRF-TOKEN=${
-                signedIn
-                  ? 'new-token'
-                  : 'old-token'
-              }; path=/`
-
-            return Promise.resolve(
-              new Response(null),
-            )
-          }
-
-          if (url.endsWith('/login')) {
-            signedIn = true
-
-            return Promise.resolve(
-              json({
-                id: 1,
-                username:
-                  'family_test',
-                displayName:
-                  'Family',
-                roles: [
-                  'FAMILY',
-                ],
-              }),
-            )
-          }
-
-          if (init.method === 'POST') {
-            return Promise.resolve(
-              signedIn
-                ? json(
-                    savedApplication,
-                    201,
-                  )
-                : new Response(
-                    null,
-                    {
-                      status: 401,
-                    },
-                  ),
-            )
-          }
-
-          return Promise.resolve(
-            json(savedApplication),
-          )
-        },
-      )
-
-    vi.stubGlobal(
-      'fetch',
-      fetchMock,
-    )
-
+  it('returns to the landing page when the session has expired at submission, without a second attempt', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, init: RequestInit) => {
+      if (url.endsWith('/csrf')) {
+        document.cookie = 'XSRF-TOKEN=old-token; path=/'
+        return Promise.resolve(new Response(null))
+      }
+      return Promise.resolve(init.method === 'POST' ? new Response(null, { status: 401 }) : json(savedApplication))
+    })
+    vi.stubGlobal('fetch', fetchMock)
     openForm()
 
-    const user =
-      await fillRequired()
+    const user = await fillRequired()
+    await user.click(screen.getByRole('button', { name: 'Submit application' }))
 
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Submit application',
-      }),
-    )
-
-    expect(
-      await screen.findByRole(
-        'alert',
-      ),
-    ).toHaveTextContent(
-      'Sign in to submit',
-    )
-
-    await user.type(
-      screen.getByLabelText(
-        'Username',
-      ),
-      'family_test',
-    )
-
-    await user.type(
-      screen.getByLabelText(
-        'Password',
-      ),
-      'test-password',
-    )
-
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Sign in',
-      }),
-    )
-
-    await waitFor(() =>
-      expect(
-        screen.queryByLabelText(
-          'Password',
-        ),
-      ).not.toBeInTheDocument(),
-    )
-
-    expect(
-      screen.getByLabelText(
-        'Elder full name',
-      ),
-    ).toHaveValue(
-      '  Tan Mei  ',
-    )
-
-    const submissions = () =>
-      fetchMock.mock.calls.filter(
-        ([url, init]) =>
-          url ===
-            '/api/intake-applications' &&
-          init.method === 'POST',
-      )
-
-    expect(
-      submissions(),
-    ).toHaveLength(1)
-
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Submit application',
-      }),
-    )
-
-    await screen.findByRole(
-      'heading',
-      {
-        name: 'Application submitted',
-      },
-    )
-
-    expect(
-      submissions(),
-    ).toHaveLength(2)
-
-    expect(
-      new Headers(
-        submissions()[1][1]
-          .headers,
-      ).get(
-        'X-XSRF-TOKEN',
-      ),
-    ).toBe('new-token')
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.filter(([url, init]) => url === '/api/intake-applications' && init.method === 'POST')).toHaveLength(1)
   })
 
   it.each([
@@ -715,21 +546,9 @@ describe('Family intake submission', () => {
       ).not.toBeInTheDocument()
 
       if (status === 403) {
-        await user.click(
-          screen.getByRole(
-            'button',
-            {
-              name:
-                'Sign in again',
-            },
-          ),
-        )
-
         expect(
-          screen.getByLabelText(
-            'Username',
-          ),
-        ).toBeInTheDocument()
+          screen.getByRole('link', { name: 'Sign in again' }),
+        ).toHaveAttribute('href', '/')
       }
     },
   )

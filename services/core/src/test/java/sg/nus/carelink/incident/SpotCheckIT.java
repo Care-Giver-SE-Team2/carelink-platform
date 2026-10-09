@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -107,6 +108,26 @@ class SpotCheckIT {
 
 		assertThat(history.recentConclusions(LocalDateTime.now(clock).minusDays(90)))
 				.containsEntry(aisha, new SpotCheckHistory.Conclusions(0, 1));
+	}
+
+	/**
+	 * The family's silence is never a yes: the request stays open and, a day after they were
+	 * asked, they are asked again - found through the notifications the request already wrote.
+	 */
+	@Test
+	void aFamilyThatHasNotAnsweredIsAskedAgainOnceTheLastAskIsADayOld() {
+		Long id = spotChecks.request(laterVisit, "Routine quality check", manager).id();
+
+		assertThat(spotChecks.dueForReminder(Duration.ofDays(1))).doesNotContain(id);
+		jdbc.update("update notification set created_at = created_at - interval 25 hour"
+				+ " where resource_type = 'SPOT_CHECK' and resource_id = ?", id);
+		assertThat(spotChecks.dueForReminder(Duration.ofDays(1))).as("asked 25 hours ago").contains(id);
+
+		assertThat(spotChecks.remind(id)).isTrue();
+		assertThat(notifications(familyAccount, "SPOT_CHECK_REMINDER")).isEqualTo(1);
+		assertThat(jdbc.queryForObject("select approval_status from spot_check where id = ?", String.class, id))
+				.as("still waiting for the family, not taken as agreed")
+				.isEqualTo("PENDING_APPROVAL");
 	}
 
 	@Test

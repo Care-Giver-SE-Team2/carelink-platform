@@ -25,6 +25,39 @@ const nodes: CarePlanNodeResponse[] = [
   { id: 3, groupName: 'Medication support', name: 'Evening reminder', visits: everyDay('19:00:00', 5), evidenceType: 'CHECKLIST', weeklyHours: null },
 ]
 
+const publishedV4 = {
+  id: 42,
+  version: 4,
+  status: 'PUBLISHED',
+  totalHours: 1.67,
+  publishedAt: '2026-08-26T10:00:00',
+  startDate: '2024-04-11',
+  updatedAt: '2026-08-26T10:00:00',
+  stopEffectiveDate: null,
+  stopReason: null,
+} as CarePlanResponse
+
+const supersededV3 = {
+  id: 41,
+  version: 3,
+  status: 'SUPERSEDED',
+  totalHours: 0.5,
+  publishedAt: '2026-07-02T09:00:00',
+  startDate: '2024-04-11',
+} as CarePlanResponse
+
+function renderPlan() {
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={['/manager/elders/7']}>
+        <Routes>
+          <Route path="/manager/elders/:elderId" element={<CarePlan />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
 beforeEach(() => {
   vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue({ id: 1, username: 'tml', displayName: 'Tan Mei Ling', roles: ['MANAGER'] })
   vi.spyOn(console, 'info').mockImplementation(() => {})
@@ -35,30 +68,21 @@ beforeEach(() => {
     address: 'Bishan St 23',
     sector: 'S31',
     livesAlone: true,
+    preferredDialects: 'Malay,Hokkien',
+    mobilityLevel: 'ASSISTIVE_CANE',
+    continuityPreference: 'PREFERRED',
   } as ElderResponse)
-  vi.spyOn(carePlanApi, 'fetchLatestCarePlan').mockResolvedValue({
-    id: 42,
-    version: 4,
-    status: 'PUBLISHED',
-    startDate: '2024-04-11',
-    updatedAt: '2026-08-26T10:00:00',
-    stopEffectiveDate: null,
-    stopReason: null,
-  } as CarePlanResponse)
+  vi.spyOn(profileApi, 'fetchElderFamily').mockResolvedValue([
+    { fullName: 'Wei Ling', relationship: 'DAUGHTER', primaryContact: true },
+  ])
+  vi.spyOn(carePlanApi, 'fetchLatestCarePlan').mockResolvedValue(publishedV4)
+  vi.spyOn(carePlanApi, 'fetchCarePlanVersions').mockResolvedValue([publishedV4, supersededV3])
   vi.spyOn(carePlanApi, 'fetchCarePlanNodes').mockResolvedValue(nodes)
 })
 
 async function renderPlanInDraft() {
   const user = userEvent.setup()
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={['/manager/elders/7']}>
-        <Routes>
-          <Route path="/manager/elders/:elderId" element={<CarePlan />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  )
+  renderPlan()
   await screen.findByText('Grooming')
   // A published plan opens read-only; editing starts a draft.
   expect(screen.queryByRole('button', { name: 'Remove task from sub-plan' })).not.toBeInTheDocument()
@@ -134,4 +158,39 @@ it('adds a sub-plan from the grouped activity picker and a per-day schedule', as
   const walk = screen.getByText('Companionship walk').parentElement!
   expect(within(walk).getByText('Tue 8:00–8:15 AM · 15 m')).toBeInTheDocument()
   expect(within(walk).getByText('Sat 8:00–8:15 AM · 15 m')).toBeInTheDocument()
+})
+
+it('shows the elder’s profile and bound family from the backend', async () => {
+  renderPlan()
+  await screen.findByText('Wei Ling (daughter)')
+  expect(screen.getByText('Malay, Hokkien')).toBeInTheDocument()
+  expect(screen.getByText('alone')).toBeInTheDocument()
+  expect(screen.getByText('cane or walker')).toBeInTheDocument()
+  expect(screen.getByText('preferred')).toBeInTheDocument()
+})
+
+it('lists every issued version, newest first, with its weekly effort', async () => {
+  renderPlan()
+  await screen.findByText('v4 · 26 Aug 2026')
+  expect(screen.getByText('1.67 h/week · from 11 Apr 2024')).toBeInTheDocument()
+  expect(screen.getByText('v3 · 2 Jul 2026')).toBeInTheDocument()
+  expect(screen.getByText('0.50 h/week · from 11 Apr 2024')).toBeInTheDocument()
+})
+
+it('compares a saved draft against the version it supersedes', async () => {
+  vi.mocked(carePlanApi.fetchLatestCarePlan).mockResolvedValue({
+    ...publishedV4,
+    id: 43,
+    version: 5,
+    status: 'DRAFT',
+    supersedesPlanId: 42,
+    publishedAt: null,
+  })
+  vi.mocked(carePlanApi.fetchCarePlanVersions).mockResolvedValue([
+    { ...publishedV4, id: 43, version: 5, status: 'DRAFT', supersedesPlanId: 42, publishedAt: null, totalHours: null },
+    publishedV4,
+  ])
+  renderPlan()
+  expect(await screen.findByRole('button', { name: 'Publish v5' })).toBeInTheDocument()
+  expect(await screen.findByRole('status')).toHaveTextContent('Draft v5 changes weekly effort 1.67 h →')
 })

@@ -20,7 +20,8 @@ import sg.nus.carelink.shared.error.BusinessRuleViolation;
  * <pre>
  *   AWAITING_FAMILY --family or default plan--> RESOLVED (REPLACED | RESCHEDULED | SKIPPED)
  *   AWAITING_FAMILY --nobody free any more----> UNCOVERED
- *   UNCOVERED       --manager re-rosters------> RESOLVED (REPLACED)
+ *   UNCOVERED       --manager or nightly run--> RESOLVED (REPLACED)
+ *   RESOLVED (REPLACED, not by FAMILY) --manager picks another--> RESOLVED (REPLACED by MANAGER)
  *   either open state --visit called off elsewhere--> RESOLVED (WITHDRAWN)
  * </pre>
  *
@@ -76,16 +77,40 @@ public record RosterChange(
 
 	/**
 	 * The visit goes to another caregiver: the family's pick, the default plan when they did
-	 * not answer, or a manager taking up an uncovered visit once somebody is free.
+	 * not answer or when the nightly run takes up an uncovered visit once somebody is free, or a
+	 * manager (see {@link #managerMayAssign()}).
 	 */
 	public RosterChange replacedBy(Long caregiverId, Long runId, DecidedBy by, Long userId, String why,
 			LocalDateTime now) {
 		Objects.requireNonNull(caregiverId, "caregiverId");
 		Objects.requireNonNull(by, "by");
-		if (by == DecidedBy.MANAGER ? status != Status.UNCOVERED : status != Status.AWAITING_FAMILY) {
+		if (by == DecidedBy.MANAGER) {
+			requireManagerMayAssign(caregiverId);
+		}
+		else if (by == DecidedBy.FAMILY ? status != Status.AWAITING_FAMILY
+				: status != Status.AWAITING_FAMILY && status != Status.UNCOVERED) {
 			throw notSettleable("given to another caregiver by " + by);
 		}
 		return settled(Outcome.REPLACED, by, userId, caregiverId, null, runId, why, now);
+	}
+
+	/**
+	 * Throws unless a manager may give the visit to {@code caregiverId}: see
+	 * {@link #managerMayAssign()}, and not to the caregiver who already has it.
+	 */
+	public void requireManagerMayAssign(Long caregiverId) {
+		if (status == Status.AWAITING_FAMILY) {
+			throw new BusinessRuleViolation("FAMILY_STILL_DECIDING",
+					"The family is still choosing who comes to visit %d; wait for their answer or the default plan"
+							.formatted(visitId));
+		}
+		if (!managerMayAssign()) {
+			throw notSettleable("given to another caregiver by a manager");
+		}
+		if (Objects.equals(caregiverId, assignedCaregiverId)) {
+			throw new BusinessRuleViolation("ALREADY_ASSIGNED",
+					"Caregiver %d already has visit %d".formatted(caregiverId, visitId));
+		}
 	}
 
 	/** Alternative 4b: the family moves the visit; whoever is free then takes it. */
@@ -145,6 +170,17 @@ public record RosterChange(
 
 	public boolean isUncovered() {
 		return status == Status.UNCOVERED;
+	}
+
+	/**
+	 * Whether a manager may put a caregiver of their choosing on the visit: when nobody was
+	 * free, or when the replacement was the institution's pick (the default plan or a manager)
+	 * rather than the family's. Not while the family is still choosing, and never over a
+	 * family's own choice.
+	 */
+	public boolean managerMayAssign() {
+		return status == Status.UNCOVERED
+				|| status == Status.RESOLVED && outcome == Outcome.REPLACED && decidedBy != DecidedBy.FAMILY;
 	}
 
 	/** Still waiting for the family, and their time is up: the default plan is due. */

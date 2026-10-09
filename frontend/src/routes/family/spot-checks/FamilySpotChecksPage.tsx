@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { Navigate } from 'react-router-dom'
 
 import { visitTime } from '../../../features/absences/presentation'
 import { problemDetail } from '../../../features/incidents/presentation'
+import { ApiError } from '../../../shared/api/client'
 import { decideSpotCheck } from '../../../features/spot-checks/api'
 import { endingLine, stageLabels } from '../../../features/spot-checks/presentation'
 import type { SpotCheck } from '../../../features/spot-checks/types'
@@ -21,20 +23,26 @@ export function FamilySpotChecksPage() {
   const waiting = (data ?? []).filter((check) => check.stage === 'AWAITING_FAMILY')
   const others = (data ?? []).filter((check) => check.stage !== 'AWAITING_FAMILY')
 
-  return (
-    <div className={styles.changes}>
-      <section className={styles.hero}>
-        <p className={styles.eyebrow}>YOUR FAMILY'S CARE</p>
-        <h1>Spot checks</h1>
-        <p>
-          To check the quality of care, a manager may ask to be present at a visit. Nobody comes to
-          watch unless you agree, and you can see what they concluded.
-        </p>
-      </section>
+  // The landing page is the only sign-in screen.
+  if (error instanceof ApiError && error.status === 401) return <Navigate to="/" replace />
 
-      {isPending && <p className={styles.state} role="status">Loading spot checks…</p>}
+  return (
+    <div className={styles.page}>
+      <header className={styles.hero}>
+        <p className={styles.eyebrow}>Your family's care</p>
+        <h1>Spot checks</h1>
+        <p className={styles.meta}>A manager may ask to be present at a visit to check the quality of care.</p>
+      </header>
+
+      {isPending && (
+        <div className={`${styles.state} ${styles.loading}`} role="status">
+          <span className={styles.spinner} aria-hidden="true" />
+          Loading spot checks…
+        </div>
+      )}
       {error && (
         <section className={styles.state} role="alert">
+          <h2>Unable to load spot checks</h2>
           <p>{problemDetail(error)}</p>
           <button type="button" onClick={() => refetch()}>Try again</button>
         </section>
@@ -46,27 +54,34 @@ export function FamilySpotChecksPage() {
         </section>
       )}
 
-      {waiting.length > 0 && (
-        <section aria-label="Waiting for your answer">
-          <h2 className={styles.heading}>Waiting for your answer</h2>
-          {waiting.map((check) => (
-            <PendingCheck key={check.id} check={check} />
-          ))}
-        </section>
-      )}
+      {data && data.length > 0 && (
+        // Desktop: what needs an answer on the left, booked and concluded checks on the right; stacked on a phone.
+        <div className={styles.split}>
+          <section className={styles.column} aria-label="Waiting for your answer">
+            <h2 className={styles.label}>Waiting for your answer</h2>
+            {waiting.length > 0 ? <>
+              <p className={styles.note}>Nobody comes to watch unless you agree, and you can see what they concluded.</p>
+              {waiting.map((check) => (
+                <PendingCheck key={check.id} check={check} />
+              ))}
+            </> : <p className={styles.caughtUp}>No request to watch a visit is waiting for you.</p>}
+          </section>
 
-      {others.length > 0 && (
-        <section aria-label="Other spot checks">
-          <h2 className={styles.heading}>Other spot checks</h2>
-          <ul className={styles.history}>
-            {others.map((check) => (
-              <li key={check.id}>
-                <strong>{visitTime(check.visitTime)}</strong> · {check.elderName} · {check.caregiverName}
-                <span>{check.stage === 'SCHEDULED' ? stageLabels.SCHEDULED : endingLine(check)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+          {others.length > 0 && (
+            <section className={styles.column} aria-label="Other spot checks">
+              <h2 className={styles.label}>Other spot checks</h2>
+              <ul className={styles.list}>
+                {others.map((check) => (
+                  <li key={check.id}>
+                    <p className={styles.rowTitle}>{visitTime(check.visitTime)}</p>
+                    <p className={styles.rowSub}>{check.elderName} · {check.caregiverName}</p>
+                    <p className={styles.rowSub}>{check.stage === 'SCHEDULED' ? stageLabels.SCHEDULED : endingLine(check)}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
     </div>
   )
@@ -94,19 +109,20 @@ function PendingCheck({ check }: { check: SpotCheck }) {
 
   return (
     <article className={styles.card} aria-label={`Spot check of the visit on ${visitTime(check.visitTime)}`}>
-      <p className={styles.when}>
-        {visitTime(check.visitTime)} · {check.elderName}
-      </p>
-      <p>
+      <div>
+        <p className={styles.rowTitle}>{visitTime(check.visitTime)}</p>
+        <p className={styles.rowSub}>{check.elderName}</p>
+      </div>
+      <p className={styles.body}>
         A manager would like to be present at this visit with {check.caregiverName}. Why: {check.purpose}
       </p>
       <div className={styles.block}>
-        <button type="button" disabled={sending} onClick={() => answer(true)}>
+        <button type="button" className={styles.primary} disabled={sending} onClick={() => answer(true)}>
           Agree
         </button>
       </div>
       <div className={styles.block}>
-        <label htmlFor={`decline-${check.id}`}>Or decline, and tell us why</label>
+        <label className={styles.fieldLabel} htmlFor={`decline-${check.id}`}>Or decline, and tell us why</label>
         <div className={styles.inline}>
           <input
             id={`decline-${check.id}`}
@@ -115,7 +131,7 @@ function PendingCheck({ check }: { check: SpotCheck }) {
             value={reason}
             onChange={(event) => setReason(event.target.value)}
           />
-          <button type="button" className={styles.quiet} disabled={sending || !reason.trim()} onClick={() => answer(false)}>
+          <button type="button" disabled={sending || !reason.trim()} onClick={() => answer(false)}>
             Decline
           </button>
         </div>

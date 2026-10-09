@@ -1,5 +1,21 @@
 # React + TypeScript + Vite
 
+## Caregiver workspace
+
+The caregiver routes provide schedule/work-pack reads, absence and spot-check responses,
+own incident reports, check-in and one-time task results. See
+[`../docs/caregiver/cg04-cg03-handoff.md`](../docs/caregiver/cg04-cg03-handoff.md)
+for integration rules, API boundaries and demonstration guidance.
+
+Check-in uses server-provided eligibility and GPS or an explicitly labelled manual
+location note. Only DONE tasks count as completed tasks; handling all tasks does not
+complete the Visit. An incident pauses open work. Evidence upload, vital signs,
+check-out and SYS03 missed-check-in scheduling are not included yet.
+
+Commands are not automatically retried. After an unknown incident result, open own
+reports in a new tab so the original page retains its immutable command key and draft.
+For validation run `npm run lint`, `npm run test:coverage` and `npm run build`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

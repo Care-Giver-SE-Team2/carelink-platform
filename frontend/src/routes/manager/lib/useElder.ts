@@ -4,10 +4,13 @@ import type { ElderResponse } from '../../../shared/api/profile'
 import type { ElderRow } from '../data/elders'
 import { ageFromDateOfBirth } from './age'
 
-/** The subset of ElderRow that GET /api/elders/{id} can fill in today; plan/roster fields stay mocked. */
+/** GET /api/elders/{id} as the care plan page uses it: ElderRow's identity fields plus the profile. */
 export type ElderSummary = Pick<ElderRow, 'id' | 'name' | 'age' | 'sector'> & {
   address: string | null
   livesAlone: boolean | null
+  preferredDialects: string | null
+  mobilityLevel: ElderResponse['mobilityLevel']
+  continuityPreference: ElderResponse['continuityPreference']
 }
 
 function toElderSummary(elder: ElderResponse): ElderSummary {
@@ -18,6 +21,9 @@ function toElderSummary(elder: ElderResponse): ElderSummary {
     sector: elder.sector ?? '',
     address: elder.address,
     livesAlone: elder.livesAlone,
+    preferredDialects: elder.preferredDialects,
+    mobilityLevel: elder.mobilityLevel,
+    continuityPreference: elder.continuityPreference,
   }
 }
 

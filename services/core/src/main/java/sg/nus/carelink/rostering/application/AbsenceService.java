@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
 import sg.nus.carelink.profile.application.RosteringProfiles;
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
+import sg.nus.carelink.rostering.domain.repository.AbsenceAlert;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
@@ -29,13 +30,15 @@ public class AbsenceService {
 	private final AbsenceReportRepository absences;
 	private final RosteringProfiles profiles;
 	private final CaregiverWorkDirectory caregivers;
+	private final AbsenceAlert alert;
 	private final Clock clock;
 
 	public AbsenceService(AbsenceReportRepository absences, RosteringProfiles profiles,
-			CaregiverWorkDirectory caregivers, Clock clock) {
+			CaregiverWorkDirectory caregivers, AbsenceAlert alert, Clock clock) {
 		this.absences = absences;
 		this.profiles = profiles;
 		this.caregivers = caregivers;
+		this.alert = alert;
 		this.clock = clock;
 	}
 
@@ -55,11 +58,16 @@ public class AbsenceService {
 				today()));
 	}
 
-	/** UC-CG02: the signed-in caregiver asks for leave; a manager reviews it. */
+	/**
+	 * UC-CG02: the signed-in caregiver asks for leave; a manager reviews it. Every manager is
+	 * told, which is UC-MG04's step 1 for a request rather than a phone call.
+	 */
 	public AbsenceReport requestForSelf(String caregiverUsername, AbsenceReport.Type type, LocalDate startDate,
 			LocalDate endDate, String reason) {
-		Long caregiverId = caregivers.require(caregiverUsername).id();
-		return keep(AbsenceReport.requested(caregiverId, type, startDate, endDate, reason, today()));
+		CaregiverWorkDirectory.Profile caregiver = caregivers.require(caregiverUsername);
+		AbsenceReport asked = keep(AbsenceReport.requested(caregiver.id(), type, startDate, endDate, reason, today()));
+		alert.requested(asked, caregiver.fullName());
+		return asked;
 	}
 
 	public AbsenceReport approve(Long absenceId, Long managerUserId) {

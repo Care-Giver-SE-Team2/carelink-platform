@@ -13,5 +13,10 @@ public interface IncidentAcknowledgementRepository {
 
 	Optional<IncidentAcknowledgement> findById(Long id);
 
+	Optional<IncidentAcknowledgement> findByIncidentIdAndFamilyMemberId(Long incidentId, Long familyMemberId);
+
+	/** Creates the pair if absent and locks its current row until the caller's transaction ends. */
+	IncidentAcknowledgement findOrCreateForUpdate(Long incidentId, Long familyMemberId);
+
 	IncidentAcknowledgement save(IncidentAcknowledgement incidentAcknowledgement);
 }

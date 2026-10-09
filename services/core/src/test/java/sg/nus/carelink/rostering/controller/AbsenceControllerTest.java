@@ -131,6 +131,25 @@ class AbsenceControllerTest {
 	}
 
 	@Test
+	void aManagersHandPickReturnsTheAbsenceOrSaysWhyNot() throws Exception {
+		when(reRostering.assignByManager(1L, 100L, 10L, 11L)).thenReturn(null);
+		when(reRostering.assignByManager(1L, 100L, 5L, 11L))
+				.thenThrow(new BusinessRuleViolation("CAREGIVER_CANNOT_TAKE_VISIT", "Aisha cannot take this visit: on leave"));
+
+		mvc.perform(post("/api/absences/1/changes/100/assignment").with(as("alice"))
+						.contentType(MediaType.APPLICATION_JSON).content("{\"caregiverId\":10}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.absence.id").value(1));
+		verify(reRostering).assignByManager(1L, 100L, 10L, 11L);
+		mvc.perform(post("/api/absences/1/changes/100/assignment").with(as("alice"))
+						.contentType(MediaType.APPLICATION_JSON).content("{\"caregiverId\":5}"))
+				.andExpect(status().isConflict());
+		mvc.perform(post("/api/absences/1/changes/100/assignment").with(as("alice"))
+						.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void aCaregiverAsksForLeaveAndSeesTheirOwn() throws Exception {
 		AbsenceReport asked = new AbsenceReport(3L, 5L, null, AbsenceReport.Type.ANNUAL, DAY, DAY, "trip",
 				AbsenceReport.Status.PENDING, null, null, null, null);

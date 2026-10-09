@@ -29,10 +29,11 @@ function json(body: unknown, status = 200) {
   })
 }
 
-function openFamily(path = '/family') {
+function openFamily(path = '/family/intake') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
+        <Route path="/" element={<h1>Landing</h1>} />
         <Route path="/family/*" element={<FamilyHome />} />
       </Routes>
     </MemoryRouter>,
@@ -50,40 +51,13 @@ afterEach(() => {
 })
 
 describe('Family intake pages', () => {
-  it('signs in after an empty 401, then loads the originally requested detail', async () => {
-    const user = userEvent.setup()
-    let signedIn = false
-    const fetchMock = vi.fn().mockImplementation((url: string, init: RequestInit) => {
-      if (url === '/api/auth/csrf') {
-        document.cookie = 'XSRF-TOKEN=login-token; path=/'
-        return Promise.resolve(new Response(null, { status: 200 }))
-      }
-      if (url === '/api/auth/login') {
-        expect(JSON.parse(init.body as string)).toEqual({
-          username: 'family_test',
-          password: 'example-password',
-        })
-        expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('login-token')
-        signedIn = true
-        return Promise.resolve(
-          json({
-            id: 1,
-            username: 'family_test',
-            displayName: 'Family Test',
-            roles: ['FAMILY'],
-          }),
-        )
-      }
-      return Promise.resolve(signedIn ? json(application) : new Response(null, { status: 401 }))
-    })
+  it('returns to the landing page on an empty 401 instead of showing a sign-in form', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }))
     vi.stubGlobal('fetch', fetchMock)
     openFamily('/family/intake/12')
-    await user.type(await screen.findByLabelText('Username'), 'family_test')
-    await user.type(screen.getByLabelText('Password'), 'example-password')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
-    expect(await screen.findByRole('heading', { name: 'Tan Mei' })).toBeInTheDocument()
-    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('/api/intake-applications/12')
-    document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/'
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(['/api/intake-applications/12'])
   })
 
   it('opens a detail page and preserves the list filter when returning', async () => {
@@ -112,66 +86,8 @@ describe('Family intake pages', () => {
     expect(back).toHaveAttribute('href', '/family/intake?status=SUBMITTED')
     await user.click(back)
     expect(await screen.findByRole('link', { name: /Tan Mei/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Submitted', pressed: true })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Filter by status' })).toHaveValue('SUBMITTED')
   })
-
-  it('does not send login credentials when CSRF initialisation fails', async () => {
-    const user = userEvent.setup()
-    let finishBootstrap!: (response: Response) => void
-    const fetchMock = vi.fn().mockImplementation((url: string) => {
-      if (url === '/api/auth/csrf') {
-        return new Promise<Response>((resolve) => {
-          finishBootstrap = resolve
-        })
-      }
-      return Promise.resolve(new Response(null, { status: 401 }))
-    })
-    vi.stubGlobal('fetch', fetchMock)
-    openFamily()
-    await user.type(await screen.findByLabelText('Username'), 'family_test')
-    await user.type(screen.getByLabelText('Password'), 'example-password')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
-    expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled()
-    expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain('/api/auth/login')
-    await act(async () => finishBootstrap(new Response(null, { status: 500 })))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to sign in')
-    expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain('/api/auth/login')
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
-  })
-
-  it.each(['/api/auth/csrf', '/api/auth/login'])(
-    'cancels a pending %s request when the user leaves the page',
-    async (pendingPath) => {
-      let pendingSignal: AbortSignal | undefined
-      const fetchMock = vi.fn().mockImplementation((url: string, init: RequestInit) => {
-        if (url === pendingPath) {
-          pendingSignal = init.signal ?? undefined
-          return new Promise<Response>((_resolve, reject) => {
-            pendingSignal?.addEventListener(
-              'abort',
-              () => {
-                reject(new DOMException('Request cancelled', 'AbortError'))
-              },
-              { once: true },
-            )
-          })
-        }
-        return Promise.resolve(new Response(null, { status: url.endsWith('/csrf') ? 200 : 401 }))
-      })
-      vi.stubGlobal('fetch', fetchMock)
-      const view = openFamily()
-      const user = userEvent.setup()
-      await user.type(await screen.findByLabelText('Username'), 'family_test')
-      await user.type(screen.getByLabelText('Password'), 'example-password')
-      await user.click(screen.getByRole('button', { name: 'Sign in' }))
-      await waitFor(() => expect(pendingSignal).toBeDefined())
-      await act(async () => view.unmount())
-      expect(pendingSignal?.aborted).toBe(true)
-      if (pendingPath.endsWith('/csrf')) {
-        expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain('/api/auth/login')
-      }
-    },
-  )
 
   it('preserves the full application identifier when requesting a detail page', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 404 }))
@@ -225,7 +141,7 @@ describe('Family intake pages', () => {
     expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await screen.findByText('Page 2 of 2')
-    await user.click(screen.getByRole('button', { name: 'Approved' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by status' }), 'Approved')
     expect(await screen.findByText('1 application')).toBeInTheDocument()
     expect(fetchMock.mock.calls.at(-1)?.[0]).toBe(
       '/api/intake-applications?page=0&size=20&status=APPROVED',
@@ -235,7 +151,7 @@ describe('Family intake pages', () => {
       'href',
       '/family/intake/12?status=APPROVED',
     )
-    await user.click(screen.getByRole('button', { name: 'All applications' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by status' }), 'All applications')
     expect(await screen.findByText('21 applications')).toBeInTheDocument()
     expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('/api/intake-applications?page=0&size=20')
   })
@@ -287,7 +203,7 @@ describe('Family intake pages', () => {
       await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh' }))
       expect(
         await screen.findByRole('heading', {
-          name: status === 401 ? 'Sign in to continue' : 'Access unavailable',
+          name: status === 401 ? 'Landing' : 'Access unavailable',
         }),
       ).toBeInTheDocument()
       expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
@@ -310,13 +226,10 @@ describe('Family intake pages', () => {
     expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
   })
 
-  it('allows signing in with another account after a permission failure', async () => {
+  it('links to the landing page to sign in with another account after a permission failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 403 })))
     openFamily()
-    await userEvent
-      .setup()
-      .click(await screen.findByRole('button', { name: 'Sign in with another account' }))
-    expect(screen.getByLabelText('Username')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Sign in with another account' })).toHaveAttribute('href', '/')
   })
 
   it.each(['network', 'server'])(
@@ -358,7 +271,7 @@ describe('Family intake pages', () => {
     vi.stubGlobal('fetch', fetchMock)
     openFamily()
     expect(screen.getByRole('status')).toHaveTextContent('Loading')
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Approved' }))
+    await userEvent.setup().selectOptions(screen.getByRole('combobox', { name: 'Filter by status' }), 'Approved')
     expect(await screen.findByRole('link', { name: /Lim Wei/ })).toBeInTheDocument()
     await act(async () =>
       finishOldRequest(json({ items: [application], page: 0, size: 20, totalElements: 1 })),
@@ -428,40 +341,9 @@ describe('Family intake pages', () => {
     openFamily('/family/intake/12')
     await screen.findByText('Tan Mei', { selector: 'h1' })
     await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh application' }))
-    expect(await screen.findByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
     expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
   })
-
-  it.each([401, 403, 500])(
-    'keeps the login form and explains a failed sign-in (%s)',
-    async (status) => {
-      const fetchMock = vi
-        .fn()
-        .mockImplementation((url: string) =>
-          Promise.resolve(
-            url.endsWith('/csrf')
-              ? new Response(null)
-              : new Response(null, { status: url.endsWith('/login') ? status : 401 }),
-          ),
-        )
-      vi.stubGlobal('fetch', fetchMock)
-      openFamily()
-      const user = userEvent.setup()
-      await user.type(await screen.findByLabelText('Username'), 'family_test')
-      await user.type(screen.getByLabelText('Password'), 'wrong-password')
-      await user.click(screen.getByRole('button', { name: 'Sign in' }))
-      expect(await screen.findByRole('alert')).toHaveTextContent(
-        status === 401
-          ? 'username or password is incorrect'
-          : status === 403
-            ? 'sign-in request expired'
-            : 'Unable to sign in',
-      )
-      expect(screen.getByLabelText('Password')).toHaveValue('')
-      expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
-      expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
-    },
-  )
 
   it('cancels an outstanding request when the page is unmounted', async () => {
     const fetchMock = vi.fn().mockImplementation(() => new Promise(() => {}))
@@ -490,12 +372,12 @@ describe('Family intake pages', () => {
     const user = userEvent.setup()
     openFamily()
     await screen.findByText('Tan Mei')
-    await user.click(screen.getByRole('button', { name: 'Approved' }))
-    await user.click(screen.getByRole('button', { name: 'All applications' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by status' }), 'Approved')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter by status' }), 'All applications')
     expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Loading')
     await act(async () => finishRefresh(new Response(null, { status: 401 })))
-    expect(await screen.findByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
   })
 
   it('offers a way back for an unknown family route', () => {

@@ -166,7 +166,9 @@ class AbsenceQueryServiceTest {
 		List<AbsenceQueryService.FamilyChange> mine = queries.forFamily("alex");
 
 		assertThat(mine).extracting(AbsenceQueryService.FamilyChange::status)
-				.containsExactly(RosterChange.Status.AWAITING_FAMILY, RosterChange.Status.RESOLVED);
+				.as("the other visit, then the moved visit offered again at its new time, then the move itself")
+				.containsExactly(RosterChange.Status.AWAITING_FAMILY, RosterChange.Status.AWAITING_FAMILY,
+						RosterChange.Status.RESOLVED);
 		AbsenceQueryService.FamilyChange moved = queries.forFamily("alex", thirtieth);
 		assertThat(moved.outcome()).isEqualTo(RosterChange.Outcome.RESCHEDULED);
 		assertThat(moved.rescheduledStart()).isEqualTo(saturday);

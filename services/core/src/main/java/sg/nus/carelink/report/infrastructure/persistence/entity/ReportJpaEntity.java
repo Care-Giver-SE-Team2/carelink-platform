@@ -51,6 +51,10 @@ public class ReportJpaEntity {
 	@Column(name = "elder_id", nullable = false)
 	private Long elderId;
 
+	/** The basis the content was assembled from (V19); null for reports filed before it. */
+	@Column(name = "basis_id")
+	private Long basisId;
+
 	/** soft FK to app_user.id */
 	@Column(name = "generated_by_user_id")
 	private Long generatedByUserId;
@@ -108,6 +112,14 @@ public class ReportJpaEntity {
 
 	public void setElderId(Long elderId) {
 		this.elderId = elderId;
+	}
+
+	public Long getBasisId() {
+		return basisId;
+	}
+
+	public void setBasisId(Long basisId) {
+		this.basisId = basisId;
 	}
 
 	public Long getGeneratedByUserId() {

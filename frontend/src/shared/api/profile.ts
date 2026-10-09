@@ -24,6 +24,18 @@ export function fetchElder(id: string): Promise<ElderResponse> {
   return api<ElderResponse>(`/elders/${id}`)
 }
 
+/** One row of GET /api/elders/{id}/family — profile.application.ElderFamilyContact. */
+export type ElderFamilyContact = {
+  fullName: string
+  relationship: 'SON' | 'DAUGHTER' | 'SPOUSE' | 'GUARDIAN' | 'OTHER'
+  primaryContact: boolean
+}
+
+/** The elder's currently bound family, primary contact first; [] when none is bound. */
+export function fetchElderFamily(id: string): Promise<ElderFamilyContact[]> {
+  return api<ElderFamilyContact[]>(`/elders/${id}/family`)
+}
+
 /**
  * Row shape for GET /api/elders — profile.controller.dto.ElderListItemResponse. The three
  * primaryCaregiver fields are all null while the elder has no primary caregiver.
@@ -204,4 +216,31 @@ export function approveIntakeApplication(id: number, message: string | null): Pr
 /** Declines: nothing is created; `message` (required) tells the family why. */
 export function declineIntakeApplication(id: number, message: string): Promise<IntakeDecision> {
   return api<IntakeDecision>(`/intake-reviews/${id}/decline`, { method: 'POST', body: JSON.stringify({ message }) })
+}
+
+/** Body of POST /api/family-registrations — profile.controller.dto.FamilyRegistrationRequest. */
+export type FamilyRegistrationRequest = {
+  username: string
+  password: string
+  fullName: string
+  phone: string
+}
+
+/** profile.controller.dto.FamilyRegistrationResponse. */
+export type FamilyRegistrationResponse = {
+  familyMemberId: number
+  username: string
+  fullName: string
+}
+
+/**
+ * Family sign-up, made before there is a session: creates a FAMILY login and its family profile.
+ * It does not sign in; the caller signs in with the same username and password afterwards.
+ * 409 when the username is taken. The caller initialises the CSRF cookie first.
+ */
+export function registerFamily(request: FamilyRegistrationRequest): Promise<FamilyRegistrationResponse> {
+  return api<FamilyRegistrationResponse>('/family-registrations', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
 }

@@ -18,19 +18,22 @@ import sg.nus.carelink.shared.error.BusinessRuleViolation;
  *   <li>{@link #generate} is the only way to make one, and it is born PUBLISHED - there is no
  *       draft stage in which the text could still be edited;</li>
  *   <li>{@link #amend} is the only operation on an existing report. It returns a copy with
- *       one more correction on the end and every other component exactly as it was.</li>
+ *       one more note on the end and every other component exactly as it was.</li>
  * </ul>
  * There is no delete here, and no endpoint that could ask for one.
  *
  * <p>Plain Java: no JPA, no Spring, no Jackson, so the rules can be exercised without a
  * database. ArchUnit fails the build if that changes.
  *
+ * @param basisId           the basis the content was assembled from; null for a report filed
+ *                          before bases were kept
  * @param generatedByUserId the manager who asked for it; null when the weekly schedule did
  * @param amendments        oldest first
  */
 public record Report(
 		Long id,
 		Long elderId,
+		Long basisId,
 		Long generatedByUserId,
 		Report.Audience audience,
 		ReportPeriod period,
@@ -48,18 +51,26 @@ public record Report(
 		amendments = amendments == null ? List.of() : List.copyOf(amendments);
 	}
 
+	/** A report without a basis: one filed before bases were kept. */
+	public Report(Long id, Long elderId, Long generatedByUserId, Audience audience, ReportPeriod period, Status status,
+			ReportContent content, List<ReportAmendment> amendments, LocalDateTime createdAt) {
+		this(id, elderId, null, generatedByUserId, audience, period, status, content, amendments, createdAt);
+	}
+
 	/**
 	 * Files a newly assembled report.
 	 *
 	 * <p>Straight to PUBLISHED: generating a report is archiving it (UC-MG07 steps 3 and 4 are
 	 * one act here), so there is no moment at which the content exists but may still change.
 	 *
+	 * @param basisId           the basis the content was assembled from
 	 * @param generatedByUserId who asked for it, or null for the scheduled run
 	 * @param now               the application clock's reading, so the report and its
-	 *                          corrections are dated on the same clock
+	 *                          notes are dated on the same clock
 	 */
 	public static Report generate(
 			Long elderId,
+			Long basisId,
 			Audience audience,
 			ReportPeriod period,
 			ReportContent content,
@@ -69,6 +80,7 @@ public record Report(
 		return new Report(
 				null,
 				elderId,
+				basisId,
 				generatedByUserId,
 				audience,
 				period,
@@ -78,44 +90,66 @@ public record Report(
 				Objects.requireNonNull(now, "now"));
 	}
 
+	/** Files a report that was not assembled from a stored basis. */
+	public static Report generate(
+			Long elderId,
+			Audience audience,
+			ReportPeriod period,
+			ReportContent content,
+			Long generatedByUserId,
+			LocalDateTime now) {
+
+		return generate(elderId, null, audience, period, content, generatedByUserId, now);
+	}
+
+	/** Appends a correction. See {@link #amend(ReportAmendment.Kind, String, Long, LocalDateTime)}. */
+	public Report amend(String note, Long authorUserId, LocalDateTime now) {
+		return amend(ReportAmendment.Kind.CORRECTION, note, authorUserId, now);
+	}
+
 	/**
-	 * Appends a correction. The one way a report changes after it has been filed.
+	 * Appends a note: a correction, or a follow-up on something the report recorded. The one
+	 * way a report changes after it has been filed.
 	 *
-	 * <p>The original text is not touched and the correction does not replace anything: a
-	 * reader sees what was generated and, underneath it, what was said about it afterwards,
-	 * by whom and when.
+	 * <p>The original text is not touched and the note does not replace anything: a reader sees
+	 * what was generated and, underneath it, what was said about it afterwards, by whom and
+	 * when. Both kinds follow the same rules; what differs is what they tell the reader.
 	 *
-	 * @return a copy of this report with the correction added last; this one is unchanged
+	 * @return a copy of this report with the note added last; this one is unchanged
 	 * @throws BusinessRuleViolation when the note is empty or longer than the column allows
 	 * @throws IllegalStateException when the report has not been stored yet and so has no id
-	 *                               a correction could refer to
+	 *                               a note could refer to
 	 */
-	public Report amend(String note, Long authorUserId, LocalDateTime now) {
+	public Report amend(ReportAmendment.Kind kind, String note, Long authorUserId, LocalDateTime now) {
+		Objects.requireNonNull(kind, "kind");
 		if (id == null) {
 			throw new IllegalStateException("A report has to be stored before it can be amended");
 		}
 		if (note == null || note.isBlank()) {
 			throw new BusinessRuleViolation(
 					"REPORT_AMENDMENT_NOTE_REQUIRED",
-					"A correction has to say what it corrects");
+					kind == ReportAmendment.Kind.CORRECTION
+							? "A correction has to say what it corrects"
+							: "A follow-up has to say what was done");
 		}
 		String text = note.strip();
 		if (text.length() > ReportAmendment.MAX_NOTE_LENGTH) {
 			throw new BusinessRuleViolation(
 					"REPORT_AMENDMENT_TOO_LONG",
-					"A correction can be at most %d characters".formatted(ReportAmendment.MAX_NOTE_LENGTH));
+					"A note can be at most %d characters".formatted(ReportAmendment.MAX_NOTE_LENGTH));
 		}
 
 		List<ReportAmendment> appended = new ArrayList<>(amendments);
 		appended.add(new ReportAmendment(
 				null,
 				id,
+				kind,
 				text,
 				Objects.requireNonNull(authorUserId, "authorUserId"),
 				Objects.requireNonNull(now, "now")));
 
 		return new Report(
-				id, elderId, generatedByUserId, audience, period, status, content, appended, createdAt);
+				id, elderId, basisId, generatedByUserId, audience, period, status, content, appended, createdAt);
 	}
 
 	/** Who a report is for. The same facts are filtered differently for each. */

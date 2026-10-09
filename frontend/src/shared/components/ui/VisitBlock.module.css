@@ -10,6 +10,19 @@
   overflow-wrap: anywhere;
 }
 
+/* Under an hour wide: one line each for elder and service, cut off rather than wrapped. */
+.narrow {
+  padding: 7px 4px;
+  overflow-wrap: normal;
+}
+
+.line {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .assigned {
   background: var(--text);
   color: var(--bg);

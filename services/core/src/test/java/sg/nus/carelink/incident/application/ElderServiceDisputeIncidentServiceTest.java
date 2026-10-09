@@ -14,6 +14,7 @@ import sg.nus.carelink.incident.support.InMemoryIncidentLogRepository;
 import sg.nus.carelink.incident.support.InMemoryIncidentRepository;
 import sg.nus.carelink.incident.support.IncidentFixtures;
 import sg.nus.carelink.incident.support.RecordingAlert;
+import sg.nus.carelink.incident.support.RecordingIncidentFamilyEvents;
 
 class ElderServiceDisputeIncidentServiceTest {
 
@@ -44,6 +45,7 @@ class ElderServiceDisputeIncidentServiceTest {
                                 IncidentFixtures.BEN
                         ),
                         alert,
+                        new RecordingIncidentFamilyEvents(),
                         EscalationPolicy.defaults(),
                         clock
                 );

@@ -50,6 +50,11 @@ class VisitScheduleQueryAdapter implements VisitScheduleQuery {
 		return !elderIds.isEmpty() && jpa.existsByElderIdInAndCaregiverId(elderIds, caregiverId);
 	}
 
+	@Override
+	public List<Long> caregiverIdsForElder(Long elderId) {
+		return jpa.findDistinctCaregiverIdsByElderId(elderId);
+	}
+
 	private static Specification<VisitJpaEntity> specification(Set<Long> elderIds,
 			VisitScheduleFilter filter, VisitScheduleFilter.DateRange dates) {
 		return (root, query, builder) -> {

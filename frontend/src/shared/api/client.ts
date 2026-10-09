@@ -14,6 +14,9 @@ export class ApiError extends Error {
   }
 }
 
+/** Dispatched on window whenever the server answers 401 outside of login. */
+export const SESSION_EXPIRED_EVENT = 'carelink:session-expired'
+
 /**
  * Shared HTTP client used by CareLink frontend features.
  *
@@ -21,9 +24,10 @@ export class ApiError extends Error {
  * Browser session cookies are included automatically.
  *
  * Authentication failures are returned to the calling feature as
- * ApiError instances. The shared client deliberately does not perform
- * navigation for a 401 response because different CareLink workflows
- * may handle authentication failures differently.
+ * ApiError instances. The client does not navigate itself: a 401 (other
+ * than a failed login) also dispatches SESSION_EXPIRED_EVENT on window,
+ * and RequireRole, which wraps every role client, returns the user to the
+ * landing page.
  */
 export async function api<T>(
   path: string,
@@ -73,6 +77,10 @@ export async function api<T>(
 
   if (!response.ok) {
     const body = await readResponseBody(response)
+
+    if (response.status === 401 && path !== '/auth/login') {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+    }
 
     throw new ApiError(
       errorMessage(body, response.status),

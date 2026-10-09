@@ -9,13 +9,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import sg.nus.carelink.report.domain.model.Report;
 import sg.nus.carelink.report.domain.model.ReportAmendment;
+import sg.nus.carelink.report.domain.model.ReportBasis;
 import sg.nus.carelink.report.domain.model.ReportContent;
 import sg.nus.carelink.report.domain.model.ReportFacts;
+import sg.nus.carelink.report.domain.model.ReportMetrics;
 import sg.nus.carelink.report.domain.model.ReportPage;
 import sg.nus.carelink.report.domain.model.ReportPeriod;
 import sg.nus.carelink.report.support.ReportFixtures;
@@ -39,8 +42,9 @@ class ReportServiceTest {
 	private static final LocalDate SUNDAY = LocalDate.of(2026, 9, 20);
 
 	private final InMemoryReportRepository repository = new InMemoryReportRepository();
+	private final InMemoryReportBasisRepository bases = new InMemoryReportBasisRepository();
 	private final FakeReportFactsSource facts = new FakeReportFactsSource().with(ReportFixtures.week());
-	private final ReportService service = new ReportService(repository, facts, SUNDAY_NIGHT);
+	private final ReportService service = new ReportService(repository, bases, facts, SUNDAY_NIGHT);
 
 	// ----------------------------------------------------------------- generating ---
 
@@ -76,7 +80,7 @@ class ReportServiceTest {
 	@Test
 	void aCompleteWeekIsFiledAsComplete() {
 		FakeReportFactsSource complete = new FakeReportFactsSource().with(ReportFixtures.closedWeek());
-		ReportService withCompleteWeek = new ReportService(repository, complete, SUNDAY_NIGHT);
+		ReportService withCompleteWeek = new ReportService(repository, bases, complete, SUNDAY_NIGHT);
 
 		assertThat(withCompleteWeek.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L))
 				.isNotEmpty()
@@ -126,7 +130,7 @@ class ReportServiceTest {
 	void aQuietWeekIsStillAReportWorthFiling() {
 		FakeReportFactsSource quiet = new FakeReportFactsSource().with(ReportFixtures.quietWeek());
 
-		List<Report> filed = new ReportService(repository, quiet, SUNDAY_NIGHT)
+		List<Report> filed = new ReportService(repository, bases, quiet, SUNDAY_NIGHT)
 				.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L);
 
 		assertThat(filed).hasSize(3).allSatisfy(report -> assertThat(report.content().dataComplete()).isTrue());
@@ -192,7 +196,7 @@ class ReportServiceTest {
 	@Test
 	void reportsAndCorrectionsAreDatedToTheSecondTheyAreStoredAt() {
 		Clock withFraction = Clock.fixed(Instant.parse("2026-09-20T15:00:42.968699100Z"), ZoneId.of("Asia/Singapore"));
-		ReportService onThatClock = new ReportService(repository, facts, withFraction);
+		ReportService onThatClock = new ReportService(repository, bases, facts, withFraction);
 
 		Report family = onThatClock.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L).getFirst();
 		ReportAmendment stored = onThatClock.amend(family.id(), "note", 9L);
@@ -211,6 +215,58 @@ class ReportServiceTest {
 		Long familyId = service.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L).getFirst().id();
 
 		assertThatThrownBy(() -> service.amend(familyId, " ", 9L)).isInstanceOf(BusinessRuleViolation.class);
+	}
+
+	@Test
+	void aFollowUpIsStoredAsOneAndANoteWithoutAKindIsACorrection() {
+		Long familyId = service.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L).getFirst().id();
+
+		ReportAmendment followUp = service.amend(familyId, ReportAmendment.Kind.FOLLOW_UP,
+				"Grab bar fitted on Thursday.", 9L);
+		ReportAmendment correction = service.amend(familyId, "Visit 13 was cancelled by the family.", 9L);
+
+		assertThat(followUp.kind()).isEqualTo(ReportAmendment.Kind.FOLLOW_UP);
+		assertThat(correction.kind()).isEqualTo(ReportAmendment.Kind.CORRECTION);
+		assertThat(service.findDetail(familyId).amendments()).extracting(ReportAmendment::kind)
+				.containsExactly(ReportAmendment.Kind.FOLLOW_UP, ReportAmendment.Kind.CORRECTION);
+	}
+
+	// ---------------------------------------------------------------------- basis ---
+
+	@Test
+	void aRunStoresOneBasisWithTheFactsAndFilesEveryReaderAgainstIt() {
+		List<Report> filed = service.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L);
+
+		assertThat(bases.stored()).hasSize(1);
+		ReportBasis basis = bases.stored().getFirst();
+		assertThat(filed).extracting(Report::basisId).containsOnly(basis.id());
+		assertThat(basis.elderId()).isEqualTo(ReportFixtures.ELDER);
+		assertThat(basis.period()).isEqualTo(ReportFixtures.WEEK);
+		assertThat(basis.createdAt()).isEqualTo(NOW);
+		assertThat(basis.metrics()).isEqualTo(ReportMetrics.of(ReportFixtures.week()));
+		assertThat(bases.factsOf(basis.id())).as("the facts every reader's report was made from")
+				.isEqualTo(ReportFixtures.week());
+	}
+
+	@Test
+	void aPeriodAlreadyOnFileStoresNoSecondBasis() {
+		service.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L);
+		service.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L);
+
+		assertThat(bases.stored()).hasSize(1);
+	}
+
+	@Test
+	void metricsAreLookedUpByBasisAndReportsWithoutOneAreLeftOut() {
+		List<Report> filed = service.generate(ReportFixtures.ELDER, MONDAY, SUNDAY, 7L);
+		Report withoutBasis = repository.save(Report.generate(2L, Report.Audience.FAMILY, ReportFixtures.WEEK,
+				ReportFixtures.content(), 7L, NOW));
+
+		Map<Long, ReportMetrics> metrics = service.metricsFor(filed);
+
+		assertThat(metrics).containsOnlyKeys(filed.getFirst().basisId());
+		assertThat(metrics.get(filed.getFirst().basisId()).visitsPlanned()).isEqualTo(3);
+		assertThat(service.metricsFor(List.of(withoutBasis))).isEmpty();
 	}
 
 	// -------------------------------------------------------------------- reading ---

@@ -25,7 +25,7 @@ export function IntakeDetailPage() {
   const { search, state } = useLocation()
   const { resource, refresh } = useIntakeApplication(id)
   return (
-    <>
+    <div className={styles.page}>
       <div className={styles.detailNav}>
         <Link className={styles.backLink} to={'/family/intake' + search}>
           <IntakeIcon name="back" />
@@ -50,7 +50,7 @@ export function IntakeDetailPage() {
       {resource.status === 'loading' && <IntakeLoading />}
       {resource.status === 'error' && <IntakeFeedback error={resource.error} onRetry={refresh} />}
       {resource.status === 'success' && <ApplicationDetails application={resource.data} />}
-    </>
+    </div>
   )
 }
 

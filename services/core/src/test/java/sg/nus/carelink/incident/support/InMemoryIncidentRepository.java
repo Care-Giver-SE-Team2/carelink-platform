@@ -19,6 +19,15 @@ public final class InMemoryIncidentRepository implements IncidentRepository {
 	private final Map<Long, Incident> rows = new LinkedHashMap<>();
 	private long nextId = 1;
 
+    @Override
+    public PageSlice<Incident> findCaregiverReports(Long actor, Long visit, int page, int size) {
+        var matching = rows.values().stream().filter(i -> i.source() == Incident.Source.CAREGIVER && actor.equals(i.reportedByUserId()))
+                .filter(i -> visit == null || visit.equals(i.visitId()))
+                .sorted(Comparator.comparing(Incident::reportedAt).thenComparing(Incident::id).reversed()).toList();
+        int from = (int) Math.min((long) page * size, matching.size());
+        return new PageSlice<>(matching.subList(from, Math.min(from + size, matching.size())), page, size, matching.size());
+    }
+
 	@Override
 	public Optional<Incident> findById(Long id) {
 		return Optional.ofNullable(rows.get(id));

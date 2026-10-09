@@ -4,31 +4,36 @@ import { Link, useParams } from 'react-router-dom'
 
 import { appendAmendment } from '../../../../features/reports/api'
 import {
+  amendmentKindLabels,
   audienceLabels,
   audienceNotes,
   generatedByLabels,
   problemDetail,
   reportPeriod,
   reportTime,
-  sectionLines,
   statusLabels,
 } from '../../../../features/reports/presentation'
+import type { ReportAmendmentKind } from '../../../../features/reports/types'
 import { useReportDetail } from '../../../../features/reports/useReportQueries'
 import { ManagerShell } from '../../components/ManagerShell'
 import { ReportFeedback } from './ReportFeedback'
+import { ReportSectionCard } from './ReportSectionCard'
 import styles from './Reports.module.css'
 
 /**
  * UC-MG07 — one filed report, as its reader will see it.
  *
- * The sections come in the order every reader's version shares, with the gaps
- * named at the top when the period's data was not complete, the disclaimer at
- * the bottom when this reader gets one, and the corrections under that.
+ * The sections come in the order every reader's version shares, each as a
+ * card laid out for its kind (ReportSectionCard), with the gaps named at the
+ * top when the period's data was not complete, the disclaimer at the bottom
+ * when this reader gets one, and the notes under that. A report filed before
+ * sections carried numbers and series shows its text alone.
  *
  * There is nothing here to edit or delete, because a filed report cannot be
- * either. The only thing a manager can do is append a correction; the report
- * is read again afterwards rather than having the note pushed onto it here,
- * so what is on the screen is what is on file.
+ * either. The only thing a manager can do is append a note - a correction, or
+ * a follow-up on something the report recorded; the report is read again
+ * afterwards rather than having the note pushed onto it here, so what is on
+ * the screen is what is on file.
  */
 export default function ReportDetail() {
   const { id } = useParams()
@@ -38,6 +43,7 @@ export default function ReportDetail() {
   const detail = useReportDetail(reportId)
 
   const [note, setNote] = useState('')
+  const [kind, setKind] = useState<ReportAmendmentKind>('CORRECTION')
   const [busy, setBusy] = useState(false)
   const [amendError, setAmendError] = useState<unknown>(null)
 
@@ -84,8 +90,9 @@ export default function ReportDetail() {
     setBusy(true)
     setAmendError(null)
     try {
-      await appendAmendment(report.id, note)
+      await appendAmendment(report.id, note, kind)
       setNote('')
+      setKind('CORRECTION')
       detail.refresh()
     } catch (error) {
       setAmendError(error)
@@ -106,7 +113,10 @@ export default function ReportDetail() {
       }
     >
       <div className={styles.page}>
-        <div>
+        <div className={styles.reportHead}>
+          <p className={styles.eyebrow}>
+            {audienceLabels[report.audience]} version · RPT-{report.id}
+          </p>
           <h1>
             {audienceLabels[report.audience]} report — Elder #{report.elderId}
           </h1>
@@ -127,27 +137,25 @@ export default function ReportDetail() {
           </section>
         )}
 
-        {report.sections.map((section) => (
-          <section key={section.title} className={styles.section}>
-            <h2 className={styles.sectionHeading}>{section.title}</h2>
-            {sectionLines(section.body).map((line, index) => (
-              <p key={`${section.title}-${index}`} className={line.nested ? styles.subLine : styles.line}>
-                {line.text}
-              </p>
-            ))}
-          </section>
-        ))}
+        <div className={styles.cards}>
+          {report.sections.map((section) => (
+            <ReportSectionCard key={section.title} section={section} />
+          ))}
+        </div>
 
         {report.disclaimer && <p className={styles.disclaimer}>{report.disclaimer}</p>}
 
-        <section className={styles.section}>
-          <h2 className={styles.sectionHeading}>Corrections — appended, never edited</h2>
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Corrections and follow-ups — appended, never edited</h2>
           {report.amendments.length === 0 ? (
-            <p className={styles.note}>No corrections have been appended.</p>
+            <p className={styles.note}>Nothing has been appended.</p>
           ) : (
             <ol className={styles.amendments}>
               {report.amendments.map((amendment) => (
                 <li key={amendment.id} className={styles.amendment}>
+                  <span className={amendment.kind === 'FOLLOW_UP' ? styles.followUpTag : styles.correctionTag}>
+                    {amendmentKindLabels[amendment.kind ?? 'CORRECTION']}
+                  </span>
                   <span className={styles.amendmentMeta}>
                     {reportTime(amendment.createdAt)} · user #{amendment.authorUserId}
                   </span>
@@ -160,7 +168,14 @@ export default function ReportDetail() {
 
         <form className={styles.panel} onSubmit={append}>
           <label>
-            Correction
+            Kind of note
+            <select value={kind} onChange={(event) => setKind(event.target.value as ReportAmendmentKind)}>
+              <option value="CORRECTION">Correction — the report said something wrong or missing</option>
+              <option value="FOLLOW_UP">Follow-up — what was done about something it recorded</option>
+            </select>
+          </label>
+          <label>
+            {amendmentKindLabels[kind]}
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -170,7 +185,7 @@ export default function ReportDetail() {
           </label>
           <div className={styles.panelActions}>
             <button type="submit" disabled={busy}>
-              {busy ? 'Appending…' : 'Append correction'}
+              {busy ? 'Appending…' : `Append ${amendmentKindLabels[kind].toLowerCase()}`}
             </button>
           </div>
         </form>

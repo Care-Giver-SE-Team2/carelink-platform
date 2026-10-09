@@ -283,8 +283,9 @@ class FamilyVisitWorkflowIT {
 			assertThat(getJson(caregiver, "/api/visits/501/work-pack").toString()).contains("Meal preparation");
 			for (var browser : List.of(manager, caregiver)) {
 				assertReadDenied(browser, "/api/visits/501/timeline", 403);
-				assertReadDenied(browser, "/api/visits/501/tasks", 403);
 			}
+			assertReadDenied(manager, "/api/visits/501/tasks", 403);
+			assertThat(getJson(caregiver, "/api/visits/501/tasks").toString()).contains("Meal preparation", "PRIVATE-NOTE");
 			assertThat(getJson(family, "/api/intake-applications").path("items")).isEmpty();
 			assertThat(getJson(family, "/api/visits?elderId=101").path("totalElements").longValue()).isEqualTo(2);
 			assertThat(getJson(family, "/api/reports?elderId=101&audience=FAMILY").path("items")).isEmpty();

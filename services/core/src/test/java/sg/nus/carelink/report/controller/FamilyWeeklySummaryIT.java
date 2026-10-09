@@ -369,13 +369,13 @@ class FamilyWeeklySummaryIT {
 		var session = loginAs("family-a");
 		var body = readSummary(session, 101, "2026-09-14");
 		assertThat(body.path("reportId").longValue()).isEqualTo(familyId);
-		assertThat(body.path("summaryText").asString()).isEqualTo(
+		assertThat(body.path("summaryText").asString()).contains(
 				"Service completion\nNo visits were scheduled in this period.\n\n"
 				+ "Vital signs\nNo vital signs were recorded in this period.\n\n"
 				+ "Observations\nNo observations were recorded in this period.\n\n"
 				+ "Incidents\nNo incidents were reported in this period.");
 		assertThat(body.path("generatedBy").asString()).isEqualTo("TEMPLATE");
-		assertThat(readDetail(session, familyId).path("sections")).hasSize(4);
+		assertThat(readDetail(session, familyId).path("sections")).hasSize(7);
 		assertThat(readSummary(session, 101, "2026-09-14")).isEqualTo(body);
 		assertThat(jdbc.queryForList("SELECT * FROM report ORDER BY id")).isEqualTo(before);
 	}

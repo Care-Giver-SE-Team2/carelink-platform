@@ -42,9 +42,17 @@ class IntakeReviewServiceTest {
 	private final UserDirectory users = mock(UserDirectory.class);
 	/** Hands out user ids from 500 and records what it was asked for. */
 	private final List<String> issuedFor = new ArrayList<>();
-	private final AccountIssuer accounts = (displayName, role) -> {
-		issuedFor.add(displayName + "/" + role);
-		return new AccountIssuer.IssuedAccount(500L + issuedFor.size(), "login" + issuedFor.size(), "Temp" + issuedFor.size());
+	private final AccountIssuer accounts = new AccountIssuer() {
+		@Override
+		public IssuedAccount issue(String displayName, Role role) {
+			issuedFor.add(displayName + "/" + role);
+			return new IssuedAccount(500L + issuedFor.size(), "login" + issuedFor.size(), "Temp" + issuedFor.size());
+		}
+
+		@Override
+		public Long register(String username, String displayName, String rawPassword, Role role) {
+			throw new UnsupportedOperationException("intake review never registers an account");
+		}
 	};
 	private final IntakeReviewService service =
 			new IntakeReviewService(applications, families, elders, caregivers, users, accounts, CLOCK);

@@ -3,10 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ApiError } from '../../shared/api/client'
 import styles from './Caregiver.module.css'
 
-export function LastFetched({ at }: { at: number }) {
+export function LastFetched({ at, subject = 'roster' }: { at: number; subject?: string }) {
   return <p className={styles.muted}>Last successfully fetched: {new Intl.DateTimeFormat('en-SG', {
     timeZone: 'Asia/Singapore', dateStyle: 'medium', timeStyle: 'medium',
-  }).format(at)} (SGT). This is the fetch time, not the roster modification time. Refresh or return to this page to check for changes; updates are not live.</p>
+  }).format(at)} (SGT). This is the fetch time, not the {subject} modification time. Refresh or return to this page to check for changes; updates are not live.</p>
 }
 
 export function QueryError({ error, retry, profile = false, back = '/caregiver' }: { error: unknown; retry: () => void; profile?: boolean; back?: string }) {

@@ -36,6 +36,13 @@ public record Elder(
 				preferredDialects, livesAlone, mobilityLevel, continuityPreference, medicalNotes, createdAt, updatedAt);
 	}
 
+	/** Preserve account, clinical and manager-owned fields when a family updates basic details. */
+	public Elder withBasicDetails(ElderBasicDetails details) {
+		return new Elder(id, userId, details.fullName(), details.gender(), details.dateOfBirth(),
+				details.phone(), details.address(), details.postalCode(), sector, details.preferredDialects(),
+				details.livesAlone(), details.mobilityLevel(), continuityPreference, medicalNotes, createdAt, updatedAt);
+	}
+
 	public enum Gender {
 		MALE, FEMALE, OTHER
 	}

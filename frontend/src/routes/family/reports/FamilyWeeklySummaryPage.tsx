@@ -3,9 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useFamilyWeeklySummary } from '../../../features/reports/useFamilyWeeklySummary'
 import { generatedByLabels, reportPeriod, statusLabels } from '../../../features/reports/presentation'
 import { isScheduleDate, scheduleDateBounds, shiftDays, singaporeToday, weekStart } from '../../../features/schedule/presentation'
-import { ReportCompleteness, ReportCorrections } from './ReportNotes'
+import { ReportCareContext, ReportCompleteness, ReportCorrections } from './ReportNotes'
 import { ReportListFeedback } from './ReportListFeedback'
 import styles from './FamilyReports.module.css'
+import { useSelectedElder } from '../components/selectedElder'
+import { useIsDesktop } from '../components/useIsDesktop'
+import { WeekVisits } from './WeekVisits'
+import { FamilyReportContent } from './FamilyReportContent'
 
 /** Reads an exact Singapore calendar week alongside its report's care notes.
  * @author Wang Zhili
@@ -20,6 +24,8 @@ export function FamilyWeeklySummaryPage() {
   const candidatePage = Number(params.get('page'))
   const page = Number.isInteger(candidatePage) && candidatePage > 0 && candidatePage <= 2147483647 ? candidatePage : 0
   const { resource, refresh } = useFamilyWeeklySummary({ elderId, week })
+  const desktop = useIsDesktop()
+  const { setElderId } = useSelectedElder()
   const data = resource.status === 'success' ? resource.data : null
   const weekly = data?.weekly
   const selectedElderId = data?.selectedElderId ?? elderId
@@ -45,64 +51,117 @@ export function FamilyWeeklySummaryPage() {
     refresh()
   }
 
-  return <div className={styles.reports}>
-    <section className={styles.hero}>
-      <p className={styles.eyebrow}>YOUR FAMILY'S CARE</p>
-      <h1>Weekly care summary</h1>
-      <p className={styles.intro}>Read the care recorded for one week, with any missing records and corrections.</p>
-      <Link className={styles.readLink} to={`/family/reports${listParams.size ? `?${listParams}` : ''}`}>All reports</Link>
-    </section>
-    <section className={styles.weekPanel} aria-label="Choose a week">
+  const elderName = data?.elders.find((elder) => elder.id === data.selectedElderId)?.fullName
+  const allReports = `/family/reports${listParams.size ? `?${listParams}` : ''}`
+  const fullReport = weekly && `/family/reports/${weekly.summary.reportId}?${detailParams}`
+  const changeElder = (id: number) => {
+    setElderId(id)
+    selectWeek(week, id, 0)
+  }
+
+  const header = <header className={styles.hero}>
+    <div>
+      <p className={styles.eyebrow}>{desktop ? ['Reports', elderName].filter(Boolean).join(' · ') : elderName ?? "Your family's care"}</p>
+      <h1>Weekly summary</h1>
+      <p className={styles.intro}>{reportPeriod(week, shiftDays(week, 6))}</p>
+      {weekly && <ReportCareContext sections={weekly.detail.sections} />}
+    </div>
+    {desktop
+      ? fullReport && <div className={styles.headerActions}>
+        <Link className={styles.headerAction} to={fullReport}>Read full report</Link>
+      </div>
+      : <Link className={styles.readLink} to={allReports}>All reports</Link>}
+  </header>
+
+  const weekPanel = <section className={styles.weekPanel} aria-label="Choose a week">
+    <button className={styles.stepper} aria-label="Previous week" disabled={week <= scheduleDateBounds.min}
+      onClick={() => selectWeek(shiftDays(week, -7))}>‹</button>
+    <div className={styles.weekCenter}>
       <h2>{reportPeriod(week, shiftDays(week, 6))}</h2>
-      <div className={styles.datePicker}>
-        <label htmlFor="summary-date">Choose a date</label>
-        <input id="summary-date" type="date" min={scheduleDateBounds.min} max={scheduleDateBounds.max}
-          value={week} aria-describedby="summary-date-help"
-          onChange={(event) => { if (event.currentTarget.validity.valid) selectWeek(event.currentTarget.value) }} />
-        <p id="summary-date-help">Choose any date to read its Monday–Sunday week.</p>
-      </div>
-      <div className={styles.weekControls}>
-        <button disabled={week <= scheduleDateBounds.min} onClick={() => selectWeek(shiftDays(week, -7))}>Previous week</button>
-        <button onClick={() => selectWeek(singaporeToday())}>This week</button>
-        <button disabled={week >= weekStart(scheduleDateBounds.max)} onClick={() => selectWeek(shiftDays(week, 7))}>Next week</button>
-      </div>
-      <p className={styles.timestamp}>Weeks follow Singapore time.</p>
-    </section>
+      <label htmlFor="summary-date" className={styles.hidden}>Choose a date</label>
+      <input id="summary-date" type="date" min={scheduleDateBounds.min} max={scheduleDateBounds.max}
+        value={week} aria-describedby="summary-date-help"
+        onChange={(event) => { if (event.currentTarget.validity.valid) selectWeek(event.currentTarget.value) }} />
+      <p id="summary-date-help" className={styles.hidden}>Choose any date to read its Monday–Sunday week.</p>
+    </div>
+    <button className={styles.stepper} aria-label="Next week" disabled={week >= weekStart(scheduleDateBounds.max)}
+      onClick={() => selectWeek(shiftDays(week, 7))}>›</button>
+    <div className={styles.weekFoot}>
+      <p>Weeks follow Singapore time.</p>
+      <button onClick={() => selectWeek(singaporeToday())}>This week</button>
+    </div>
+  </section>
+
+  const status = <>
     {resource.status === 'loading' && <p className={styles.loading} role="status">Loading your weekly summary…</p>}
     {resource.status === 'error' && <ReportListFeedback error={resource.error} onRetry={reload} onResetAccess={resetAccess} />}
-    {data && <>
-      <div className={styles.toolbar}>
-        {data.elders.length > 0 && <div className={styles.elderPicker}>
-          <label htmlFor="summary-elder">Care for</label>
-          <select id="summary-elder" value={data.selectedElderId ?? ''} onChange={(event) => selectWeek(week, Number(event.target.value), 0)}>
-            {data.elders.map((elder) => <option key={elder.id} value={elder.id}>{elder.fullName}</option>)}
-          </select>
-        </div>}
-        <button onClick={reload}>Refresh</button>
+  </>
+
+  // Phone only: on desktop the elder is chosen in the side rail. Refresh sits with the summary.
+  const toolbar = data && data.elders.length > 0 && !desktop && <div className={styles.toolbar}>
+    <div className={styles.elderPicker}>
+      <label htmlFor="summary-elder">Care for</label>
+      <select id="summary-elder" value={data.selectedElderId ?? ''} onChange={(event) => changeElder(Number(event.target.value))}>
+        {data.elders.map((elder) => <option key={elder.id} value={elder.id}>{elder.fullName}</option>)}
+      </select>
+    </div>
+  </div>
+  const refreshButton = <button className={styles.refresh} onClick={reload}>Refresh</button>
+
+  const content = data && <>
+    {/* With no summary to sit beside, Refresh gets its own row above the message card. */}
+    {(data.elders.length === 0 || !weekly) && <div className={styles.refreshBar}>{refreshButton}</div>}
+    {data.elders.length === 0 ? <section className={styles.state}>
+      <h2>No linked elders yet</h2>
+      <p>Your care reports will be available once a family binding is active.</p>
+      <Link to="/family/service-applications">View my applications</Link>
+    </section> : !weekly && <section className={styles.state}>
+      <h2>No report for this week</h2>
+      <p>No published or archived report is available for the selected week. Choose another week or check again later.</p>
+    </section>}
+    {weekly && <article aria-label="Weekly care summary" className={styles.summaryArticle}>
+      <div className={styles.tagRow}>
+        <span className={styles.modelTag}>{generatedByLabels[weekly.summary.generatedBy]}</span>
+        <span>from the week's records</span>
+        {refreshButton}
       </div>
-      {data.elders.length === 0 ? <section className={styles.state}>
-        <h2>No linked elders yet</h2>
-        <p>Your care reports will be available once a family binding is active.</p>
-        <Link to="/family/intake">View my applications</Link>
-      </section> : !weekly && <section className={styles.state}>
-        <h2>No report for this week</h2>
-        <p>No published or archived report is available for the selected week. Choose another week or check again later.</p>
-      </section>}
-      {weekly && <article aria-label="Weekly care summary" className={styles.cards}>
-        <section className={styles.card}>
-          <div className={styles.cardTop}>
-            <span className={styles.reference}>REPORT #{weekly.summary.reportId}</span>
-            <span className={styles.badge} data-status={weekly.detail.status}>{statusLabels[weekly.detail.status]}</span>
-          </div>
-          <p className={styles.source}>{generatedByLabels[weekly.summary.generatedBy]}</p>
-          <ReportCompleteness report={weekly.detail} />
-          <p className={styles.body} aria-label="Summary text">{weekly.summary.summaryText}</p>
-          <Link className={styles.readLink} to={`/family/reports/${weekly.summary.reportId}?${detailParams}`}>Read full report</Link>
-        </section>
-        <ReportCorrections amendments={weekly.detail.amendments} />
-        <p className={styles.disclaimer}>{weekly.summary.disclaimer}</p>
-        <p className={styles.timestamp}>Dates and times are shown in Singapore time.</p>
-      </article>}
-    </>}
+      <section className={styles.reportMeta}>
+        <ReportCompleteness report={weekly.detail} />
+        <div className={styles.cardFoot}>
+          <span className={styles.reference}>REPORT #{weekly.summary.reportId}</span>
+          <span className={styles.badge} data-status={weekly.detail.status}>{statusLabels[weekly.detail.status]}</span>
+        </div>
+      </section>
+      <FamilyReportContent sections={weekly.detail.sections} />
+      <p className={styles.disclaimer}>{weekly.summary.disclaimer}</p>
+      <ReportCorrections amendments={weekly.detail.amendments} />
+      {!desktop && fullReport && <div className={styles.actions}>
+        <Link className={styles.secondary} to={fullReport}>Read full report</Link>
+      </div>}
+      <p className={styles.timestamp}>Dates and times are shown in Singapore time.</p>
+    </article>}
+  </>
+
+  if (desktop) {
+    return <div className={styles.weekly}>
+      {header}
+      <div className={styles.split}>
+        <div className={styles.splitMain}>{status}{content}</div>
+        <div className={styles.splitSide}>
+          {/* Moving between reports lives in this column: every report here, another week below. */}
+          <Link className={styles.sideLink} to={allReports}>All reports <span aria-hidden="true">→</span></Link>
+          {weekPanel}
+          {toolbar}
+          {data?.selectedElderId != null && <WeekVisits elderId={data.selectedElderId} week={week} />}
+        </div>
+      </div>
+    </div>
+  }
+  return <div className={styles.weekly}>
+    {header}
+    {weekPanel}
+    {status}
+    {toolbar}
+    {content}
   </div>
 }

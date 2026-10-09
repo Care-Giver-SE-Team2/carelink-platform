@@ -2,13 +2,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '../../shared/api/client'
 import {
+  amendmentKindLabels,
   audienceLabels,
+  figureText,
+  metricsLine,
   previousWeek,
   problemDetail,
   reportDay,
+  reportLine,
+  reportNumber,
   reportPeriod,
   reportTime,
+  sectionKey,
   sectionLines,
+  sparkline,
   todayIso,
 } from './presentation'
 
@@ -139,5 +146,140 @@ describe('reading an error', () => {
       'Request failed with status 502.',
     )
     expect(problemDetail(new TypeError('Failed to fetch'))).toMatch(/could not be completed/)
+  })
+})
+
+describe('figures and charts', () => {
+  it('writes a number as the report did and a figure by what it is', () => {
+    expect(reportNumber(66.67)).toBe('66.67')
+    expect(reportNumber(3.5)).toBe('3.5')
+    expect(reportNumber(100)).toBe('100')
+    expect(figureText({ key: 'fulfilment', label: 'Fulfilment', value: 66.67, outOf: null, unit: '%' })).toBe('66.67%')
+    expect(figureText({ key: 'visits', label: 'Visits carried out', value: 2, outOf: 3, unit: null })).toBe('2 of 3')
+    expect(figureText({ key: 'incidents', label: 'Incidents', value: 1, outOf: null, unit: null })).toBe('1')
+  })
+
+  it("puts a basis's numbers in one line, and a dash for a report without one", () => {
+    const metrics = {
+      visitsPlanned: 3,
+      visitsCompleted: 2,
+      fulfilmentRate: 66.67,
+      vitalsOutOfRange: 1,
+      incidentCount: 1,
+      averageElderRating: 3.5,
+      ratingCount: 2,
+      dataComplete: false,
+    }
+
+    expect(metricsLine(metrics)).toBe('2 of 3 visits (66.67%) · 1 incident · rated 3.5')
+    expect(
+      metricsLine({ ...metrics, visitsPlanned: 0, visitsCompleted: 0, fulfilmentRate: null, incidentCount: 0, averageElderRating: null }),
+    ).toBe('no visits planned · 0 incidents · not rated')
+    expect(metricsLine(null)).toBe('—')
+    expect(metricsLine(undefined)).toBe('—')
+  })
+
+  it('spaces the points evenly and scales them between the lowest and the highest', () => {
+    const shape = sparkline(
+      [
+        { at: '2026-09-14T09:10', low: 128, high: 128, flagged: false },
+        { at: '2026-09-16T09:10', low: 142, high: 142, flagged: true },
+      ],
+      100,
+      40,
+    )
+
+    expect(shape?.min).toBe(128)
+    expect(shape?.max).toBe(142)
+    expect(shape?.points.map((point) => point.x)).toEqual([4, 96])
+    expect(shape?.points[0].mid).toBe(36)
+    expect(shape?.points[1].mid).toBe(4)
+    expect(shape?.points[1].flagged).toBe(true)
+    expect(shape?.line).toBe('M4.0 36.0 L96.0 4.0')
+  })
+
+  it("keeps both ends of a day's range and centres a single flat point", () => {
+    const day = sparkline([{ at: '2026-09-14', low: 70, high: 96, flagged: true }], 100, 40)
+
+    expect(day?.points[0].x).toBe(50)
+    expect(day?.points[0].low).toBe(36)
+    expect(day?.points[0].high).toBe(4)
+
+    const flat = sparkline([{ at: '2026-09-14', low: 72, high: 72, flagged: false }], 100, 40)
+    expect(flat?.points[0].mid).toBe(20)
+    expect(sparkline([], 100, 40)).toBeNull()
+  })
+
+  it('names the two kinds of note', () => {
+    expect(amendmentKindLabels.CORRECTION).toBe('Correction')
+    expect(amendmentKindLabels.FOLLOW_UP).toBe('Follow-up')
+  })
+})
+
+describe('lines as rows', () => {
+  it('keys a section by its title when it was filed without a key', () => {
+    expect(sectionKey({ title: 'Ratings and spot checks' })).toBe('ratings-and-spot-checks')
+    expect(sectionKey({ title: 'Service completion', key: 'service-completion' })).toBe('service-completion')
+    expect(sectionKey({ title: '  Vital  signs! ' })).toBe('vital-signs')
+  })
+
+  it("takes a visit's time and state out of the line and keeps the rest in order", () => {
+    expect(
+      reportLine({ text: 'Mon 14 Sep 09:00 · Personal care · Daniel Goh · verified · evidence 2 of 2 verified', nested: false }),
+    ).toEqual({
+      text: 'Mon 14 Sep 09:00 · Personal care · Daniel Goh · verified · evidence 2 of 2 verified',
+      nested: false,
+      time: 'Mon 14 Sep 09:00',
+      parts: ['Personal care', 'Daniel Goh', 'evidence 2 of 2 verified'],
+      status: { text: 'verified', tone: 'ok' },
+    })
+  })
+
+  it('finds the time wherever the report put it, and the first state in the line', () => {
+    const request = reportLine({ text: 'Hospital escort · Sat 19 Sep 10:00 · approved and booked', nested: false })
+    expect(request.time).toBe('Sat 19 Sep 10:00')
+    expect(request.parts).toEqual(['Hospital escort'])
+    expect(request.status).toEqual({ text: 'approved and booked', tone: 'ok' })
+
+    const incident = reportLine({
+      text: 'Tue 15 Sep 10:15 · incident 2 · FALL · severity MEDIUM · RESOLVED · resolved Tue 15 Sep 11:02',
+      nested: false,
+    })
+    expect(incident.status).toEqual({ text: 'RESOLVED', tone: 'ok' })
+    expect(incident.parts).toEqual(['incident 2', 'FALL', 'severity MEDIUM', 'resolved Tue 15 Sep 11:02'])
+
+    const review = reportLine({ text: 'Review of Daniel Goh · 14 Sep – 20 Sep · 4 out of 5 · keep the current caregiver', nested: false })
+    expect(review.time).toBe('14 Sep – 20 Sep')
+    expect(review.status).toBeNull()
+  })
+
+  it('reads each state the report writes in the tone a manager should see it', () => {
+    const tone = (state: string) => reportLine({ text: 'Fri 18 Sep 09:00 · Personal care · ' + state, nested: false }).status?.tone
+    expect(tone('scheduled')).toBe('warn')
+    expect(tone('awaiting the family')).toBe('warn')
+    expect(tone('ended in an exception')).toBe('bad')
+    expect(tone('needs improvement')).toBe('bad')
+    expect(tone('out of range')).toBe('bad')
+    expect(tone('UNRESOLVED_ESCALATED')).toBe('bad')
+    expect(tone('ACKNOWLEDGED')).toBe('warn')
+    expect(tone('cancelled at the family\'s request')).toBe('neutral')
+    expect(tone('rescheduled with Mei Ling (caregiver #5)')).toBe('neutral')
+    expect(tone('Mei Ling took the visit')).toBe('ok')
+    expect(tone('replaced by Mei Ling (caregiver #5)')).toBe('ok')
+    expect(tone('evidence 2 of 2 verified')).toBeUndefined()
+  })
+
+  it('leaves a sentence whole, and a step marked as one', () => {
+    expect(reportLine({ text: 'No incidents were reported in this period.', nested: false })).toMatchObject({
+      time: null,
+      parts: ['No incidents were reported in this period.'],
+      status: null,
+    })
+    expect(reportLine({ text: 'cancelled', nested: false }).status).toBeNull()
+    expect(reportLine({ text: 'Tue 15 Sep 10:21 · CLAIMED · staff', nested: true })).toMatchObject({
+      nested: true,
+      time: 'Tue 15 Sep 10:21',
+      parts: ['CLAIMED', 'staff'],
+    })
   })
 })

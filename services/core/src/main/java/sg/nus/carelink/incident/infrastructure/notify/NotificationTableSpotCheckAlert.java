@@ -89,6 +89,19 @@ class NotificationTableSpotCheckAlert implements SpotCheckAlert {
 	}
 
 	@Override
+	public void reminded(SpotCheck check, Names names) {
+		String when = check.proposedTime().format(WHEN);
+		for (Long family : boundFamily(check.elderId())) {
+			write(family, "SPOT_CHECK_REMINDER", "Still waiting for your answer: may a manager watch the visit on %s?"
+					.formatted(when),
+					("A manager would like to be present at %s's visit on %s: %s. Nobody comes to watch unless you agree;"
+							+ " the request stays open until you answer or the visit starts.")
+							.formatted(elder(names), when, check.reason()),
+					check.id());
+		}
+	}
+
+	@Override
 	public void withdrawn(SpotCheck check, Names names) {
 		for (Long family : boundFamily(check.elderId())) {
 			write(family, "SPOT_CHECK_WITHDRAWN",

@@ -110,7 +110,8 @@ public class IncidentJpaEntity {
     @Column(name = "location_text", length = 255)
     private String locationText;
 
-    @Column(name = "description", length = 500)
+    /** VARCHAR(2000) since V19: the caregiver's form and the elder's dispute both allow 2000 characters. */
+    @Column(name = "description", length = 2000)
     private String description;
 
     /** countdown deadline; SYS02 escalates past this */

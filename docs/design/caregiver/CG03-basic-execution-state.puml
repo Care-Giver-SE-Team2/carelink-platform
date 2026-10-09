@@ -1,0 +1,20 @@
+@startuml
+title CG03 basic execution and CG04 pause (implemented scope)
+hide empty description
+[*] --> SCHEDULED : manager publishes and assigns
+SCHEDULED --> ARRIVED : check-in / authorized + window + plan tasks
+ARRIVED --> IN_PROGRESS : same check-in transaction
+IN_PROGRESS : PENDING task -> DONE / SKIPPED / REFUSED
+IN_PROGRESS : task writes advance parent version, not Visit state
+SCHEDULED --> EXCEPTION : incident / start reached
+ARRIVED --> EXCEPTION : incident
+IN_PROGRESS --> EXCEPTION : incident
+EXCEPTION : execution commands blocked
+EXCEPTION : manager resolves Incident, not Visit
+state "Terminal Visit (existing)" as Terminal
+Terminal : supplemental incident preserves terminal status
+note bottom of IN_PROGRESS
+All-DONE is not COMPLETED.
+Check-out/evidence/CG05 are future scope.
+end note
+@enduml

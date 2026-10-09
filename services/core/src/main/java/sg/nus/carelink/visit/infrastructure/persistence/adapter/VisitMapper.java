@@ -29,7 +29,9 @@ final class VisitMapper {
 				e.getCarePlanId(),
 				e.getVersion(),
 				e.getCreatedAt(),
-				e.getUpdatedAt());
+				e.getUpdatedAt(),
+                e.getHealthFlag() == null ? null : sg.nus.carelink.visit.domain.model.HealthObservation.Flag.valueOf(e.getHealthFlag()),
+                e.getHealthNote());
 	}
 
 	static VisitJpaEntity toEntity(Visit d) {
@@ -48,6 +50,8 @@ final class VisitMapper {
 		e.setStateDeadline(d.stateDeadline());
 		e.setCarePlanId(d.carePlanId());
 		e.setVersion(d.version());
+        e.setHealthFlag(d.healthFlag() == null ? null : d.healthFlag().name());
+        e.setHealthNote(d.healthNote());
 		return e;
 	}
 }

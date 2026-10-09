@@ -9,21 +9,15 @@ function hours(value: number): string {
   return `${value.toFixed(1)} h`
 }
 
-function DayCell({
-  load,
-  day,
-  cover,
-  onOpen,
-}: {
-  load: DayLoad
-  day: WeekDay
-  cover: boolean
-  onOpen: () => void
-}) {
+function DayCell({ load, day, onOpen }: { load: DayLoad; day: WeekDay; onOpen: () => void }) {
   if (load.visits === 0) {
-    return <div className={cx(styles.cell, styles.empty, day.isToday && styles.today)}>—</div>
+    return load.leave ? (
+      <div className={cx(styles.cell, styles.empty, styles.onLeave)}>On leave</div>
+    ) : (
+      <div className={cx(styles.cell, styles.empty, day.isToday && styles.today)}>—</div>
+    )
   }
-  const overCap = !cover && load.hours > CAP_HOURS_PER_DAY
+  const overCap = load.hours > CAP_HOURS_PER_DAY
   const fill = overCap ? styles.overCap : day.isPast ? styles.past : styles.scheduled
   const flags: ReactNode[] = []
   if (load.exceptions > 0) flags.push(<span key="exceptions" className={styles.danger}>{load.exceptions} exception</span>)
@@ -32,19 +26,17 @@ function DayCell({
   return (
     <button
       type="button"
-      className={cx(styles.cell, styles.load, day.isToday && styles.today)}
+      className={cx(styles.cell, styles.load, day.isToday && styles.today, load.leave !== null && styles.onLeave)}
       onClick={onOpen}
-      aria-label={`${day.label}: ${load.visits} visits, ${hours(load.hours)}${cover ? ' to cover' : ''}. Open in Day view`}
+      aria-label={`${day.label}: ${load.leave ? 'on leave, ' : ''}${load.visits} visits, ${hours(load.hours)}. Open in Day view`}
     >
-      <span className={cx(styles.figures, cover && styles.coverText)}>
-        <span>{cover ? `${load.visits} to cover` : `${load.visits} visits`}</span>
+      <span className={styles.figures}>
+        <span>{load.visits} visits</span>
         <span className={overCap ? styles.danger : styles.muted}>{hours(load.hours)}</span>
       </span>
-      {!cover && (
-        <span className={styles.track}>
-          <span className={cx(styles.fill, fill)} style={{ width: `${Math.min(100, (load.hours / CAP_HOURS_PER_DAY) * 100)}%` }} />
-        </span>
-      )}
+      <span className={styles.track}>
+        <span className={cx(styles.fill, fill)} style={{ width: `${Math.min(100, (load.hours / CAP_HOURS_PER_DAY) * 100)}%` }} />
+      </span>
       {flags.length > 0 && <span className={styles.flags}>{flags}</span>}
     </button>
   )
@@ -52,7 +44,7 @@ function DayCell({
 
 /**
  * One week as caregiver × day load: visits, hours against the daily cap, and flags. A cell
- * opens that day in the Day view. The "Needs cover" row counts visits nobody has yet.
+ * opens that day in the Day view. A day a caregiver is on approved leave is hatched.
  */
 export function WeekGrid({
   days,
@@ -88,22 +80,16 @@ export function WeekGrid({
           <div key={row.id} className={cx(styles.row, styles.body)} role="row">
             <div role="rowheader" className={styles.label}>
               <div className={styles.name}>{row.name}</div>
-              <div className={cx(styles.sub, row.kind === 'cover' && styles.coverText)}>{row.subLine}</div>
+              <div className={styles.sub}>{row.subLine}</div>
             </div>
             {row.days.map((load, i) => (
               <div key={days[i].date} role="cell" className={styles.slot}>
-                <DayCell load={load} day={days[i]} cover={row.kind === 'cover'} onOpen={() => onOpenDay(days[i].date)} />
+                <DayCell load={load} day={days[i]} onOpen={() => onOpenDay(days[i].date)} />
               </div>
             ))}
             <div role="cell" className={styles.total}>
-              {row.kind === 'cover' ? (
-                hours(row.totalHours)
-              ) : (
-                <>
-                  <span className={row.totalHours > CAP_HOURS_PER_WEEK ? styles.danger : undefined}>{hours(row.totalHours)}</span>
-                  <div className={styles.cap}>/ {CAP_HOURS_PER_WEEK}</div>
-                </>
-              )}
+              <span className={row.totalHours > CAP_HOURS_PER_WEEK ? styles.danger : undefined}>{hours(row.totalHours)}</span>
+              <div className={styles.cap}>/ {CAP_HOURS_PER_WEEK}</div>
             </div>
           </div>
         ))}

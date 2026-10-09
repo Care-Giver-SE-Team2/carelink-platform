@@ -1,0 +1,36 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  min-height: 720px;
+}
+
+.lists {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.notice {
+  margin: 16px 20px 0;
+}
+
+.directory {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.pagination {
+  padding: 12px 20px;
+}
+
+.status {
+  margin: 0;
+  padding: 0 20px 20px;
+  font: 400 12px/1.5 var(--font);
+  color: var(--text-muted);
+}
+
+.emptyPanel {
+  padding: 18px 20px;
+}

@@ -11,6 +11,7 @@ import {
 } from '../../features/auth/api'
 import type { CurrentUser } from '../../features/auth/types'
 import { ApiError } from '../api/client'
+import { NotificationBell } from './notifications/NotificationBell'
 
 /**
  * The frame every role screen sits in.
@@ -176,6 +177,8 @@ export function RoleShell({
               gap: 12,
             }}
           >
+            <NotificationBell />
+
             <div
               aria-hidden="true"
               style={{

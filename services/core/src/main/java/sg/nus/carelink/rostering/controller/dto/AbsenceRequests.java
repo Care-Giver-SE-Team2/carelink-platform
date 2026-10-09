@@ -51,6 +51,12 @@ public final class AbsenceRequests {
 	public record Reroster(RosteringRun.Objective objective) {
 	}
 
+	/** Body of {@code POST /api/absences/{id}/changes/{changeId}/assignment}: who the manager picked. */
+	public record Assignment(
+			@NotNull(message = "caregiverId is required")
+			Long caregiverId) {
+	}
+
 	/** Body of {@code POST /api/roster-changes/{id}/decision}. */
 	public record Decision(
 			@NotNull(message = "choice is required")

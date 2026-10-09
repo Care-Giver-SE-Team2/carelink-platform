@@ -9,6 +9,7 @@ import java.util.Set;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.incident.domain.model.ContactAttempt;
@@ -25,7 +26,7 @@ import sg.nus.carelink.shared.error.ResourceNotFound;
 /**
  * Application layer of the incident module: one public method per step of UC-MG05, plus
  * the entry points that raise an incident in the first place
- * (UC-EL03, UC-EL01 and UC-CG04).
+ * (UC-EL03, UC-EL01, UC-CG04 and UC-SYS03).
  *
  * <p>Each method does the same four things and nothing else: load through the ports, call
  * the domain model, save, write the timeline. The rules themselves are in
@@ -78,17 +79,26 @@ public class IncidentService {
     // ------------------------------------------------------------------- raising ---
 
     /**
+     * UC-SYS03: join the locked Visit transition and trigger ledger transaction.
+     * Routing registers the family event; do not publish or notify the family a second time.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Incident raiseForMissedCheckIn(Long elderId, Long visitId,
+            LocalDateTime dueAt, LocalDateTime observedAt) {
+        var saved = incidents.save(Incident.raisedForMissedCheckIn(elderId, visitId, dueAt, observedAt));
+        timeline.save(IncidentLog.systemEntry(saved.id(), IncidentLog.Action.REPORTED,
+                "assigned caregiver has not checked in after the allowed lateness threshold", observedAt));
+        return escalation.routeNewIncident(saved);
+    }
+
+    /**
      * UC-EL03: an elder triggers the one-tap emergency call.
      *
-     * <p>Owned by the elder module. Left exactly as it was written there: it records the
-     * incident and stops.
-     *
-     * <p><strong>The incident is not routed here.</strong> An SOS with no responder and no
-     * countdown sits in the table until a human notices it, which is the failure UC-MG05's
-     * escalation chain exists to prevent. Closing that gap is one line -
-     * {@code return escalation.routeNewIncident(saved);} - but it belongs to whoever owns
-     * this use case, not to the manager module, so it is raised on the pull request rather
-     * than made here.
+     * <p>Recording the call is the elder module's, written there and kept as it was. What
+     * follows is UC-MG05's trigger and step 1, the same as for every other incident: the
+     * call goes on its timeline and is routed - everyone who could act is told at once, a
+     * named manager is made responsible and the countdown starts, so an SOS can never sit
+     * in the table waiting for somebody to notice it.
      */
     public Incident createElderEmergency(
             Long elderId,
@@ -108,8 +118,25 @@ public class IncidentService {
                         description
                 );
 
-        return incidents.save(
+        Incident saved = incidents.save(
                 incident
+        );
+
+        timeline.save(
+                IncidentLog.entry(
+                        saved.id(),
+                        actorLabel(
+                                reportedByUserId,
+                                "elder"
+                        ),
+                        IncidentLog.Action.REPORTED,
+                        "emergency call by the elder",
+                        now()
+                )
+        );
+
+        return escalation.routeNewIncident(
+                saved
         );
     }
 
@@ -272,6 +299,44 @@ public class IncidentService {
     }
 
     /**
+     * UC-MG03 / UC-MG04: a visit falls on a caregiver's approved leave, is due soon, and is
+     * still theirs because nobody has re-rostered it. Raised by the roster's reminder scan
+     * before the visit, so the gap reaches the manager's queue while there is time to act.
+     *
+     * <p>The same kind of incident as {@link #raiseForUncoveredVisit} - a visit nobody will
+     * check in to unless somebody acts - and only the timeline says how it came about.
+     */
+    public Incident raiseForUnrosteredLeaveVisit(
+            Long elderId,
+            Long visitId,
+            String description) {
+
+        Incident saved =
+                incidents.save(
+                        Incident.raisedForUncoveredVisit(
+                                elderId,
+                                visitId,
+                                description,
+                                now()
+                        )
+                );
+
+        timeline.save(
+                IncidentLog.entry(
+                        saved.id(),
+                        "system",
+                        IncidentLog.Action.REPORTED,
+                        "visit due soon is still with a caregiver on leave",
+                        now()
+                )
+        );
+
+        return escalation.routeNewIncident(
+                saved
+        );
+    }
+
+    /**
      * UC-MG08 exception 4a: a manager went to watch a visit and the caregiver never came. The
      * spot check turns into a missed-visit exception and takes the UC-MG05 route, like any
      * other visit nobody checked in to; the manager who saw it is on the timeline.
@@ -314,8 +379,11 @@ public class IncidentService {
      * takes it out of the scheduled scan's reach.
      *
      * <p>A take-over that is refused because somebody else got there first is written to the
-     * timeline before the rejection is thrown, so the attempt leaves a trace.
+     * timeline before the rejection is thrown, so the attempt leaves a trace. The refusal must
+     * not roll that row back with it, hence {@code noRollbackFor}: when the refusal is thrown,
+     * the timeline entry is the only thing this transaction has written.
      */
+    @Transactional(noRollbackFor = BusinessRuleViolation.class)
     public Incident claim(
             Long incidentId,
             Long userId,

@@ -170,7 +170,8 @@ public class AbsenceQueryService {
 				change.decidedAt(), change.respondBy(), change.note(),
 				person(change.originalCaregiverId(), names), person(change.proposedCaregiverId(), names),
 				person(change.assignedCaregiverId(), names), change.rescheduledVisitId(),
-				rescheduledStart(change), change.incidentId(), change.rosteringRunId(), objective, views);
+				rescheduledStart(change), change.incidentId(), change.rosteringRunId(), objective, views,
+				change.managerMayAssign() && change.visitStart().isAfter(now()));
 	}
 
 	private FamilyChange familyView(RosterChange change, Map<Long, String> names, Map<Long, String> elderNames) {
@@ -249,13 +250,18 @@ public class AbsenceQueryService {
 	public record Person(Long caregiverId, String name) {
 	}
 
-	/** One vacated visit as the manager sees it, with the run behind its current state. */
+	/**
+	 * One vacated visit as the manager sees it, with the run behind its current state.
+	 *
+	 * @param managerMayAssign whether the manager may hand-pick a caregiver for it now: see
+	 *     {@link RosterChange#managerMayAssign()}, and the visit is still ahead
+	 */
 	public record ChangeView(Long id, Long visitId, Long elderId, String elderName, LocalDateTime visitStart,
 			LocalDateTime visitEnd, RosterChange.Status status, RosterChange.Outcome outcome,
 			RosterChange.DecidedBy decidedBy, LocalDateTime decidedAt, LocalDateTime respondBy, String note,
 			Person absentCaregiver, Person proposedCaregiver, Person assignedCaregiver, Long rescheduledVisitId,
 			LocalDateTime rescheduledStart, Long incidentId, Long rosteringRunId, RosteringRun.Objective objective,
-			List<CandidateView> candidates) {
+			List<CandidateView> candidates, boolean managerMayAssign) {
 	}
 
 	public record CandidateView(Long caregiverId, String name, Integer rank, BigDecimal score, String reason,

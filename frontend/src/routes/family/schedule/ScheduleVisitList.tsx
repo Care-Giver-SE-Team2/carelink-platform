@@ -1,26 +1,32 @@
 import { Link } from 'react-router-dom'
 import type { FamilyVisitPage } from '../../../features/schedule/types'
-import { serviceLabel, visitDate, visitStatusLabels, visitTime } from '../../../features/schedule/presentation'
+import { serviceLabel, visitDate, visitDayMonth, visitStatusLabels, visitTime, visitWeekday } from '../../../features/schedule/presentation'
 import styles from './FamilySchedule.module.css'
 
 /**
  * Displays the returned page of planned visits and its server snapshot time.
  * @author Wang Zhili
  */
-export function ScheduleVisitList({ visits, onPage, onCaregiver }: {
+export function ScheduleVisitList({ visits, primaryCaregiver = null, onPage, onCaregiver, onRefresh }: {
   visits: FamilyVisitPage
+  /** The elder's primary caregiver, named on the rows they are assigned to. */
+  primaryCaregiver?: { id: number; name: string } | null
   onPage: (page: number) => void
   onCaregiver: (id: number) => void
+  onRefresh: () => void
 }) {
   const pages = Math.ceil(visits.totalElements / visits.size)
   const snapshot = visits.items[0]?.asOf
   return (
     <>
-      <div className={styles.summary} aria-live="polite">
-        <strong>{visits.totalElements} {visits.totalElements === 1 ? 'visit' : 'visits'} this week</strong>
-        {visits.items.length > 0 && <span>
-          Showing {visits.page * visits.size + 1}–{visits.page * visits.size + visits.items.length} of {visits.totalElements}
-        </span>}
+      <div className={styles.summary}>
+        <div className={styles.summaryText} aria-live="polite">
+          <strong>{visits.totalElements} {visits.totalElements === 1 ? 'visit' : 'visits'} this week</strong>
+          {visits.items.length > 0 && <span>
+            Showing {visits.page * visits.size + 1}–{visits.page * visits.size + visits.items.length} of {visits.totalElements}
+          </span>}
+        </div>
+        <button className={styles.refresh} onClick={onRefresh}>Refresh</button>
       </div>
       {visits.items.length === 0 ? (
         <section className={styles.state}>
@@ -33,38 +39,39 @@ export function ScheduleVisitList({ visits, onPage, onCaregiver }: {
       ) : (
         <ol className={styles.visits} aria-label="Scheduled visits">
           {visits.items.map((visit) => (
-            <li key={visit.id} className={styles.card}>
-              <div className={styles.cardTop}>
-                <time dateTime={visit.scheduledStart}>{visitDate(visit.scheduledStart)}</time>
-                <span className={styles.badge} data-status={visit.status}>
-                  {visitStatusLabels[visit.status] ?? visit.status}
-                </span>
+            <li key={visit.id} className={styles.row} data-status={visit.status}>
+              <time className={styles.day} dateTime={visit.scheduledStart}>
+                <strong>{visitWeekday(visit.scheduledStart)}</strong>{visitDayMonth(visit.scheduledStart)}
+              </time>
+              <div className={styles.rowMain}>
+                <h2>{serviceLabel(visit.serviceType)}</h2>
+                <p className={styles.time}>
+                  <time dateTime={visit.scheduledStart}>{visitTime(visit.scheduledStart)}</time>
+                  {visit.scheduledEnd
+                    ? <> – <time dateTime={visit.scheduledEnd}>
+                      {visitDate(visit.scheduledStart) !== visitDate(visit.scheduledEnd) && visitDate(visit.scheduledEnd) + ', '}
+                      {visitTime(visit.scheduledEnd)}
+                    </time></>
+                    : <span> · End time to be confirmed</span>}
+                </p>
+                <p className={styles.sub}>
+                  {visit.caregiverId === null ? 'Caregiver awaiting assignment'
+                    : visit.caregiverId === primaryCaregiver?.id ? primaryCaregiver.name : 'Caregiver assigned'}
+                </p>
               </div>
-              <h2>{serviceLabel(visit.serviceType)}</h2>
-              <p className={styles.time}>
-                <time dateTime={visit.scheduledStart}>{visitTime(visit.scheduledStart)}</time>
-                {visit.scheduledEnd
-                  ? <> – <time dateTime={visit.scheduledEnd}>
-                    {visitDate(visit.scheduledStart) !== visitDate(visit.scheduledEnd) && visitDate(visit.scheduledEnd) + ', '}
-                    {visitTime(visit.scheduledEnd)}
-                  </time></>
-                  : <span> · End time to be confirmed</span>}
-              </p>
-              <div className={styles.caregiver}>
-                <span className={styles.caregiverIcon} aria-hidden="true">{visit.caregiverId === null ? '–' : '✓'}</span>
-                <span>{visit.caregiverId === null ? 'Caregiver awaiting assignment' : 'Caregiver assigned'}</span>
-                <span className={styles.reference}>Visit #{visit.id}</span>
+              <div className={styles.rowSide}>
+                <span className={styles.status}>{visitStatusLabels[visit.status] ?? visit.status}</span>
+                {visit.caregiverId !== null && <button
+                  className={styles.caregiverButton}
+                  aria-label={`View caregiver for visit ${visit.id}`}
+                  aria-haspopup="dialog"
+                  onClick={() => onCaregiver(visit.caregiverId!)}
+                >caregiver</button>}
               </div>
               <Link className={styles.progressLink} to={`/family/visits/${visit.id}`}
                 aria-label={`View progress for visit ${visit.id}`}>
-                View progress <span aria-hidden="true">→</span>
+                <span className={styles.hidden}>View progress</span>
               </Link>
-              {visit.caregiverId !== null && <button
-                className={styles.caregiverButton}
-                aria-label={`View caregiver for visit ${visit.id}`}
-                aria-haspopup="dialog"
-                onClick={() => onCaregiver(visit.caregiverId!)}
-              >View caregiver <span aria-hidden="true">→</span></button>}
             </li>
           ))}
         </ol>

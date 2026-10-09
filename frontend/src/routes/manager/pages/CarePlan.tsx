@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ManagerShell } from '../components/ManagerShell'
 import { UserIdentity } from '../components/UserIdentity'
-import { ACTIVITY_CATALOG, CARE_PLANS, ELDER_PROFILES, activityCategory } from '../data/carePlans'
+import { ACTIVITY_CATALOG, activityCategory } from '../data/carePlans'
 import type { PlanNode, SubPlanNode, TaskNode } from '../data/carePlans'
 import { useElder } from '../lib/useElder'
+import { useElderFamily } from '../lib/useElderFamily'
+import { useCarePlanVersions } from '../lib/useCarePlanVersions'
+import { continuityLabel, dialectsLabel, familyLabel, livesLabel, mobilityLabel } from '../lib/elderProfile'
+import { formatDate } from '../lib/nextVisit'
 import { useCurrentUser } from '../lib/useCurrentUser'
 import {
   countTree,
@@ -27,7 +31,7 @@ import {
   fetchLatestCarePlan,
   publishCarePlan,
 } from '../../../shared/api/careplan'
-import type { PlanNodePayload } from '../../../shared/api/careplan'
+import type { CarePlanResponse, PlanNodePayload } from '../../../shared/api/careplan'
 import {
   BackLink,
   Badge,
@@ -45,7 +49,6 @@ import {
   PlanTreeView,
   SidePanel,
   SplitLayout,
-  Tag,
 } from '../../../shared/components/ui'
 import type { BadgeStatus, SelectGroup } from '../../../shared/components/ui'
 import { PlanTreeEditor } from '../components/PlanTreeEditor'
@@ -55,9 +58,6 @@ import { VersionHistoryList } from '../components/VersionHistoryList'
 import type { VersionEntry } from '../components/VersionHistoryList'
 import type { DayScheduleValue } from '../components/weekdays'
 import styles from './CarePlan.module.css'
-
-/** Placeholder until real roster data exists — see the publish modal copy. */
-const MOCK_AFFECTED_WEEKS = 4
 
 const ACTIVITY_OPTIONS: SelectGroup[] = ACTIVITY_CATALOG.map((group) => ({
   group: group.category,
@@ -69,12 +69,11 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function collectDefaultCollapsed(nodes: PlanNode[]): Set<string> {
-  const collapsed = new Set<string>()
-  for (const node of nodes) {
-    if (node.type === 'subplan' && node.defaultCollapsed) collapsed.add(node.id)
-  }
-  return collapsed
+/** An issued version's badge: superseded ones are archived; a published one not yet started is scheduled. */
+function versionStatus(plan: CarePlanResponse): BadgeStatus {
+  if (plan.status === 'SUPERSEDED') return 'archived'
+  if (plan.status === 'STOPPED') return 'stopped'
+  return plan.startDate && plan.startDate > todayIso() ? 'scheduled' : 'published'
 }
 
 /** Frontend tree -> the wire shape POST /api/care-plans/{id}/publish expects: every node is
@@ -106,19 +105,19 @@ export default function CarePlan() {
   const { elderId } = useParams()
 
   const { data: elder, isLoading: elderLoading, isError: elderError } = useElder(elderId)
+  const { data: family } = useElderFamily(elderId)
+  const { data: versions } = useCarePlanVersions(elderId)
   const { data: currentUser } = useCurrentUser()
-  const initialPlan = elderId ? CARE_PLANS[elderId] : undefined
-  const profile = elderId ? ELDER_PROFILES[elderId] : undefined
+  const queryClient = useQueryClient()
 
-  const [tree, setTree] = useState<PlanNode[]>(initialPlan?.tree ?? [])
-  const [status, setStatus] = useState<'draft' | 'published' | 'stopped'>(initialPlan?.status ?? 'draft')
-  const [version, setVersion] = useState(initialPlan?.version ?? 0)
-  const [versions, setVersions] = useState(initialPlan?.versions ?? [])
-  const [priorPublishedHours, setPriorPublishedHours] = useState(initialPlan?.priorPublishedHours)
-  const [startDate, setStartDate] = useState(initialPlan?.startDate ?? '')
-  const [collapsed, setCollapsed] = useState<Set<string>>(() =>
-    collectDefaultCollapsed(initialPlan?.tree ?? []),
-  )
+  const [tree, setTree] = useState<PlanNode[]>([])
+  const [status, setStatus] = useState<'draft' | 'published' | 'stopped'>('draft')
+  /** The latest issued (published or stopped) version; a draft is always this + 1. */
+  const [version, setVersion] = useState(0)
+  /** Weekly effort of the version a draft replaces, so the draft can show what it changes. */
+  const [priorPublishedHours, setPriorPublishedHours] = useState<number | undefined>()
+  const [startDate, setStartDate] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<SubPlanNode | null>(null)
   const [publishing, setPublishing] = useState(false)
@@ -145,10 +144,9 @@ export default function CarePlan() {
     }
   }, [elder, currentUser])
 
-  // Loads whatever is actually in the database for this elder, overriding the mock fixture
-  // above (which never matches a real, numeric elder id). An elder with no plan yet keeps the
-  // empty-draft defaults the mock fallback already set up. Goes through useQuery (not a plain
-  // effect) so React 18 StrictMode's dev-mode double-mount doesn't fire the GETs twice.
+  // Loads the elder's latest plan and its tasks. An elder with no plan yet keeps the empty-draft
+  // defaults above. Goes through useQuery (not a plain effect) so React 18 StrictMode's dev-mode
+  // double-mount doesn't fire the GETs twice.
   const { data: latestPlan } = useQuery({
     queryKey: ['carePlan', 'latest', elder?.id],
     queryFn: () => fetchLatestCarePlan(elder!.id),
@@ -164,7 +162,7 @@ export default function CarePlan() {
   useEffect(() => {
     if (!latestPlan || !planNodes) return
     setTree(fromCarePlanNodeResponses(planNodes))
-    setVersion(latestPlan.version)
+    setVersion(latestPlan.status === 'DRAFT' ? latestPlan.version - 1 : latestPlan.version)
     setStartDate(latestPlan.startDate ?? '')
     if (latestPlan.status === 'PUBLISHED') {
       setStatus('published')
@@ -178,6 +176,17 @@ export default function CarePlan() {
       setStatus('draft')
     }
   }, [latestPlan, planNodes])
+
+  // A draft saved on the backend compares against the published version it supersedes.
+  useEffect(() => {
+    if (latestPlan?.status !== 'DRAFT' || !versions) return
+    const superseded = versions.find((v) => v.id === latestPlan.supersedesPlanId)
+    setPriorPublishedHours(superseded?.totalHours == null ? undefined : Number(superseded.totalHours))
+  }, [latestPlan, versions])
+
+  function refreshVersions() {
+    void queryClient.invalidateQueries({ queryKey: ['carePlan', 'versions', elderId] })
+  }
 
   if (elderLoading || elderError || !elder) {
     return (
@@ -298,10 +307,7 @@ export default function CarePlan() {
     try {
       const planId = await getOrCreateDraftPlanId()
       const published = await publishCarePlan(planId, startDate, toPlanNodePayloads(tree))
-      setVersions((prev) => [
-        { version: published.version, date: 'today', summary: 'published from console' },
-        ...prev,
-      ])
+      refreshVersions()
       setVersion(published.version)
       setStatus('published')
       setPriorPublishedHours(undefined)
@@ -320,13 +326,19 @@ export default function CarePlan() {
 
   const history: VersionEntry[] = [
     ...(status === 'draft' ? [{ n: version + 1, date: 'editing', status: 'draft' as const }] : []),
-    ...versions.map((v, i) => ({
-      n: v.version,
-      date: v.date,
-      summary: v.summary,
-      // The newest recorded version is the live one (the draft above, if any, isn't yet).
-      status: i > 0 ? ('archived' as const) : status === 'draft' ? ('published' as const) : badgeStatus,
-    })),
+    ...(versions ?? [])
+      .filter((v) => v.status !== 'DRAFT')
+      .map((v) => ({
+        n: v.version,
+        date: v.publishedAt ? formatDate(v.publishedAt) : '—',
+        summary: [
+          v.totalHours != null && `${formatHoursFixed(Number(v.totalHours))}/week`,
+          v.startDate && `from ${formatDate(v.startDate)}`,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        status: versionStatus(v),
+      })),
   ]
 
   const headerContext = (
@@ -436,32 +448,17 @@ export default function CarePlan() {
             meta={[elder.age, elder.id, elder.sector].filter((part) => part !== '' && part !== null).join(' · ')}
           />
         </div>,
-        profile && (
-          <KeyValueList
-            key="profile"
-            variant="ruled"
-            items={[
-              { label: 'Dialect', value: profile.dialect },
-              {
-                label: 'Lives',
-                value: elder.livesAlone === null ? 'not on file' : elder.livesAlone ? 'alone' : 'with family',
-              },
-              { label: 'Family', value: profile.family },
-              { label: 'Mobility', value: profile.mobility },
-              { label: 'Continuity', value: profile.continuity },
-            ]}
-          />
-        ),
-        profile && (
-          <div key="certs" className={styles.railGroup}>
-            <Eyebrow>Required certifications</Eyebrow>
-            <div className={styles.tags}>
-              {profile.requiredCertifications.map((cert) => (
-                <Tag key={cert}>{cert}</Tag>
-              ))}
-            </div>
-          </div>
-        ),
+        <KeyValueList
+          key="profile"
+          variant="ruled"
+          items={[
+            { label: 'Dialect', value: dialectsLabel(elder.preferredDialects) },
+            { label: 'Lives', value: livesLabel(elder.livesAlone) },
+            { label: 'Family', value: family ? familyLabel(family) : '…' },
+            { label: 'Mobility', value: mobilityLabel(elder.mobilityLevel) },
+            { label: 'Continuity', value: continuityLabel(elder.continuityPreference) },
+          ]}
+        />,
         history.length > 0 && (
           <div key="history" className={styles.railGroup}>
             <Eyebrow>Version history</Eyebrow>
@@ -471,7 +468,7 @@ export default function CarePlan() {
         status === 'draft' && priorPublishedHours !== undefined && (
           <Callout key="delta" tone="info" role="status">
             Draft v{version + 1} changes weekly effort {formatHoursFixed(priorPublishedHours)} →{' '}
-            {formatHoursFixed(totalHours)}. Publishing re-runs the roster for affected weeks.
+            {formatHoursFixed(totalHours)}. Publishing reschedules upcoming visits to match.
           </Callout>
         ),
       ]}
@@ -503,7 +500,7 @@ export default function CarePlan() {
           <BodyText>
             This publishes v{version + 1} at {formatHoursFixed(totalHours)}/week
             {priorPublishedHours !== undefined ? ` (from ${formatHoursFixed(priorPublishedHours)})` : ''}.
-            Publishing re-runs the roster for the next {MOCK_AFFECTED_WEEKS} weeks.
+            Upcoming visits that haven't started are rescheduled to match.
           </BodyText>
           {publishError && (
             <Callout tone="danger" role="alert">
@@ -518,6 +515,7 @@ export default function CarePlan() {
           elder={elder}
           onClose={() => setShowStopModal(false)}
           onStopped={(stopped) => {
+            refreshVersions()
             setStatus('stopped')
             setStopInfo({
               effectiveDate: stopped.stopEffectiveDate ?? '',

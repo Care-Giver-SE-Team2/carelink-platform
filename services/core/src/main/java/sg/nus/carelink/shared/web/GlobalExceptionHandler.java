@@ -56,6 +56,15 @@ class GlobalExceptionHandler {
 		return problem;
 	}
 
+	@ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+	ProblemDetail onOptimisticConflict(org.springframework.dao.OptimisticLockingFailureException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+				"The record changed concurrently. Refresh and retry the operation.");
+		problem.setTitle("Concurrent update");
+		problem.setProperty("code", "CONCURRENT_UPDATE");
+		return problem;
+	}
+
 	@ExceptionHandler(ResourceNotFound.class)
 	ProblemDetail onResourceNotFound(ResourceNotFound ex) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());

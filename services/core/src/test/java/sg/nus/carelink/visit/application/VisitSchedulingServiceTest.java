@@ -17,7 +17,7 @@ class VisitSchedulingServiceTest {
 	private static final LocalDateTime WED_8 = LocalDateTime.of(2026, 10, 7, 8, 0);
 
 	private final InMemoryVisitRepository visits = new InMemoryVisitRepository();
-	private final VisitSchedulingService scheduling = new VisitSchedulingService(visits);
+	private final VisitSchedulingService scheduling = new VisitSchedulingService(visits, visits);
 
 	@Test
 	void createsScheduledVisitsLinkedToTheirPlanTask() {

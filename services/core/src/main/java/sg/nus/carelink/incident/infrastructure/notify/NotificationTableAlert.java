@@ -16,7 +16,7 @@ import sg.nus.carelink.incident.domain.repository.IncidentAlert;
 import sg.nus.carelink.shared.security.Role;
 
 /**
- * Writes alerts as rows in {@code notification}, which is what the in-app inbox reads.
+ * Writes staff alerts as rows in {@code notification}, which is what the in-app inbox reads.
  *
  * <p>Nothing sends these anywhere. Push, SMS and e-mail would need a component that polls
  * this table, calls whatever carries the message, and moves the row to SENT or FAILED with
@@ -25,9 +25,10 @@ import sg.nus.carelink.shared.security.Role;
  * honest state: the alert exists and is addressed, and whoever builds the sender will find
  * it waiting rather than having to work out the audience again.
  *
- * <p>Reads three tables it does not own - {@code user_role}, {@code elder_family_binding},
- * {@code visit} - with plain statements that take an id and nothing else. Reading is not
- * owning; no other module's code changes for this to work.
+ * <p>Reads tables it does not own - {@code user_role}, {@code visit} - with plain statements
+ * that take an id and nothing else. Reading is not
+ * owning; no other module's code changes for this to work. Family messages are created only
+ * by the after-commit FM05 observer, so this adapter never produces a second family copy.
  */
 @Component
 class NotificationTableAlert implements IncidentAlert {
@@ -36,29 +37,6 @@ class NotificationTableAlert implements IncidentAlert {
 			select u.id from app_user u
 			join user_role r on r.user_id = u.id
 			where u.enabled = true and r.role = :role
-			""";
-
-	/**
-	 * Family members with a binding that is active now, through to their account.
-	 *
-	 * <p>The moment is bound as a {@link Timestamp} made from the application's clock, and
-	 * both halves of that matter. Not SQL {@code now()}: that is the database's own clock, in
-	 * the database's own zone. And not a {@link LocalDateTime}: the JVM runs in UTC while the
-	 * JDBC connection declares Asia/Singapore, and Connector/J converts a {@code Timestamp}
-	 * between the two but sends a {@code LocalDateTime} exactly as it is. {@code expires_at}
-	 * is written through JPA, which binds a {@code Timestamp}, so it sits in the column eight
-	 * hours from its nominal value. Only a {@code Timestamp} parameter lands on the same side
-	 * of that shift; a {@code LocalDateTime} kept an expired binding receiving alerts for eight
-	 * more hours, which is what this code did until the report module's queries showed the
-	 * two parameter types are not treated alike.
-	 */
-	private static final String BOUND_FAMILY = """
-			select f.user_id from elder_family_binding b
-			join family_member f on f.id = b.family_member_id
-			where b.elder_id = :elderId
-			  and b.status = 'ACTIVE'
-			  and (b.expires_at is null or b.expires_at > :now)
-			  and f.user_id is not null
 			""";
 
 	/** The caregiver on this elder's most recent visit, if there has been one. */
@@ -89,7 +67,6 @@ class NotificationTableAlert implements IncidentAlert {
 	@Override
 	public int broadcastRaised(Incident incident) {
 		Set<Long> audience = new LinkedHashSet<>(managers());
-		audience.addAll(boundFamily(incident.elderId()));
 		audience.addAll(recentCaregiver(incident.elderId()));
 
 		String title = "%s: %s".formatted(incident.severity(), incident.category());
@@ -117,30 +94,10 @@ class NotificationTableAlert implements IncidentAlert {
 		}
 	}
 
-	@Override
-	public void chainExhausted(Incident incident) {
-		for (Long userId : boundFamily(incident.elderId())) {
-			write(userId, "INCIDENT_UNRESOLVED",
-					"Incident %d has not been taken up".formatted(incident.id()),
-					"The institution has been unable to assign a responder. Please contact them directly.",
-					incident.id());
-		}
-	}
-
 	// -------------------------------------------------------------------- queries ---
 
 	private List<Long> managers() {
 		return jdbc.sql(MANAGERS).param("role", Role.MANAGER.name()).query(Long.class).list();
-	}
-
-	private List<Long> boundFamily(Long elderId) {
-		return elderId == null
-				? List.of()
-				: jdbc.sql(BOUND_FAMILY)
-						.param("elderId", elderId)
-						.param("now", Timestamp.valueOf(LocalDateTime.now(clock)))
-						.query(Long.class)
-						.list();
 	}
 
 	private List<Long> recentCaregiver(Long elderId) {

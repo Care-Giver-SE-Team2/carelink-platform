@@ -28,4 +28,7 @@ public interface FamilyAccessQuery {
 	 * @author Wang Zhili
 	 */
 	void requireReadableElder(String authenticatedUsername, Long elderId);
+
+	/** Requires an ACTIVE, unexpired FULL binding for a family write operation. */
+	void requireWritableElder(String authenticatedUsername, Long elderId);
 }

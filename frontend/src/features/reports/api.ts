@@ -6,6 +6,7 @@ import type {
   GenerateReportsRequest,
   Report,
   ReportAmendment,
+  ReportAmendmentKind,
   ReportDetail,
   ReportListQuery,
   ReportPage,
@@ -84,21 +85,24 @@ export async function generateReports(
 }
 
 /**
- * Appends a correction to a filed report. The report's own text is not touched.
+ * Appends a note to a filed report: a correction, or a follow-up on something
+ * it recorded. The report's own text is not touched.
  * @param id Report identifier
- * @param note What the correction says
+ * @param note What the note says
+ * @param kind A correction unless said otherwise
  * @param signal Cancels the request
- * @return The stored correction
+ * @return The stored note
  */
 export async function appendAmendment(
   id: number,
   note: string,
+  kind: ReportAmendmentKind = 'CORRECTION',
   signal?: AbortSignal,
 ): Promise<ReportAmendment> {
   await initialiseCsrf(signal)
   return api<ReportAmendment>('/reports/' + id + '/amendments', {
     method: 'POST',
-    body: JSON.stringify({ note }),
+    body: JSON.stringify({ note, kind }),
     signal,
   })
 }

@@ -2,6 +2,8 @@ package sg.nus.carelink.report.infrastructure.persistence.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -10,10 +12,11 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 /**
- * JPA entity for table report_amendment (V8).
+ * JPA entity for table report_amendment (V8, kind since V19).
  *
- * <p>A correction appended to a report. Rows are inserted and never updated, so every column
- * is {@code updatable = false}; a correction to a correction is another row.
+ * <p>A note appended to a report - a correction or a follow-up. Rows are inserted and never
+ * updated, so every column is {@code updatable = false}; a correction to a correction is
+ * another row.
  *
  * <p>report_id is a plain id rather than an association to {@link ReportJpaEntity}, as
  * everywhere else in the schema's mappings: the adapter reads a report's corrections with
@@ -26,12 +29,20 @@ import java.time.LocalDateTime;
 @Table(name = "report_amendment")
 public class ReportAmendmentJpaEntity {
 
+	public enum Kind {
+		CORRECTION, FOLLOW_UP
+	}
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
 	@Column(name = "report_id", nullable = false, updatable = false)
 	private Long reportId;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "kind", nullable = false, updatable = false)
+	private Kind kind = Kind.CORRECTION;
 
 	@Column(name = "note", nullable = false, updatable = false, length = 1000)
 	private String note;
@@ -63,6 +74,14 @@ public class ReportAmendmentJpaEntity {
 
 	public void setReportId(Long reportId) {
 		this.reportId = reportId;
+	}
+
+	public Kind getKind() {
+		return kind;
+	}
+
+	public void setKind(Kind kind) {
+		this.kind = kind;
 	}
 
 	public String getNote() {

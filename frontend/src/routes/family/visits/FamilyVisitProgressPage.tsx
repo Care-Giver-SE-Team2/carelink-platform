@@ -1,12 +1,10 @@
-import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { ApiError } from '../../../shared/api/client'
 import { serviceLabel, visitDate, visitStatusLabels, visitTime } from '../../../features/schedule/presentation'
 import { useFamilyVisitProgress } from '../../../features/visits/useFamilyVisitProgress'
 import type { VisitPart } from '../../../features/visits/useFamilyVisitProgress'
 import type { FamilyVisitTask } from '../../../features/visits/types'
-import { FamilySignIn } from '../components/FamilySignIn'
 import styles from './FamilyVisitProgress.module.css'
 
 const taskLabels: Record<FamilyVisitTask['status'], string> = {
@@ -115,12 +113,9 @@ function ProgressSection<T>({ title, resource, onRetry, disabled, paused, childr
 }
 
 function VisitFeedback({ error, onRetry, disabled }: { error: unknown; onRetry: () => void; disabled: boolean }) {
-  const [signIn, setSignIn] = useState(false)
   const status = error instanceof ApiError ? error.status : undefined
-  if (status === 401 || signIn) {
-    return <FamilySignIn onSignedIn={() => { setSignIn(false); onRetry() }}
-      description="Sign in with your family account to view this visit's progress." />
-  }
+  // The landing page is the only sign-in screen.
+  if (status === 401) return <Navigate to="/" replace />
   const forbidden = status === 403
   const missing = status === 404
   const invalid = status === 400
@@ -131,6 +126,6 @@ function VisitFeedback({ error, onRetry, disabled }: { error: unknown; onRetry: 
       : invalid ? 'Check the visit link or return to your schedule.'
       : 'Check your connection and try again.'}</p>
     {!missing && !invalid && <button onClick={onRetry} disabled={disabled}>Try again</button>}
-    {forbidden && <button onClick={() => setSignIn(true)}>Sign in with another account</button>}
+    {forbidden && <Link to="/">Sign in with another account</Link>}
   </section>
 }

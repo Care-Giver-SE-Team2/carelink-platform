@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +25,9 @@ class AbsenceServiceTest {
 	private final ReRosteringFakes.Absences absences = new ReRosteringFakes.Absences();
 	private final ReRosteringFakes.Profiles profiles = new ReRosteringFakes.Profiles().caregiver(5L, "Aisha", false);
 	private final CaregiverWorkDirectory caregivers = mock(CaregiverWorkDirectory.class);
+	private final List<String> told = new ArrayList<>();
 	private final AbsenceService service = new AbsenceService(absences, profiles, caregivers,
+			new ReRosteringFakes.AbsenceAlerts(told),
 			new ReRosteringFakes.MutableClock(TODAY.atTime(9, 0), ZoneId.of("Asia/Singapore")));
 
 	@Test
@@ -67,6 +71,8 @@ class AbsenceServiceTest {
 		AbsenceReport asked = service.requestForSelf("aisha", null, TODAY.plusDays(1), TODAY.plusDays(1), null);
 		assertThat(asked.status()).isEqualTo(AbsenceReport.Status.PENDING);
 		assertThat(asked.caregiverId()).isEqualTo(5L);
+		assertThat(told).as("the managers hear of a request, not of an absence they recorded themselves")
+				.containsExactly("Aisha " + asked.id());
 
 		AbsenceReport approved = service.approve(asked.id(), 11L);
 		assertThat(approved.status()).isEqualTo(AbsenceReport.Status.APPROVED);

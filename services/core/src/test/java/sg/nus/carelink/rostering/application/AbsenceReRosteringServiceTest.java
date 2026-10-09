@@ -216,6 +216,107 @@ class AbsenceReRosteringServiceTest {
 		assertThat(visits.rows.get(30L).caregiverId()).isEqualTo(9L);
 	}
 
+	@Test
+	void theNightlyRunTakesUpAnUncoveredVisitAsTheDefaultPlanNotInAManagersName() {
+		profiles.candidates.removeIf(c -> c.caregiverId() == 9L || c.caregiverId() == 10L);
+		service.reroster(absenceId, null, 11L);
+		profiles.caregiver(9L, "Farah", false);
+
+		AbsenceReRosteringService.ReRosterOutcome takenUp = service.reroster(absenceId, null, null);
+
+		assertThat(takenUp.settled()).isEqualTo(3);
+		RosterChange settled = changes.forVisit(30L);
+		assertThat(settled.decidedBy()).isEqualTo(RosterChange.DecidedBy.DEFAULT_PLAN);
+		assertThat(settled.decidedByUserId()).isNull();
+		assertThat(settled.note()).startsWith("Somebody became free for the uncovered visit");
+		assertThat(runs.findById(takenUp.runId()).orElseThrow().requestedByUserId()).isNull();
+		assertThat(visits.rows.get(30L).caregiverId()).isEqualTo(9L);
+	}
+
+	// ------------------------------------------------------------------ the manager's own pick ---
+
+	@Test
+	void aManagerMayHandPickOverTheDefaultPlan() {
+		clock.set(EIGHTH.minusMinutes(30));
+		service.reroster(absenceId, null, 11L);
+		Long change = changes.forVisit(30L).id();
+		assertThat(changes.forVisit(30L).assignedCaregiverId()).as("the default plan's pick").isEqualTo(9L);
+
+		RosterChange picked = service.assignByManager(absenceId, change, 10L, 12L);
+
+		assertThat(picked.outcome()).isEqualTo(RosterChange.Outcome.REPLACED);
+		assertThat(picked.decidedBy()).isEqualTo(RosterChange.DecidedBy.MANAGER);
+		assertThat(picked.decidedByUserId()).isEqualTo(12L);
+		assertThat(picked.assignedCaregiverId()).isEqualTo(10L);
+		assertThat(picked.note()).isEqualTo("A manager chose Siti for the visit");
+		assertThat(visits.rows.get(30L).caregiverId()).isEqualTo(10L);
+		assertThat(alerts.sent).endsWith("settled REPLACED visit 30");
+		assertThat(alerts.notices.get(alerts.notices.size() - 1).caregiverName()).isEqualTo("Siti");
+		assertThat(candidates.findByRunAndVisit(picked.rosteringRunId(), 30L))
+				.filteredOn(c -> c.outcome() == RosteringCandidate.Outcome.SELECTED)
+				.extracting(RosteringCandidate::caregiverId).containsExactly(10L);
+
+		assertThatThrownBy(() -> service.assignByManager(absenceId, change, 10L, 12L))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting("code").isEqualTo("ALREADY_ASSIGNED");
+		assertThat(service.assignByManager(absenceId, change, 9L, 12L).assignedCaregiverId())
+				.as("a manager may change their own pick").isEqualTo(9L);
+	}
+
+	@Test
+	void aManagerMayNotPickWhileTheFamilyIsChoosingOrOverTheirChoice() {
+		service.reroster(absenceId, null, 11L);
+		Long deciding = changes.forVisit(30L).id();
+		Long chosen = changes.forVisit(31L).id();
+		service.decide(chosen, "alex", FamilyChoice.keepSuggestion());
+
+		assertThatThrownBy(() -> service.assignByManager(absenceId, deciding, 10L, 12L))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting("code").isEqualTo("FAMILY_STILL_DECIDING");
+		assertThatThrownBy(() -> service.assignByManager(absenceId, chosen, 10L, 12L))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting("code").isEqualTo("ROSTER_CHANGE_NOT_OPEN");
+		assertThat(visits.rows.get(30L).caregiverId()).isEqualTo(5L);
+		assertThat(visits.rows.get(31L).caregiverId()).isEqualTo(9L);
+	}
+
+	@Test
+	void aHandPickMustStillPassEveryHardRule() {
+		clock.set(EIGHTH.minusMinutes(30));
+		service.reroster(absenceId, null, 11L);
+		Long change = changes.forVisit(30L).id();
+
+		assertThatThrownBy(() -> service.assignByManager(absenceId, change, 5L, 12L))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.hasMessageStartingWith("Aisha cannot take this visit")
+				.extracting("code").isEqualTo("CAREGIVER_CANNOT_TAKE_VISIT");
+		assertThatThrownBy(() -> service.assignByManager(absenceId, change, 404L, 12L))
+				.isInstanceOf(sg.nus.carelink.shared.error.ResourceNotFound.class);
+		assertThatThrownBy(() -> service.assignByManager(absenceId + 1, change, 10L, 12L))
+				.as("the change must belong to the absence in the path")
+				.isInstanceOf(sg.nus.carelink.shared.error.ResourceNotFound.class);
+		assertThat(visits.rows.get(30L).caregiverId()).isEqualTo(9L);
+
+		clock.set(EIGHTH.plusMinutes(1));
+		assertThatThrownBy(() -> service.assignByManager(absenceId, change, 10L, 12L))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting("code").isEqualTo("VISIT_NOT_OPEN");
+	}
+
+	@Test
+	void aManagerMayHandPickForAnUncoveredVisit() {
+		profiles.candidates.removeIf(c -> c.caregiverId() == 9L || c.caregiverId() == 10L);
+		service.reroster(absenceId, null, 11L);
+		profiles.caregiver(10L, "Siti", false);
+
+		RosterChange picked = service.assignByManager(absenceId, changes.forVisit(30L).id(), 10L, 12L);
+
+		assertThat(picked.decidedBy()).isEqualTo(RosterChange.DecidedBy.MANAGER);
+		assertThat(picked.incidentId()).as("the incident stays on record").isEqualTo(900L);
+		assertThat(visits.rows.get(30L).status()).isEqualTo("SCHEDULED");
+		assertThat(visits.rows.get(30L).caregiverId()).isEqualTo(10L);
+	}
+
 	// ------------------------------------------------------------------ steps 5-6 ---
 
 	@Test
@@ -307,7 +408,28 @@ class AbsenceReRosteringServiceTest {
 		assertThat(visits.rows.get(30L).status()).isEqualTo("CANCELLED");
 		assertThat(visits.rows.get(500L).start()).isEqualTo(saturday);
 		assertThat(visits.rows.get(500L).end()).isEqualTo(saturday.plusMinutes(45));
-		assertThat(alerts.notices.get(alerts.notices.size() - 1).newStart()).isEqualTo(saturday);
+		assertThat(alerts.notices.get(alerts.sent.indexOf("settled RESCHEDULED visit 30")).newStart()).isEqualTo(saturday);
+	}
+
+	/** Back to step 3 for the new time: the family chooses who comes, as they did the first time. */
+	@Test
+	void afterAMoveTheFamilyChoosesAgainForTheNewTime() {
+		service.reroster(absenceId, null, 11L);
+		LocalDateTime saturday = LocalDateTime.of(2026, 10, 10, 9, 0);
+
+		service.decide(changes.forVisit(30L).id(), "alex", FamilyChoice.moveTo(saturday));
+
+		RosterChange offer = changes.forVisit(500L);
+		assertThat(offer.status()).isEqualTo(RosterChange.Status.AWAITING_FAMILY);
+		assertThat(offer.proposedCaregiverId()).as("the person pencilled in at the new time").isEqualTo(5L);
+		assertThat(offer.respondBy()).isAfter(NOW);
+		assertThat(alerts.sent).endsWith("settled RESCHEDULED visit 30", "offered visit 500");
+
+		RosterChange kept = service.decide(offer.id(), "alex", FamilyChoice.keepSuggestion());
+
+		assertThat(kept.outcome()).isEqualTo(RosterChange.Outcome.REPLACED);
+		assertThat(kept.decidedBy()).isEqualTo(RosterChange.DecidedBy.FAMILY);
+		assertThat(visits.rows.get(500L).caregiverId()).isEqualTo(5L);
 	}
 
 	@Test

@@ -5,6 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import sg.nus.carelink.report.domain.model.ConfirmationFact;
+import sg.nus.carelink.report.domain.model.ElderProfile;
 import sg.nus.carelink.report.domain.model.IncidentFact;
 import sg.nus.carelink.report.domain.model.ObservationFact;
 import sg.nus.carelink.report.domain.model.Report;
@@ -12,17 +14,23 @@ import sg.nus.carelink.report.domain.model.ReportContent;
 import sg.nus.carelink.report.domain.model.ReportFacts;
 import sg.nus.carelink.report.domain.model.ReportPeriod;
 import sg.nus.carelink.report.domain.model.ReportSection;
+import sg.nus.carelink.report.domain.model.ReviewFact;
+import sg.nus.carelink.report.domain.model.RosterChangeFact;
+import sg.nus.carelink.report.domain.model.SpotCheckFact;
+import sg.nus.carelink.report.domain.model.ValueAddedFact;
 import sg.nus.carelink.report.domain.model.VisitFact;
 import sg.nus.carelink.report.domain.model.VitalFact;
 
 /**
  * One elder's week, written out by hand: the facts every report test starts from.
  *
- * <p>Built to exercise every rule the three readers differ on in a single set of facts - a
- * caregiver with a name and a number, a reading that was out of range, notes in the
- * caregiver's own words, an incident with staff names on its timeline, and one visit that is
- * not closed. The assembler tests feed this same instance to all three readers, so the
- * audience is the only thing that changes between them.
+ * <p>Built to exercise every rule the three readers differ on in a single set of facts - an
+ * elder with a name, an age and medical notes, a caregiver with a name and a number, a reading
+ * that was out of range, notes in the caregiver's own words, an incident with staff names on
+ * its timeline, the elder's comments, a family review, a spot-check finding, an absence still
+ * waiting for the family, a value-added request, and one visit that is not closed. The
+ * assembler tests feed this same instance to all three readers, so the audience is the only
+ * thing that changes between them.
  */
 public final class ReportFixtures {
 
@@ -32,14 +40,25 @@ public final class ReportFixtures {
 
 	public static final VisitFact MONDAY = new VisitFact(
 			11L, 3L, "Daniel Goh", "Personal care", LocalDateTime.of(2026, 9, 14, 9, 0),
-			VisitFact.Status.VERIFIED, 2, 2);
+			VisitFact.Status.VERIFIED, 2, 2, false, 60, 55);
 	public static final VisitFact WEDNESDAY = new VisitFact(
 			12L, 3L, "Daniel Goh", "Personal care", LocalDateTime.of(2026, 9, 16, 9, 0),
-			VisitFact.Status.VERIFIED, 2, 2);
+			VisitFact.Status.VERIFIED, 2, 2, false, 60, 65);
 	/** Not closed: the week's report has to say so and name it. */
 	public static final VisitFact FRIDAY = new VisitFact(
 			13L, 3L, "Daniel Goh", "Personal care", LocalDateTime.of(2026, 9, 18, 9, 0),
-			VisitFact.Status.SCHEDULED, 0, 0);
+			VisitFact.Status.SCHEDULED, 0, 0, false, 60, null);
+
+	public static final String MEDICAL_NOTES = "Hypertension, on amlodipine.";
+	/** Born 2 March 1941: 85 at the end of the week, in the band 80–89. */
+	public static final ElderProfile TAN_AH_MEI = new ElderProfile(
+			"Tan Ah Mei", "FEMALE", LocalDate.of(1941, 3, 2), "ASSISTIVE_CANE", true, MEDICAL_NOTES,
+			3L, "Daniel Goh", 3, new BigDecimal("6.50"));
+
+	public static final String ELDER_COMMENT = "He left before the exercises were done.";
+	public static final String REVIEW_NOTES = "Kind, but sometimes rushed.";
+	public static final String FINDING = "Gloves were not changed between tasks.";
+	public static final String CAREGIVER_RESPONSE = "I will carry a spare pair.";
 
 	public static final String MOBILITY_NOTE = "Walked to the void deck with the cane, steady on her feet.";
 	public static final String MEALS_NOTE = "Ate half of lunch; said she was not hungry.";
@@ -68,7 +87,22 @@ public final class ReportFixtures {
 				List.of(
 						new ObservationFact(11L, "Mobility", MOBILITY_NOTE),
 						new ObservationFact(12L, "Meals", MEALS_NOTE)),
-				List.of(fall()));
+				List.of(fall()),
+				TAN_AH_MEI,
+				new ReportFacts.Quality(
+						List.of(
+								new ConfirmationFact(11L, false, 5, "Very patient today.", LocalDateTime.of(2026, 9, 14, 11, 0)),
+								new ConfirmationFact(12L, true, 2, ELDER_COMMENT, LocalDateTime.of(2026, 9, 16, 11, 0))),
+						List.of(new ReviewFact(3L, "Daniel Goh", WEEK.start(), WEEK.end(), 4, 5, 4, REVIEW_NOTES,
+								"RENEW_CURRENT")),
+						List.of(new SpotCheckFact(4L, 3L, "Daniel Goh", LocalDateTime.of(2026, 9, 16, 10, 0), "APPROVED",
+								"NEEDS_IMPROVEMENT", "COMPLETED", FINDING, CAREGIVER_RESPONSE,
+								LocalDateTime.of(2026, 9, 16, 10, 40)))),
+				new ReportFacts.Changes(
+						List.of(new RosterChangeFact(13L, LocalDateTime.of(2026, 9, 18, 9, 0), 3L, "Daniel Goh",
+								"AWAITING_FAMILY", null, null, null, null)),
+						List.of(new ValueAddedFact(7L, "Hospital escort", LocalDateTime.of(2026, 9, 19, 10, 0),
+								"DISPATCHED", 15L))));
 	}
 
 	/** The same week with nothing left open. */
@@ -76,7 +110,7 @@ public final class ReportFixtures {
 		ReportFacts week = week();
 		return new ReportFacts(
 				week.elderId(), week.period(), List.of(MONDAY, WEDNESDAY),
-				week.vitals(), week.observations(), week.incidents());
+				week.vitals(), week.observations(), week.incidents(), week.elder(), week.quality(), week.changes());
 	}
 
 	/** A real elder with nothing recorded. */

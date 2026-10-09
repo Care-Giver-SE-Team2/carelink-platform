@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { intakeDate, intakeStatus, statusLabels } from '../../../features/intake/presentation'
 import type { IntakeStatus } from '../../../features/intake/types'
@@ -6,6 +5,7 @@ import { useIntakeApplications } from '../../../features/intake/useIntakeQueries
 import { IntakeIcon, IntakeLoading, StatusBadge } from './IntakeLayout'
 import { IntakeFeedback } from './IntakeFeedback'
 import styles from './FamilyIntake.module.css'
+import { useIsDesktop } from '../components/useIsDesktop'
 
 /**
  * Lists only the signed-in family's applications, with status filters and pagination.
@@ -17,14 +17,6 @@ export function IntakeListPage() {
   const page =
     Number.isInteger(candidate) && candidate >= 0 && candidate <= 2147483647 ? candidate : 0
   const status = intakeStatus(params.get('status'))
-  const activeFilter = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    activeFilter.current?.scrollIntoView?.({
-      block: 'nearest',
-      inline: 'nearest',
-      behavior: 'instant',
-    })
-  }, [status])
   const { resource, refresh } = useIntakeApplications({ page, size: 20, status })
   const changeQuery = (nextPage: number, nextStatus = status) => {
     const next = new URLSearchParams()
@@ -33,46 +25,9 @@ export function IntakeListPage() {
     setParams(next)
   }
   const backSearch = params.toString() ? '?' + params.toString() : ''
-
-  return (
+  const desktop = useIsDesktop()
+  const list = (
     <>
-      <section className={styles.hero}>
-        <div>
-          <p className={styles.eyebrow}>YOUR FAMILY'S CARE</p>
-          <h1>My applications</h1>
-          <p className={styles.subtitle}>
-            A little clarity, at every step.
-            <br />
-            Follow your loved one's care application here.
-          </p>
-        </div>
-        <span className={styles.heroIcon}>
-          <IntakeIcon name="file" />
-        </span>
-      </section>
-      <Link className={styles.createLink} to="/family/intake/new">
-        New application
-        <IntakeIcon name="arrow" />
-      </Link>
-      <div className={styles.filters} role="group" aria-label="Filter applications by status">
-        <button
-          ref={!status ? activeFilter : undefined}
-          aria-pressed={!status}
-          onClick={() => setParams({})}
-        >
-          All applications
-        </button>
-        {(Object.keys(statusLabels) as IntakeStatus[]).map((value) => (
-          <button
-            ref={status === value ? activeFilter : undefined}
-            key={value}
-            aria-pressed={status === value}
-            onClick={() => changeQuery(0, value)}
-          >
-            {statusLabels[value]}
-          </button>
-        ))}
-      </div>
       <div className={styles.toolbar}>
         <span aria-live="polite">
           {resource.status === 'success'
@@ -80,12 +35,27 @@ export function IntakeListPage() {
               (resource.data.totalElements === 1 ? ' application' : ' applications')
             : 'Your applications'}
         </span>
+        <label className={styles.srOnly} htmlFor="intake-status">Filter by status</label>
+        <select
+          id="intake-status"
+          className={styles.statusFilter}
+          value={status ?? ''}
+          onChange={(event) => {
+            const next = intakeStatus(event.target.value)
+            if (next) changeQuery(0, next)
+            else setParams({})
+          }}
+        >
+          <option value="">All applications</option>
+          {(Object.keys(statusLabels) as IntakeStatus[]).map((value) => (
+            <option key={value} value={value}>{statusLabels[value]}</option>
+          ))}
+        </select>
         <button
-          className={styles.textButton}
+          className={styles.refreshButton}
           onClick={refresh}
           disabled={resource.status === 'loading'}
         >
-          <IntakeIcon name="refresh" />
           Refresh
         </button>
       </div>
@@ -159,5 +129,45 @@ export function IntakeListPage() {
         </>
       )}
     </>
+  )
+  const createLink = (
+    <Link className={styles.createLink} to="/family/intake/new">
+      New application
+      <IntakeIcon name="arrow" />
+    </Link>
+  )
+
+  return (
+    <div className={styles.page}>
+      <section className={styles.hero}>
+        <div>
+          <p className={styles.eyebrow}>EARLIER REGISTRATION APPLICATIONS</p>
+          <h1>My applications</h1>
+          <p className={styles.subtitle}>
+            Earlier applications to register an elder.
+            <br />
+            For a linked elder, submit a new service application.
+          </p>
+        </div>
+        {!desktop && (
+          <span className={styles.heroIcon}>
+            <IntakeIcon name="file" />
+          </span>
+        )}
+      </section>
+      {!desktop && createLink}
+      {desktop ? (
+        <div className={styles.split}>
+          <div className={styles.splitMain}>{list}</div>
+          {/* Desktop: starting an application lives beside the list rather than above it. */}
+          <aside className={styles.createCard} aria-labelledby="create-application">
+            <p className={styles.eyebrow}>New application</p>
+            <h2 id="create-application">Apply for care for a linked elder</h2>
+            <p>Choose an elder you are linked to and request care services. These new requests are separate from the earlier registration applications shown here.</p>
+            {createLink}
+          </aside>
+        </div>
+      ) : list}
+    </div>
   )
 }

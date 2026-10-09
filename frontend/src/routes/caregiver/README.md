@@ -43,3 +43,25 @@ npm run dev
 ```
 
 然后打开 http://localhost:5173/caregiver
+
+## Batch 1A: caregiver leave self-service
+
+`/caregiver/absences` lets the signed-in caregiver submit whole-day leave and read
+their own pending, approved and rejected requests. It reuses the MG04 endpoints;
+approval and explicit re-rostering remain separate manager actions. Requests are
+not retried automatically. Refresh or return to the page to read decisions.
+
+The caregiver navigation preserves the schedule date range when moving between
+the schedule, a work pack and self-service pages. Leave does not include editing,
+withdrawal, work preferences or availability in this slice.
+
+## Batch 1B: spot-check conclusions and responses
+
+`/caregiver/spot-checks` reads only the signed-in caregiver's completed checks.
+The caregiver can respond or update their current response (up to 500 characters),
+without changing the manager's finding. Drafts survive refresh in this page's
+memory and are discarded on access loss or navigation away.
+
+The notification bell opens `/caregiver/spot-checks?spotCheckId=<id>`. The page
+locates that id only within the authorized collection; no manager detail endpoint
+is used. Managers see saved responses by refreshing their existing Quality page.

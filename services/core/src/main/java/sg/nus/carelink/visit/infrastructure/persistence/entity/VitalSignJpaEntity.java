@@ -52,6 +52,11 @@ public class VitalSignJpaEntity {
 	@Column(name = "recorded_at", nullable = false)
 	private LocalDateTime recordedAt;
 
+    @Column(name = "health_record_id")
+    private Long healthRecordId;
+    public Long getHealthRecordId() { return healthRecordId; }
+    public void setHealthRecordId(Long value) { healthRecordId = value; }
+
 	public VitalSignJpaEntity() {
 	}
 

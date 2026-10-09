@@ -53,6 +53,13 @@ public class CarePlanController {
 		return ResponseEntity.of(service.findCarePlan(id));
 	}
 
+	/** Every version of the elder's plan, drafts included, newest first. */
+	@GetMapping
+	@PreAuthorize("hasRole('MANAGER')")
+	public List<CarePlan> versionsForElder(@RequestParam Long elderId) {
+		return service.findVersions(elderId);
+	}
+
 	/** The elder's highest-version plan (draft, published or superseded), if any. */
 	@GetMapping("/latest")
 	@PreAuthorize("hasRole('MANAGER')")

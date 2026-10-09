@@ -288,6 +288,17 @@ public record Incident(
         );
     }
 
+    /** SYS03, distinct from an unassigned visit: attendance is blocked by the Visit's EXCEPTION state. */
+    public static Incident raisedForMissedCheckIn(Long elderId, Long visitId, LocalDateTime dueAt, LocalDateTime now) {
+        Objects.requireNonNull(elderId, "elderId");
+        Objects.requireNonNull(visitId, "visitId");
+        Objects.requireNonNull(dueAt, "dueAt");
+        Objects.requireNonNull(now, "now");
+        return new Incident(null, elderId, visitId, null, null, Source.SYSTEM_MISSED_CHECKIN,
+                Category.SERVICE, Severity.MEDIUM, Status.OPEN, null, null, null,
+                "Assigned caregiver has not checked in by " + dueAt + ". Manager review is required.", null, now, null);
+    }
+
     // ------------------------------------------------------------------ transitions ---
 
     /**

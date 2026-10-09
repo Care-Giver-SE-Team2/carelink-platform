@@ -2,6 +2,7 @@ package sg.nus.carelink.shared.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -59,11 +60,16 @@ class SecurityConfig {
 								"/api/auth/csrf"
 						).permitAll()
 
+						// Family sign-up: the caller has no account, so no role, yet.
+						.requestMatchers(HttpMethod.POST, "/api/family-registrations", "/api/elder-registrations").permitAll()
+
 						// Front-end static assets.
 						.requestMatchers(
 								"/",
 								"/index.html",
-								"/caregiver", "/caregiver/", "/caregiver/visits/*",
+								"/apply",
+								"/caregiver", "/caregiver/", "/caregiver/visits/*", "/caregiver/visits/*/report-incident",
+                                "/caregiver/absences", "/caregiver/spot-checks", "/caregiver/incidents", "/caregiver/incidents/*",
 								"/favicon.ico",
 								"/assets/**",
 								"/vite.svg"

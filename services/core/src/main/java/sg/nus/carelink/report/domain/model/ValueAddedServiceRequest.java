@@ -1,31 +1,161 @@
 package sg.nus.carelink.report.domain.model;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Objects;
+
+import sg.nus.carelink.shared.error.BusinessRuleViolation;
 
 /**
- * Domain model for value_added_service_request.
- *
- * <p>Generated starting point: the same fields as the table, and nothing else. This is
- * where the business rules and the design patterns go — reshape it into a proper
- * aggregate (add behaviour, fold child tables in, drop columns the domain does not
- * care about). identity.domain.model.AppUser is the template. Must not import JPA or
- * Spring Data; ArchUnit rejects the build if it does.
+ * One value-added service request shared by UC-EL02 and UC-FM08.
+ * The elder creates the row; a bound family member later approves or rejects the same row.
  */
 public record ValueAddedServiceRequest(
-		Long id,
-		Long elderId,
-		Long valueAddedServiceId,
-		Long requestedByFamilyMemberId,
-		Long approvingFamilyMemberId,
-		Long visitId,
-		LocalDateTime requestedSchedule,
-		String specialInstructions,
-		ValueAddedServiceRequest.Status status,
-		LocalDateTime decidedAt,
-		LocalDateTime createdAt,
-		LocalDateTime updatedAt) {
+        Long id,
+        Long elderId,
+        Long valueAddedServiceId,
+        Long requestedByFamilyMemberId,
+        Long approvingFamilyMemberId,
+        Long visitId,
+        LocalDateTime requestedSchedule,
+        String specialInstructions,
+        Status status,
+        LocalDateTime decidedAt,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt) {
 
-	public enum Status {
-		PENDING_APPROVAL, APPROVED, REJECTED, DISPATCHED, COMPLETED, CANCELLED
-	}
+    /** How far ahead a service must be asked for, so there is time to answer and staff it. */
+    public static final Duration MIN_NOTICE = Duration.ofHours(2);
+
+    /** How long before the requested time the family must have answered; after that it lapses. */
+    public static final Duration ANSWER_CUTOFF = Duration.ofMinutes(30);
+
+    public ValueAddedServiceRequest {
+        Objects.requireNonNull(elderId, "elderId");
+        Objects.requireNonNull(valueAddedServiceId, "valueAddedServiceId");
+        Objects.requireNonNull(status, "status");
+    }
+
+    /** A new request must be for at least {@link #MIN_NOTICE} from now. */
+    public static void requireEnoughNotice(LocalDateTime requestedSchedule, LocalDateTime now) {
+        Objects.requireNonNull(requestedSchedule, "requestedSchedule");
+        if (requestedSchedule.isBefore(now.plus(MIN_NOTICE))) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_TOO_SOON",
+                    "Choose a time at least " + MIN_NOTICE.toHours() + " hours from now.");
+        }
+    }
+
+    /** Whether the family can still answer: until {@link #ANSWER_CUTOFF} before the requested time. */
+    public boolean answerableAt(LocalDateTime now) {
+        return status == Status.PENDING_APPROVAL && requestedSchedule != null
+                && now.isBefore(requestedSchedule.minus(ANSWER_CUTOFF));
+    }
+
+    /**
+     * UC-FM08 on the elder's behalf: a family member asks for the service themselves. It still
+     * starts pending, and is approved by the same family member as it is dispatched.
+     */
+    public static ValueAddedServiceRequest requestedByFamily(
+            Long elderId,
+            Long valueAddedServiceId,
+            Long familyMemberId,
+            LocalDateTime requestedSchedule,
+            String specialInstructions) {
+        Objects.requireNonNull(familyMemberId, "familyMemberId");
+        ValueAddedServiceRequest request = requestedByElder(
+                elderId, valueAddedServiceId, requestedSchedule, specialInstructions);
+        return new ValueAddedServiceRequest(
+                null, elderId, valueAddedServiceId, familyMemberId, null, null,
+                request.requestedSchedule(), request.specialInstructions(), Status.PENDING_APPROVAL,
+                null, null, null);
+    }
+
+    /** UC-EL02: the elder requests an available catalogue service. */
+    public static ValueAddedServiceRequest requestedByElder(
+            Long elderId,
+            Long valueAddedServiceId,
+            LocalDateTime requestedSchedule,
+            String specialInstructions) {
+        Objects.requireNonNull(elderId, "elderId");
+        Objects.requireNonNull(valueAddedServiceId, "valueAddedServiceId");
+        Objects.requireNonNull(requestedSchedule, "requestedSchedule");
+        return new ValueAddedServiceRequest(
+                null, elderId, valueAddedServiceId, null, null, null,
+                requestedSchedule, normalise(specialInstructions), Status.PENDING_APPROVAL,
+                null, null, null);
+    }
+
+    /** UC-FM08: approval creates a visit work order, so the request becomes DISPATCHED. */
+    public ValueAddedServiceRequest approveAndDispatch(
+            Long familyMemberId,
+            Long dispatchedVisitId,
+            LocalDateTime now) {
+        requirePending();
+        Objects.requireNonNull(familyMemberId, "familyMemberId");
+        Objects.requireNonNull(dispatchedVisitId, "dispatchedVisitId");
+        Objects.requireNonNull(now, "now");
+        return new ValueAddedServiceRequest(
+                id, elderId, valueAddedServiceId, requestedByFamilyMemberId,
+                familyMemberId, dispatchedVisitId, requestedSchedule, specialInstructions,
+                Status.DISPATCHED, now, createdAt, updatedAt);
+    }
+
+    /** UC-FM08: family declines the request without creating a visit. */
+    public ValueAddedServiceRequest reject(Long familyMemberId, LocalDateTime now) {
+        requirePending();
+        Objects.requireNonNull(familyMemberId, "familyMemberId");
+        Objects.requireNonNull(now, "now");
+        return new ValueAddedServiceRequest(
+                id, elderId, valueAddedServiceId, requestedByFamilyMemberId,
+                familyMemberId, null, requestedSchedule, specialInstructions,
+                Status.REJECTED, now, createdAt, updatedAt);
+    }
+
+    /**
+     * Called off before it is carried out: by a manager, or because its visit was called off.
+     * Only a request still waiting for the family or dispatched and not yet done can be.
+     */
+    public ValueAddedServiceRequest cancelled() {
+        if (status != Status.PENDING_APPROVAL && status != Status.DISPATCHED) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_REQUEST_CLOSED",
+                    "Only a pending or dispatched value-added service request can be cancelled.");
+        }
+        return withStatus(Status.CANCELLED);
+    }
+
+    /** Its visit was carried out. */
+    public ValueAddedServiceRequest completed() {
+        if (status != Status.DISPATCHED) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_REQUEST_NOT_DISPATCHED",
+                    "Only a dispatched value-added service request can be completed.");
+        }
+        return withStatus(Status.COMPLETED);
+    }
+
+    private ValueAddedServiceRequest withStatus(Status next) {
+        return new ValueAddedServiceRequest(
+                id, elderId, valueAddedServiceId, requestedByFamilyMemberId,
+                approvingFamilyMemberId, visitId, requestedSchedule, specialInstructions,
+                next, decidedAt, createdAt, updatedAt);
+    }
+
+    private void requirePending() {
+        if (status != Status.PENDING_APPROVAL) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_REQUEST_ALREADY_DECIDED",
+                    "Only a pending value-added service request can be decided.");
+        }
+    }
+
+    private static String normalise(String text) {
+        if (text == null || text.isBlank()) return null;
+        return text.trim();
+    }
+
+    public enum Status {
+        PENDING_APPROVAL, APPROVED, REJECTED, DISPATCHED, COMPLETED, CANCELLED
+    }
 }

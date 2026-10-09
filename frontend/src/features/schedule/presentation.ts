@@ -112,6 +112,38 @@ export function visitDate(timestamp: string): string {
 }
 
 /**
+ * Whole years between a date of birth and a calendar date.
+ * @param dateOfBirth Date in YYYY-MM-DD format, or null when not recorded
+ * @param today Date in YYYY-MM-DD format, usually today in Singapore
+ * @return Age in years, or null when it cannot be worked out
+ */
+export function ageOn(dateOfBirth: string | null, today: string): number | null {
+  if (!dateOfBirth) return null
+  const [by, bm, bd] = dateOfBirth.split('-').map(Number)
+  const [ty, tm, td] = today.split('-').map(Number)
+  const age = ty - by - (tm < bm || (tm === bm && td < bd) ? 1 : 0)
+  return Number.isFinite(age) && age >= 0 ? age : null
+}
+
+/**
+ * Short weekday of a visit in Singapore, for compact day columns.
+ * @param timestamp API timestamp with a UTC offset
+ * @return Weekday such as Mon, or an unavailable placeholder
+ */
+export function visitWeekday(timestamp: string): string {
+  return formatTimestamp(timestamp, { weekday: 'short' })
+}
+
+/**
+ * Day and month of a visit in Singapore, for compact day columns.
+ * @param timestamp API timestamp with a UTC offset
+ * @return Date such as 5 Oct, or an unavailable placeholder
+ */
+export function visitDayMonth(timestamp: string): string {
+  return formatTimestamp(timestamp, { day: 'numeric', month: 'short' })
+}
+
+/**
  * Formats a visit time in Singapore using the 24-hour clock.
  * @param timestamp API timestamp with a UTC offset
  * @return Hour and minute or an unavailable placeholder

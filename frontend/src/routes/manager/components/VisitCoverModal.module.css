@@ -1,0 +1,7 @@
+/* Placement only — the dialog chrome and rows come from shared/components/ui. */
+.list {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--border-light);
+  border-bottom: none;
+}

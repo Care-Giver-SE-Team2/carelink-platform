@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.identity.application.UserDirectory;
@@ -209,6 +210,41 @@ public class SpotCheckService implements SpotCheckHistory {
 	public SpotCheck respond(Long checkId, String caregiverUsername, String response) {
 		Long caregiverId = caregivers.require(caregiverUsername).id();
 		return checks.save(require(checkId).respondedBy(caregiverId, response));
+	}
+
+	// ------------------------------------------------------------------ reminders ---
+
+	/**
+	 * The family's side, exception 1a: a request they have not answered stays open - never taken
+	 * as a yes - and they are asked again. These are the requests whose visit is still ahead and
+	 * whose family was last asked at least {@code after} ago.
+	 */
+	@Transactional(readOnly = true)
+	public List<Long> dueForReminder(Duration after) {
+		LocalDateTime now = now();
+		return checks.findAwaitingConsent().stream()
+				.filter(check -> check.proposedTime().isAfter(now))
+				.filter(check -> {
+					LocalDateTime lastAsked = lookups.lastAskedAt(check.id())
+							.orElse(Objects.requireNonNullElse(check.createdAt(), now));
+					return !lastAsked.plus(after).isAfter(now);
+				})
+				.map(SpotCheck::id)
+				.toList();
+	}
+
+	/**
+	 * Asks the family about one request again, if it is still theirs to answer. Its own
+	 * transaction, so one request that cannot be reminded holds back none of the others.
+	 */
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public boolean remind(Long checkId) {
+		SpotCheck check = require(checkId);
+		if (check.stage() != SpotCheck.Stage.AWAITING_FAMILY || !check.proposedTime().isAfter(now())) {
+			return false;
+		}
+		alert.reminded(check, names(check));
+		return true;
 	}
 
 	// ------------------------------------------------------------------ rostering ---

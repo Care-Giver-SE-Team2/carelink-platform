@@ -16,10 +16,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +46,7 @@ import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.application.FamilyReportQueryService;
 import sg.nus.carelink.report.domain.model.Report;
 import sg.nus.carelink.report.domain.model.ReportAmendment;
+import sg.nus.carelink.report.domain.model.ReportMetrics;
 import sg.nus.carelink.report.domain.model.ReportPage;
 import sg.nus.carelink.report.domain.service.ReportAssembler;
 import sg.nus.carelink.report.support.ReportFixtures;
@@ -65,6 +68,10 @@ class ReportControllerTest {
 
 	private static final AppUser MANAGER =
 			new AppUser(11L, "alice", "Alice Tan", Set.of(Role.MANAGER), true);
+
+	/** The numbers of the week in ReportFixtures, as its basis would hold them. */
+	private static final ReportMetrics METRICS = new ReportMetrics(
+			3, 2, new BigDecimal("66.67"), 1, 1, new BigDecimal("3.50"), 2, false);
 
 	private final ReportService service = mock(ReportService.class);
 	private final IdentityService identity = mock(IdentityService.class);
@@ -165,32 +172,52 @@ class ReportControllerTest {
 
 	@Test
 	void readsOneReportWithItsSectionsDisclaimerAndCorrections() throws Exception {
-		Report family = new Report(40L, 1L, 11L, Report.Audience.FAMILY, ReportFixtures.WEEK,
+		Report family = new Report(40L, 1L, 8L, 11L, Report.Audience.FAMILY, ReportFixtures.WEEK,
 				Report.Status.PUBLISHED,
 				ReportAssembler.forAudience(Report.Audience.FAMILY).assemble(ReportFixtures.week()),
 				List.of(new ReportAmendment(3L, 40L, "Visit 13 was cancelled by the family.", 11L,
-						LocalDateTime.of(2026, 9, 21, 9, 30))),
+								LocalDateTime.of(2026, 9, 21, 9, 30)),
+						new ReportAmendment(4L, 40L, ReportAmendment.Kind.FOLLOW_UP, "Grab bar fitted.", 11L,
+								LocalDateTime.of(2026, 9, 22, 10, 0))),
 				ReportFixtures.GENERATED_AT);
 		when(service.findDetail(40L)).thenReturn(family);
+		when(service.metricsFor(List.of(family))).thenReturn(Map.of(8L, METRICS));
 
 		mvc.perform(get("/api/reports/40").with(asManager()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(40))
+				.andExpect(jsonPath("$.basisId").value(8))
 				.andExpect(jsonPath("$.audience").value("FAMILY"))
 				.andExpect(jsonPath("$.dataComplete").value(false))
-				.andExpect(jsonPath("$.sections.length()").value(4))
-				.andExpect(jsonPath("$.sections[0].title").value("Service completion"))
-				.andExpect(jsonPath("$.sections[1].title").value("Vital signs"))
-				.andExpect(jsonPath("$.sections[1].body").value(
+				.andExpect(jsonPath("$.metrics.visitsPlanned").value(3))
+				.andExpect(jsonPath("$.metrics.visitsCompleted").value(2))
+				.andExpect(jsonPath("$.metrics.fulfilmentRate").value(66.67))
+				.andExpect(jsonPath("$.metrics.averageElderRating").value(3.5))
+				.andExpect(jsonPath("$.sections.length()").value(7))
+				.andExpect(jsonPath("$.sections[0].key").value("overview"))
+				.andExpect(jsonPath("$.sections[0].figures[0].key").value("visits"))
+				.andExpect(jsonPath("$.sections[0].figures[0].value").value(2))
+				.andExpect(jsonPath("$.sections[0].figures[0].outOf").value(3))
+				.andExpect(jsonPath("$.sections[2].title").value("Service completion"))
+				.andExpect(jsonPath("$.sections[3].title").value("Vital signs"))
+				.andExpect(jsonPath("$.sections[3].body").value(
 						"Systolic 128–142 mmHg\nDiastolic 82–88 mmHg\nPulse 72–76 bpm\nTemperature 36.6–36.8 °C"))
-				.andExpect(jsonPath("$.sections[2].title").value("Observations"))
-				.andExpect(jsonPath("$.sections[3].title").value("Incidents"))
+				.andExpect(jsonPath("$.sections[3].series[0].key").value("systolic"))
+				.andExpect(jsonPath("$.sections[3].series[0].unit").value("mmHg"))
+				.andExpect(jsonPath("$.sections[3].series[0].points[1].at").value("2026-09-16"))
+				.andExpect(jsonPath("$.sections[3].series[0].points[1].high").value(142))
+				.andExpect(jsonPath("$.sections[3].series[0].points[1].flagged").value(true))
+				.andExpect(jsonPath("$.sections[4].title").value("Observations"))
+				.andExpect(jsonPath("$.sections[5].title").value("Incidents"))
+				.andExpect(jsonPath("$.sections[6].title").value("Ratings and spot checks"))
 				.andExpect(jsonPath("$.disclaimer").value("This summary is prepared from care records for "
 						+ "information only and does not constitute medical advice."))
 				.andExpect(jsonPath("$.amendments[0].id").value(3))
+				.andExpect(jsonPath("$.amendments[0].kind").value("CORRECTION"))
 				.andExpect(jsonPath("$.amendments[0].note").value("Visit 13 was cancelled by the family."))
 				.andExpect(jsonPath("$.amendments[0].authorUserId").value(11))
-				.andExpect(jsonPath("$.amendments[0].createdAt").value("2026-09-21T09:30:00"));
+				.andExpect(jsonPath("$.amendments[0].createdAt").value("2026-09-21T09:30:00"))
+				.andExpect(jsonPath("$.amendments[1].kind").value("FOLLOW_UP"));
 	}
 
 	@Test
@@ -200,7 +227,9 @@ class ReportControllerTest {
 		mvc.perform(get("/api/reports/42").with(asManager()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.disclaimer").isEmpty())
-				.andExpect(jsonPath("$.amendments.length()").value(0));
+				.andExpect(jsonPath("$.amendments.length()").value(0))
+				.andExpect(jsonPath("$.basisId").isEmpty())
+				.andExpect(jsonPath("$.metrics").isEmpty());
 	}
 
 	@Test
@@ -223,7 +252,24 @@ class ReportControllerTest {
 				.andExpect(jsonPath("$.totalElements").value(1))
 				.andExpect(jsonPath("$.items[0].id").value(40))
 				.andExpect(jsonPath("$.items[0].audience").value("FAMILY"))
-				.andExpect(jsonPath("$.items[0].sections").doesNotExist());
+				.andExpect(jsonPath("$.items[0].sections").doesNotExist())
+				.andExpect(jsonPath("$.items[0].metrics").isEmpty());
+	}
+
+	@Test
+	void eachRowOfTheListCarriesTheNumbersOfItsBasis() throws Exception {
+		Report filed = new Report(40L, 1L, 8L, 7L, Report.Audience.INTERNAL, ReportFixtures.WEEK, Report.Status.PUBLISHED,
+				ReportFixtures.content(), List.of(), ReportFixtures.GENERATED_AT);
+		ReportPage page = new ReportPage(List.of(filed), 0, 20, 1);
+		when(service.page(null, null, 0, 20)).thenReturn(page);
+		when(service.metricsFor(page.items())).thenReturn(Map.of(8L, METRICS));
+
+		mvc.perform(get("/api/reports").with(asManager()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items[0].basisId").value(8))
+				.andExpect(jsonPath("$.items[0].metrics.fulfilmentRate").value(66.67))
+				.andExpect(jsonPath("$.items[0].metrics.incidentCount").value(1))
+				.andExpect(jsonPath("$.items[0].metrics.ratingCount").value(2));
 	}
 
 	@Test
@@ -248,7 +294,7 @@ class ReportControllerTest {
 
 	@Test
 	void aCorrectionAnswers201WithWhatWasStored() throws Exception {
-		when(service.amend(40L, "Visit 13 was cancelled by the family.", 11L)).thenReturn(
+		when(service.amend(40L, ReportAmendment.Kind.CORRECTION, "Visit 13 was cancelled by the family.", 11L)).thenReturn(
 				new ReportAmendment(3L, 40L, "Visit 13 was cancelled by the family.", 11L,
 						LocalDateTime.of(2026, 9, 21, 9, 30)));
 
@@ -257,10 +303,35 @@ class ReportControllerTest {
 						.content("{\"note\":\"Visit 13 was cancelled by the family.\"}"))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.id").value(3))
+				.andExpect(jsonPath("$.kind").value("CORRECTION"))
 				.andExpect(jsonPath("$.note").value("Visit 13 was cancelled by the family."))
 				.andExpect(jsonPath("$.authorUserId").value(11))
 				.andExpect(jsonPath("$.createdAt").value("2026-09-21T09:30:00"))
 				.andExpect(jsonPath("$.reportId").doesNotExist());
+	}
+
+	@Test
+	void aFollowUpIsAppendedAsOne() throws Exception {
+		when(service.amend(40L, ReportAmendment.Kind.FOLLOW_UP, "Grab bar fitted on Thursday.", 11L)).thenReturn(
+				new ReportAmendment(4L, 40L, ReportAmendment.Kind.FOLLOW_UP, "Grab bar fitted on Thursday.", 11L,
+						LocalDateTime.of(2026, 9, 24, 15, 0)));
+
+		mvc.perform(post("/api/reports/40/amendments").with(asManager())
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"note\":\"Grab bar fitted on Thursday.\",\"kind\":\"FOLLOW_UP\"}"))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.id").value(4))
+				.andExpect(jsonPath("$.kind").value("FOLLOW_UP"));
+	}
+
+	@Test
+	void aKindThatDoesNotExistIs400() throws Exception {
+		mvc.perform(post("/api/reports/40/amendments").with(asManager())
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"note\":\"x\",\"kind\":\"GOSSIP\"}"))
+				.andExpect(status().isBadRequest());
+
+		verify(service, never()).amend(anyLong(), any(), anyString(), anyLong());
 	}
 
 	@Test
@@ -271,7 +342,7 @@ class ReportControllerTest {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.fields.note").value("note is required"));
 
-		verify(service, never()).amend(anyLong(), anyString(), anyLong());
+		verify(service, never()).amend(anyLong(), any(), anyString(), anyLong());
 	}
 
 	@Test
@@ -285,7 +356,7 @@ class ReportControllerTest {
 
 	@Test
 	void correctingAnUnknownReportIs404() throws Exception {
-		when(service.amend(eq(404L), anyString(), anyLong())).thenThrow(new ResourceNotFound("Report", 404L));
+		when(service.amend(eq(404L), any(), anyString(), anyLong())).thenThrow(new ResourceNotFound("Report", 404L));
 
 		mvc.perform(post("/api/reports/404/amendments").with(asManager())
 						.contentType(MediaType.APPLICATION_JSON)
@@ -295,7 +366,7 @@ class ReportControllerTest {
 
 	@Test
 	void aCorrectionTheRulesRefuseIs409() throws Exception {
-		when(service.amend(eq(40L), anyString(), anyLong())).thenThrow(
+		when(service.amend(eq(40L), any(), anyString(), anyLong())).thenThrow(
 				new BusinessRuleViolation("REPORT_AMENDMENT_NOTE_REQUIRED", "A correction has to say what it corrects"));
 
 		mvc.perform(post("/api/reports/40/amendments").with(asManager())

@@ -15,6 +15,10 @@ import sg.nus.carelink.incident.infrastructure.persistence.entity.IncidentJpaEnt
 /** Spring Data repository for incident. Used by persistence.adapter only; never exposed outwards. */
 public interface IncidentJpaRepository extends JpaRepository<IncidentJpaEntity, Long> {
 
+    @Query("select i from IncidentJpaEntity i where i.reportedByUserId=:actor and i.source=:source and (:visit is null or i.visitId=:visit) order by i.reportedAt desc, i.id desc")
+    Page<IncidentJpaEntity> findCaregiverReports(@Param("actor") Long actor, @Param("source") IncidentJpaEntity.Source source,
+            @Param("visit") Long visit, Pageable pageable);
+
 	/**
 	 * Backs the scheduled scan of UC-SYS02: incidents in one of the given states whose
 	 * response deadline has passed, oldest deadline first.

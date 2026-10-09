@@ -48,6 +48,9 @@ public class ValueAddedServiceJpaEntity {
 	@Column(name = "description")
 	private String description;
 
+	@Column(name = "duration_minutes", nullable = false)
+	private Integer durationMinutes = 60;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false)
 	private Status status = Status.AVAILABLE;
@@ -83,6 +86,14 @@ public class ValueAddedServiceJpaEntity {
 
 	public void setDescription(String description) {
 		this.description = description;
+	}
+
+	public Integer getDurationMinutes() {
+		return durationMinutes;
+	}
+
+	public void setDurationMinutes(Integer durationMinutes) {
+		this.durationMinutes = durationMinutes;
 	}
 
 	public Status getStatus() {

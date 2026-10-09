@@ -3,13 +3,16 @@ package sg.nus.carelink.report.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
 import sg.nus.carelink.report.domain.model.ReportContent;
+import sg.nus.carelink.report.domain.model.ReportFigure;
 import sg.nus.carelink.report.domain.model.ReportSection;
+import sg.nus.carelink.report.domain.model.ReportSeries;
 import sg.nus.carelink.report.domain.service.ReportContentBuilder;
 
 /**
@@ -126,5 +129,24 @@ class ReportContentBuilderTest {
 				.completeness(List.of(), String::valueOf)
 				.section("Service completion", "3 visits")
 				.generatedBy(ReportContent.GeneratedBy.TEMPLATE);
+	}
+
+	@Test
+	void aSectionKeepsItsFiguresAndSeriesAndTwoTitlesWithTheSameKeyAreRefused() {
+		ReportFigure figure = ReportFigure.count("incidents", "Incidents", 1);
+		ReportSeries pulse = new ReportSeries("pulse", "Pulse", "bpm", List.of(
+				new ReportSeries.Point("2026-09-14", BigDecimal.TEN, BigDecimal.TEN, false)));
+
+		ReportContentBuilder builder = ReportContentBuilder.create()
+				.completeness(List.of(), Object::toString)
+				.section("Vital signs", "Pulse 10 bpm", List.of(figure), List.of(pulse))
+				.generatedBy(ReportContent.GeneratedBy.TEMPLATE);
+
+		assertThatThrownBy(() -> builder.section("Vital Signs!", "again"))
+				.isInstanceOf(IllegalArgumentException.class);
+		ReportSection section = builder.build().sections().getFirst();
+		assertThat(section.key()).isEqualTo("vital-signs");
+		assertThat(section.figures()).containsExactly(figure);
+		assertThat(section.series()).containsExactly(pulse);
 	}
 }

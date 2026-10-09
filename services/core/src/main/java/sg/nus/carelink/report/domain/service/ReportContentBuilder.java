@@ -6,14 +6,16 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import sg.nus.carelink.report.domain.model.ReportContent;
+import sg.nus.carelink.report.domain.model.ReportFigure;
 import sg.nus.carelink.report.domain.model.ReportSection;
+import sg.nus.carelink.report.domain.model.ReportSeries;
 
 /**
  * Puts a report's content together one part at a time, then hands back an immutable
  * {@link ReportContent}: the Builder half of DP5.
  *
- * <p>The content has five parts that arrive at different moments of {@link ReportAssembler}'s
- * skeleton - the completeness verdict first, then four sections in turn, then the disclaimer
+ * <p>The content has its parts arrive at different moments of {@link ReportAssembler}'s
+ * skeleton - the completeness verdict first, then the sections in turn, then the disclaimer
  * and how the text was produced. A constructor taking all five would force the skeleton to
  * hold every intermediate result in locals until the end; a mutable {@code ReportContent}
  * would let an archived report be changed after the fact. The builder is the mutable stage
@@ -53,15 +55,24 @@ public final class ReportContentBuilder {
 		return this;
 	}
 
-	/** Adds the next section. Titles are unique within one report. */
+	/** Adds the next section, as text only. Titles are unique within one report. */
 	public ReportContentBuilder section(String title, String body) {
+		return section(title, body, List.of(), List.of());
+	}
+
+	/**
+	 * Adds the next section with the numbers it states and the series it summarises. Titles,
+	 * and the keys made from them, are unique within one report.
+	 */
+	public ReportContentBuilder section(String title, String body, List<ReportFigure> figures, List<ReportSeries> series) {
 		if (title == null || title.isBlank()) {
 			throw new IllegalArgumentException("A report section needs a title");
 		}
-		if (sections.stream().anyMatch(section -> section.title().equals(title))) {
+		String key = ReportSection.keyOf(title);
+		if (sections.stream().anyMatch(section -> section.title().equals(title) || section.key().equals(key))) {
 			throw new IllegalArgumentException("A report already has a section called " + title);
 		}
-		sections.add(new ReportSection(title, body == null ? "" : body));
+		sections.add(new ReportSection(key, title, body == null ? "" : body, figures, series));
 		return this;
 	}
 

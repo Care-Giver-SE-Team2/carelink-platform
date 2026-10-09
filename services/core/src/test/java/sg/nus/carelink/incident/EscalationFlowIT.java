@@ -1,6 +1,7 @@
 package sg.nus.carelink.incident;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -33,6 +34,7 @@ import sg.nus.carelink.incident.domain.model.IncidentLog;
 import sg.nus.carelink.incident.domain.model.PageSlice;
 import sg.nus.carelink.incident.domain.model.Playbook;
 import sg.nus.carelink.incident.domain.repository.IncidentRepository;
+import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
@@ -212,6 +214,25 @@ class EscalationFlowIT {
 		return rows == null ? 0L : rows;
 	}
 
+	// ------------------------------------------------------------ what is kept ---
+
+	/**
+	 * The caregiver's form and the elder's dispute both take 2000 characters, and since V19 the
+	 * column keeps all of them; the notification that quotes it is cut to its own column.
+	 */
+	@Test
+	void aTwoThousandCharacterAccountIsKeptWhole() {
+		String account = "Found on the floor by the bed. ".repeat(70).substring(0, 2000);
+
+		Incident raised = incidents.reportByCaregiver(
+				elder, null, null, Incident.Category.MEDICAL, Incident.Severity.LOW, account);
+
+		assertThat(repository.findById(raised.id()).orElseThrow().description()).isEqualTo(account).hasSize(2000);
+		assertThat(jdbc.queryForList("select char_length(body) from notification where resource_type = 'INCIDENT'"
+				+ " and resource_id = ?", Integer.class, raised.id())).isNotEmpty().allMatch(length -> length <= 1000);
+		closeSoTheSweepDoesNotFindIt(raised);
+	}
+
 	// ------------------------------------------------------- who hears about it ---
 
 	/**
@@ -350,6 +371,45 @@ class EscalationFlowIT {
 		assertThat(timeline).containsExactly(
 				"REPORTED", "BROADCAST", "ASSIGNED", "CLAIMED",
 				"CONTACT_ATTEMPTED", "PLAYBOOK_APPLIED", "RESOLVED");
+	}
+
+	/** The elder's one-tap call is routed like every other incident: told to everyone, owned by a named manager. */
+	@Test
+	void anElderEmergencyCallIsRoutedAndBroadcastLikeAnyOtherIncident() {
+		Incident raised = incidents.createElderEmergency(elder, null, null, null, "Blk 123", "Pressed the SOS button");
+
+		assertThat(raised.responderUserId()).isNotNull();
+		assertThat(raised.respondBy()).isNotNull();
+		Integer told = jdbc.queryForObject(
+				"select count(*) from notification where resource_id = ? and event_type = 'INCIDENT_RAISED'",
+				Integer.class, raised.id());
+		assertThat(told).as("every manager is told at once").isGreaterThanOrEqualTo(3);
+		assertThat(incidents.timelineOf(raised.id()).stream().map(IncidentLog::action))
+				.containsSubsequence("REPORTED", "BROADCAST", "ASSIGNED");
+
+		// Taken over, so its countdown does not run on into another test's sweep.
+		incidents.claim(raised.id(), raised.responderUserId(), "test");
+	}
+
+	/**
+	 * A take-over refused because somebody else got there first is written to the timeline
+	 * before the refusal is thrown; the rule keeps refused attempts, not only the one that
+	 * worked. Only a real transaction shows whether that row outlives the exception after it.
+	 */
+	@Test
+	void aRefusedTakeOverStaysOnTheTimelineAfterTheRefusal() {
+		Incident raised = raiseFor(elder, "SOS pressed");
+		Long id = raised.id();
+		incidents.claim(id, alice, "Alice Tan (it-alice)");
+
+		assertThatThrownBy(() -> incidents.claim(id, ben, "Ben Lim (it-ben)"))
+				.isInstanceOf(BusinessRuleViolation.class);
+
+		assertThat(incidents.timelineOf(id).stream().map(IncidentLog::action))
+				.containsSubsequence("CLAIMED", "CLAIM_REJECTED");
+		assertThat(repository.findById(id).orElseThrow().responderUserId())
+				.as("the refused attempt changed nothing else")
+				.isEqualTo(alice);
 	}
 
 	// ------------------------------------------------------------ escalating ---

@@ -42,6 +42,22 @@ describe('VisitBlock', () => {
     const cells = container.querySelectorAll<HTMLElement>('[style]')
     expect(cells[1].style.gridColumn).toBe('4 / span 2')
   })
+
+  it('counts hours in slots on a finer grid, and cuts a block under an hour to one line each', () => {
+    const { container } = render(
+      <div>
+        <VisitBlock elderShort="Mohd Y." label="Medication reminder" state="assigned" startCol={6} span={1} slotsPerHour={4} title="09:00 · Mohd Yusof" />
+        <VisitBlock elderShort="Goh S.L." label="Meal preparation" state="assigned" startCol={2} span={4} slotsPerHour={4} />
+        <VisitBlock elderShort="Tan H.S." label="Personal care" state="assigned" startCol={10} span={8} slotsPerHour={4} />
+      </div>,
+    )
+
+    const short = screen.getByTitle('09:00 · Mohd Yusof')
+    expect(short.children).toHaveLength(2)
+    expect(short).toHaveTextContent('Mohd Y.Medication reminder')
+    expect(container.querySelectorAll('br')).toHaveLength(1)
+    expect(screen.getByText('Tan H.S. · Personal care')).toBeInTheDocument()
+  })
 })
 
 describe('Legend', () => {

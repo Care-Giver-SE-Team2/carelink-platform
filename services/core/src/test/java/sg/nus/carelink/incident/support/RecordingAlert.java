@@ -17,7 +17,6 @@ public final class RecordingAlert implements IncidentAlert {
 
 	private final List<Long> broadcasts = new ArrayList<>();
 	private final List<HandOver> handOvers = new ArrayList<>();
-	private final List<Long> exhausted = new ArrayList<>();
 	private int audienceSize = 3;
 
 	public RecordingAlert withAudienceOf(int size) {
@@ -36,11 +35,6 @@ public final class RecordingAlert implements IncidentAlert {
 		handOvers.add(new HandOver(incident.id(), fromUserId, toUserId));
 	}
 
-	@Override
-	public void chainExhausted(Incident incident) {
-		exhausted.add(incident.id());
-	}
-
 	public List<Long> broadcasts() {
 		return List.copyOf(broadcasts);
 	}
@@ -49,7 +43,4 @@ public final class RecordingAlert implements IncidentAlert {
 		return List.copyOf(handOvers);
 	}
 
-	public List<Long> exhausted() {
-		return List.copyOf(exhausted);
-	}
 }

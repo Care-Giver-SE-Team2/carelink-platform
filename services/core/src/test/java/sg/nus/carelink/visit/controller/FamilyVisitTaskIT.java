@@ -245,10 +245,19 @@ class FamilyVisitTaskIT {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = {"no-profile", "no-binding", "manager", "caregiver", "elder"})
+	@ValueSource(strings = {"no-profile", "no-binding", "manager", "elder"})
 	void unavailableFamilyAccessAndOtherRolesCannotReadTask(String username) throws Exception {
 		mvc.perform(get("/api/visits/501/tasks").session(loginAs(username)))
 				.andExpect(status().isForbidden()).andExpect(jsonPath("$.caregiverNote").doesNotExist());
+	}
+
+	@Test
+	void caregiverTasksRequireCurrentAssignmentAndAValidWorkPack() throws Exception {
+		var session = loginAs("caregiver");
+		// This older family fixture intentionally has no valid plan; it is not an executable work-pack.
+		mvc.perform(get("/api/visits/501/tasks").session(session)).andExpect(status().isConflict());
+		jdbc.update("UPDATE visit SET caregiver_id = NULL WHERE id = 501");
+		mvc.perform(get("/api/visits/501/tasks").session(session)).andExpect(status().isForbidden());
 	}
 
 	@Test

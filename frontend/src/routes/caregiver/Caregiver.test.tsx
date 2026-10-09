@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import CaregiverHome from './index'
@@ -50,7 +50,7 @@ describe('caregiver read workflow', () => {
     expect(screen.getByText('First aid · Expired')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: /View work pack/ }))
     expect(await screen.findByText('Version 1')).toBeInTheDocument()
-    expect(screen.getByText(/Read-only work pack/)).toBeInTheDocument()
+    expect(screen.getByText(/Execution controls are unavailable/)).toBeInTheDocument()
     expect(screen.getByText('Checklist')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← My schedule' })).toHaveAttribute('href', '/caregiver?dateFrom=' + day + '&dateTo=' + day)
     expect(screen.queryByRole('button', { name: /Check.in|Submit/ })).not.toBeInTheDocument()
@@ -157,7 +157,7 @@ describe('caregiver read workflow', () => {
     fireEvent(window, new Event('focus'))
     expect(screen.queryByText('Demo address')).not.toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'My schedule' })).toHaveAttribute('href', '/caregiver?dateFrom=' + day + '&dateTo=' + day)
+    expect(within(screen.getByRole('alert')).getByRole('link', { name: 'My schedule' })).toHaveAttribute('href', '/caregiver?dateFrom=' + day + '&dateTo=' + day)
   })
   it('coalesces return events, ignores hidden events and refreshes after network recovery', async () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')

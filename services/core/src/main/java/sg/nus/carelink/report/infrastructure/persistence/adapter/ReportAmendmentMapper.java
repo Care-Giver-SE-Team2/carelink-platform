@@ -13,13 +13,20 @@ final class ReportAmendmentMapper {
 	}
 
 	static ReportAmendment toDomain(ReportAmendmentJpaEntity e) {
-		return new ReportAmendment(e.getId(), e.getReportId(), e.getNote(), e.getAuthorUserId(), e.getCreatedAt());
+		return new ReportAmendment(
+				e.getId(),
+				e.getReportId(),
+				ReportAmendment.Kind.valueOf(e.getKind().name()),
+				e.getNote(),
+				e.getAuthorUserId(),
+				e.getCreatedAt());
 	}
 
 	static ReportAmendmentJpaEntity toEntity(ReportAmendment d) {
 		ReportAmendmentJpaEntity e = new ReportAmendmentJpaEntity();
 		e.setId(d.id());
 		e.setReportId(d.reportId());
+		e.setKind(ReportAmendmentJpaEntity.Kind.valueOf(d.kind().name()));
 		e.setNote(d.note());
 		e.setAuthorUserId(d.authorUserId());
 		e.setCreatedAt(d.createdAt());

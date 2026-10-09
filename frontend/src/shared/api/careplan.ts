@@ -52,6 +52,11 @@ export async function fetchLatestCarePlan(elderId: string | number): Promise<Car
   }
 }
 
+/** Every version of the elder's plan, drafts included, newest first; [] when the elder has none. */
+export function fetchCarePlanVersions(elderId: string | number): Promise<CarePlanResponse[]> {
+  return api<CarePlanResponse[]>(`/care-plans?elderId=${elderId}`)
+}
+
 export function fetchCarePlanNodes(carePlanId: number): Promise<CarePlanNodeResponse[]> {
   return api<CarePlanNodeResponse[]>(`/care-plans/${carePlanId}/nodes`)
 }

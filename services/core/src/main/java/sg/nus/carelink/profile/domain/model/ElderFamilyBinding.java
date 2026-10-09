@@ -130,6 +130,24 @@ public record ElderFamilyBinding(
         );
     }
 
+    /** Only the addressed family member may accept a pending request. */
+    public ElderFamilyBinding confirm(LocalDateTime now) {
+        if (status != Status.PENDING_CONFIRMATION) {
+            throw new BusinessRuleViolation("FAMILY_BINDING_NOT_PENDING", "Only pending bindings can be confirmed.");
+        }
+        Objects.requireNonNull(now, "now");
+        return new ElderFamilyBinding(id, elderId, familyMemberId, relationship, isPrimaryContact,
+                accessScope, Status.ACTIVE, now, expiresAt, createdAt, updatedAt);
+    }
+
+    public ElderFamilyBinding reject() {
+        if (status != Status.PENDING_CONFIRMATION) {
+            throw new BusinessRuleViolation("FAMILY_BINDING_NOT_PENDING", "Only pending bindings can be rejected.");
+        }
+        return new ElderFamilyBinding(id, elderId, familyMemberId, relationship, isPrimaryContact,
+                accessScope, Status.REJECTED, null, expiresAt, createdAt, updatedAt);
+    }
+
     /**
      * Revokes a binding from the elder side.
      */

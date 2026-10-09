@@ -15,6 +15,7 @@ import tools.jackson.databind.json.JsonMapper;
 import sg.nus.carelink.report.domain.model.Report;
 import sg.nus.carelink.report.domain.model.ReportAmendment;
 import sg.nus.carelink.report.domain.model.ReportContent;
+import sg.nus.carelink.report.domain.model.ReportSection;
 import sg.nus.carelink.report.domain.service.ReportAssembler;
 import sg.nus.carelink.report.infrastructure.persistence.entity.ReportAmendmentJpaEntity;
 import sg.nus.carelink.report.infrastructure.persistence.entity.ReportJpaEntity;
@@ -31,6 +32,7 @@ class ReportMapperTest {
 		ReportJpaEntity entity = new ReportJpaEntity();
 		entity.setId(1L);
 		entity.setElderId(2L);
+		entity.setBasisId(8L);
 		entity.setGeneratedByUserId(3L);
 		entity.setAudience(ReportJpaEntity.Audience.FAMILY);
 		entity.setPeriodStart(LocalDate.of(2026, 9, 14));
@@ -44,6 +46,7 @@ class ReportMapperTest {
 		Report domain = ReportMapper.toDomain(entity, List.of(correction));
 		assertThat(domain.id()).isEqualTo(entity.getId());
 		assertThat(domain.elderId()).isEqualTo(entity.getElderId());
+		assertThat(domain.basisId()).isEqualTo(entity.getBasisId());
 		assertThat(domain.generatedByUserId()).isEqualTo(entity.getGeneratedByUserId());
 		assertThat(domain.audience().name()).isEqualTo(entity.getAudience().name());
 		assertThat(domain.period().start()).isEqualTo(entity.getPeriodStart());
@@ -57,6 +60,7 @@ class ReportMapperTest {
 		ReportJpaEntity back = ReportMapper.toEntity(domain);
 		assertThat(back.getId()).isEqualTo(entity.getId());
 		assertThat(back.getElderId()).isEqualTo(entity.getElderId());
+		assertThat(back.getBasisId()).isEqualTo(entity.getBasisId());
 		assertThat(back.getGeneratedByUserId()).isEqualTo(entity.getGeneratedByUserId());
 		assertThat(back.getAudience()).isEqualTo(entity.getAudience());
 		assertThat(back.getPeriodStart()).isEqualTo(entity.getPeriodStart());
@@ -69,12 +73,15 @@ class ReportMapperTest {
 	@Test
 	void mapsEveryAmendmentColumnInBothDirections() {
 		ReportAmendmentJpaEntity row = amendmentRow();
+		row.setKind(ReportAmendmentJpaEntity.Kind.FOLLOW_UP);
 
 		ReportAmendment domain = ReportAmendmentMapper.toDomain(row);
 		ReportAmendmentJpaEntity back = ReportAmendmentMapper.toEntity(domain);
 
+		assertThat(domain.kind()).isEqualTo(ReportAmendment.Kind.FOLLOW_UP);
 		assertThat(back.getId()).isEqualTo(row.getId());
 		assertThat(back.getReportId()).isEqualTo(row.getReportId());
+		assertThat(back.getKind()).isEqualTo(row.getKind());
 		assertThat(back.getNote()).isEqualTo(row.getNote());
 		assertThat(back.getAuthorUserId()).isEqualTo(row.getAuthorUserId());
 		assertThat(back.getCreatedAt()).isEqualTo(row.getCreatedAt());
@@ -95,6 +102,38 @@ class ReportMapperTest {
 		assertThat(stored.get("disclaimer").isNull()).isTrue();
 		assertThat(stored.get("generatedBy").asString()).isEqualTo("TEMPLATE");
 		assertThat(ReportContentJson.read(json)).isEqualTo(ReportFixtures.content());
+	}
+
+	/** A section's key, figures and series are stored with it and read back as they were written. */
+	@Test
+	void aSectionKeepsItsKeyFiguresAndSeries() {
+		ReportContent content = ReportAssembler.forAudience(Report.Audience.FAMILY).assemble(ReportFixtures.week());
+		String json = ReportContentJson.write(content);
+		JsonNode vitals = JsonMapper.builder().build().readTree(json).get("sections").get(3);
+
+		assertThat(vitals.propertyNames()).containsExactlyInAnyOrder("title", "body", "key", "figures", "series");
+		assertThat(vitals.get("key").asString()).isEqualTo("vital-signs");
+		assertThat(vitals.get("series").get(0).propertyNames())
+				.containsExactlyInAnyOrder("key", "label", "unit", "points");
+		assertThat(vitals.get("series").get(0).get("points").get(1).propertyNames())
+				.containsExactlyInAnyOrder("at", "low", "high", "flagged");
+		assertThat(ReportContentJson.read(json)).isEqualTo(content);
+	}
+
+	/** A report filed before sections had keys, figures and series reads back keyed by its titles, with neither. */
+	@Test
+	void aSectionStoredBeforeKeysExistedIsKeyedByItsTitle() {
+		ReportContent read = ReportContentJson.read("""
+				{"sections":[{"title":"Service completion","body":"3 visits."},
+				             {"title":"Vital signs","body":"none","key":" ","figures":null,"series":null}],
+				 "dataComplete":true,"missingItems":[],"disclaimer":null,"generatedBy":"TEMPLATE"}
+				""");
+
+		assertThat(read.sections()).extracting(ReportSection::key).containsExactly("service-completion", "vital-signs");
+		assertThat(read.sections()).allSatisfy(section -> {
+			assertThat(section.figures()).isEmpty();
+			assertThat(section.series()).isEmpty();
+		});
 	}
 
 	/** An archived report written by a later version, with a field this one does not know, still reads. */

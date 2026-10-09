@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -44,6 +45,7 @@ public class EscalationService {
 	private final IncidentLogRepository timeline;
 	private final ManagerDirectory directory;
 	private final IncidentAlert alert;
+	private final IncidentFamilyEvents familyEvents;
 	private final EscalationPolicy policy;
 	private final Clock clock;
 
@@ -52,6 +54,7 @@ public class EscalationService {
 			IncidentLogRepository timeline,
 			ManagerDirectory directory,
 			IncidentAlert alert,
+			IncidentFamilyEvents familyEvents,
 			EscalationPolicy policy,
 			Clock clock) {
 
@@ -59,6 +62,7 @@ public class EscalationService {
 		this.timeline = timeline;
 		this.directory = directory;
 		this.alert = alert;
+		this.familyEvents = familyEvents;
 		this.policy = policy;
 		this.clock = clock;
 	}
@@ -74,13 +78,15 @@ public class EscalationService {
 	public Incident routeNewIncident(Incident saved) {
 		LocalDateTime now = now();
 
-		// Everyone who could act hears about it first, in the same second, before the chain
-		// decides anything. Who finds out and who is answerable are different questions, and
-		// nobody should wait on the second to be told the first.
+		// Staff alerts remain in the source transaction; family delivery belongs to the
+		// after-commit Observer and must not survive a later CG04 receipt failure.
 		int told = alert.broadcastRaised(saved);
 		timeline.save(IncidentLog.systemEntry(saved.id(), IncidentLog.Action.BROADCAST,
-				"%d recipient(s): every manager, the family bound to this elder, and the caregiver "
+				"%d staff recipient(s): every manager and the caregiver "
 						.formatted(told) + "who last visited", now));
+		// One identity per new fact. Successful CG04 command replay never routes again.
+		familyEvents.raised(UUID.randomUUID(), saved.id(), saved.elderId(),
+				saved.reportedAt().atZone(Incident.CARELINK_ZONE).toOffsetDateTime());
 
 		EscalationOutcome outcome = chainFor(saved, now).handle(EscalationRequest.routing(saved, now, policy));
 		return applyOutcome(saved, outcome, now, IncidentLog.SYSTEM_ACTOR, "first responder");
@@ -182,8 +188,9 @@ public class EscalationService {
 
 		Incident unresolved = incidents.save(incident.markUnresolvedEscalated());
 		timeline.save(IncidentLog.entry(unresolved.id(), actor, IncidentLog.Action.CHAIN_EXHAUSTED,
-				"%s - %s; pinned for the family".formatted(narrative, outcome.describeRoute()), now));
-		alert.chainExhausted(unresolved);
+				"%s - %s; family event registered for delivery after commit".formatted(narrative, outcome.describeRoute()), now));
+		familyEvents.unresolved(UUID.randomUUID(), unresolved.id(), unresolved.elderId(),
+				now.atZone(Incident.CARELINK_ZONE).toOffsetDateTime());
 		return unresolved;
 	}
 

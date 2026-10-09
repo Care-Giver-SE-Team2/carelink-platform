@@ -1,5 +1,6 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Report } from '../../features/reports/types'
@@ -41,10 +42,14 @@ function BrowserHistory() {
 }
 function openReports(path = '/family/reports') {
   return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={[path]}>
       <BrowserHistory />
-      <Routes><Route path="/family/*" element={<FamilyHome />} /></Routes>
-    </MemoryRouter>,
+      <Routes>
+        <Route path="/" element={<h1>Landing</h1>} />
+        <Route path="/family/*" element={<FamilyHome />} />
+      </Routes>
+    </MemoryRouter></QueryClientProvider>,
   )
 }
 function queries(fetchMock: ReturnType<typeof installApi>) {
@@ -67,7 +72,7 @@ describe('Family care report list', () => {
     const fetchMock = installApi()
     openReports()
     expect(await screen.findByRole('heading', { name: '21 Sep – 27 Sep 2026' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Care reports' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('aria-current', 'page')
     expect(document.title).toBe('Care reports · CareLink')
     expect(fetchMock.mock.calls.map(([path]) => path.split('?')[0])).toEqual(['/api/auth/me', '/api/elders', '/api/reports'])
     expect(queries(fetchMock)).toEqual([{ elderId: '21', audience: 'FAMILY', page: '0', size: '20' }])
@@ -130,7 +135,7 @@ describe('Family care report list', () => {
     expect(screen.queryByRole('list', { name: 'Care reports' })).not.toBeInTheDocument()
     if (kind === 'unbound') {
       expect(queries(fetchMock)).toEqual([])
-      expect(screen.getByRole('link', { name: 'View my applications' })).toHaveAttribute('href', '/family/intake')
+      expect(screen.getByRole('link', { name: 'View my applications' })).toHaveAttribute('href', '/family/service-applications')
       expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     }
     if (kind === 'page') {
@@ -148,7 +153,7 @@ describe('Family care report list', () => {
       await screen.findByText('Records complete')
       denied = true
       await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh' }))
-      expect(await screen.findByRole('heading', { name: code === 401 ? 'Sign in to continue' : 'Report access unavailable' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: code === 401 ? 'Landing' : 'Report access unavailable' })).toBeInTheDocument()
       expect(screen.queryByRole('list', { name: 'Care reports' })).not.toBeInTheDocument()
       expect(screen.queryByRole('combobox', { name: 'Care for' })).not.toBeInTheDocument()
       expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
@@ -213,8 +218,7 @@ describe('Family care report list', () => {
     openReports()
     await screen.findByRole('heading', { name: 'Report access unavailable' })
     expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(['/api/auth/me'])
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Sign in with another account' }))
-    expect(screen.getByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in with another account' })).toHaveAttribute('href', '/')
   })
 
   it('rechecks revoked bindings and reloads available elders before retrying reports', async () => {
@@ -241,33 +245,12 @@ describe('Family care report list', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
-  it('signs in with CSRF and reloads reports using the new account’s elders', async () => {
-    let signedIn = false
-    const fetchMock = installApi((url, init) => {
-      if (url.pathname === '/api/auth/csrf') {
-        document.cookie = 'XSRF-TOKEN=report-login; path=/'
-        return new Response(null)
-      }
-      if (url.pathname === '/api/auth/login') {
-        expect(JSON.parse(init.body as string)).toEqual({ username: 'family_b', password: 'test-password' })
-        expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('report-login')
-        signedIn = true
-        return json({ ...family, id: 12, username: 'family_b' })
-      }
-      if (!signedIn) return new Response(null, { status: 401 })
-      if (url.pathname === '/api/elders') return json([elders[1]])
-      return undefined
-    })
+  it('returns to the landing page without loading reports when there is no session', async () => {
+    const fetchMock = installApi((url) => url.pathname === '/api/auth/me' ? new Response(null, { status: 401 }) : undefined)
     openReports('/family/reports?elderId=21&page=4')
-    const user = userEvent.setup()
-    await user.type(await screen.findByLabelText('Username'), 'family_b')
-    await user.type(screen.getByLabelText('Password'), 'test-password')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
-    await screen.findByText('Records complete')
-    expect(screen.getByRole('combobox', { name: 'Care for' })).toHaveValue('22')
-    expect(queries(fetchMock)).toEqual([{ elderId: '22', page: '0', audience: 'FAMILY', size: '20' }])
-    expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Current URL')).toHaveTextContent('/family/reports')
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(['/api/auth/me'])
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument()
   })
 
   it.each(['network', 'server', 'audit'])('retries a %s failure without presenting it as an empty report list', async (failure) => {
@@ -314,7 +297,7 @@ describe('Family care report list', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading your reports')
     expect(screen.queryByRole('list', { name: 'Care reports' })).not.toBeInTheDocument()
     await act(async () => finishCurrent(new Response(null, { status: 401 })))
-    expect(await screen.findByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
   })
 
   it.each(['/api/auth/me', '/api/elders', '/api/reports'])(
@@ -336,18 +319,19 @@ describe('Family care report list', () => {
     },
   )
 
-  it('keeps applications and weekly schedule reachable through the same family navigation', async () => {
-    installApi((url) => ['/api/visits', '/api/intake-applications'].includes(url.pathname)
+  it('keeps applications, the weekly schedule and the weekly summary reachable through the tab bar', async () => {
+    installApi((url) => ['/api/visits', '/api/family/service-applications'].includes(url.pathname)
       ? json({ items: [], page: 0, size: 20, totalElements: 0 }) : undefined)
     openReports()
     await screen.findByText('Records complete')
     const user = userEvent.setup()
-    await user.click(screen.getByRole('link', { name: 'Weekly schedule' }))
+    await user.click(screen.getByRole('link', { name: 'Schedule' }))
     expect(await screen.findByRole('heading', { name: 'No visits this week' })).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: 'My applications' }))
-    expect(await screen.findByRole('heading', { name: 'No applications yet' })).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: 'Care reports' }))
-    expect(await screen.findByText('Records complete')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Services' }))
+    expect(await screen.findByRole('heading', { name: 'No service applications yet' })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Reports' }))
+    expect(await screen.findByRole('heading', { name: 'Weekly summary' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('aria-current', 'page')
   })
 
 })

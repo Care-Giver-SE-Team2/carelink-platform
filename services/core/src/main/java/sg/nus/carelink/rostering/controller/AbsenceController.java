@@ -101,6 +101,15 @@ public class AbsenceController {
 		return new AbsenceResponses.ReRostered(outcome, queries.caseOf(id));
 	}
 
+	/** The manager hand-picks who takes a vacated visit, in place of the search's own pick. */
+	@PostMapping("/absences/{id}/changes/{changeId}/assignment")
+	@PreAuthorize("hasRole('MANAGER')")
+	public AbsenceQueryService.AbsenceCase assign(@PathVariable Long id, @PathVariable Long changeId,
+			@Valid @RequestBody AbsenceRequests.Assignment body, Principal principal) {
+		reRostering.assignByManager(id, changeId, body.caregiverId(), managerId(principal));
+		return queries.caseOf(id);
+	}
+
 	/** Step 7: the manager confirms every vacated visit is accounted for. */
 	@PostMapping("/absences/{id}/coverage-confirmation")
 	@PreAuthorize("hasRole('MANAGER')")

@@ -30,8 +30,10 @@ import org.springframework.test.context.TestPropertySource;
 
 import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.domain.model.Report;
+import sg.nus.carelink.report.domain.model.ElderProfile;
 import sg.nus.carelink.report.domain.model.ReportAmendment;
 import sg.nus.carelink.report.domain.model.ReportFacts;
+import sg.nus.carelink.report.domain.model.ReportMetrics;
 import sg.nus.carelink.report.domain.model.ReportPage;
 import sg.nus.carelink.report.domain.model.ReportPeriod;
 import sg.nus.carelink.report.domain.model.ReportSection;
@@ -87,6 +89,8 @@ class ReportFlowIT {
 	private static Long manager;
 	private static Long caregiverUser;
 	private static Long caregiver;
+	/** The caregiver who covers an absence in the roster change rows. */
+	private static Long replacement;
 
 	private Long elder;
 
@@ -109,6 +113,10 @@ class ReportFlowIT {
 					+ " values ('it-report-caregiver', '{noop}unused-here', 'Daniel Goh', true)", Map.of());
 			caregiver = insert("insert into caregiver (user_id, full_name, status) values (:user, 'Daniel Goh', 'AVAILABLE')",
 					Map.of("user", caregiverUser));
+			Long replacementUser = insert("insert into app_user (username, password_hash, display_name, enabled)"
+					+ " values ('it-report-replacement', '{noop}unused-here', 'Mei Ling', true)", Map.of());
+			replacement = insert("insert into caregiver (user_id, full_name, status) values (:user, 'Mei Ling', 'AVAILABLE')",
+					Map.of("user", replacementUser));
 		}
 		elder = newElder("Report Test Elder");
 	}
@@ -179,7 +187,115 @@ class ReportFlowIT {
 				.param("id", family.id()).query(String.class).single();
 
 		assertThat(type).isEqualTo("OBJECT");
-		assertThat(firstTitle).isEqualTo("Service completion");
+		assertThat(firstTitle).isEqualTo("Overview");
+	}
+
+	// ---------------------------------------------------- what else a report reads ---
+
+	/**
+	 * The profile, the plan, the elder's answers, the family's reviews, the spot checks, the
+	 * roster changes and the value-added requests come from their own tables - each written the
+	 * way its module writes it - and only the rows that belong to the week are read.
+	 */
+	@Test
+	void theRestOfTheWeeksRecordIsReadFromItsOwnTables() {
+		givenTheElderHasAProfileAPlanAndAPrimaryCaregiver();
+		Long timed = timedVisit(LocalDateTime.of(2026, 9, 15, 9, 0), LocalDateTime.of(2026, 9, 15, 10, 0),
+				LocalDateTime.of(2026, 9, 15, 9, 5), LocalDateTime.of(2026, 9, 15, 10, 0));
+		answer(timed, "CONFIRMED", 4, "Very patient.", LocalDateTime.of(2026, 9, 15, 11, 0));
+		Long family = insert("insert into family_member (full_name) values ('IT Family')", Map.of());
+		review(family, MONDAY, SUNDAY, 4, "Kind, but rushed.");
+		review(family, MONDAY.minusWeeks(2), SUNDAY.minusWeeks(2), 2, "an earlier fortnight");
+		spotCheck(LocalDateTime.of(2026, 9, 16, 10, 0), "Gloves not changed.");
+		spotCheck(LocalDateTime.of(2026, 9, 23, 10, 0), "next week's");
+		rosterChange(timed, LocalDateTime.of(2026, 9, 15, 9, 0));
+		valueAdded("Hospital escort", LocalDateTime.of(2026, 9, 19, 10, 0));
+		valueAdded("Companionship", LocalDateTime.of(2026, 9, 21, 10, 0));
+
+		ReportFacts week = facts.gather(elder, new ReportPeriod(MONDAY, SUNDAY)).orElseThrow();
+
+		assertThat(week.elder()).isEqualTo(new ElderProfile("Report Test Elder", "FEMALE", LocalDate.of(1941, 3, 2),
+				"ASSISTIVE_CANE", true, "Hypertension.", caregiver, "Daniel Goh", 2, new BigDecimal("6.50")));
+		assertThat(week.visits()).singleElement().satisfies(visit -> {
+			assertThat(visit.plannedMinutes()).isEqualTo(60);
+			assertThat(visit.workedMinutes()).isEqualTo(55);
+		});
+		assertThat(week.quality().confirmations()).singleElement().satisfies(answer -> {
+			assertThat(answer.visitId()).isEqualTo(timed);
+			assertThat(answer.rating()).isEqualTo(4);
+			assertThat(answer.disputed()).isFalse();
+			assertThat(answer.confirmedAt()).isEqualTo(LocalDateTime.of(2026, 9, 15, 11, 0));
+		});
+		assertThat(week.quality().reviews()).singleElement().satisfies(review -> {
+			assertThat(review.caregiverName()).isEqualTo("Daniel Goh");
+			assertThat(review.periodStart()).isEqualTo(MONDAY);
+			assertThat(review.notes()).isEqualTo("Kind, but rushed.");
+		});
+		assertThat(week.quality().spotChecks()).singleElement().satisfies(check -> {
+			assertThat(check.proposedTime()).isEqualTo(LocalDateTime.of(2026, 9, 16, 10, 0));
+			assertThat(check.finding()).isEqualTo("Gloves not changed.");
+		});
+		assertThat(week.changes().rosterChanges()).singleElement().satisfies(change -> {
+			assertThat(change.visitStart()).isEqualTo(LocalDateTime.of(2026, 9, 15, 9, 0));
+			assertThat(change.outcome()).isEqualTo("REPLACED");
+			assertThat(change.assignedCaregiverName()).isEqualTo("Mei Ling");
+		});
+		assertThat(week.changes().valueAdded()).singleElement().satisfies(request -> {
+			assertThat(request.service()).isEqualTo("Hospital escort");
+			assertThat(request.requestedFor()).isEqualTo(LocalDateTime.of(2026, 9, 19, 10, 0));
+		});
+	}
+
+	@Test
+	void anElderWithNothingOnFileHasAnEmptyProfileRatherThanNone() {
+		ReportFacts week = facts.gather(elder, new ReportPeriod(MONDAY, SUNDAY)).orElseThrow();
+
+		assertThat(week.elder().fullName()).isEqualTo("Report Test Elder");
+		assertThat(week.elder().hasPlan()).isFalse();
+		assertThat(week.elder().hasPrimaryCaregiver()).isFalse();
+		assertThat(week.elder().livesAlone()).isNull();
+		assertThat(week.quality().isEmpty()).isTrue();
+	}
+
+	// ----------------------------------------------------------------- the basis ---
+
+	/** A run stores one basis with the numbers in columns and the facts as a document, and its reports point to it. */
+	@Test
+	void aRunFilesItsReportsAgainstOneBasis() {
+		givenTheElderHadAVerifiedWeek();
+		visit(LocalDateTime.of(2026, 9, 18, 9, 0), "SCHEDULED");
+		Long monday = jdbc.sql("select id from visit where elder_id = :elder order by scheduled_start limit 1")
+				.param("elder", elder).query(Long.class).single();
+		answer(monday, "CONFIRMED", 5, null, LocalDateTime.of(2026, 9, 14, 11, 0));
+
+		List<Report> filed = reports.generate(elder, MONDAY, SUNDAY, manager);
+
+		Long basisId = filed.getFirst().basisId();
+		assertThat(filed).extracting(Report::basisId).containsOnly(basisId).doesNotContainNull();
+		Map<String, Object> row = jdbc.sql("select elder_id, visits_planned, visits_completed, fulfilment_rate,"
+						+ " vitals_out_of_range, incident_count, avg_elder_rating, rating_count, data_complete, facts_version,"
+						+ " json_type(facts) as facts_type, json_unquote(json_extract(facts, '$.elder.fullName')) as elder_name"
+						+ " from report_basis where id = :id")
+				.param("id", basisId).query().singleRow();
+		assertThat(((Number) row.get("elder_id")).longValue()).isEqualTo(elder);
+		assertThat(((Number) row.get("visits_planned")).intValue()).isEqualTo(3);
+		assertThat(((Number) row.get("visits_completed")).intValue()).isEqualTo(2);
+		assertThat((BigDecimal) row.get("fulfilment_rate")).isEqualByComparingTo("66.67");
+		assertThat(((Number) row.get("vitals_out_of_range")).intValue()).isEqualTo(1);
+		assertThat(((Number) row.get("incident_count")).intValue()).isEqualTo(1);
+		assertThat((BigDecimal) row.get("avg_elder_rating")).isEqualByComparingTo("5");
+		assertThat(((Number) row.get("rating_count")).intValue()).isEqualTo(1);
+		assertThat(row.get("data_complete")).isIn(false, 0, 0L);
+		assertThat(((Number) row.get("facts_version")).intValue()).isEqualTo(1);
+		assertThat(row.get("facts_type")).isEqualTo("OBJECT");
+		assertThat(row.get("elder_name")).isEqualTo("Report Test Elder");
+
+		Map<Long, ReportMetrics> metrics = reports.metricsFor(filed);
+		assertThat(metrics.get(basisId).fulfilmentRate()).isEqualByComparingTo("66.67");
+		assertThat(metrics.get(basisId).dataComplete()).isFalse();
+		reports.generate(elder, MONDAY, SUNDAY, manager);
+		assertThat(jdbc.sql("select count(*) from report_basis where elder_id = :elder").param("elder", elder)
+				.query(Long.class).single()).as("a period already on file stores no second basis").isEqualTo(1L);
 	}
 
 	// ------------------------------------------------------------------- the week ---
@@ -271,6 +387,23 @@ class ReportFlowIT {
 		assertThat(read.createdAt()).isEqualTo(family.createdAt());
 	}
 
+	/** A follow-up is stored as one, beside the report, and read back with its kind. */
+	@Test
+	void aFollowUpIsStoredWithItsKind() {
+		givenTheElderHadAVerifiedWeek();
+		Report internal = reports.generate(elder, MONDAY, SUNDAY, manager).getLast();
+
+		ReportAmendment followUp = reports.amend(internal.id(), ReportAmendment.Kind.FOLLOW_UP,
+				"Grab bar fitted on Thursday.", manager);
+		ReportAmendment correction = reports.amend(internal.id(), "The fall was on Tuesday.", manager);
+
+		assertThat(jdbc.sql("select kind from report_amendment where id = :id").param("id", followUp.id())
+				.query(String.class).single()).isEqualTo("FOLLOW_UP");
+		assertThat(reports.findDetail(internal.id()).amendments()).extracting(ReportAmendment::kind)
+				.containsExactly(ReportAmendment.Kind.FOLLOW_UP, ReportAmendment.Kind.CORRECTION);
+		assertThat(correction.kind()).isEqualTo(ReportAmendment.Kind.CORRECTION);
+	}
+
 	// -------------------------------------------------------------------- the list ---
 
 	/** A8: latest period first, the three versions of a period together - MySQL's ENUM order. */
@@ -321,6 +454,74 @@ class ReportFlowIT {
 		log(fall, "Ben Lim (it-ben)", "CLAIMED", "taken over; countdown stopped", LocalDateTime.of(2026, 9, 15, 10, 21));
 		log(fall, "Ben Lim (it-ben)", "RESOLVED",
 				"HANDLED_ON_SITE :: No injury. Bathroom grab bar to be fitted this week.", LocalDateTime.of(2026, 9, 15, 11, 2));
+	}
+
+	/** Born 2 March 1941, walks with a cane, lives alone; plan version 2 in force over a superseded version 1. */
+	private void givenTheElderHasAProfileAPlanAndAPrimaryCaregiver() {
+		jdbc.sql("update elder set gender = 'FEMALE', date_of_birth = :dob, mobility_level = 'ASSISTIVE_CANE',"
+						+ " lives_alone = true, medical_notes = 'Hypertension.' where id = :elder")
+				.param("dob", LocalDate.of(1941, 3, 2)).param("elder", elder).update();
+		jdbc.sql("insert into elder_primary_caregiver (elder_id, caregiver_id) values (:elder, :caregiver)")
+				.param("elder", elder).param("caregiver", caregiver).update();
+		jdbc.sql("insert into care_plan (elder_id, version, status, total_hours) values (:elder, 1, 'SUPERSEDED', 4.00)")
+				.param("elder", elder).update();
+		jdbc.sql("insert into care_plan (elder_id, version, status, total_hours) values (:elder, 2, 'PUBLISHED', 6.50)")
+				.param("elder", elder).update();
+	}
+
+	private Long timedVisit(LocalDateTime start, LocalDateTime end, LocalDateTime checkedIn, LocalDateTime checkedOut) {
+		return insert("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,"
+						+ " checked_in_at, checked_out_at, status)"
+						+ " values (:elder, :caregiver, 'Personal care', :start, :end, :in, :out, 'VERIFIED')",
+				Map.of("elder", elder, "caregiver", caregiver, "start", at(start), "end", at(end),
+						"in", at(checkedIn), "out", at(checkedOut)));
+	}
+
+	private void answer(Long visit, String status, Integer rating, String comment, LocalDateTime when) {
+		jdbc.sql("insert into elder_confirmation (visit_id, elder_id, confirmation_status, rating, comment, confirmed_at)"
+						+ " values (:visit, :elder, :status, :rating, :comment, :when)")
+				.param("visit", visit).param("elder", elder).param("status", status).param("rating", rating)
+				.param("comment", comment).param("when", at(when))
+				.update();
+	}
+
+	private void review(Long family, LocalDate start, LocalDate end, int overall, String notes) {
+		jdbc.sql("insert into caregiver_review (family_member_id, elder_id, caregiver_id, period_start, period_end,"
+						+ " overall_rating, punctuality_score, care_quality_score, feedback_notes, renewal_decision)"
+						+ " values (:family, :elder, :caregiver, :start, :end, :overall, 5, 4, :notes, 'RENEW_CURRENT')")
+				.param("family", family).param("elder", elder).param("caregiver", caregiver)
+				.param("start", start).param("end", end).param("overall", overall).param("notes", notes)
+				.update();
+	}
+
+	private void spotCheck(LocalDateTime proposed, String finding) {
+		jdbc.sql("insert into spot_check (elder_id, caregiver_id, proposed_time, approval_status, finding, result, outcome,"
+						+ " checked_at) values (:elder, :caregiver, :proposed, 'APPROVED', :finding, 'NEEDS_IMPROVEMENT',"
+						+ " 'COMPLETED', :checked)")
+				.param("elder", elder).param("caregiver", caregiver).param("proposed", at(proposed))
+				.param("finding", finding).param("checked", at(proposed.plusMinutes(40)))
+				.update();
+	}
+
+	private void rosterChange(Long visit, LocalDateTime visitStart) {
+		Long absence = insert("insert into absence_report (caregiver_id, start_date, end_date, status)"
+						+ " values (:caregiver, :start, :end, 'APPROVED')",
+				Map.of("caregiver", caregiver, "start", visitStart.toLocalDate(), "end", visitStart.toLocalDate()));
+		jdbc.sql("insert into roster_change (absence_id, visit_id, elder_id, original_caregiver_id, visit_start, status,"
+						+ " outcome, decided_by, assigned_caregiver_id, created_at, updated_at)"
+						+ " values (:absence, :visit, :elder, :caregiver, :start, 'RESOLVED', 'REPLACED', 'FAMILY',"
+						+ " :replacement, :start, :start)")
+				.param("absence", absence).param("visit", visit).param("elder", elder).param("caregiver", caregiver)
+				.param("start", at(visitStart)).param("replacement", replacement)
+				.update();
+	}
+
+	private void valueAdded(String service, LocalDateTime requestedFor) {
+		jdbc.sql("insert into value_added_service_request (elder_id, value_added_service_id, requested_schedule, status)"
+						+ " values (:elder, (select s.id from value_added_service s where s.name = :service),"
+						+ " :requested, 'PENDING_APPROVAL')")
+				.param("elder", elder).param("service", service).param("requested", at(requestedFor))
+				.update();
 	}
 
 	private Long newElder(String name) {

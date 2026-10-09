@@ -1,0 +1,434 @@
+/* Family home: white screen header, then labelled sections of white cards on the tinted page. */
+.home {
+  display: grid;
+  gap: 0;
+}
+
+.header {
+  composes: band from '../components/FamilyScreen.module.css';
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Outranks the composed band's own bottom margin. */
+.home > .header {
+  margin-bottom: 0;
+}
+
+.eyebrow,
+.sectionLabel {
+  color: var(--fm-accent);
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  line-height: 1.2 !important;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  margin-bottom: 8px !important;
+}
+
+.meta {
+  margin-top: 6px !important;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag {
+  flex: none;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: var(--fm-accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sectionLabel {
+  margin: 22px 0 12px !important;
+}
+
+/* Phone: the first section sits 18px under the header (or the elder picker). */
+@media (max-width: 899px) {
+  .header + .columns > .column:first-child > section:first-child .sectionLabel,
+  .picker + .columns > .column:first-child > section:first-child .sectionLabel {
+    margin-top: 18px !important;
+  }
+}
+
+.loading {
+  padding: 24px 0;
+  color: var(--fm-muted);
+  text-align: center;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 13.5px;
+  color: var(--fm-muted);
+}
+
+.picker select {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  background: var(--fm-card);
+  padding: 0 12px;
+  color: var(--fm-ink);
+  font: inherit;
+  font-weight: 600;
+}
+
+.card,
+.empty {
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 16px;
+}
+
+p.card {
+  color: var(--fm-muted);
+  font-size: 14px;
+}
+
+.empty {
+  margin-top: 18px;
+  padding: 22px 18px;
+  text-align: center;
+}
+
+.empty p {
+  margin: 6px 0 16px !important;
+  color: var(--fm-muted);
+  font-size: 14px;
+}
+
+.primary {
+  display: block;
+  border-radius: 16px;
+  background: var(--fm-accent);
+  padding: 15px 0;
+  color: #fff !important;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* Live visit card. */
+.liveTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.range {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--fm-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.state > span {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+.state[data-live='true'] {
+  color: var(--fm-accent);
+}
+
+.state[data-live='true'] > span {
+  background: currentColor;
+}
+
+.service {
+  margin: 8px 0 14px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.unassigned {
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 50%;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.name {
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.personMeta {
+  margin-top: 2px !important;
+  color: var(--fm-muted);
+  font-size: 13px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tags li {
+  border-radius: 999px;
+  background: var(--fm-accent-tint);
+  padding: 5px 10px;
+  color: var(--fm-accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.facts {
+  margin: 16px 0 0;
+  border-top: 1px solid var(--fm-line-row);
+}
+
+.facts div,
+.rows div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.facts div {
+  padding: 9px 0 0;
+  font-size: 13.5px;
+}
+
+.facts dt {
+  color: var(--fm-muted);
+}
+
+.facts dd,
+.rows dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.cardLink {
+  display: block;
+  margin-top: 14px;
+  border-top: 1px solid var(--fm-line-row);
+  padding-top: 12px;
+  color: var(--fm-accent) !important;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* This week: a white card of key/value rows. */
+.rows {
+  margin: 0;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 2px 16px;
+}
+
+.rows div {
+  align-items: center;
+  min-height: 46px;
+  font-size: 14.5px;
+}
+
+.rows div + div {
+  border-top: 1px solid var(--fm-line-row);
+}
+
+.linkAction {
+  color: var(--fm-pending) !important;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Phone: the two columns simply stack. */
+.columns {
+  composes: split from '../components/FamilyScreen.module.css';
+}
+
+.columns,
+.column {
+  display: grid;
+  align-content: start;
+}
+
+.later {
+  margin: 0;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 2px 22px;
+  list-style: none;
+}
+
+.later li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px 0;
+  font-size: 14.5px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.later li + li {
+  border-top: 1px solid var(--fm-line-row);
+}
+
+.laterTime,
+.laterCaregiver {
+  color: var(--fm-muted);
+}
+
+@media (min-width: 900px) {
+  .home > .header {
+    margin-bottom: 26px;
+  }
+
+  /* A lone message keeps the 640px reading width of the single-column tabs, centred under the header. */
+  .home > .empty {
+    width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
+  }
+
+  .eyebrow,
+  .sectionLabel {
+    font-size: 12px !important;
+  }
+
+  .sectionLabel {
+    margin: 26px 0 12px !important;
+  }
+
+  .column > :first-child .sectionLabel,
+  .column > .sectionLabel:first-child {
+    margin-top: 0 !important;
+  }
+
+  .card {
+    padding: 22px;
+  }
+
+  /* Happening now: caregiver and tags on the left, arrived / tasks / close on the right. */
+  article.card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 200px;
+    column-gap: 24px;
+  }
+
+  article.card > * {
+    grid-column: 1 / -1;
+  }
+
+  article.card > .caregiver {
+    grid-column: 1;
+    margin-top: 4px;
+  }
+
+  article.card:not(:has(.facts)) > .caregiver {
+    grid-column: 1 / -1;
+  }
+
+  article.card > .facts {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    display: grid;
+    gap: 10px;
+    margin: 4px 0 0;
+    border-top: 0;
+    border-left: 1px solid var(--fm-line-card);
+    padding-left: 20px;
+  }
+
+  article.card > .facts div {
+    padding: 0;
+  }
+
+  .range {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .service {
+    margin: 12px 0 14px;
+    font-size: 22px;
+    font-weight: 600;
+  }
+
+  .avatar {
+    width: 60px;
+    height: 60px;
+  }
+
+  .name {
+    font-size: 16px;
+  }
+
+  .personMeta {
+    font-size: 13.5px;
+  }
+
+  .tags li {
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+
+  .rows {
+    padding: 2px 20px;
+  }
+}

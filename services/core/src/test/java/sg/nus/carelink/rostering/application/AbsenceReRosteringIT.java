@@ -190,6 +190,26 @@ class AbsenceReRosteringIT {
 		assertThat(jdbc.queryForObject("select caregiver_id from visit where id = ?", Long.class,
 				moved.rescheduledVisitId())).isEqualTo(moved.assignedCaregiverId());
 		assertThat(queries.forFamily(familyUsername, change).rescheduledStart()).isEqualTo(later);
+
+		// Back to step 3 for the new time: a change of its own, with the suggestions filed under the new visit.
+		assertThat(jdbc.queryForObject("select status from roster_change where visit_id = ?", String.class,
+				moved.rescheduledVisitId())).isEqualTo("AWAITING_FAMILY");
+		assertThat(count("select count(*) from rostering_candidate where visit_id = ? and outcome = 'SUGGESTED'",
+				moved.rescheduledVisitId())).isPositive();
+		assertThat(notifications(familyAccount, "ROSTER_CHANGE_OFFERED")).isEqualTo(2);
+	}
+
+	/** Step 1 for a request the caregiver made themselves: every manager hears of it in their inbox. */
+	@Test
+	void aCaregiversOwnRequestReachesTheManagers() {
+		String username = jdbc.queryForObject("select u.username from app_user u join caregiver c on c.user_id = u.id"
+				+ " where c.id = ?", String.class, siti);
+
+		AbsenceReport asked = absences.requestForSelf(username, AbsenceReport.Type.ANNUAL, TOMORROW.plusDays(3),
+				TOMORROW.plusDays(3), "family trip");
+
+		assertThat(count("select count(*) from notification where recipient_user_id = ? and event_type = 'ABSENCE_REQUESTED'"
+				+ " and resource_type = 'ABSENCE' and resource_id = ?", manager, asked.id())).isEqualTo(1);
 	}
 
 	// ------------------------------------------------------------------ the institution ---

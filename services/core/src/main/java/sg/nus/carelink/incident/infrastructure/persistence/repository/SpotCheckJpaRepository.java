@@ -17,6 +17,8 @@ public interface SpotCheckJpaRepository extends JpaRepository<SpotCheckJpaEntity
 
 	List<SpotCheckJpaEntity> findByCaregiverIdOrderByProposedTimeDescIdDesc(Long caregiverId);
 
+	List<SpotCheckJpaEntity> findByApprovalStatusAndOutcomeIsNull(SpotCheckJpaEntity.ApprovalStatus approvalStatus);
+
 	List<SpotCheckJpaEntity> findByOutcomeAndCheckedAtGreaterThanEqual(SpotCheckJpaEntity.Outcome outcome,
 			LocalDateTime since);
 }

@@ -97,6 +97,8 @@ export type ChangeView = {
   rosteringRunId: number | null
   objective: RosteringObjective | 'COST' | null
   candidates: CandidateView[]
+  /** Whether the manager may hand-pick who takes it: nobody was found, or the replacement was not the family's choice. */
+  managerMayAssign: boolean
 }
 
 export type AbsenceCase = {

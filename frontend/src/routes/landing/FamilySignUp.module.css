@@ -1,0 +1,68 @@
+/*
+ * The pieces the family sign-up page adds to the landing page's design language. Colours come
+ * from the local tokens Landing.module.css declares on .page, which this page also renders.
+ */
+
+.wordmarkLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.intro {
+  padding: 64px 56px 56px;
+  max-width: 520px;
+}
+
+.steps {
+  margin: 36px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  column-gap: 14px;
+  row-gap: 4px;
+}
+
+.steps li::before {
+  content: counter(step);
+  grid-row: span 2;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font: 600 14px/1 'IBM Plex Mono', monospace;
+}
+
+.stepTitle {
+  font: 600 15px/1.3 'Instrument Sans', sans-serif;
+  color: var(--ink);
+  align-self: end;
+}
+
+.stepText {
+  font: 400 12.5px/1.5 'IBM Plex Mono', monospace;
+  color: var(--muted);
+}
+
+.fieldError {
+  margin: 6px 0 0;
+  font: 400 12.5px/1.4 'Instrument Sans', sans-serif;
+  color: var(--danger-text);
+}
+
+@media (max-width: 860px) {
+  .intro {
+    padding: 32px 16px 24px;
+  }
+}

@@ -30,7 +30,8 @@ public record ReportContent(
 		ReportContent.GeneratedBy generatedBy) {
 
 	private static final Set<String> FAMILY_SECTION_TITLES = Set.of(
-			"Service completion", "Vital signs", "Observations", "Incidents");
+			"Overview", "Services", "Service completion", "Vital signs", "Observations", "Incidents",
+			"Ratings and spot checks");
 
 	public ReportContent {
 		sections = List.copyOf(Objects.requireNonNull(sections, "sections"));

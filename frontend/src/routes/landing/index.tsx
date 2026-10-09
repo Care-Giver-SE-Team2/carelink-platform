@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import caregiverImage from '../../assets/Caregiver.png'
 import { signInWithSession } from '../../features/auth/api'
+import { homePathFor } from '../../features/auth/roles'
 import { ApiError } from '../../shared/api/client'
 import { IconCalendar, IconClock, IconDocCheck, IconHeart, IconUsers } from './icons'
 import styles from './Landing.module.css'
@@ -57,23 +58,9 @@ export default function LandingHome() {
         password,
       })
 
-      if (user.roles.includes('ELDER')) {
-        navigate('/elder')
-        return
-      }
-
-      if (user.roles.includes('FAMILY')) {
-        navigate('/family')
-        return
-      }
-
-      if (user.roles.includes('CAREGIVER')) {
-        navigate('/caregiver')
-        return
-      }
-
-      if (user.roles.includes('MANAGER')) {
-        navigate('/manager')
+      const home = homePathFor(user.roles)
+      if (home) {
+        navigate(home)
         return
       }
 
@@ -339,7 +326,7 @@ export default function LandingHome() {
             </div>
 
             <Link
-              to="/family"
+              to="/apply"
               className={styles.applyCard}
             >
               <div className={styles.applyCardRow}>
@@ -356,6 +343,13 @@ export default function LandingHome() {
                 Takes about ten minutes. A care manager replies
                 within two working days.
               </div>
+            </Link>
+            <Link to="/elder/register" className={styles.applyCard}>
+              <div className={styles.applyCardRow}>
+                <span className={styles.applyCardLabel}>Register as an elder</span>
+                <span className={styles.applyCardArrow}>→</span>
+              </div>
+              <div className={styles.applyCardCaption}>Create a login with a username and password.</div>
             </Link>
           </div>
         </form>

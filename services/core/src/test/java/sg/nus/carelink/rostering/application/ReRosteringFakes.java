@@ -22,6 +22,7 @@ import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidate;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidateCheck;
 import sg.nus.carelink.rostering.domain.model.RosteringConstraint;
+import sg.nus.carelink.rostering.domain.repository.AbsenceAlert;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
 import sg.nus.carelink.rostering.domain.repository.RosterAudit;
 import sg.nus.carelink.rostering.domain.repository.RosterChangeAlert;
@@ -361,6 +362,11 @@ final class ReRosteringFakes {
 				throw new AccessDeniedException("A readable elder binding is required");
 			}
 		}
+
+		@Override
+		public void requireWritableElder(String username, Long elderId) {
+			requireReadableElder(username, elderId);
+		}
 	}
 
 	static final class Alerts implements RosterChangeAlert {
@@ -386,6 +392,27 @@ final class ReRosteringFakes {
 		private void record(String what, RosterChange change, Notice notice) {
 			sent.add(what + " visit " + change.visitId());
 			notices.add(notice);
+		}
+	}
+
+	/** Records each absence notice as "name absenceId", plus what the nightly run did with added visits. */
+	static final class AbsenceAlerts implements AbsenceAlert {
+
+		final List<String> told;
+
+		AbsenceAlerts(List<String> told) {
+			this.told = told;
+		}
+
+		@Override
+		public void requested(AbsenceReport absence, String caregiverName) {
+			told.add(caregiverName + " " + absence.id());
+		}
+
+		@Override
+		public void visitsRerostered(AbsenceReport absence, String caregiverName, Rerostered what) {
+			told.add("%s %d offered %d, settled %d, uncovered %d".formatted(caregiverName, absence.id(), what.offered(),
+					what.settled(), what.uncovered()));
 		}
 	}
 

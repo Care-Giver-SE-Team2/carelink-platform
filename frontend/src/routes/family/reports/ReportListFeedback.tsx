@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { Link, Navigate } from 'react-router-dom'
 import { ApiError } from '../../../shared/api/client'
-import { FamilySignIn } from '../components/FamilySignIn'
 import styles from './FamilyReports.module.css'
 
 /**
@@ -12,11 +11,9 @@ export function ReportListFeedback({ error, onRetry, onResetAccess }: {
   onRetry: () => void
   onResetAccess: () => void
 }) {
-  const [signIn, setSignIn] = useState(false)
   const status = error instanceof ApiError ? error.status : undefined
-  if (status === 401 || signIn) {
-    return <FamilySignIn onSignedIn={onResetAccess} description="Sign in with your family account to view your loved one's care reports." />
-  }
+  // The landing page is the only sign-in screen.
+  if (status === 401) return <Navigate to="/" replace />
   const forbidden = status === 403
   return (
     <section className={styles.state} role="alert">
@@ -27,7 +24,7 @@ export function ReportListFeedback({ error, onRetry, onResetAccess }: {
       <button onClick={forbidden ? onResetAccess : onRetry}>
         {forbidden ? 'Reload available elders' : 'Try again'}
       </button>
-      {forbidden && <button onClick={() => setSignIn(true)}>Sign in with another account</button>}
+      {forbidden && <Link to="/">Sign in with another account</Link>}
     </section>
   )
 }

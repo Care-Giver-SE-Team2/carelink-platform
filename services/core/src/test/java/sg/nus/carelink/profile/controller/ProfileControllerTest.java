@@ -18,17 +18,40 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import sg.nus.carelink.profile.application.ElderFamilyContact;
+import sg.nus.carelink.profile.application.ElderFamilyContactService;
 import sg.nus.carelink.profile.application.ElderSummary;
 import sg.nus.carelink.profile.application.FamilyElderQueryService;
 import sg.nus.carelink.profile.application.ProfileService;
 import sg.nus.carelink.profile.domain.model.Elder;
+import sg.nus.carelink.profile.domain.model.ElderFamilyBinding;
 
 /** HTTP surface only: status codes for found and not found. Security is tested at the filter-chain level. */
 class ProfileControllerTest {
 
 	private final ProfileService service = mock(ProfileService.class);
 	private final FamilyElderQueryService familyElders = mock(FamilyElderQueryService.class);
-	private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ProfileController(service, familyElders)).build();
+	private final ElderFamilyContactService familyContacts = mock(ElderFamilyContactService.class);
+	private final MockMvc mvc = MockMvcBuilders
+			.standaloneSetup(new ProfileController(service, familyElders, familyContacts)).build();
+
+	@Test
+	void returnsTheEldersFamily() throws Exception {
+		when(familyContacts.listForElder(1L)).thenReturn(Optional.of(List.of(
+				new ElderFamilyContact("Wei Ling", ElderFamilyBinding.Relationship.DAUGHTER, true))));
+
+		mvc.perform(get("/api/elders/1/family"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[{"fullName":"Wei Ling","relationship":"DAUGHTER","primaryContact":true}]"""));
+	}
+
+	@Test
+	void returns404ForTheFamilyOfAnUnknownElder() throws Exception {
+		when(familyContacts.listForElder(2L)).thenReturn(Optional.empty());
+
+		mvc.perform(get("/api/elders/2/family")).andExpect(status().isNotFound());
+	}
 
 	@Test
 	void returns200WithTheRecord() throws Exception {

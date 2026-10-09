@@ -50,8 +50,8 @@ class InMemoryReportRepository implements ReportRepository {
 		if (report.id() != null) {
 			throw new IllegalArgumentException("reports are stored once");
 		}
-		Report stored = new Report(nextId++, report.elderId(), report.generatedByUserId(), report.audience(),
-				report.period(), report.status(), report.content(), List.of(), report.createdAt());
+		Report stored = new Report(nextId++, report.elderId(), report.basisId(), report.generatedByUserId(),
+				report.audience(), report.period(), report.status(), report.content(), List.of(), report.createdAt());
 		rows.put(stored.id(), stored);
 		return stored;
 	}
@@ -67,8 +67,8 @@ class InMemoryReportRepository implements ReportRepository {
 
 	@Override
 	public ReportAmendment saveAmendment(ReportAmendment amendment) {
-		ReportAmendment stored = new ReportAmendment(nextAmendmentId++, amendment.reportId(), amendment.note(),
-				amendment.authorUserId(), amendment.createdAt());
+		ReportAmendment stored = new ReportAmendment(nextAmendmentId++, amendment.reportId(), amendment.kind(),
+				amendment.note(), amendment.authorUserId(), amendment.createdAt());
 		amendments.add(stored);
 		return stored;
 	}
@@ -120,7 +120,7 @@ class InMemoryReportRepository implements ReportRepository {
 		List<ReportAmendment> own = amendments.stream()
 				.filter(amendment -> Objects.equals(amendment.reportId(), report.id()))
 				.toList();
-		return new Report(report.id(), report.elderId(), report.generatedByUserId(), report.audience(),
-				report.period(), report.status(), report.content(), own, report.createdAt());
+		return new Report(report.id(), report.elderId(), report.basisId(), report.generatedByUserId(),
+				report.audience(), report.period(), report.status(), report.content(), own, report.createdAt());
 	}
 }

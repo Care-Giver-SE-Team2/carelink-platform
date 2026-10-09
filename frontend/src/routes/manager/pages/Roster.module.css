@@ -9,6 +9,10 @@
   white-space: nowrap;
 }
 
+.search {
+  width: 240px;
+}
+
 .dayPagination {
   padding: 12px 20px 20px;
 }

@@ -62,6 +62,7 @@ const awaiting: AbsenceCase = {
       incidentId: null,
       rosteringRunId: 1,
       objective: 'CONTINUITY',
+      managerMayAssign: false,
       candidates: [
         {
           caregiverId: 9,
@@ -106,6 +107,7 @@ const awaiting: AbsenceCase = {
       incidentId: 900,
       rosteringRunId: 1,
       objective: 'CONTINUITY',
+      managerMayAssign: false,
       candidates: [],
     },
   ],
@@ -183,6 +185,39 @@ it('shows the server sentence when coverage cannot be confirmed yet', async () =
   await userEvent.click(screen.getByRole('button', { name: 'Confirm coverage' }))
 
   expect(await screen.findByRole('alert')).toHaveTextContent('The request could not be completed')
+})
+
+it('lets the manager hand-pick over the default plan, and only where they may', async () => {
+  const settled: AbsenceCase = {
+    ...awaiting,
+    changes: [
+      {
+        ...awaiting.changes[0],
+        status: 'RESOLVED',
+        outcome: 'REPLACED',
+        decidedBy: 'DEFAULT_PLAN',
+        assignedCaregiver: { caregiverId: 9, name: 'Farah' },
+        managerMayAssign: true,
+        candidates: [
+          { ...awaiting.changes[0].candidates[0], outcome: 'SELECTED' },
+          { ...awaiting.changes[0].candidates[0], caregiverId: 10, name: 'Siti', rank: 2 },
+          awaiting.changes[0].candidates[1],
+        ],
+      },
+      awaiting.changes[1],
+    ],
+  }
+  vi.spyOn(absencesApi, 'getAbsence').mockResolvedValue(settled)
+  const assign = vi.spyOn(absencesApi, 'assignCaregiver').mockResolvedValue(settled)
+
+  renderAt('/manager/absences/4')
+  await screen.findByRole('heading', { name: 'Aisha — 8 Oct' })
+
+  expect(screen.getAllByRole('button', { name: /^Assign / })).toHaveLength(1)
+  expect(screen.queryByRole('button', { name: 'Assign Farah' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Assign Aisha' })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Assign Siti' }))
+  expect(assign).toHaveBeenCalledWith(4, 100, 10)
 })
 
 it('lists absences and approves one a caregiver asked for', async () => {

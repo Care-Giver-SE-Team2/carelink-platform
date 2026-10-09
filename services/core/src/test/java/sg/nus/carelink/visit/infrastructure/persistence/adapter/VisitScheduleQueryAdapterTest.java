@@ -143,6 +143,15 @@ class VisitScheduleQueryAdapterTest {
 		verify(jpa).existsByElderIdInAndCaregiverId(READABLE_ELDERS, 201L);
 	}
 
+	@Test
+	void listsDistinctCaregiversThatHaveVisitedTheElder() {
+		when(jpa.findDistinctCaregiverIdsByElderId(101L)).thenReturn(List.of(201L, 202L));
+
+		assertThat(adapter.caregiverIdsForElder(101L)).containsExactly(201L, 202L);
+
+		verify(jpa).findDistinctCaregiverIdsByElderId(101L);
+	}
+
 	private static VisitScheduleFilter filter(int page, int size) {
 		return new VisitScheduleFilter(null, null, FIRST_DATE, LAST_DATE, null, page, size);
 	}

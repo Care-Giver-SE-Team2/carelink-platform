@@ -22,6 +22,53 @@ export type ReportStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 /** TEMPLATE until a language-model summary exists; it is not a failure. */
 export type ReportGeneratedBy = 'MODEL' | 'TEMPLATE'
 
+/** A correction says the report was wrong; a follow-up records what was done about something in it. */
+export type ReportAmendmentKind = 'CORRECTION' | 'FOLLOW_UP'
+
+/**
+ * The numbers of the basis a report was filed from: the same for the three
+ * readers' versions of one elder's period. A rate or an average with nothing
+ * to be taken over is null, not zero.
+ */
+export interface ReportMetrics {
+  visitsPlanned: number
+  visitsCompleted: number
+  fulfilmentRate: number | null
+  vitalsOutOfRange: number
+  incidentCount: number
+  averageElderRating: number | null
+  ratingCount: number
+  dataComplete: boolean
+}
+
+/** One number a section states: "2 of 3", "66.67 %", "3.5 of 5". */
+export interface ReportFigure {
+  key: string
+  label: string
+  value: number
+  outOf: number | null
+  unit: string | null
+}
+
+/**
+ * One point of a series: a reading (`low === high`, `at` a date and time) or,
+ * in the family's version, a day's lowest and highest (`at` a date).
+ */
+export interface ReportPoint {
+  at: string
+  low: number
+  high: number
+  flagged: boolean
+}
+
+/** One measured metric over the period, oldest point first. */
+export interface ReportSeries {
+  key: string
+  label: string
+  unit: string | null
+  points: ReportPoint[]
+}
+
 /** One filed report, without its text - a row of the list, or what Generate hands back. */
 export interface Report {
   id: number
@@ -35,20 +82,32 @@ export interface Report {
   generatedBy: ReportGeneratedBy
   createdAt: string | null
   archivedAt: string | null
+  /** The basis the report was filed from; absent or null for one filed before bases were kept. */
+  basisId?: number | null
+  /** That basis's numbers, on the manager's list and detail. */
+  metrics?: ReportMetrics | null
 }
 
-/** One titled section. The body is plain text, one item per line. */
+/**
+ * One titled section. The body is plain text, one item per line; reports since V19 also carry the section's key, the numbers it states and the series it
+ * summarises.
+ */
 export interface ReportSection {
   title: string
   body: string
+  key?: string
+  figures?: ReportFigure[]
+  series?: ReportSeries[]
 }
 
-/** A correction appended to a report: dated, signed, never edited afterwards. */
+/** A note appended to a report: dated, signed, never edited afterwards. */
 export interface ReportAmendment {
   id: number
   note: string
   authorUserId: number
   createdAt: string
+  /** CORRECTION when absent: every note was one before follow-ups existed. */
+  kind?: ReportAmendmentKind
 }
 
 /** One report with its text, its disclaimer if its reader gets one, and every correction. */

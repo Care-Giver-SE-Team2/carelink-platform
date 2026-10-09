@@ -123,6 +123,48 @@ class RosterChangeTest {
 	}
 
 	@Test
+	void theNightlyRunMayTakeUpAnUncoveredVisitAsTheDefaultPlan() {
+		RosterChange uncovered = saved(RosterChange.uncovered(12L, SLOT, 2L, 77L, NOW));
+
+		RosterChange settled = uncovered.replacedBy(9L, 4L, RosterChange.DecidedBy.DEFAULT_PLAN, null, "found", NOW);
+
+		assertThat(settled.decidedBy()).isEqualTo(RosterChange.DecidedBy.DEFAULT_PLAN);
+		assertThat(settled.decidedByUserId()).isNull();
+	}
+
+	@Test
+	void aManagerMayRedoTheInstitutionsPickButNeverTheFamilys() {
+		RosterChange byDefault = offered().replacedBy(9L, 3L, RosterChange.DecidedBy.DEFAULT_PLAN, null, "no answer", NOW);
+		RosterChange byFamily = offered().replacedBy(9L, 3L, RosterChange.DecidedBy.FAMILY, 41L, "kept", NOW);
+		RosterChange skipped = offered().skipped(41L, "skip", NOW);
+
+		assertThat(offered().managerMayAssign()).isFalse();
+		assertThat(saved(RosterChange.uncovered(12L, SLOT, 2L, 77L, NOW)).managerMayAssign()).isTrue();
+		assertThat(byDefault.managerMayAssign()).isTrue();
+		assertThat(byFamily.managerMayAssign()).isFalse();
+		assertThat(skipped.managerMayAssign()).isFalse();
+
+		RosterChange byManager = byDefault.replacedBy(10L, 4L, RosterChange.DecidedBy.MANAGER, 11L, "picked", NOW);
+		assertThat(byManager.assignedCaregiverId()).isEqualTo(10L);
+		assertThat(byManager.decidedBy()).isEqualTo(RosterChange.DecidedBy.MANAGER);
+		assertThat(byManager.managerMayAssign()).as("a manager may change their own pick").isTrue();
+
+		assertThatThrownBy(() -> byManager.replacedBy(10L, 5L, RosterChange.DecidedBy.MANAGER, 11L, "same", NOW))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting("code").isEqualTo("ALREADY_ASSIGNED");
+		assertThatThrownBy(() -> byFamily.replacedBy(10L, 4L, RosterChange.DecidedBy.MANAGER, 11L, "over", NOW))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting("code").isEqualTo("ROSTER_CHANGE_NOT_OPEN");
+		RosterChange stillOffered = offered();
+		assertThatThrownBy(() -> stillOffered.requireManagerMayAssign(10L))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting("code").isEqualTo("FAMILY_STILL_DECIDING");
+		assertThatThrownBy(() -> byDefault.replacedBy(10L, 4L, RosterChange.DecidedBy.DEFAULT_PLAN, null, "x", NOW))
+				.as("only a manager may redo a settled change")
+				.isInstanceOf(BusinessRuleViolation.class);
+	}
+
+	@Test
 	void anOfferWhoseReplacementVanishedBecomesUncovered() {
 		RosterChange uncovered = offered().leftUncovered(78L, 5L, "nobody free any more", NOW);
 

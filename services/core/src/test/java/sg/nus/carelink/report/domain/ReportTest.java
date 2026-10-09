@@ -136,7 +136,8 @@ class ReportTest {
 				.filter(method -> Modifier.isPublic(method.getModifiers()))
 				.filter(method -> !Modifier.isStatic(method.getModifiers()))
 				.filter(method -> method.getReturnType().equals(Report.class))
-				.map(Method::getName))
+				.map(Method::getName)
+				.distinct())
 				.containsExactly("amend");
 		assertThat(Arrays.stream(Report.class.getDeclaredMethods()).map(Method::getName))
 				.noneMatch(name -> name.startsWith("set") || name.startsWith("delete") || name.startsWith("remove"));
@@ -154,5 +155,35 @@ class ReportTest {
 				.isInstanceOf(NullPointerException.class);
 		assertThat(new Report(1L, 1L, 7L, Report.Audience.FAMILY, ReportFixtures.WEEK,
 				Report.Status.PUBLISHED, content, null, LATER).amendments()).isEmpty();
+	}
+
+	@Test
+	void aFollowUpIsAppendedLikeACorrectionAndSaysWhatItIs() {
+		Report filed = ReportFixtures.stored(40L, Report.Audience.FAMILY);
+
+		Report followedUp = filed.amend(ReportAmendment.Kind.FOLLOW_UP, " Grab bar fitted. ", 9L, LATER);
+
+		assertThat(followedUp.amendments()).singleElement().satisfies(note -> {
+			assertThat(note.kind()).isEqualTo(ReportAmendment.Kind.FOLLOW_UP);
+			assertThat(note.note()).isEqualTo("Grab bar fitted.");
+		});
+		assertThat(followedUp.content()).isEqualTo(filed.content());
+		assertThatThrownBy(() -> filed.amend(ReportAmendment.Kind.FOLLOW_UP, " ", 9L, LATER))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.hasMessageContaining("what was done");
+		assertThatThrownBy(() -> filed.amend(null, "note", 9L, LATER)).isInstanceOf(NullPointerException.class);
+	}
+
+	@Test
+	void aReportKeepsTheBasisItWasFiledFromThroughEveryNote() {
+		Report filed = Report.generate(ReportFixtures.ELDER, 8L, Report.Audience.REGULATOR, ReportFixtures.WEEK,
+				ReportFixtures.content(), 7L, LATER);
+		Report stored = new Report(40L, filed.elderId(), filed.basisId(), filed.generatedByUserId(), filed.audience(),
+				filed.period(), filed.status(), filed.content(), filed.amendments(), filed.createdAt());
+
+		assertThat(filed.basisId()).isEqualTo(8L);
+		assertThat(stored.amend("note", 9L, LATER).basisId()).isEqualTo(8L);
+		assertThat(ReportFixtures.stored(41L, Report.Audience.FAMILY).basisId())
+				.as("a report filed before bases were kept").isNull();
 	}
 }

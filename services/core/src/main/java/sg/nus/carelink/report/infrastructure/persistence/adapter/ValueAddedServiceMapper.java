@@ -17,6 +17,7 @@ final class ValueAddedServiceMapper {
 				e.getId(),
 				e.getName(),
 				e.getDescription(),
+				e.getDurationMinutes() == null ? ValueAddedService.DEFAULT_DURATION_MINUTES : e.getDurationMinutes(),
 				e.getStatus() == null ? null : ValueAddedService.Status.valueOf(e.getStatus().name()),
 				e.getCreatedAt(),
 				e.getUpdatedAt());
@@ -27,6 +28,7 @@ final class ValueAddedServiceMapper {
 		e.setId(d.id());
 		e.setName(d.name());
 		e.setDescription(d.description());
+		e.setDurationMinutes(d.durationMinutes());
 		e.setStatus(d.status() == null ? null : ValueAddedServiceJpaEntity.Status.valueOf(d.status().name()));
 		return e;
 	}

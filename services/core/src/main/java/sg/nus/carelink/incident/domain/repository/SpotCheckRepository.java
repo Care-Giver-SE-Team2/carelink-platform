@@ -29,4 +29,7 @@ public interface SpotCheckRepository {
 
 	/** Spot checks concluded on site since then: what rostering weighs. */
 	List<SpotCheck> findConcludedSince(LocalDateTime since);
+
+	/** Requests the family has not answered yet: still open, still waiting for consent. */
+	List<SpotCheck> findAwaitingConsent();
 }

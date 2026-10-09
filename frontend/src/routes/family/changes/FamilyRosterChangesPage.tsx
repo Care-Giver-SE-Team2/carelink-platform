@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { Navigate } from 'react-router-dom'
 
 import { decideChange } from '../../../features/absences/api'
 import { settledLine, visitTime } from '../../../features/absences/presentation'
 import type { FamilyChange, FamilyDecision } from '../../../features/absences/types'
 import { useFamilyChanges, useRefreshAbsences } from '../../../features/absences/useAbsenceQueries'
 import { problemDetail } from '../../../features/incidents/presentation'
+import { ApiError } from '../../../shared/api/client'
 import styles from './FamilyRosterChanges.module.css'
 
 /**
@@ -21,20 +23,26 @@ export function FamilyRosterChangesPage() {
   const waiting = (data ?? []).filter((change) => change.status === 'AWAITING_FAMILY')
   const others = (data ?? []).filter((change) => change.status !== 'AWAITING_FAMILY')
 
-  return (
-    <div className={styles.changes}>
-      <section className={styles.hero}>
-        <p className={styles.eyebrow}>YOUR FAMILY'S CARE</p>
-        <h1>Visit changes</h1>
-        <p>
-          When a caregiver is away, we suggest who comes instead. Choose before the time shown;
-          if we have not heard from you by then, the suggested caregiver will come.
-        </p>
-      </section>
+  // The landing page is the only sign-in screen.
+  if (error instanceof ApiError && error.status === 401) return <Navigate to="/" replace />
 
-      {isPending && <p className={styles.state} role="status">Loading changes…</p>}
+  return (
+    <div className={styles.page}>
+      <header className={styles.hero}>
+        <p className={styles.eyebrow}>Your family's care</p>
+        <h1>Visit changes</h1>
+        <p className={styles.meta}>When a caregiver is away, we suggest who comes instead.</p>
+      </header>
+
+      {isPending && (
+        <div className={`${styles.state} ${styles.loading}`} role="status">
+          <span className={styles.spinner} aria-hidden="true" />
+          Loading changes…
+        </div>
+      )}
       {error && (
         <section className={styles.state} role="alert">
+          <h2>Unable to load visit changes</h2>
           <p>{problemDetail(error)}</p>
           <button type="button" onClick={() => refetch()}>Try again</button>
         </section>
@@ -46,31 +54,40 @@ export function FamilyRosterChangesPage() {
         </section>
       )}
 
-      {waiting.length > 0 && (
-        <section aria-label="Waiting for your answer">
-          <h2 className={styles.heading}>Waiting for your answer</h2>
-          {waiting.map((change) => (
-            <PendingChange key={change.id} change={change} />
-          ))}
-        </section>
-      )}
+      {data && data.length > 0 && (
+        // Desktop: what needs an answer on the left, what is settled on the right; stacked on a phone.
+        <div className={styles.split}>
+          <section className={styles.column} aria-label="Waiting for your answer">
+            <h2 className={styles.label}>Waiting for your answer</h2>
+            {waiting.length > 0 ? <>
+              <p className={styles.note}>
+                Choose before the time shown; if we have not heard from you by then, the suggested caregiver will come.
+              </p>
+              {waiting.map((change) => (
+                <PendingChange key={change.id} change={change} />
+              ))}
+            </> : <p className={styles.caughtUp}>Every change to your visits has been answered.</p>}
+          </section>
 
-      {others.length > 0 && (
-        <section aria-label="Earlier changes">
-          <h2 className={styles.heading}>Earlier changes</h2>
-          <ul className={styles.history}>
-            {others.map((change) => (
-              <li key={change.id}>
-                <strong>{visitTime(change.visitStart)}</strong> · {change.elderName}
-                <span>
-                  {change.status === 'UNCOVERED'
-                    ? 'We are still finding a caregiver; a manager is handling it.'
-                    : settledLine(change)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+          {others.length > 0 && (
+            <section className={styles.column} aria-label="Earlier changes">
+              <h2 className={styles.label}>Earlier changes</h2>
+              <ul className={styles.list}>
+                {others.map((change) => (
+                  <li key={change.id}>
+                    <p className={styles.rowTitle}>{visitTime(change.visitStart)}</p>
+                    <p className={styles.rowSub}>
+                      {change.elderName} ·{' '}
+                      {change.status === 'UNCOVERED'
+                        ? 'We are still finding a caregiver; a manager is handling it.'
+                        : settledLine(change)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
     </div>
   )
@@ -110,10 +127,11 @@ function PendingChange({ change }: { change: FamilyChange }) {
 
   return (
     <article className={styles.card} aria-label={`Change to the visit on ${visitTime(change.visitStart)}`}>
-      <p className={styles.when}>
-        {visitTime(change.visitStart)} · {change.elderName}
-      </p>
-      <p>
+      <div>
+        <p className={styles.rowTitle}>{visitTime(change.visitStart)}</p>
+        <p className={styles.rowSub}>{change.elderName}</p>
+      </div>
+      <p className={styles.body}>
         {change.usualCaregiverName} is away for this visit.
         {suggested ? ` We suggest ${suggested.name}${suggested.reason ? ` (${suggested.reason.toLowerCase()})` : ''}.` : ''}
       </p>
@@ -121,29 +139,31 @@ function PendingChange({ change }: { change: FamilyChange }) {
 
       <form onSubmit={keep} className={styles.block}>
         <fieldset>
-          <legend>Who should come</legend>
-          {change.options.map((option) => (
-            <label key={option.caregiverId} className={styles.option}>
-              <input
-                type="radio"
-                name={`caregiver-${change.id}`}
-                checked={caregiverId === option.caregiverId}
-                onChange={() => setCaregiverId(option.caregiverId)}
-              />
-              <span>
-                <strong>{option.name}</strong>
-                {option.reason && <small>{option.reason}</small>}
-              </span>
-            </label>
-          ))}
+          <legend className={styles.fieldLabel}>Who should come</legend>
+          <div className={styles.options}>
+            {change.options.map((option) => (
+              <label key={option.caregiverId} className={styles.option}>
+                <input
+                  type="radio"
+                  name={`caregiver-${change.id}`}
+                  checked={caregiverId === option.caregiverId}
+                  onChange={() => setCaregiverId(option.caregiverId)}
+                />
+                <span>
+                  <strong>{option.name}</strong>
+                  {option.reason && <small>{option.reason}</small>}
+                </span>
+              </label>
+            ))}
+          </div>
         </fieldset>
-        <button type="submit" disabled={sending || caregiverId === null}>
+        <button type="submit" className={styles.primary} disabled={sending || caregiverId === null}>
           Confirm caregiver
         </button>
       </form>
 
       <form onSubmit={move} className={styles.block}>
-        <label htmlFor={`move-${change.id}`}>Or move the visit to</label>
+        <label className={styles.fieldLabel} htmlFor={`move-${change.id}`}>Or move the visit to</label>
         <div className={styles.inline}>
           <input
             id={`move-${change.id}`}

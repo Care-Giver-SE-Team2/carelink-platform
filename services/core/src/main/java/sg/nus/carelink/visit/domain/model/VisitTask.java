@@ -24,4 +24,13 @@ public record VisitTask(
 	public enum Status {
 		PENDING, DONE, SKIPPED, REFUSED
 	}
+
+    public VisitTask result(Status result, String outcome, String note, LocalDateTime now) {
+        if (status != Status.PENDING || result == null || result == Status.PENDING) throw new sg.nus.carelink.shared.error.BusinessRuleViolation("TASK_RESULT_NOT_ALLOWED", "Task cannot be changed.");
+        String cleanOutcome = outcome == null ? null : outcome.strip();
+        String cleanNote = note == null ? null : note.strip();
+        if (result != Status.DONE && (cleanNote == null || cleanNote.isEmpty())) throw new sg.nus.carelink.shared.error.BusinessRuleViolation("TASK_REASON_REQUIRED", "A reason is required for skipped or refused tasks.");
+        if ((cleanOutcome != null && cleanOutcome.length() > 255) || (cleanNote != null && cleanNote.length() > 500)) throw new sg.nus.carelink.shared.error.BusinessRuleViolation("TASK_TEXT_TOO_LONG", "Task text is too long.");
+        return new VisitTask(id, visitId, carePlanNodeId, name, result, cleanOutcome, cleanNote, result == Status.DONE ? now : null);
+    }
 }

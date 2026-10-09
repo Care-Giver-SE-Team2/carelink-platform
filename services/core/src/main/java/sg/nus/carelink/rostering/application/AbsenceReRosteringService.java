@@ -6,7 +6,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,8 +27,6 @@ import sg.nus.carelink.rostering.domain.model.AbsenceReport;
 import sg.nus.carelink.rostering.domain.model.FamilyResponseWindow;
 import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidate;
-import sg.nus.carelink.rostering.domain.model.RosteringCandidateCheck;
-import sg.nus.carelink.rostering.domain.model.RosteringConstraint;
 import sg.nus.carelink.rostering.domain.model.RosteringRun;
 import sg.nus.carelink.rostering.domain.model.VacatedSlot;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
@@ -42,10 +39,7 @@ import sg.nus.carelink.rostering.domain.repository.RosteringConstraintRepository
 import sg.nus.carelink.rostering.domain.repository.RosteringRunRepository;
 import sg.nus.carelink.rostering.domain.service.Booking;
 import sg.nus.carelink.rostering.domain.service.ReplacementFinder;
-import sg.nus.carelink.rostering.domain.service.ReplacementRule;
-import sg.nus.carelink.rostering.domain.service.ReplacementRules;
 import sg.nus.carelink.rostering.domain.service.RosterSnapshot;
-import sg.nus.carelink.rostering.domain.service.RuleCheck;
 import sg.nus.carelink.rostering.domain.service.ScoringObjective;
 import sg.nus.carelink.rostering.domain.service.Shortlist;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
@@ -79,8 +73,7 @@ public class AbsenceReRosteringService {
 	private final RosterChangeRepository changes;
 	private final RosteringRunRepository runs;
 	private final RosteringCandidateRepository candidates;
-	private final RosteringCandidateCheckRepository checks;
-	private final RosteringConstraintRepository constraints;
+	private final ReplacementSearchRecord search;
 	private final RosterSnapshotLoader snapshots;
 	private final VisitReassignment visits;
 	private final RosteringProfiles profiles;
@@ -103,8 +96,7 @@ public class AbsenceReRosteringService {
 		this.changes = changes;
 		this.runs = runs;
 		this.candidates = candidates;
-		this.checks = checks;
-		this.constraints = constraints;
+		this.search = new ReplacementSearchRecord(constraints, candidates, checks);
 		this.snapshots = snapshots;
 		this.visits = visits;
 		this.profiles = profiles;
@@ -128,6 +120,10 @@ public class AbsenceReRosteringService {
 	 *
 	 * <p>Safe to repeat: a visit already offered or settled is not touched again, which is also
 	 * how visits the nightly roster adds to the absence's days later get picked up.
+	 *
+	 * @param managerUserId null when the nightly run re-rosters, not a manager
+	 *     ({@link AbsenceCoverageService}); an uncovered visit it takes up is then settled by the
+	 *     default plan rather than in a manager's name
 	 */
 	public ReRosterOutcome reroster(Long absenceId, RosteringRun.Objective objective, Long managerUserId) {
 		AbsenceReport absence = requireApproved(absenceId);
@@ -141,7 +137,7 @@ public class AbsenceReRosteringService {
 			return new ReRosterOutcome(absenceId, null, 0, 0, 0, 0);
 		}
 
-		RuleSet rules = ruleSet();
+		ReplacementSearchRecord.RuleSet rules = search.ruleSet();
 		ReplacementFinder finder = new ReplacementFinder(rules.rules(), scoring);
 		RosterSnapshot snapshot = snapshots.load(slots);
 		RosteringRun run = runs.save(RosteringRun.forAbsence(absenceId, finder.objective().objective(),
@@ -153,7 +149,7 @@ public class AbsenceReRosteringService {
 		int continuity = 0;
 		for (VacatedSlot slot : slots) {
 			Shortlist shortlist = finder.shortlist(slot, snapshot);
-			Map<Long, Long> candidateIds = record(run.id(), shortlist, rules);
+			Map<Long, Long> candidateIds = search.record(run.id(), shortlist, rules);
 			RosterChange existing = byVisit.get(slot.visitId());
 			Optional<Shortlist.Verdict> best = shortlist.best();
 
@@ -173,8 +169,12 @@ public class AbsenceReRosteringService {
 				continuity++;
 			}
 			if (existing != null) {
-				replace(existing, slot, best.get(), run.id(), candidateIds, RosterChange.DecidedBy.MANAGER,
-						managerUserId, "A manager re-rostered the uncovered visit once somebody was free");
+				boolean bySystem = managerUserId == null;
+				replace(existing, slot, best.get(), run.id(), candidateIds,
+						bySystem ? RosterChange.DecidedBy.DEFAULT_PLAN : RosterChange.DecidedBy.MANAGER, managerUserId,
+						bySystem
+								? "Somebody became free for the uncovered visit, so the default plan put them on it"
+								: "A manager re-rostered the uncovered visit once somebody was free");
 				settled++;
 				continue;
 			}
@@ -273,6 +273,49 @@ public class AbsenceReRosteringService {
 		return absences.save(absence.coverageConfirmedBy(managerUserId, now()));
 	}
 
+	// ------------------------------------------------------------------ the manager's own pick ---
+
+	/**
+	 * The manager puts a caregiver of their choosing on a vacated visit instead of whoever the
+	 * search ranked first: when nobody was free, or over the institution's own pick, never over
+	 * the family's ({@link RosterChange#managerMayAssign()}). The caregiver must still pass every
+	 * hard rule against the roster as it is now; if not, nothing changes and the manager is told
+	 * which rule stopped them. The family is told who is coming.
+	 */
+	public RosterChange assignByManager(Long absenceId, Long changeId, Long caregiverId, Long managerUserId) {
+		RosterChange change = changes.lock(changeId)
+				.filter(c -> c.absenceId().equals(absenceId))
+				.orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
+		change.requireManagerMayAssign(caregiverId);
+		LocalDateTime now = now();
+		VisitReassignment.VisitSlot visit = visits.find(change.visitId())
+				.filter(v -> "SCHEDULED".equals(v.status()) || "EXCEPTION".equals(v.status()) && v.caregiverId() == null)
+				.filter(v -> v.start().isAfter(now))
+				.orElseThrow(() -> new BusinessRuleViolation("VISIT_NOT_OPEN",
+						"The visit has started, passed or been called off, so it can no longer be reassigned"));
+
+		VacatedSlot slot = toSlot(visit, change.originalCaregiverId());
+		ReplacementSearchRecord.RuleSet rules = search.ruleSet();
+		ReplacementFinder finder = new ReplacementFinder(rules.rules(), ScoringObjective.of(objectiveOf(change)));
+		RosterSnapshot snapshot = snapshots.load(List.of(slot));
+		Shortlist shortlist = finder.shortlist(slot, snapshot);
+		Shortlist.Verdict chosen = shortlist.all().stream()
+				.filter(verdict -> verdict.caregiverId().equals(caregiverId))
+				.findFirst()
+				.orElseThrow(() -> new ResourceNotFound("Caregiver", caregiverId));
+		if (!chosen.isSuggested()) {
+			throw new BusinessRuleViolation("CAREGIVER_CANNOT_TAKE_VISIT",
+					"%s cannot take this visit: %s".formatted(chosen.name(), chosen.reason()));
+		}
+
+		RosteringRun run = runs.save(RosteringRun.forAbsence(change.absenceId(), finder.objective().objective(),
+				managerUserId, now));
+		Map<Long, Long> candidateIds = search.record(run.id(), shortlist, rules);
+		runs.save(run.committed(1, 1, snapshot.elder(slot.elderId()).priorVisitsBy(caregiverId) > 0 ? 1 : 0, now));
+		return replace(change, slot, chosen, run.id(), candidateIds, RosterChange.DecidedBy.MANAGER, managerUserId,
+				"A manager chose %s for the visit".formatted(chosen.name()));
+	}
+
 	// ------------------------------------------------------------------ the family's three options ---
 
 	/** Keep the suggestion, or pick another of the options the family was shown. */
@@ -293,9 +336,12 @@ public class AbsenceReRosteringService {
 	}
 
 	/**
-	 * Alternative 4b: move the visit. The search runs again for the new time - the absent
-	 * caregiver is a candidate again if the new time is after their leave - and the best person
-	 * free then takes it. Nobody free means the family is asked for another time; nothing changes.
+	 * Alternative 4b: move the visit, then back to step 3 for the new time. The search runs again
+	 * for it - the absent caregiver is a candidate again if the new time is after their leave -
+	 * and the visit moves there with the best person free then pencilled in. The family is then
+	 * offered the choice for the new time, under the same window and default plan as the first:
+	 * keep that person, pick another of the suggestions, move it again or skip it. Nobody free
+	 * means the family is asked for another time; nothing changes.
 	 */
 	private RosterChange reschedule(RosterChange change, LocalDateTime newStart, Long familyUserId) {
 		LocalDateTime now = now();
@@ -315,7 +361,7 @@ public class AbsenceReRosteringService {
 							"The elder already has a visit at %s".formatted(other.start().format(WHEN)));
 				});
 
-		RuleSet rules = ruleSet();
+		ReplacementSearchRecord.RuleSet rules = search.ruleSet();
 		ReplacementFinder finder = new ReplacementFinder(rules.rules(), ScoringObjective.of(objectiveOf(change)));
 		Shortlist shortlist = finder.shortlist(moved, snapshot);
 		Shortlist.Verdict best = shortlist.best().orElseThrow(() -> new BusinessRuleViolation("NOBODY_FREE_THEN",
@@ -323,17 +369,38 @@ public class AbsenceReRosteringService {
 
 		RosteringRun run = runs.save(RosteringRun.forAbsence(change.absenceId(), finder.objective().objective(),
 				familyUserId, now));
-		Map<Long, Long> candidateIds = record(run.id(), shortlist, rules);
+		Long newVisitId = visits.moveTo(change.visitId(), newStart, best.caregiverId(),
+				new VisitReassignment.Change(change.absenceId(), familyUserId, null,
+						"Moved at the family's request while the caregiver is absent (absence %d); the family chooses who comes"
+								.formatted(change.absenceId())));
+		search.record(run.id(), newVisitId, shortlist, rules);
 		runs.save(run.committed(1, 1, snapshot.elder(moved.elderId()).priorVisitsBy(best.caregiverId()) > 0 ? 1 : 0, now));
 
-		Long newVisitId = visits.moveTo(change.visitId(), newStart, best.caregiverId(),
-				new VisitReassignment.Change(change.absenceId(), familyUserId, candidateIds.get(best.caregiverId()),
-						"Moved at the family's request while the caregiver is absent (absence " + change.absenceId() + ")"));
-		select(candidateIds.get(best.caregiverId()));
 		RosterChange settled = changes.save(change.rescheduled(newVisitId, best.caregiverId(), run.id(), familyUserId,
 				"Moved to %s at the family's request".formatted(newStart.format(WHEN)), now));
 		alert.settled(settled, notice(settled, best.name(), best.caregiverId(), newStart, null));
+		offerTheNewTime(settled, newVisitId, run.id(), best, now);
 		return settled;
+	}
+
+	/**
+	 * Step 3 again, for the visit at its new time: the family is offered the suggestions the search
+	 * just made, with the pencilled-in person as the default. The offer is a change of its own, on
+	 * the new visit, so it is answered, defaulted and confirmed like every other.
+	 */
+	private void offerTheNewTime(RosterChange moved, Long newVisitId, Long runId, Shortlist.Verdict best,
+			LocalDateTime now) {
+		VacatedSlot slot = toSlot(visits.find(newVisitId).orElseThrow(), moved.originalCaregiverId());
+		Optional<LocalDateTime> respondBy = window.respondBy(now, slot.start());
+		RosterChange offer = changes.save(RosterChange.offered(moved.absenceId(), slot, runId, best.caregiverId(),
+				respondBy.orElse(now), now));
+		if (respondBy.isPresent()) {
+			alert.offered(offer, notice(offer, best.name(), best.caregiverId(), null, null));
+		}
+		else {
+			settleWithRecheck(offer, best.caregiverId(), RosterChange.DecidedBy.DEFAULT_PLAN, null,
+					"The new time is too soon to ask the family again, so the best replacement keeps the visit");
+		}
 	}
 
 	/** Alternative 4c: skip this visit. Called off, recorded as the family's own cancellation. */
@@ -362,14 +429,14 @@ public class AbsenceReRosteringService {
 					.formatted(current.map(v -> v.status().toLowerCase()).orElse("removed")), now()));
 		}
 		VacatedSlot slot = toSlot(current.get(), change.originalCaregiverId());
-		RuleSet rules = ruleSet();
+		ReplacementSearchRecord.RuleSet rules = search.ruleSet();
 		ReplacementFinder finder = new ReplacementFinder(rules.rules(), ScoringObjective.of(objectiveOf(change)));
 		RosterSnapshot snapshot = snapshots.load(List.of(slot));
 		Shortlist shortlist = finder.shortlist(slot, snapshot);
 		LocalDateTime now = now();
 		RosteringRun run = runs.save(RosteringRun.forAbsence(change.absenceId(), finder.objective().objective(),
 				userId, now));
-		Map<Long, Long> candidateIds = record(run.id(), shortlist, rules);
+		Map<Long, Long> candidateIds = search.record(run.id(), shortlist, rules);
 
 		Optional<Shortlist.Verdict> chosen = shortlist.ranked().stream()
 				.filter(verdict -> verdict.caregiverId().equals(wanted))
@@ -394,7 +461,7 @@ public class AbsenceReRosteringService {
 		Long candidateId = candidateIds.get(verdict.caregiverId());
 		visits.reassign(slot.visitId(), verdict.caregiverId(), new VisitReassignment.Change(change.absenceId(), userId,
 				candidateId, "%s (absence %d): %s".formatted(byWhom(by), change.absenceId(), why)));
-		select(candidateId);
+		search.select(candidateId);
 		RosterChange settled = changes.save(change.replacedBy(verdict.caregiverId(), runId, by, userId, why, now()));
 		String forFamily = by == RosterChange.DecidedBy.FAMILY ? null : why;
 		alert.settled(settled, notice(settled, verdict.name(), verdict.caregiverId(), null, forFamily));
@@ -420,54 +487,6 @@ public class AbsenceReRosteringService {
 		RosterChange saved = changes.save(change);
 		alert.coordinating(saved, notice(saved, null, null, null, null));
 		return saved;
-	}
-
-	// ------------------------------------------------------------------ the search's record ---
-
-	/**
-	 * Keeps every candidate the search considered and every rule result behind them, so "why
-	 * was she not suggested" has an answer afterwards.
-	 *
-	 * @return caregiver id to the id of their rostering_candidate row
-	 */
-	private Map<Long, Long> record(Long runId, Shortlist shortlist, RuleSet rules) {
-		Map<Long, Long> ids = new HashMap<>();
-		for (Shortlist.Verdict verdict : shortlist.all()) {
-			RosteringCandidate saved = candidates.save(new RosteringCandidate(null, runId, shortlist.slot().visitId(),
-					verdict.caregiverId(), verdict.rank(), verdict.score(),
-					verdict.isSuggested() ? RosteringCandidate.Outcome.SUGGESTED : RosteringCandidate.Outcome.EXCLUDED,
-					verdict.excludedBy(), verdict.reason()));
-			ids.put(verdict.caregiverId(), saved.id());
-			for (RuleCheck check : verdict.checks()) {
-				Long constraintId = rules.constraintIds().get(check.code());
-				if (constraintId != null) {
-					checks.save(new RosteringCandidateCheck(null, saved.id(), constraintId, check.result(), check.detail()));
-				}
-			}
-		}
-		return ids;
-	}
-
-	private void select(Long candidateId) {
-		if (candidateId != null) {
-			candidates.findById(candidateId).ifPresent(candidate -> candidates.save(candidate.selected()));
-		}
-	}
-
-	/**
-	 * The rules as the table configures them. A table with no rows - a database nobody migrated
-	 * past V11 - falls back to the defaults rather than letting everybody through.
-	 */
-	private RuleSet ruleSet() {
-		List<RosteringConstraint> rows = constraints.findAll();
-		if (rows.isEmpty()) {
-			return new RuleSet(ReplacementRules.defaults(), Map.of());
-		}
-		return new RuleSet(ReplacementRules.from(rows),
-				rows.stream().collect(Collectors.toMap(RosteringConstraint::code, RosteringConstraint::id, (a, b) -> a)));
-	}
-
-	private record RuleSet(List<ReplacementRule> rules, Map<String, Long> constraintIds) {
 	}
 
 	// ------------------------------------------------------------------ helpers ---

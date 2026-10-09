@@ -21,8 +21,10 @@ class CaregiverWorkServiceTest {
     final CaregiverWorkDirectory directory = mock(CaregiverWorkDirectory.class);
     final VisitPlanReader plans = mock(VisitPlanReader.class);
     final AccessAudit audit = mock(AccessAudit.class);
+    final VisitInstructionRepository instructions = mock(VisitInstructionRepository.class);
     final Clock clock = Clock.fixed(Instant.parse("2026-09-23T17:00:00Z"), ZoneOffset.UTC);
-    final CaregiverWorkService service = new CaregiverWorkService(visits,tasks,directory,plans,audit,clock);
+    final CaregiverWorkService service = new CaregiverWorkService(visits,tasks,directory,plans,audit,clock,
+            new VisitExecutionPolicy(Duration.ofMinutes(30),Duration.ofMinutes(10)),mock(VisitCheckInRepository.class),instructions);
     final LocalDate day = LocalDate.of(2026,9,24);
 
     @BeforeEach void profile() {
@@ -119,5 +121,23 @@ class CaregiverWorkServiceTest {
         assertThatThrownBy(() -> service.workPack("a",1L)).isInstanceOf(BusinessRuleViolation.class);
         verify(audit).workPack(20L,1L,"FAILED");
         verify(audit,never()).workPack(20L,1L,"OK");
+    }
+
+    @Test void aStandaloneVisitOffersItsServiceAsTheTaskWithoutReadingAPlan() {
+        var extra = new Visit(1L,3L,2L,null,null,"Hospital escort",day.atTime(9,0),null,
+            null,null,Visit.Status.SCHEDULED,null,null,0,null,null);
+        when(visits.findById(1L)).thenReturn(Optional.of(extra));
+        when(directory.elder(3L)).thenReturn(new CaregiverWorkDirectory.ElderView(3L,"Mei","Address","North",List.of("English"),null,null));
+        when(tasks.findByVisitId(1L)).thenReturn(List.of());
+        when(instructions.find(1L)).thenReturn(Optional.of("Bring the wheelchair"));
+
+        var result = service.workPack("a",1L);
+
+        assertThat(result.serviceInstructions()).containsExactly("Hospital escort","Bring the wheelchair");
+        assertThat(result.carePlanId()).isNull();
+        assertThat(result.execution().blockedReason()).as("only the clock stops it, not a missing plan")
+            .isEqualTo("VISIT_CHECK_IN_WINDOW");
+        verifyNoInteractions(plans);
+        verify(audit).workPack(20L,1L,"OK");
     }
 }

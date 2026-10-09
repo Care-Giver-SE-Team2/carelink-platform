@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,6 +35,7 @@ import sg.nus.carelink.incident.support.InMemoryIncidentLogRepository;
 import sg.nus.carelink.incident.support.InMemoryIncidentRepository;
 import sg.nus.carelink.incident.support.IncidentFixtures;
 import sg.nus.carelink.incident.support.RecordingAlert;
+import sg.nus.carelink.incident.support.RecordingIncidentFamilyEvents;
 import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
 import sg.nus.carelink.profile.application.FamilyAccessQuery;
 import sg.nus.carelink.profile.application.RosteringProfiles;
@@ -65,7 +67,7 @@ class SpotCheckServiceTest {
 	@BeforeEach
 	void setUp() {
 		EscalationService escalation = new EscalationService(incidentRows, timeline,
-				FakeManagerDirectory.with(IncidentFixtures.ALICE, IncidentFixtures.BEN), new RecordingAlert(),
+				FakeManagerDirectory.with(IncidentFixtures.ALICE, IncidentFixtures.BEN), new RecordingAlert(), new RecordingIncidentFamilyEvents(),
 				EscalationPolicy.defaults(), clock);
 		IncidentService incidents = new IncidentService(incidentRows, timeline, escalation, clock);
 		service = new SpotCheckService(checks, lookups, alerts, incidents, new Family(), users, caregivers,
@@ -201,6 +203,26 @@ class SpotCheckServiceTest {
 		assertThat(service.visitsToCheck(7L).get(0).caregiverName()).isEqualTo("Aisha");
 	}
 
+	/** The family's silence is never a yes: a day after the last ask they are asked again, and only them. */
+	@Test
+	void aFamilyThatHasNotAnsweredForADayIsAskedAgain() {
+		Long waiting = service.request(30L, "Routine", 11L).id();
+		Long askedRecently = service.request(31L, "Routine", 11L).id();
+		Long answered = service.request(32L, "Routine", 11L).id();
+		lookups.lastAsked.put(waiting, NOW.minusHours(25));
+		lookups.lastAsked.put(askedRecently, NOW.minusHours(3));
+		lookups.lastAsked.put(answered, NOW.minusDays(2));
+		checks.save(checks.findById(answered).orElseThrow().approvedBy(21L, NOW));
+		alerts.sent.clear();
+
+		List<Long> due = service.dueForReminder(Duration.ofDays(1));
+
+		assertThat(due).containsExactly(waiting);
+		assertThat(service.remind(waiting)).isTrue();
+		assertThat(alerts.sent).containsExactly("reminded 30: Mdm Tan");
+		assertThat(service.remind(answered)).as("an answered request is not asked about again").isFalse();
+	}
+
 	// ------------------------------------------------------------------ fakes ---
 
 	private static final class Checks implements SpotCheckRepository {
@@ -245,6 +267,11 @@ class SpotCheckServiceTest {
 					.filter(c -> c.outcome() == SpotCheck.Outcome.COMPLETED && !c.checkedAt().isBefore(since))
 					.toList();
 		}
+
+		@Override
+		public List<SpotCheck> findAwaitingConsent() {
+			return findAll().stream().filter(c -> c.stage() == SpotCheck.Stage.AWAITING_FAMILY).toList();
+		}
 	}
 
 	private static final class Lookups implements SpotCheckLookups {
@@ -269,6 +296,13 @@ class SpotCheckServiceTest {
 		@Override
 		public Optional<Long> familyMemberIdOf(Long userId) {
 			return Optional.ofNullable(familyMembers.get(userId));
+		}
+
+		final Map<Long, LocalDateTime> lastAsked = new HashMap<>();
+
+		@Override
+		public Optional<LocalDateTime> lastAskedAt(Long checkId) {
+			return Optional.ofNullable(lastAsked.get(checkId));
 		}
 	}
 
@@ -295,6 +329,11 @@ class SpotCheckServiceTest {
 		public void withdrawn(SpotCheck check, Names names) {
 			sent.add("withdrawn " + check.visitId());
 		}
+
+		@Override
+		public void reminded(SpotCheck check, Names names) {
+			sent.add("reminded " + check.visitId() + ": " + names.elderName());
+		}
 	}
 
 	/** Family "alex" is bound to elder 7 only. */
@@ -310,6 +349,11 @@ class SpotCheckServiceTest {
 			if (!readableElderIds(username).contains(elderId)) {
 				throw new AccessDeniedException("A readable elder binding is required");
 			}
+		}
+
+		@Override
+		public void requireWritableElder(String username, Long elderId) {
+			requireReadableElder(username, elderId);
 		}
 	}
 

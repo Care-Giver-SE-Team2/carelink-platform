@@ -20,6 +20,7 @@ import sg.nus.carelink.incident.support.IncidentFixtures;
 import sg.nus.carelink.incident.support.InMemoryIncidentLogRepository;
 import sg.nus.carelink.incident.support.InMemoryIncidentRepository;
 import sg.nus.carelink.incident.support.RecordingAlert;
+import sg.nus.carelink.incident.support.RecordingIncidentFamilyEvents;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 
@@ -34,6 +35,7 @@ class IncidentServiceTest {
 	private final InMemoryIncidentRepository incidents = new InMemoryIncidentRepository();
 	private final InMemoryIncidentLogRepository timeline = new InMemoryIncidentLogRepository();
 	private final RecordingAlert alert = new RecordingAlert();
+	private final RecordingIncidentFamilyEvents familyEvents = new RecordingIncidentFamilyEvents();
 	private final Clock clock = IncidentFixtures.clockAt(IncidentFixtures.RAISED_AT);
 
 	private IncidentService service;
@@ -51,7 +53,7 @@ class IncidentServiceTest {
 
 	private IncidentService buildService(FakeManagerDirectory directory) {
 		EscalationService escalation = new EscalationService(
-				incidents, timeline, directory, alert, EscalationPolicy.defaults(), clock);
+				incidents, timeline, directory, alert, familyEvents, EscalationPolicy.defaults(), clock);
 		return new IncidentService(incidents, timeline, escalation, clock);
 	}
 
@@ -60,7 +62,7 @@ class IncidentServiceTest {
 	// ------------------------------------------------------- telling people ---
 
 	@Test
-	void everybodyWhoCouldActIsToldBeforeTheChainDecidesAnything() {
+	void staffBroadcastAndFamilyFactPrecedeFirstAssignment() {
 		Incident raised = raise();
 
 		assertThat(alert.broadcasts())
@@ -69,6 +71,10 @@ class IncidentServiceTest {
 		assertThat(timeline.actionsFor(raised.id()))
 				.as("the broadcast lands on the timeline before the first assignment")
 				.containsSubsequence("BROADCAST", "ASSIGNED");
+		assertThat(familyEvents.events()).singleElement().satisfies(event -> {
+			assertThat(event.type().name()).isEqualTo("INCIDENT_RAISED");
+			assertThat(event.occurredAt()).isEqualTo(raised.reportedAt().atZone(Incident.CARELINK_ZONE).toOffsetDateTime());
+		});
 	}
 
 	@Test
@@ -86,6 +92,7 @@ class IncidentServiceTest {
 					assertThat(handOver.from()).isEqualTo(IncidentFixtures.ALICE.userId());
 					assertThat(handOver.to()).isEqualTo(IncidentFixtures.BEN.userId());
 				});
+		assertThat(familyEvents.events()).hasSize(1);
 	}
 
 	@Test
@@ -95,7 +102,13 @@ class IncidentServiceTest {
 		Incident raised = raise();
 
 		assertThat(raised.status()).isEqualTo(Incident.Status.UNRESOLVED_ESCALATED);
-		assertThat(alert.exhausted()).containsExactly(raised.id());
+		assertThat(familyEvents.events()).extracting(event -> event.type().name())
+				.containsExactly("INCIDENT_RAISED", "INCIDENT_UNRESOLVED");
+		assertThat(familyEvents.events()).allSatisfy(event -> {
+			assertThat(event.incidentId()).isEqualTo(raised.id());
+			assertThat(event.elderId()).isEqualTo(raised.elderId());
+		});
+		assertThat(familyEvents.events()).extracting(event -> event.eventId()).doesNotHaveDuplicates();
 	}
 
 	// ------------------------------------------------------------- routing ---
@@ -111,16 +124,18 @@ class IncidentServiceTest {
 	}
 
 	/**
-	 * Records the gap rather than papering over it. UC-EL03 belongs to the elder module and
-	 * still stops at "saved"; routing it is one line in that module's own method, and is
-	 * raised there rather than changed from here.
+	 * The most urgent incident of all goes the same way as every other one: on the timeline,
+	 * to a named responder, with the countdown running.
 	 */
 	@Test
-	void anElderSosIsNotRoutedYetAndThatIsTheKnownGap() {
+	void anElderSosIsRoutedLikeEveryOtherIncident() {
 		Incident raised = service.createElderEmergency(7L, 99L, null, null, "Blk 123", "fell");
 
-		assertThat(raised.responderUserId()).isNull();
-		assertThat(raised.respondBy()).isNull();
+		assertThat(raised.responderUserId()).isNotNull();
+		assertThat(raised.respondBy()).isNotNull();
+		assertThat(service.timelineOf(raised.id()).stream().map(IncidentLog::action))
+				.startsWith("REPORTED")
+				.contains("ASSIGNED");
 	}
 
 	@Test

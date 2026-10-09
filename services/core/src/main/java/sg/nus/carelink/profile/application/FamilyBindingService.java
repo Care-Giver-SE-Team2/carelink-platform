@@ -1,6 +1,8 @@
 package sg.nus.carelink.profile.application;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -194,6 +196,32 @@ public class FamilyBindingService {
                                 familyMemberId
                         )
                 );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ElderFamilyBinding> listForFamilyUser(Long familyUserId) {
+        FamilyMember family = familyMembers.findByUserId(familyUserId)
+                .orElseThrow(() -> new ResourceNotFound("Family member for user", familyUserId));
+        return bindings.findByFamilyMemberId(family.id());
+    }
+
+    public ElderFamilyBinding decideForFamilyUser(Long familyUserId, Long bindingId, boolean approve) {
+        FamilyMember family = familyMembers.findByUserId(familyUserId)
+                .orElseThrow(() -> new ResourceNotFound("Family member for user", familyUserId));
+        ElderFamilyBinding binding = bindings.findById(bindingId)
+                .orElseThrow(() -> new ResourceNotFound("Family binding", bindingId));
+        if (!family.id().equals(binding.familyMemberId())) {
+            throw new ResourceNotFound("Family binding", bindingId);
+        }
+        return bindings.save(approve
+                ? binding.confirm(LocalDateTime.now(ZoneId.of("Asia/Singapore")))
+                : binding.reject());
+    }
+
+    @Transactional(readOnly = true)
+    public Elder requireElder(Long elderId) {
+        return elders.findById(elderId)
+                .orElseThrow(() -> new ResourceNotFound("Elder", elderId));
     }
 
     private Elder requireElderByUserId(

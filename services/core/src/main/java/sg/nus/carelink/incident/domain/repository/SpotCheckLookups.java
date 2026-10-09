@@ -22,6 +22,9 @@ public interface SpotCheckLookups {
 	/** The family member profile of an account, if it has one. */
 	Optional<Long> familyMemberIdOf(Long userId);
 
+	/** When the family was last asked about this request, first or again; empty if never. */
+	Optional<LocalDateTime> lastAskedAt(Long checkId);
+
 	/** A visit as a spot check sees it. */
 	record VisitFacts(Long visitId, Long elderId, Long caregiverId, LocalDateTime start, String status,
 			String serviceType) {

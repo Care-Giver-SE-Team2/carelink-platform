@@ -1,0 +1,40 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  min-height: 720px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px;
+}
+
+.helper {
+  margin: 0;
+  font: 400 12px/1.5 var(--font);
+  color: var(--text-muted);
+}
+
+.pagination {
+  padding: 12px 20px;
+}
+
+.status {
+  margin: 0;
+  padding: 20px;
+  font: 400 12px/1.5 var(--font);
+  color: var(--text-muted);
+}
+
+.emptyPanel {
+  padding: 18px 20px;
+}

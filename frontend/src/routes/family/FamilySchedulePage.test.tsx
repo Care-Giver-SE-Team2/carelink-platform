@@ -38,7 +38,10 @@ function installApi(override?: (url: URL, init: RequestInit) => Response | Promi
 function openSchedule() {
   return render(
     <MemoryRouter initialEntries={['/family/schedule']}>
-      <Routes><Route path="/family/*" element={<FamilyHome />} /></Routes>
+      <Routes>
+        <Route path="/" element={<h1>Landing</h1>} />
+        <Route path="/family/*" element={<FamilyHome />} />
+      </Routes>
     </MemoryRouter>,
   )
 }
@@ -94,19 +97,17 @@ describe('Family weekly schedule', () => {
     const fetchMock = installApi((url) => url.pathname === '/api/elders' ? json([]) : undefined)
     openSchedule()
     expect(await screen.findByRole('heading', { name: 'No linked elders yet' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'View my applications' })).toHaveAttribute('href', '/family/intake')
+    expect(screen.getByRole('link', { name: 'View my applications' })).toHaveAttribute('href', '/family/service-applications')
     expect(queries(fetchMock)).toEqual([])
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
   it('rejects a manager session before requesting elders or visits and offers another account', async () => {
-    const user = userEvent.setup()
     const fetchMock = installApi((url) => url.pathname === '/api/auth/me' ? json({ ...family, roles: ['MANAGER'] }) : undefined)
     openSchedule()
     expect(await screen.findByRole('heading', { name: 'Schedule access unavailable' })).toBeInTheDocument()
     expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(['/api/auth/me'])
-    await user.click(screen.getByRole('button', { name: 'Sign in with another account' }))
-    expect(screen.getByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in with another account' })).toHaveAttribute('href', '/')
   })
 
   it('uses total counts for pagination and resets to the first page when the week changes', async () => {
@@ -312,7 +313,7 @@ describe('Family weekly schedule', () => {
     expect(screen.getByText(/Schedule checked/)).toBeInTheDocument()
     accessLost = true
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
-    expect(await screen.findByRole('heading', { name: status === 401 ? 'Sign in to continue' : 'Schedule access unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: status === 401 ? 'Landing' : 'Schedule access unavailable' })).toBeInTheDocument()
     expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
     expect(screen.queryByText('Lim Wei')).not.toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Scheduled visits' })).not.toBeInTheDocument()
@@ -335,34 +336,12 @@ describe('Family weekly schedule', () => {
     expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
   })
 
-  it('signs in through CSRF and restores the week the family selected', async () => {
-    const user = userEvent.setup()
-    let signedIn = false
-    const fetchMock = installApi((url, init) => {
-      if (url.pathname === '/api/auth/me' && !signedIn) return new Response(null, { status: 401 })
-      if (url.pathname === '/api/auth/csrf') {
-        document.cookie = 'XSRF-TOKEN=family-sign-in; path=/'
-        return new Response(null, { status: 200 })
-      }
-      if (url.pathname === '/api/auth/login') {
-        expect(JSON.parse(init.body as string)).toEqual({ username: 'family_test', password: 'example-password' })
-        expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('family-sign-in')
-        expect(init.credentials).toBe('include')
-        signedIn = true
-        return json(family)
-      }
-      return undefined
-    })
+  it('returns to the landing page without requesting elders or visits when there is no session', async () => {
+    const fetchMock = installApi((url) => url.pathname === '/api/auth/me' ? new Response(null, { status: 401 }) : undefined)
     openSchedule()
-    expect(await screen.findByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Next week/ }))
-    await user.type(await screen.findByLabelText('Username'), ' family_test ')
-    await user.type(screen.getByLabelText('Password'), 'example-password')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
-    expect(await screen.findByRole('heading', { name: 'Bathing assistance' })).toBeInTheDocument()
-    expect(queries(fetchMock)).toEqual([{ elderId: '21', dateFrom: '2026-10-05', dateTo: '2026-10-11', page: '0', size: '20' }])
-    const paths = fetchMock.mock.calls.map(([path]) => path)
-    expect(paths.indexOf('/api/auth/csrf')).toBeLessThan(paths.indexOf('/api/auth/login'))
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(['/api/auth/me'])
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument()
   })
 
   it('shows a readable validation error and recovers after a network failure', async () => {

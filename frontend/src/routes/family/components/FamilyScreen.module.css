@@ -1,0 +1,143 @@
+/*
+ * The white screen header at the top of every family page: back link, eyebrow, title and meta.
+ * It owns the top inset (the phone's safe area, if any, plus 24px), so white runs to the top edge.
+ * Page modules pull it in with `composes: band from ...` so their markup stays unchanged.
+ * The background bleeds to the viewport edges without widening the page (border-image outsets
+ * are not scrollable overflow), and the bottom 1px of the image is the card line.
+ */
+.band {
+  margin-bottom: 18px;
+  padding: calc(env(safe-area-inset-top) + 24px) 0 18px;
+  border-image: linear-gradient(to top, var(--fm-line-card) 1px, var(--fm-card) 1px) fill 0 / / 0 100vmax;
+}
+
+/* Consecutive bands (a back link above the page title) read as one header. */
+.band:has(+ .band),
+.band:has(+ article > .band:first-child) {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-image-source: linear-gradient(var(--fm-card) 0 0);
+}
+
+.band:has(+ .band) + .band,
+.band:has(+ article > .band:first-child) + article > .band {
+  padding-top: 12px;
+}
+
+/* Visually hidden, still read by screen readers and matched by labels. */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Week stepper: ‹ week + date › on one row, a note and This week underneath. */
+.weekStepper {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--fm-card);
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+}
+.weekStepper .stepper {
+  min-height: 44px;
+  padding: 0;
+  border-radius: 14px;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+}
+.weekCenter {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.weekCenter h2 {
+  font-size: 15.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.weekCenter input {
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--fm-card);
+  color: var(--fm-muted);
+  color-scheme: light;
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.weekCenter input:hover {
+  border-color: var(--fm-line-control);
+}
+.weekFoot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--fm-line-row);
+  padding-top: 10px;
+}
+.weekFoot p {
+  color: var(--fm-faint);
+  font-size: 12.5px;
+}
+.weekStepper .weekFoot button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
+/* Single-column pages opt in; on desktop their content keeps a 640px reading width, left-aligned. */
+.page {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 900px) {
+  /* Desktop page header: no phone inset, wider type. */
+  .band {
+    margin-bottom: 26px;
+    padding: 24px 0 20px;
+  }
+
+  .band:is(header, section, div) h1 {
+    font-size: 28px;
+  }
+
+  .band > p:first-child,
+  .band > div:first-child > p:first-child {
+    font-size: 12px !important;
+  }
+
+  .page > :not(.band) {
+    max-width: 640px;
+  }
+
+  /*
+   * Two-column tabs (Home, Schedule, Reports, Services) all split at the same place: the same
+   * ratio and gap, in the same centred 1120px block, so moving between tabs never shifts the columns.
+   */
+  .split,
+  .page > .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+    width: 100%;
+    max-width: 1120px;
+    margin-inline: auto;
+  }
+}

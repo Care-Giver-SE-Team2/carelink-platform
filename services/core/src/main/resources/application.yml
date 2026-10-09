@@ -20,6 +20,13 @@ spring:
 # gets later-level-multiplier times as long, because a second responder is a safety net
 # rather than a competitor.
 carelink:
+  # SYS03: assigned but not checked in, once per Visit; does NOT close late check-in.
+  missed-check-in:
+    enabled: true
+    scan-interval: PT60S
+    scan-initial-delay: PT30S
+    lookback: PT24H
+    batch-size: 200
   caregiver:
     credential-warning-days: 30
     # SYS01. When the daily scan moves certificates to EXPIRING/EXPIRED and sends the alerts
@@ -39,11 +46,16 @@ carelink:
   # run rolls that window forward (Spring cron, read in schedule-zone; "-" switches it off).
   roster:
     horizon-days: 14
-    schedule-cron: "0 30 2 * * *"
+    schedule-cron: "0 0 0 * * *"
     schedule-zone: Asia/Singapore
     # How often a visit still unassigned at its start time is turned into an exception.
     uncovered-scan-interval: PT60S
     uncovered-scan-initial-delay: PT30S
+    # A visit on approved leave still with the caregiver who is away this long before it
+    # starts gets an incident, so a manager re-rosters it in time; how often that is checked.
+    leave-reminder-lead: PT24H
+    leave-reminder-interval: PT15M
+    leave-reminder-initial-delay: PT2M
   # UC-MG04. How long a family has to answer a change before the default plan runs (the use
   # case: two hours by default, never a constant), how long before a visit its replacement
   # must know, how far back visits to an elder count as continuity and spot-check conclusions
@@ -56,6 +68,12 @@ carelink:
     spot-check-lookback: P90D
     scan-interval: PT60S
     scan-initial-delay: PT45S
+  # UC-MG08 with the family's side (FM07 exception 1a): a request the family has not answered
+  # stays open, never taken as a yes, and they are asked again once the last ask is this old.
+  spot-checks:
+    consent-reminder-after: P1D
+    reminder-scan-interval: PT1H
+    reminder-scan-initial-delay: PT3M
 
 management:
   endpoints:

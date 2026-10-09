@@ -1,12 +1,15 @@
 package sg.nus.carelink.report.infrastructure.persistence.adapter;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import sg.nus.carelink.report.domain.model.ReportContent;
+import sg.nus.carelink.report.domain.model.ReportFigure;
 import sg.nus.carelink.report.domain.model.ReportSection;
+import sg.nus.carelink.report.domain.model.ReportSeries;
 
 /**
  * ReportContent to and from the JSON in report.content.
@@ -20,7 +23,8 @@ import sg.nus.carelink.report.domain.model.ReportSection;
  * <p>Its own mapper, not the web layer's. How the API renders JSON may be tuned for the
  * browser at any time; the archive's format must not move with it. Unknown fields are
  * ignored on the way back in, so a later version can add one without making older reports
- * unreadable.
+ * unreadable - and fields a section gained later (its key, figures and series) read back from
+ * an older report as absent: the key made from the title, no figures, no series.
  */
 final class ReportContentJson {
 
@@ -56,7 +60,7 @@ final class ReportContentJson {
 
 		static Stored of(ReportContent content) {
 			return new Stored(
-					content.sections().stream().map(section -> new StoredSection(section.title(), section.body())).toList(),
+					content.sections().stream().map(StoredSection::of).toList(),
 					content.dataComplete(),
 					content.missingItems(),
 					content.disclaimer(),
@@ -74,11 +78,66 @@ final class ReportContentJson {
 	}
 
 	/** The stored shape of one section. */
-	record StoredSection(String title, String body) {
+	record StoredSection(String title, String body, String key, List<StoredFigure> figures, List<StoredSeries> series) {
 
-		/** A section stored without a body reads back as an empty one, as the builder would have made it. */
+		static StoredSection of(ReportSection section) {
+			return new StoredSection(
+					section.title(),
+					section.body(),
+					section.key(),
+					section.figures().stream().map(StoredFigure::of).toList(),
+					section.series().stream().map(StoredSeries::of).toList());
+		}
+
+		/**
+		 * A section stored without a body reads back as an empty one, as the builder would have
+		 * made it; one stored without a key is keyed by its title, as the builder keys them.
+		 */
 		ReportSection toDomain() {
-			return new ReportSection(title, body == null ? "" : body);
+			return new ReportSection(
+					key == null || key.isBlank() ? ReportSection.keyOf(title) : key,
+					title,
+					body == null ? "" : body,
+					figures == null ? List.of() : figures.stream().map(StoredFigure::toDomain).toList(),
+					series == null ? List.of() : series.stream().map(StoredSeries::toDomain).toList());
+		}
+	}
+
+	/** The stored shape of one figure. */
+	record StoredFigure(String key, String label, BigDecimal value, BigDecimal outOf, String unit) {
+
+		static StoredFigure of(ReportFigure figure) {
+			return new StoredFigure(figure.key(), figure.label(), figure.value(), figure.outOf(), figure.unit());
+		}
+
+		ReportFigure toDomain() {
+			return new ReportFigure(key, label, value, outOf, unit);
+		}
+	}
+
+	/** The stored shape of one series. */
+	record StoredSeries(String key, String label, String unit, List<StoredPoint> points) {
+
+		static StoredSeries of(ReportSeries series) {
+			return new StoredSeries(series.key(), series.label(), series.unit(),
+					series.points().stream().map(StoredPoint::of).toList());
+		}
+
+		ReportSeries toDomain() {
+			return new ReportSeries(key, label, unit,
+					points == null ? List.of() : points.stream().map(StoredPoint::toDomain).toList());
+		}
+	}
+
+	/** The stored shape of one point. */
+	record StoredPoint(String at, BigDecimal low, BigDecimal high, boolean flagged) {
+
+		static StoredPoint of(ReportSeries.Point point) {
+			return new StoredPoint(point.at(), point.low(), point.high(), point.flagged());
+		}
+
+		ReportSeries.Point toDomain() {
+			return new ReportSeries.Point(at, low, high, flagged);
 		}
 	}
 }

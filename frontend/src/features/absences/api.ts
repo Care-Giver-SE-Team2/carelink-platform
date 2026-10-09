@@ -63,6 +63,21 @@ export async function rerosterAbsence(
   })
 }
 
+/** The manager hand-picks who takes a vacated visit, in place of the search's pick. */
+export async function assignCaregiver(
+  absenceId: number,
+  changeId: number,
+  caregiverId: number,
+  signal?: AbortSignal,
+): Promise<AbsenceCase> {
+  await initialiseCsrf(signal)
+  return api<AbsenceCase>('/absences/' + absenceId + '/changes/' + changeId + '/assignment', {
+    method: 'POST',
+    body: JSON.stringify({ caregiverId }),
+    signal,
+  })
+}
+
 /** Step 7: the manager confirms every vacated visit is accounted for. */
 export async function confirmCoverage(id: number, signal?: AbortSignal): Promise<AbsenceCase> {
   await initialiseCsrf(signal)

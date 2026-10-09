@@ -16,6 +16,11 @@ import java.util.Objects;
  *                              assembler for their audience, not here
  * @param evidenceCount         items of evidence captured on the visit
  * @param verifiedEvidenceCount how many of those have been verified
+ * @param skippedByFamily       cancelled because the family chose to skip it while its caregiver
+ *                              was away (UC-MG04 alternative 4c): not a missed visit, but still
+ *                              one the period's record has to show
+ * @param plannedMinutes        scheduled length, start to end; null when no end was scheduled
+ * @param workedMinutes         time on site, check-in to check-out; null until both happened
  */
 public record VisitFact(
 		Long id,
@@ -25,12 +30,34 @@ public record VisitFact(
 		LocalDateTime scheduledStart,
 		VisitFact.Status status,
 		int evidenceCount,
-		int verifiedEvidenceCount) {
+		int verifiedEvidenceCount,
+		boolean skippedByFamily,
+		Integer plannedMinutes,
+		Integer workedMinutes) {
 
 	public VisitFact {
 		Objects.requireNonNull(id, "id");
 		Objects.requireNonNull(scheduledStart, "scheduledStart");
 		Objects.requireNonNull(status, "status");
+	}
+
+	/** A visit without its durations: how visits were read before the report counted hours. */
+	public VisitFact(Long id, Long caregiverId, String caregiverName, String serviceType, LocalDateTime scheduledStart,
+			VisitFact.Status status, int evidenceCount, int verifiedEvidenceCount, boolean skippedByFamily) {
+		this(id, caregiverId, caregiverName, serviceType, scheduledStart, status, evidenceCount, verifiedEvidenceCount,
+				skippedByFamily, null, null);
+	}
+
+	/** A visit no family chose to skip, which is nearly every visit. */
+	public VisitFact(Long id, Long caregiverId, String caregiverName, String serviceType, LocalDateTime scheduledStart,
+			VisitFact.Status status, int evidenceCount, int verifiedEvidenceCount) {
+		this(id, caregiverId, caregiverName, serviceType, scheduledStart, status, evidenceCount, verifiedEvidenceCount,
+				false);
+	}
+
+	/** Cancelled at the family's request: counted in the period, never as a missed visit. */
+	public boolean cancelledByFamily() {
+		return status == Status.CANCELLED && skippedByFamily;
 	}
 
 	/**
@@ -51,6 +78,27 @@ public record VisitFact(
 		return switch (status) {
 			case SCHEDULED, ARRIVED, IN_PROGRESS, COMPLETED -> false;
 			case VERIFIED, AUTO_CLOSED, EXCEPTION, CANCELLED -> true;
+		};
+	}
+
+	/**
+	 * Whether the visit counts as planned for the period: every visit except a cancelled one.
+	 * A cancellation - at the family's request or otherwise - takes the visit out of what was
+	 * meant to happen, so it never counts against the period's fulfilment.
+	 */
+	public boolean isPlanned() {
+		return status != Status.CANCELLED;
+	}
+
+	/**
+	 * Whether the service was carried out: the caregiver checked out, whether or not the elder
+	 * has confirmed since (COMPLETED, VERIFIED, or AUTO_CLOSED when the elder never answered).
+	 * A visit that ended in an exception was not.
+	 */
+	public boolean isCompleted() {
+		return switch (status) {
+			case COMPLETED, VERIFIED, AUTO_CLOSED -> true;
+			case SCHEDULED, ARRIVED, IN_PROGRESS, EXCEPTION, CANCELLED -> false;
 		};
 	}
 

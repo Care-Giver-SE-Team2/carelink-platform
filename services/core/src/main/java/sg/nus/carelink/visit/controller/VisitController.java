@@ -37,13 +37,21 @@ public class VisitController {
 	private final FamilyVisitDetailService familyVisits;
 	private final FamilyVisitTimelineService familyTimeline;
 	private final FamilyVisitTaskService familyTasks;
+    private final sg.nus.carelink.visit.application.CaregiverWorkService caregiverWork;
 
 	public VisitController(VisitService service, FamilyVisitDetailService familyVisits,
 			FamilyVisitTimelineService familyTimeline, FamilyVisitTaskService familyTasks) {
+		this(service,familyVisits,familyTimeline,familyTasks,null);
+	}
+    @org.springframework.beans.factory.annotation.Autowired
+    public VisitController(VisitService service, FamilyVisitDetailService familyVisits,
+            FamilyVisitTimelineService familyTimeline, FamilyVisitTaskService familyTasks,
+            sg.nus.carelink.visit.application.CaregiverWorkService caregiverWork) {
 		this.service = service;
 		this.familyVisits = familyVisits;
 		this.familyTimeline = familyTimeline;
 		this.familyTasks = familyTasks;
+        this.caregiverWork = caregiverWork;
 	}
 
 	/**
@@ -76,11 +84,14 @@ public class VisitController {
 				.map(FamilyVisitTimelineEntryResponse::from).toList();
 	}
 
-	/** Family task fields only; the caregiver projection remains unimplemented on this endpoint. */
+	/** The role selects a safe projection; a caller cannot request another projection. */
 	@GetMapping("/{visitId}/tasks")
-	@PreAuthorize("hasRole('FAMILY')")
-	public List<FamilyVisitTaskResponse> tasks(@PathVariable Long visitId, Authentication authentication) {
+	@PreAuthorize("hasAnyRole('FAMILY','CAREGIVER')")
+	public List<Object> tasks(@PathVariable Long visitId, Authentication authentication) {
+        if (authentication.getAuthorities().stream().noneMatch(role -> role.getAuthority().equals("ROLE_FAMILY"))) {
+            return caregiverWork.workPack(authentication.getName(),visitId).tasks().stream().map(Object.class::cast).toList();
+        }
 		return familyTasks.findTasks(authentication.getName(), visitId).stream()
-				.map(FamilyVisitTaskResponse::from).toList();
+				.map(FamilyVisitTaskResponse::from).map(Object.class::cast).toList();
 	}
 }

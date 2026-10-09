@@ -1,84 +1,139 @@
 .reports {
+  composes: page from '../components/FamilyScreen.module.css';
+}
+.reportDetail { max-width: 1060px; }
+.reports.reportDetail > article { max-width: none; }
+.hero.detailHero { display: block; }
+.detailHero > .eyebrow { margin-top: 18px; }
+.amendmentKind {
+  display: inline-block;
+  padding: 5px 9px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+/* The weekly summary is a two-column page on desktop, so it does not take the 640px column. */
+.weekly {
   overflow-wrap: anywhere;
 }
 .hero {
-  margin-bottom: 26px;
+  composes: band from '../components/FamilyScreen.module.css';
 }
-.hero > p:last-child,
+/* Tab-root header: title block on the left, a link-action on the right. */
+.hero:has(> div) {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hero:has(> div) > .readLink {
+  flex: none;
+  min-height: 32px;
+  margin: 0;
+}
 .hero > .intro {
-  margin-top: 12px;
-  color: #60776f;
-  font-size: 14px;
+  margin-top: 6px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+.hero h1 {
+  font-variant-numeric: tabular-nums;
+}
+.hero .careContext {
+  margin-top: 10px;
+  color: var(--fm-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.hero > p:not(.reference, .source, .timestamp, .eyebrow, .intro) {
+  margin-top: 6px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
 }
 .eyebrow {
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 1.8px;
-  color: #48786b;
-  margin-bottom: 12px !important;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--fm-accent);
+  margin-bottom: 8px !important;
 }
 .toolbar {
   display: flex;
-  align-items: end;
-  gap: 14px;
-  margin-bottom: 24px;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 18px;
 }
 .toolbar > button {
   flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 13px;
 }
 .elderPicker {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .elderPicker label {
-  display: block;
-  font-size: 12px;
-  font-weight: 650;
-  color: #496d60;
-  margin-bottom: 7px;
+  flex: none;
+  color: var(--fm-muted);
+  font-size: 13.5px;
 }
 .elderPicker select {
+  flex: 1;
   width: 100%;
   min-width: 0;
-  min-height: 46px;
-  padding: 10px 12px;
-  border: 1px solid #cadbd7;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--fm-line-control);
   border-radius: 12px;
   font: inherit;
-  font-size: 16px;
-  color: #203a36;
-  background: white;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fm-ink);
+  background: var(--fm-card);
+  color-scheme: light;
   text-overflow: ellipsis;
-}
-.elderPicker select:focus-visible {
-  outline: 3px solid #14947f;
-  outline-offset: 3px;
 }
 .summary {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   flex-wrap: wrap;
   gap: 6px;
-  color: #597367;
-  font-size: 12px;
-  margin-bottom: 14px;
+  color: var(--fm-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 10px;
 }
 .summary strong {
-  color: #294e40;
-  font-size: 14px;
+  color: var(--fm-ink);
+  font-size: 14.5px;
+  font-weight: 600;
 }
 .cards {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 .card {
-  background: white;
-  border: 1px solid #dfe9e4;
+  background: var(--fm-card);
+  border: 1px solid var(--fm-line-card);
   border-radius: 18px;
-  padding: 20px;
+  padding: 16px 18px;
 }
 .cardTop {
   display: flex;
@@ -86,76 +141,78 @@
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 13px;
+  margin-bottom: 11px;
 }
 .reference {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: #60776f;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--fm-faint);
+  font-variant-numeric: tabular-nums;
 }
 .badge {
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 7px;
-  color: #356c59;
-  background: #e9f3ef;
+  border: 1px solid var(--fm-accent-tint);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--fm-accent);
+  background: var(--fm-accent-tint);
 }
 .badge[data-status='ARCHIVED'] {
-  color: #58645e;
-  background: #edf0ee;
+  color: var(--fm-muted);
+  background: var(--fm-note);
+  border-color: var(--fm-note);
 }
 .card h2 {
-  font-size: 19px;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
 }
 .source {
-  margin-top: 7px !important;
-  color: #60776f;
-  font-size: 12px;
+  margin-top: 6px !important;
+  color: var(--fm-muted);
+  font-size: 13.5px;
 }
+/* Completeness note: accent tint when complete, the waiting palette when records are missing. */
 .completeness {
-  margin-top: 18px;
-  padding: 12px;
-  border-radius: 10px;
-  font-size: 12px;
-  color: #356c59;
-  background: #edf5f1;
+  margin-top: 14px;
+  padding: 12px 13px;
+  border: 1px solid var(--fm-accent-tint);
+  border-radius: 14px;
+  font-size: 13.5px;
+  color: var(--fm-good);
+  background: var(--fm-accent-tint);
+}
+.completeness > p {
+  font-weight: 600;
 }
 .completeness[data-complete='false'] {
-  color: #79591d;
-  background: #fff4df;
+  color: var(--fm-pending);
+  background: var(--fm-pending-tint);
+  border-color: var(--fm-pending-line);
 }
 .completeness ul {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   padding-left: 18px;
+  color: var(--fm-ink);
 }
+.completeness summary { cursor: pointer; margin-top: 6px; }
 .state {
-  margin-top: 18px;
-  border: 1px solid #dfe9e4;
+  margin-top: 12px;
+  border: 1px solid var(--fm-line-card);
   border-radius: 18px;
-  padding: 30px 22px;
+  padding: 28px 20px;
   text-align: center;
-  background: white;
-}
-.pagination {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 24px;
-}
-.pagination button {
-  font-size: 12px;
-  padding: 10px;
-}
-.pagination > span {
-  font-size: 12px;
-  text-align: center;
+  background: var(--fm-card);
 }
 .state p {
-  color: #63796e;
-  font-size: 14px;
-  margin: 12px 0 20px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+  margin: 8px 0 18px;
 }
 .state button {
   margin: 4px;
@@ -164,102 +221,364 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fm-accent);
+}
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 18px;
+}
+.pagination > span {
+  font-size: 13px;
+  color: var(--fm-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .loading {
   min-height: 190px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #60776f;
-  font-size: 14px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
 }
 .body {
   white-space: pre-wrap;
-  margin-top: 14px !important;
-  line-height: 1.8;
+  margin-top: 10px !important;
+  font-size: 15.5px;
+  line-height: 1.6;
+  text-wrap: pretty;
 }
-.readLink,
-.backLink {
+/* Link-action ("read →"): inline, in the waiting/attention colour as in the mock. */
+.readLink {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  font-size: 14px;
-}
-.readLink {
-  margin-top: 14px;
-}
-.backLink {
+  margin-top: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fm-pending) !important;
   text-decoration: none;
 }
+.readLink:hover {
+  text-decoration: underline;
+}
 .detailNav {
+  composes: band from '../components/FamilyScreen.module.css';
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 24px;
+}
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--fm-muted) !important;
+}
+.backLink::before {
+  content: '←' / '';
+  margin-right: 6px;
 }
 .timestamp {
-  color: #60776f;
-  font-size: 12px;
-  margin-top: 12px !important;
+  color: var(--fm-faint);
+  font-size: 12.5px;
+  margin-top: 8px !important;
+  font-variant-numeric: tabular-nums;
 }
 .correction {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #dfe9e4;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fm-line-row);
+}
+.correction > .timestamp {
+  display: block;
+  margin-top: 0 !important;
 }
 .disclaimer {
   white-space: pre-wrap;
-  padding: 20px 0 8px;
+  margin-top: 6px !important;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--fm-note);
   font-size: 13px;
-  color: #496d60;
+  line-height: 1.5;
+  color: var(--fm-muted);
+}
+.reports > article > .disclaimer {
+  margin-top: 16px !important;
+}
+.hidden {
+  composes: visuallyHidden from '../components/FamilyScreen.module.css';
 }
 .weekPanel {
-  border: 1px solid #dfe9e4;
-  border-radius: 18px;
-  padding: 18px;
-  margin-bottom: 24px;
-  background: #edf5f1;
+  composes: weekStepper from '../components/FamilyScreen.module.css';
 }
-.datePicker {
-  margin: 18px 0;
+.stepper {
+  composes: stepper from '../components/FamilyScreen.module.css';
 }
-.datePicker label {
-  display: block;
-  font-size: 13px;
-  margin-bottom: 6px;
+.weekCenter {
+  composes: weekCenter from '../components/FamilyScreen.module.css';
 }
-.datePicker input {
-  width: 100%;
-  min-width: 0;
-  min-height: 46px;
-  border: 1px solid #cadbd7;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font: inherit;
-  font-size: 16px;
-  color: #203a36;
-  background: white;
+.weekFoot {
+  composes: weekFoot from '../components/FamilyScreen.module.css';
 }
-.datePicker p {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #60776f;
+/* Weekly summary: report metadata, saved sections, corrections, then actions. */
+.summaryArticle {
+  display: grid;
+  gap: 12px;
 }
-.weekControls {
+.reportMeta .completeness { margin-top: 0; }
+.reportMeta .cardFoot { margin-top: 10px; padding: 0 0 4px; border-top: 0; }
+.summaryArticle > .disclaimer {
+  margin-top: 0 !important;
+}
+.tagRow {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  color: var(--fm-muted);
+  font-size: 12.5px;
 }
-.weekControls button {
-  flex: 1;
-  font-size: 12px;
-  padding: 10px;
+.modelTag {
+  border-radius: 999px;
+  background: var(--fm-accent);
+  padding: 4px 10px;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-@media (max-width: 400px) {
-  .card {
-    padding: 16px;
+.summaryArticle .body {
+  margin-top: 0 !important;
+  font-size: 16px;
+}
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+  border-top: 1px solid var(--fm-line-row);
+  padding-top: 12px;
+}
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+}
+.secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 16px;
+  background: var(--fm-card);
+  color: var(--fm-accent) !important;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.secondary:hover {
+  background: var(--fm-note);
+}
+.summaryArticle > .timestamp {
+  margin-top: 0 !important;
+  text-align: center;
+}
+/* Header actions (desktop): secondary buttons that fill with the accent on hover. */
+.headerActions {
+  display: flex;
+  flex: none;
+  gap: 10px;
+}
+.headerAction {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  background: var(--fm-card);
+  padding: 12px 18px;
+  color: var(--fm-accent) !important;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.headerAction:hover {
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
+  color: #fff !important;
+}
+.sectionLabel {
+  margin-bottom: 12px !important;
+  color: var(--fm-accent);
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  line-height: 1 !important;
+  text-transform: uppercase;
+}
+/* Desktop weekly summary: the summary at reading width, the week's controls and visits beside it. */
+.split {
+  composes: split from '../components/FamilyScreen.module.css';
+}
+.splitMain,
+.splitSide {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.splitSide > .toolbar {
+  justify-content: flex-end;
+  margin: -6px 0 0;
+}
+.splitMain .card {
+  padding: 26px 30px;
+}
+.splitMain .body {
+  max-width: 60ch;
+  font-size: 17px;
+  line-height: 1.65;
+}
+.splitMain .state,
+.splitMain .loading {
+  margin-top: 0;
+}
+.visitRows {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 0;
+  list-style: none;
+}
+/* Rows run edge to edge so a tinted row fills the card; dividers stay inset with the text. */
+.visitRows li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(70px, auto);
+  column-gap: 12px;
+  align-items: center;
+  padding: 13px 20px;
+  font-size: 14.5px;
+  line-height: 1.3;
+}
+.visitRows li + li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 20px;
+  left: 20px;
+  border-top: 1px solid var(--fm-line-row);
+}
+/* No divider against a tinted row: the tint itself separates it. */
+.visitRows li[data-status='EXCEPTION']::before,
+.visitRows li[data-status='EXCEPTION'] + li::before {
+  display: none;
+}
+.visitRows li[data-status='EXCEPTION'] {
+  background: var(--fm-urgent-tint);
+}
+.visitDay {
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+.visitStatus {
+  color: var(--fm-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+.visitRows li:is([data-status='COMPLETED'], [data-status='VERIFIED'], [data-status='AUTO_CLOSED']) .visitStatus {
+  color: var(--fm-good);
+}
+.visitRows li[data-status='EXCEPTION'] .visitStatus {
+  color: var(--fm-urgent);
+}
+.visitRows li[data-status='CANCELLED'] {
+  color: var(--fm-faint);
+}
+@media (min-width: 900px) {
+  .hero:has(> div) {
+    align-items: flex-end;
   }
+  .hero > div > .intro {
+    font-size: 13.5px;
+  }
+}
+/* Refresh: bordered secondary button, on the count row (list) or beside the summary tag (weekly). */
+.summary {
+  align-items: center;
+}
+.summaryText {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+}
+.reports .refresh,
+.weekly .refresh {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+.tagRow > .refresh {
+  margin-left: auto;
+}
+/* Refresh on its own row (on the page, not in a card) when there is no count or summary row to share. */
+.refreshBar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0 10px;
+}
+.refreshBar + .state {
+  margin-top: 0;
+}
+.refreshBar .refresh {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+.splitMain > .refreshBar {
+  margin: 0;
+}
+.sideLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  background: var(--fm-card);
+  color: var(--fm-accent) !important;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.sideLink:hover {
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
+  color: #fff !important;
 }

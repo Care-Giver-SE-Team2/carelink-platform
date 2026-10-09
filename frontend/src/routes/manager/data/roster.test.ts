@@ -3,6 +3,7 @@ import type { CaregiverOption } from '../../../shared/api/profile'
 import type { VisitResponse } from '../../../shared/api/visit'
 import type { ElderRow } from './elders'
 import {
+  absencesOn,
   addDays,
   dayContext,
   elderShort,
@@ -82,7 +83,7 @@ describe('elderShort', () => {
 })
 
 describe('toDayTimeline', () => {
-  it('puts each visit on its caregiver row, and unassigned ones in Needs cover', () => {
+  it('puts each visit on its caregiver row, and leaves out visits nobody has', () => {
     const timeline = toDayTimeline(
       [
         visit(1, '2026-10-05T09:30:00', '2026-10-05T10:00:00', 5),
@@ -96,24 +97,23 @@ describe('toDayTimeline', () => {
     expect(timeline.rows.map((row) => [row.name, row.subLine])).toEqual([
       ['Aisyah N.', 'S31 · Hokkien, Mandarin'],
       ['Ong Wei Jie', 'S31 · Hokkien, Mandarin'],
-      ['Needs cover', '1 unassigned'],
     ])
-    expect(timeline.rows[1].blocks.map((block) => [block.hour, block.state, block.elderShort])).toEqual([
-      [9, 'assigned', 'Tan H.S.'],
-      [14, 'closed', 'Tan H.S.'],
+    expect(timeline.rows[1].blocks.map((block) => [block.hour, block.startMinute, block.state, block.elderShort])).toEqual([
+      [9, 570, 'assigned', 'Tan H.S.'],
+      [14, 840, 'closed', 'Tan H.S.'],
     ])
-    expect(timeline.rows[2].blocks).toMatchObject([{ hour: 11, minutes: 90, state: 'needs_cover' }])
+    expect(timeline.rows.flatMap((row) => row.blocks).map((block) => block.id)).not.toContain('2')
     expect([timeline.startHour, timeline.endHour]).toEqual([8, 20])
-  })
-
-  it('shows an uncovered visit that became an exception as an exception, still in Needs cover', () => {
-    const timeline = toDayTimeline([visit(1, '2026-10-05T11:00:00', '2026-10-05T12:00:00', null, 'EXCEPTION')], [], [])
-    expect(timeline.rows).toMatchObject([{ kind: 'cover', blocks: [{ state: 'exception', label: 'exception' }] }])
   })
 
   it('widens the hours to fit a visit outside 08–20', () => {
     const timeline = toDayTimeline([visit(1, '2026-10-05T07:00:00', '2026-10-05T07:30:00', 5)], [caregiver(5, 'Ong Wei Jie')], [])
     expect(timeline.startHour).toBe(7)
+  })
+
+  it('widens to the hour a late visit actually ends in', () => {
+    const timeline = toDayTimeline([visit(1, '2026-10-05T19:30:00', '2026-10-05T20:30:00', 5)], [caregiver(5, 'Ong Wei Jie')], [])
+    expect(timeline.endHour).toBe(21)
   })
 })
 
@@ -129,29 +129,68 @@ describe('toWeek', () => {
       [caregiver(5, 'Ong Wei Jie')],
     )
 
-    expect(rows.map((row) => row.name)).toEqual(['Ong Wei Jie', 'Needs cover'])
-    expect(rows[0].days[0]).toEqual({ visits: 2, hours: 1.5, exceptions: 1 })
+    expect(rows.map((row) => row.name)).toEqual(['Ong Wei Jie'])
+    expect(rows[0].days[0]).toEqual({ visits: 2, hours: 1.5, exceptions: 1, leave: null })
+    expect(rows[0].days[1]).toEqual({ visits: 0, hours: 0, exceptions: 0, leave: null })
     expect(rows[0].totalHours).toBe(1.5)
-    expect(rows[1].days[1]).toEqual({ visits: 1, hours: 0.5, exceptions: 0 })
+  })
+
+  it('marks the days a caregiver is on leave, counting whatever is still on their schedule', () => {
+    const empty: VisitResponse[] = []
+    const leave = { id: 4, caregiverId: 6, startDate: '2026-10-06', endDate: '2026-10-07' }
+    const days = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']
+    const rows = toWeek(
+      [empty, [visit(1, '2026-10-06T08:00:00', '2026-10-06T09:00:00', 6)], empty, empty, empty, empty, empty],
+      [caregiver(5, 'Aaron'), caregiver(6, 'Zainab')],
+      days.map((day) => absencesOn([leave], day)),
+    )
+
+    expect(rows.map((row) => row.name)).toEqual(['Aaron', 'Zainab'])
+    expect(rows[1].days.map((day) => day.leave?.id ?? null)).toEqual([null, 4, 4, null, null, null, null])
+    expect(rows[1].days[1]).toMatchObject({ visits: 1, hours: 1 })
+    expect(rows[0].days.every((day) => day.leave === null)).toBe(true)
+  })
+})
+
+describe('leave on the roster', () => {
+  const leave = { id: 4, caregiverId: 5, startDate: '2026-10-06', endDate: '2026-10-07' }
+
+  it('counts both ends of an absence', () => {
+    expect(absencesOn([leave], '2026-10-05')).toEqual([])
+    expect(absencesOn([leave], '2026-10-06')).toEqual([leave])
+    expect(absencesOn([leave], '2026-10-07')).toEqual([leave])
+    expect(absencesOn([leave], '2026-10-08')).toEqual([])
+  })
+
+  it('marks the caregiver away that day, and nobody else', () => {
+    const timeline = toDayTimeline(
+      [visit(1, '2026-10-06T09:00:00', '2026-10-06T10:00:00', 5)],
+      [caregiver(5, 'Ong Wei Jie'), caregiver(6, 'Aaron')],
+      [],
+      absencesOn([leave], '2026-10-06'),
+    )
+
+    expect(timeline.rows.map((row) => [row.name, row.leave?.id ?? null])).toEqual([
+      ['Aaron', null],
+      ['Ong Wei Jie', 4],
+    ])
+    expect(timeline.rows[1].blocks[0]).toMatchObject({ state: 'assigned', label: 'Bathing assistance' })
   })
 })
 
 describe('paging the roster', () => {
   const rows = toDayTimeline(
-    [
-      visit(1, '2026-10-05T09:00:00', null, 7, 'EXCEPTION'),
-      visit(2, '2026-10-05T10:00:00', null, null),
-    ],
+    [visit(1, '2026-10-05T09:00:00', null, 7, 'EXCEPTION'), visit(2, '2026-10-05T10:00:00', null, null)],
     [caregiver(5, 'Aisyah N.'), caregiver(6, 'Ben Tan'), caregiver(7, 'Zainal A.')],
     [],
   ).rows
 
   it('puts a caregiver with an exception first, so it lands on page 1', () => {
-    expect(rows.map((row) => row.name)).toEqual(['Zainal A.', 'Aisyah N.', 'Ben Tan', 'Needs cover'])
+    expect(rows.map((row) => row.name)).toEqual(['Zainal A.', 'Aisyah N.', 'Ben Tan'])
   })
 
-  it('pages caregivers only, keeping Needs cover on every page', () => {
-    expect(pageOf(rows, 2, 2)).toMatchObject({ page: 2, total: 3, rows: [{ name: 'Ben Tan' }, { name: 'Needs cover' }] })
+  it('pages caregivers, clamping to the pages there are', () => {
+    expect(pageOf(rows, 2, 2)).toMatchObject({ page: 2, total: 3, rows: [{ name: 'Ben Tan' }] })
     expect(pageOf(rows, 9, 2).page).toBe(2)
   })
 })

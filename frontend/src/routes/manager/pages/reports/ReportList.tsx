@@ -6,6 +6,7 @@ import { generateReports } from '../../../../features/reports/api'
 import {
   audienceLabels,
   audienceNotes,
+  metricsLine,
   previousWeek,
   problemDetail,
   reportPeriod,
@@ -213,48 +214,52 @@ export default function ReportList() {
               No reports are on file here yet. Generate a period above, or wait for Sunday's run.
             </p>
           ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th scope="col">Period</th>
-                  <th scope="col">Elder</th>
-                  <th scope="col">Reader</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Data</th>
-                  <th scope="col">Filed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resource.data.items.map((report) => (
-                  <tr key={report.id}>
-                    <td>
-                      <Link to={'/manager/reports/' + report.id}>
-                        {reportPeriod(report.periodStart, report.periodEnd)}
-                      </Link>
-                    </td>
-                    <td className={styles.data}>#{report.elderId}</td>
-                    <td>
-                      <span className={styles.readerTag} title={audienceNotes[report.audience]}>
-                        {audienceLabels[report.audience]}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={styles.statusTag}>{statusLabels[report.status]}</span>
-                    </td>
-                    <td className={styles.data}>
-                      {report.dataComplete ? (
-                        <span className={styles.complete}>complete</span>
-                      ) : (
-                        <span className={styles.incompleteMark}>
-                          incomplete · {report.missingItems.length} missing
-                        </span>
-                      )}
-                    </td>
-                    <td className={styles.data}>{reportTime(report.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Period</th>
+                      <th scope="col">Elder</th>
+                      <th scope="col">Reader</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Data</th>
+                      <th scope="col">The period</th>
+                      <th scope="col">Filed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resource.data.items.map((report) => (
+                      <tr key={report.id}>
+                        <td>
+                          <Link to={'/manager/reports/' + report.id}>
+                            {reportPeriod(report.periodStart, report.periodEnd)}
+                          </Link>
+                        </td>
+                        <td className={styles.data}>#{report.elderId}</td>
+                        <td>
+                          <span className={styles.readerTag} title={audienceNotes[report.audience]}>
+                            {audienceLabels[report.audience]}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={styles.statusTag}>{statusLabels[report.status]}</span>
+                        </td>
+                        <td className={styles.data}>
+                          {report.dataComplete ? (
+                            <span className={styles.complete}>complete</span>
+                          ) : (
+                            <span className={styles.incompleteMark}>
+                              incomplete · {report.missingItems.length} missing
+                            </span>
+                          )}
+                        </td>
+                        <td className={styles.data}>{metricsLine(report.metrics)}</td>
+                        <td className={styles.data}>{reportTime(report.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            </div>
           ))}
       </div>
     </ManagerShell>

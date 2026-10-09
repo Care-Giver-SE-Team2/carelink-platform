@@ -18,6 +18,15 @@ public interface AccountIssuer {
 	 */
 	IssuedAccount issue(String displayName, Role role);
 
+	/**
+	 * Creates an enabled account with one role, under a username and password the person chose
+	 * themselves (e.g. a family member signing up from the landing page).
+	 *
+	 * @return the new account's id
+	 * @throws sg.nus.carelink.shared.error.BusinessRuleViolation If the username is already taken
+	 */
+	Long register(String username, String displayName, String rawPassword, Role role);
+
 	record IssuedAccount(Long userId, String username, String temporaryPassword) {
 	}
 }

@@ -1,6 +1,7 @@
 package sg.nus.carelink.identity.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Set;
 
@@ -9,6 +10,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import sg.nus.carelink.identity.domain.model.AppUser;
+import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.security.Role;
 
 /** Issuing a login for another module: a free username, one role, and only the password's hash stored. */
@@ -46,5 +48,29 @@ class AccountIssuerServiceTest {
 	void eachAccountGetsADifferentPassword() {
 		assertThat(issuer.issue("A", Role.ELDER).temporaryPassword())
 				.isNotEqualTo(issuer.issue("B", Role.ELDER).temporaryPassword());
+	}
+
+	@Test
+	void registersTheChosenUsernameWithTheRoleAndOnlyTheHashOfTheChosenPassword() {
+		Long userId = issuer.register("lim.family", "Lim Wei Ling", "chosen-password", Role.FAMILY);
+
+		AppUser stored = users.findById(userId).orElseThrow();
+		assertThat(stored.username()).isEqualTo("lim.family");
+		assertThat(stored.displayName()).isEqualTo("Lim Wei Ling");
+		assertThat(stored.roles()).containsExactly(Role.FAMILY);
+		assertThat(stored.enabled()).isTrue();
+		String hash = users.passwordHashOf("lim.family");
+		assertThat(hash).isNotEqualTo("chosen-password");
+		assertThat(encoder.matches("chosen-password", hash)).isTrue();
+	}
+
+	@Test
+	void refusesToRegisterATakenUsername() {
+		users.with(new AppUser(1L, "lim.family", "Someone", Set.of(Role.ELDER), true));
+
+		assertThatThrownBy(() -> issuer.register("lim.family", "Lim Wei Ling", "chosen-password", Role.FAMILY))
+				.isInstanceOfSatisfying(BusinessRuleViolation.class,
+						violation -> assertThat(violation.code()).isEqualTo("USERNAME_TAKEN"));
+		assertThat(users.findById(1L).orElseThrow().displayName()).isEqualTo("Someone");
 	}
 }

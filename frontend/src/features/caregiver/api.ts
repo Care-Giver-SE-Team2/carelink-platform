@@ -17,8 +17,10 @@ export type WorkPack = {
   visit: VisitSummary
   elder: { elderId: number; preferredName: string; serviceAddress: string | null; postalSector: string | null; languageNeeds: string[]; accessNotes: string | null; emergencyNotes: string | null }
   carePlanId: number | null; carePlanVersion: number | null; serviceInstructions: string[]
-  tasks: { id: number; name: string; status: string; outcome: string | null; caregiverNote: string | null }[]
+  tasks: { id: number; name: string; status: string; outcome: string | null; caregiverNote: string | null; completedAt?: string | null }[]
   requiredEvidenceKinds: string[]
+  healthObservation?: { healthFlag: import('../caregiver-execution/api').HealthFlag | null; healthNote: string | null }
+  execution?: { allowedActions: string[]; blockedReason: string | null; serverNow: string; checkInOpensAt: string; checkInClosesAt: string; checkedInAt: string | null; checkedOutAt: string | null; lateArrival: boolean; locationSource: string | null }
 }
 export function getMyProfile(signal?: AbortSignal) { return api<CaregiverProfile>('/caregivers/me', { signal }) }
 export function getMySchedule(query: string, signal?: AbortSignal) { return api<Schedule>('/caregivers/me/schedule' + (query ? '?' + query : ''), { signal }) }

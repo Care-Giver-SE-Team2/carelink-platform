@@ -1,0 +1,184 @@
+/* Colours and sizes come from the theme variables, so the bell follows whichever client it sits in,
+   the elder theme's larger type included.
+
+   The controls are styled as `.root .x`, one step more specific than a client's own rule for every
+   button on its pages (the family app's `.portal button` sets a 48px minimum height, padding and a
+   pill border), so the bell keeps its own shape wherever it is placed. */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+/* Above the page's own header band, clear of the phone's notch. */
+.floating {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  right: 14px;
+  z-index: 20;
+}
+
+.root .bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 6px);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.root .bell svg {
+  flex: none;
+}
+
+.root .bell:hover {
+  border-color: var(--text);
+}
+
+.root .bell:focus-visible,
+.root .item:focus-visible,
+.root .textButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--danger);
+  color: #fff;
+  font: 600 11px/18px var(--font);
+  text-align: center;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: min(360px, calc(100vw - 32px));
+  max-height: 440px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: var(--shadow-modal);
+  color: var(--text);
+  text-align: left;
+  white-space: normal;
+}
+
+.panelHead {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.panelTitle {
+  font-weight: 600;
+}
+
+.root .textButton {
+  min-height: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--link, var(--accent));
+  font: inherit;
+  font-size: 0.9em;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.root .textButton:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+.note {
+  margin: 0;
+  padding: 14px 12px;
+  color: var(--text-muted);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.root .item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-height: auto;
+  padding: 10px 12px 10px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border-light, var(--border));
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.root .item:hover {
+  background: var(--bg-hover, var(--bg));
+}
+
+.root .unread {
+  border-left-color: var(--accent);
+}
+
+.unread .itemTitle {
+  font-weight: 600;
+}
+
+.itemBody {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-secondary, var(--text-muted));
+  font-size: 0.9em;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.itemTime {
+  color: var(--text-faint, var(--text-muted));
+  font-size: 0.8em;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

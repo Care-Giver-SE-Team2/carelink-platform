@@ -38,7 +38,10 @@ function installApi(override?: (url: URL, init: RequestInit) => Response | Promi
 function openSummary(path = '/family/reports/weekly?elderId=21&weekStart=2026-09-21') {
   return render(<MemoryRouter initialEntries={[path]}>
     <CurrentUrl />
-    <Routes><Route path="/family/*" element={<FamilyHome />} /></Routes>
+    <Routes>
+      <Route path="/" element={<h1>Landing</h1>} />
+      <Route path="/family/*" element={<FamilyHome />} />
+    </Routes>
   </MemoryRouter>)
 }
 function CurrentUrl() {
@@ -56,6 +59,39 @@ afterEach(() => {
 })
 
 describe('Family weekly care summary', () => {
+  it('presents legacy report visits as separate rows instead of a single summary paragraph', async () => {
+    installApi((url) => url.pathname === '/api/reports/301' ? json({ ...detail, sections: [
+      { title: 'Service completion', body: '2 visits: 1 scheduled, 1 verified.\nMon 21 Sep 09:00 · Personal care · Mei · verified · evidence 2 of 2 verified\nWed 23 Sep 09:00 · Personal care · Mei · scheduled · no evidence' },
+      { title: 'Observations', body: 'Mon 21 Sep · Mei: Comfortable after the visit.' },
+    ] }) : undefined)
+    openSummary()
+    const article = await screen.findByRole('article', { name: 'Weekly care summary' })
+    const visits = within(article).getByRole('region', { name: 'Visits' })
+    expect(within(visits).getByText('verified')).toBeInTheDocument()
+    expect(within(visits).getByText('scheduled')).toBeInTheDocument()
+    expect(within(article).getByRole('region', { name: 'Caregiver notes' })).toBeInTheDocument()
+    expect(within(article).queryByLabelText('Summary text')).not.toBeInTheDocument()
+    expect(within(article).queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('uses the source report visual sections for a new weekly report', async () => {
+    installApi((url) => url.pathname === '/api/reports/301' ? json({ ...detail, sections: [
+      { key: 'overview', title: 'Overview', body: 'Care plan version 3 · 6.5 h a week.\nMain caregiver: Mei.\nVisits: 2 of 3 carried out.', figures: [
+        { key: 'visits', label: 'Visits carried out', value: 2, outOf: 3, unit: null },
+      ] },
+      { key: 'services', title: 'Services', body: 'Personal care: 2 of 3 carried out' },
+    ] }) : undefined)
+    openSummary()
+    const article = await screen.findByRole('article', { name: 'Weekly care summary' })
+    expect(within(article).getByText('2 of 3')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'This week' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Care context at report generation')).toHaveTextContent('Main caregiver: Mei · Care plan v3 · 6.5 h/week')
+    expect(screen.queryByText('Visits: 2 of 3 carried out.')).not.toBeInTheDocument()
+    expect(within(article).getByText('Personal care: 2 of 3 carried out')).toBeInTheDocument()
+    expect(within(article).queryByLabelText('Summary text')).not.toBeInTheDocument()
+    expect(within(article).getByText('Some care records are missing')).toBeInTheDocument()
+  })
+
   it('reads the selected week and its source report together, preserving text, completeness and corrections', async () => {
     const fetchMock = installApi()
     openSummary()
@@ -73,10 +109,10 @@ describe('Family weekly care summary', () => {
     expect(screen.getByRole('heading', { name: '21 Sep – 27 Sep 2026' })).toBeInTheDocument()
     expect(within(article).getByText('Structured template')).toBeInTheDocument()
     expect(within(article).getByText('Archived')).toBeInTheDocument()
-    expect(within(article).getByLabelText('Summary text').textContent).toBe(summary.summaryText)
+    expect(within(article).getByRole('region', { name: 'Visits' }).querySelector('p')?.textContent).toBe(detail.sections[0].body)
     expect(within(article).getByText('One visit record is missing.')).toBeInTheDocument()
     expect(within(article).getByText('Some care records are missing')).toBeInTheDocument()
-    expect(within(article).getByRole('region', { name: 'Corrections' }).querySelector('p')?.textContent).toBe(detail.amendments[0].note)
+    expect(within(article).getByRole('region', { name: 'Corrections and follow-ups' }).querySelector('p')?.textContent).toBe(detail.amendments[0].note)
     expect(within(article).getByText('28 Sept 2026, 00:30')).toBeInTheDocument()
     expect(within(article).getByText(summary.disclaimer)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument()
@@ -149,7 +185,7 @@ describe('Family weekly care summary', () => {
       await screen.findByRole('article')
       denied = true
       await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh' }))
-      expect(await screen.findByRole('heading', { name: status === 401 ? 'Sign in to continue' : 'Report access unavailable' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: status === 401 ? 'Landing' : 'Report access unavailable' })).toBeInTheDocument()
       expect(screen.queryByRole('article')).not.toBeInTheDocument()
       expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
       expect(screen.queryByText('One visit record is missing.')).not.toBeInTheDocument()
@@ -231,13 +267,13 @@ describe('Family weekly care summary', () => {
 
   it('switches elders using the selected week and clears the originating list page', async () => {
     const fetchMock = installApi((url) => url.pathname === '/api/elders/22/weekly-summary' ? json({ ...summary, elderId: 22, reportId: 302, summaryText: 'Care for Lim Wei.' })
-      : url.pathname === '/api/reports/302' ? json({ ...detail, id: 302, elderId: 22, dataComplete: true, missingItems: [], amendments: [] }) : undefined)
+      : url.pathname === '/api/reports/302' ? json({ ...detail, id: 302, elderId: 22, sections: [{ title: 'Observations', body: 'Care for Lim Wei.' }], dataComplete: true, missingItems: [], amendments: [] }) : undefined)
     openSummary('/family/reports/weekly?elderId=21&page=3&weekStart=2026-09-21')
     await screen.findByRole('article')
     await userEvent.setup().selectOptions(screen.getByRole('combobox', { name: 'Care for' }), '22')
     await screen.findByText('Care for Lim Wei.')
     expect(screen.getByText('Records complete')).toBeInTheDocument()
-    expect(screen.getByText('No corrections have been added.')).toBeInTheDocument()
+    expect(screen.getByText('No corrections or follow-ups have been added.')).toBeInTheDocument()
     expect(screen.queryByText('One visit record is missing.')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Current URL')).toHaveTextContent('/family/reports/weekly?elderId=22&weekStart=2026-09-21')
     expect(fetchMock.mock.calls.map(([path]) => path).slice(-2)).toEqual(['/api/elders/22/weekly-summary?weekStart=2026-09-21', '/api/reports/302'])
@@ -283,20 +319,20 @@ describe('Family weekly care summary', () => {
     },
   )
 
-  it('preserves literal summary text while newly added corrections stay separate on refresh', async () => {
+  it('preserves literal saved chapter text while newly added corrections stay separate on refresh', async () => {
     const text = '<img src=x onerror="alert(1)">\n\n  **Original observation**\n'
     let corrected = false
     installApi((url) => url.pathname.includes('weekly-summary') ? json({ ...summary, summaryText: text })
-      : corrected && url.pathname === '/api/reports/301' ? json({ ...detail, amendments: [...detail.amendments, { id: 72, note: 'Additional correction.', createdAt: '2026-09-29T00:00:00+08:00' }] }) : undefined)
+      : url.pathname === '/api/reports/301' ? json({ ...detail, sections: [{ title: 'Observations', body: text }], amendments: corrected ? [...detail.amendments, { id: 72, note: 'Additional correction.', createdAt: '2026-09-29T00:00:00+08:00' }] : detail.amendments }) : undefined)
     openSummary()
     await screen.findByRole('article')
     corrected = true
     await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh' }))
     await screen.findByText('Additional correction.')
-    expect(screen.getByLabelText('Summary text').textContent).toBe(text)
+    expect(screen.getByRole('region', { name: 'Caregiver notes' }).querySelector('p')?.textContent).toBe(text)
     expect(screen.getByRole('article').querySelector('img')).toBeNull()
     expect(screen.getByRole('article').querySelector('strong')).toBeNull()
-    expect(Array.from(screen.getByRole('region', { name: 'Corrections' }).querySelectorAll('p')).map((node) => node.textContent))
+    expect(Array.from(screen.getByRole('region', { name: 'Corrections and follow-ups' }).querySelectorAll('p')).map((node) => node.textContent))
       .toEqual(['Visit duration corrected to 45 minutes.\nOriginal report retained.', 'Additional correction.'])
   })
 
@@ -366,37 +402,18 @@ describe('Family weekly care summary', () => {
     expect(await screen.findByRole('heading', { name: 'Report access unavailable' })).toBeInTheDocument()
   })
 
-  it.each([401, 403])('signs in from %s with CSRF and loads the new account’s elder for the same week', async (status) => {
-    let signedIn = false
-    const fetchMock = installApi((url, init) => {
-      if (url.pathname === '/api/auth/csrf') {
-        document.cookie = 'XSRF-TOKEN=weekly-login; path=/'
-        return new Response(null)
-      }
-      if (url.pathname === '/api/auth/login') {
-        expect(JSON.parse(init.body as string)).toEqual({ username: 'family_b', password: 'test-password' })
-        expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('weekly-login')
-        signedIn = true
-        return json({ ...family, id: 12 })
-      }
-      if (url.pathname === '/api/auth/me') return json({ ...family, roles: ['ROLE_FAMILY'] })
-      if (signedIn && url.pathname === '/api/elders') return json([elders[1]])
-      if (url.pathname === '/api/elders/21/weekly-summary') return new Response(null, { status })
-      if (url.pathname === '/api/elders/22/weekly-summary') return json({ ...summary, elderId: 22, reportId: 302, summaryText: 'New account care summary.' })
-      if (url.pathname === '/api/reports/302') return json({ ...detail, elderId: 22, id: 302, dataComplete: true, missingItems: [], amendments: [] })
-      return undefined
-    })
+  it('returns to the landing page on 401 and links there to switch account on 403', async () => {
+    let status = 401
+    installApi((url) => url.pathname === '/api/elders/21/weekly-summary' ? new Response(null, { status }) : undefined)
+    const { unmount } = openSummary('/family/reports/weekly?elderId=21&page=3&weekStart=2026-09-21')
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument()
+    unmount()
+
+    status = 403
     openSummary('/family/reports/weekly?elderId=21&page=3&weekStart=2026-09-21')
-    const user = userEvent.setup()
-    if (status === 403) await user.click(await screen.findByRole('button', { name: 'Sign in with another account' }))
-    await user.type(await screen.findByLabelText('Username'), 'family_b')
-    await user.type(screen.getByLabelText('Password'), 'test-password')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
-    await screen.findByText('New account care summary.')
-    expect(screen.getByRole('combobox', { name: 'Care for' })).toHaveValue('22')
-    expect(screen.queryByText('Tan Mei')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Current URL')).toHaveTextContent('/family/reports/weekly?weekStart=2026-09-21')
-    expect(fetchMock.mock.calls.filter(([path]) => path.startsWith('/api/reports/')).map(([path]) => path)).toEqual(['/api/reports/302'])
+    expect(await screen.findByRole('link', { name: 'Sign in with another account' })).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('article')).not.toBeInTheDocument()
   })
 
   it('reloads available elders after a binding is revoked, keeping the chosen week', async () => {

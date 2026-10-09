@@ -56,6 +56,12 @@ public class CarePlanService {
 		return carePlans.findLatestByElderId(elderId);
 	}
 
+	/** Every version of the elder's plan, drafts included, newest first — the editor's version history. */
+	@Transactional(readOnly = true)
+	public List<CarePlan> findVersions(Long elderId) {
+		return carePlans.findByElderId(elderId).reversed();
+	}
+
 	@Transactional(readOnly = true)
 	public List<CarePlanNode> findNodes(Long carePlanId) {
 		return carePlanNodes.findByCarePlanId(carePlanId);

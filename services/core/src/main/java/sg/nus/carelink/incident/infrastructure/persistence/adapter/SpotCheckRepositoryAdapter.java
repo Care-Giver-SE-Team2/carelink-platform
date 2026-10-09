@@ -61,4 +61,11 @@ class SpotCheckRepositoryAdapter implements SpotCheckRepository {
 				.map(SpotCheckMapper::toDomain)
 				.toList();
 	}
+
+	@Override
+	public List<SpotCheck> findAwaitingConsent() {
+		return jpa.findByApprovalStatusAndOutcomeIsNull(SpotCheckJpaEntity.ApprovalStatus.PENDING_APPROVAL).stream()
+				.map(SpotCheckMapper::toDomain)
+				.toList();
+	}
 }

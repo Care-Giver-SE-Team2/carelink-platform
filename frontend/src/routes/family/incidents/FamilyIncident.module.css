@@ -1,0 +1,35 @@
+/* FM05 inherits the family palette and keeps the same reading width on phone and desktop. */
+.page { composes: page from '../components/FamilyScreen.module.css'; }
+.navigation {
+  composes: band from '../components/FamilyScreen.module.css';
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding-right: 44px; /* Keep the page action clear of the existing floating bell. */
+}
+.navigation a { color: var(--fm-muted); min-height: 44px; display: inline-flex; align-items: center; }
+.hero { composes: band from '../components/FamilyScreen.module.css'; }
+.hero > p { margin-top: 8px; color: var(--fm-muted); }
+.hero > .eyebrow { color: var(--fm-accent); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; margin: 0 0 8px; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.badge { padding: 6px 10px; border-radius: 999px; color: var(--fm-accent); background: var(--fm-accent-tint); font-size: 12px; }
+.badge[data-severity='HIGH'] { color: var(--fm-urgent); background: var(--fm-urgent-tint); }
+.card { margin-bottom: 14px; padding: 20px; background: var(--fm-card); border: 1px solid var(--fm-line-card); border-radius: 18px; }
+.card > p, .card > a, .card > button { margin-top: 12px; }
+.description { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
+.facts { margin: 18px 0 0; display: grid; gap: 12px; }
+.facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 10px; }
+.facts dt { color: var(--fm-muted); }
+.facts dd { margin: 0; }
+.muted, .timestamp { color: var(--fm-muted); font-size: 13px; }
+.timestamp { margin-top: 12px; }
+.deadline { padding: 12px; background: var(--fm-pending-tint); border-radius: 12px; }
+.form { display: grid; gap: 10px; margin: 18px 0; }
+.form textarea { width: 100%; min-width: 0; resize: vertical; padding: 12px; border: 1px solid var(--fm-line-control); border-radius: 12px; font: inherit; color: var(--fm-ink); background: var(--fm-card); }
+.form label { font-weight: 600; }
+.form > .primary { background: var(--fm-accent); color: #fff; }
+.form > .primary:not(:disabled):hover { background: var(--fm-accent-strong); }
+.error { margin-top: 12px; padding: 12px; color: var(--fm-urgent); background: var(--fm-urgent-tint); border-radius: 12px; }
+.error button { margin-top: 10px; }
+.confirmed { margin: 18px 0; padding: 16px; border-radius: 12px; background: var(--fm-accent-tint); }
+.confirmed p { margin-top: 8px; }
+.loading { min-height: 180px; display: grid; place-items: center; color: var(--fm-muted); }
+@media (max-width: 360px) { .card { padding: 16px; } .facts > div { grid-template-columns: 1fr; gap: 4px; } }

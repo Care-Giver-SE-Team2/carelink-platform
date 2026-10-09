@@ -5,9 +5,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,9 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.report.domain.model.Report;
 import sg.nus.carelink.report.domain.model.ReportAmendment;
+import sg.nus.carelink.report.domain.model.ReportBasis;
 import sg.nus.carelink.report.domain.model.ReportFacts;
+import sg.nus.carelink.report.domain.model.ReportMetrics;
 import sg.nus.carelink.report.domain.model.ReportPage;
 import sg.nus.carelink.report.domain.model.ReportPeriod;
+import sg.nus.carelink.report.domain.repository.ReportBasisRepository;
 import sg.nus.carelink.report.domain.repository.ReportFactsSource;
 import sg.nus.carelink.report.domain.repository.ReportRepository;
 import sg.nus.carelink.report.domain.service.ReportAssembler;
@@ -31,10 +38,10 @@ import sg.nus.carelink.shared.error.ResourceNotFound;
  * the domain ports, calls the domain model, saves, and returns. Business rules stay in
  * domain.model. identity.application.IdentityService is the template.
  *
- * <p>For UC-MG07 that means: gather one elder's facts once, hand the same facts to the
- * assembler for each reader, file what comes back. How the three versions differ is decided
- * in {@code domain.service}; if a filtering rule appears in this file, it is in the wrong
- * place.
+ * <p>For UC-MG07 that means: gather one elder's facts once, store them as the run's basis, hand
+ * the same facts to the assembler for each reader, file what comes back against the basis. How
+ * the three versions differ is decided in {@code domain.service}; if a filtering rule appears
+ * in this file, it is in the wrong place.
  */
 @Service
 @Transactional
@@ -46,11 +53,13 @@ public class ReportService {
 	private static final int MAX_PAGE_SIZE = 200;
 
 	private final ReportRepository reports;
+	private final ReportBasisRepository bases;
 	private final ReportFactsSource facts;
 	private final Clock clock;
 
-	ReportService(ReportRepository reports, ReportFactsSource facts, Clock clock) {
+	ReportService(ReportRepository reports, ReportBasisRepository bases, ReportFactsSource facts, Clock clock) {
 		this.reports = reports;
+		this.bases = bases;
 		this.facts = facts;
 		this.clock = clock;
 	}
@@ -99,7 +108,8 @@ public class ReportService {
 
 	/**
 	 * One elder's three reports. The facts are read once, and only if at least one reader's
-	 * report is still missing; every reader's assembler is given the same facts.
+	 * report is still missing; they are stored as the basis of what this run files, and every
+	 * reader's assembler is given the same facts.
 	 */
 	private List<Report> generateFor(Long elderId, ReportPeriod period, Long requestedByUserId) {
 		Map<Report.Audience, Report> onFile = new EnumMap<>(Report.Audience.class);
@@ -113,6 +123,7 @@ public class ReportService {
 		ReportFacts gathered = facts.gather(elderId, period)
 				.orElseThrow(() -> new ResourceNotFound("Elder", elderId));
 		LocalDateTime now = now();
+		ReportBasis basis = bases.save(ReportBasis.of(gathered, now), gathered);
 
 		List<Report> result = new ArrayList<>();
 		for (Report.Audience audience : Report.Audience.values()) {
@@ -120,6 +131,7 @@ public class ReportService {
 			if (report == null) {
 				report = reports.save(Report.generate(
 						elderId,
+						basis.id(),
 						audience,
 						period,
 						ReportAssembler.forAudience(audience).assemble(gathered),
@@ -133,14 +145,19 @@ public class ReportService {
 
 	// ----------------------------------------------------------------- correcting ---
 
-	/**
-	 * Appends a correction to a filed report. The report's own row is not written: the
-	 * correction is stored beside it, dated and signed.
-	 *
-	 * @return the stored correction
-	 */
+	/** Appends a correction. See {@link #amend(Long, ReportAmendment.Kind, String, Long)}. */
 	public ReportAmendment amend(Long reportId, String note, Long authorUserId) {
-		Report amended = require(reportId).amend(note, authorUserId, now());
+		return amend(reportId, ReportAmendment.Kind.CORRECTION, note, authorUserId);
+	}
+
+	/**
+	 * Appends a note to a filed report: a correction, or a follow-up on something it recorded.
+	 * The report's own row is not written: the note is stored beside it, dated and signed.
+	 *
+	 * @return the stored note
+	 */
+	public ReportAmendment amend(Long reportId, ReportAmendment.Kind kind, String note, Long authorUserId) {
+		Report amended = require(reportId).amend(kind, note, authorUserId, now());
 		return reports.saveAmendment(amended.amendments().getLast());
 	}
 
@@ -162,6 +179,17 @@ public class ReportService {
 	@Transactional(readOnly = true)
 	public ReportPage page(Long elderId, Report.Audience audience, int page, int size) {
 		return reports.findPage(elderId, audience, Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
+	}
+
+	/**
+	 * The numbers of the bases the given reports were filed from, by basis id: what the
+	 * manager's list and detail show beside each report. Reports filed before bases were kept
+	 * have none and are left out.
+	 */
+	@Transactional(readOnly = true)
+	public Map<Long, ReportMetrics> metricsFor(Collection<Report> filed) {
+		Set<Long> ids = filed.stream().map(Report::basisId).filter(Objects::nonNull).collect(Collectors.toSet());
+		return ids.isEmpty() ? Map.of() : bases.findMetrics(ids);
 	}
 
 	private Report require(Long id) {

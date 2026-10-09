@@ -54,7 +54,10 @@ function CurrentUrl() {
 function openProgress(path = '/family/visits/501', strict = false) {
   const page = <MemoryRouter initialEntries={[path]}>
     <CurrentUrl />
-    <Routes><Route path="/family/*" element={<FamilyHome />} /></Routes>
+    <Routes>
+      <Route path="/" element={<h1>Landing</h1>} />
+      <Route path="/family/*" element={<FamilyHome />} />
+    </Routes>
   </MemoryRouter>
   return render(strict ? <StrictMode>{page}</StrictMode> : page)
 }
@@ -122,7 +125,7 @@ describe('Family visit automatic refresh', () => {
       await act(async () => { openProgress() })
       denied = true
       await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
-      expect(screen.getByRole('heading', { name: status === 401 ? 'Sign in to continue' : 'Visit access unavailable' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: status === 401 ? 'Landing' : 'Visit access unavailable' })).toBeInTheDocument()
       expect(screen.queryByText('Home care')).not.toBeInTheDocument()
       expect(screen.queryByRole('list', { name: 'Visit tasks' })).not.toBeInTheDocument()
       const count = fetchMock.mock.calls.length
@@ -250,7 +253,7 @@ describe('Family visit automatic refresh', () => {
     await act(async () => { online.mockReturnValue(true); window.dispatchEvent(new Event('online')) })
     expect(screen.getByText('1 of 4 tasks completed')).toBeInTheDocument()
     await act(async () => finish(json({}, 401)))
-    expect(screen.queryByRole('heading', { name: 'Sign in to continue' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Landing' })).not.toBeInTheDocument()
     await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
     expect(fetchMock.mock.calls.filter(([path]) => path.endsWith('/tasks'))).toHaveLength(2)
   })
@@ -381,7 +384,7 @@ describe('Family visit progress', () => {
       await waitFor(() => expect(pending.size).toBe(3))
       const failedPath = '/api/visits/501' + (part === 'details' ? '' : '/' + part)
       await act(async () => pending.get(failedPath)!(json({}, status)))
-      expect(await screen.findByRole('heading', { name: status === 401 ? 'Sign in to continue' : 'Visit access unavailable' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: status === 401 ? 'Landing' : 'Visit access unavailable' })).toBeInTheDocument()
       for (const [path, finish] of pending) {
         if (path !== failedPath) await act(async () => finish(json(path.endsWith('/tasks') ? tasks : path.endsWith('/timeline') ? timeline : visit)))
       }
@@ -431,36 +434,20 @@ describe('Family visit progress', () => {
     expect(fetchMock).toHaveBeenCalledTimes(stage === 'session' ? 1 : 4)
   })
 
-  it.each([[401, true], [401, false], [403, false]] as const)(
-    'rechecks the same visit after signing in from %s (access granted: %s)', async (initialStatus, granted) => {
-      let signedIn = false
-      const fetchMock = installApi((url) => {
-        if (url.pathname === '/api/auth/me' && !signedIn) return json({}, initialStatus)
-        if (url.pathname === '/api/auth/csrf') {
-          document.cookie = 'XSRF-TOKEN=visit-token; path=/'
-          return new Response(null, { status: 204 })
-        }
-        if (url.pathname === '/api/auth/login') { signedIn = true; return json(family) }
-        if (signedIn && !granted && url.pathname.endsWith('/tasks')) return json({}, 403)
-      })
-      const user = userEvent.setup()
-      openProgress()
-      if (initialStatus === 403) await user.click(await screen.findByRole('button', { name: 'Sign in with another account' }))
-      await user.type(await screen.findByLabelText('Username'), 'family-a')
-      await user.type(screen.getByLabelText('Password'), 'test-only-password')
-      await user.click(screen.getByRole('button', { name: 'Sign in' }))
-      if (granted) expect(await screen.findByText('1 of 4 tasks completed')).toBeInTheDocument()
-      else {
-        expect(await screen.findByRole('heading', { name: 'Visit access unavailable' })).toBeInTheDocument()
-        expect(screen.queryByText('Home care')).not.toBeInTheDocument()
-      }
-      const login = fetchMock.mock.calls.find(([path]) => path === '/api/auth/login')!
-      expect(login[1].method).toBe('POST')
-      expect(new Headers(login[1].headers).get('X-XSRF-TOKEN')).toBe('visit-token')
-      expect(fetchMock.mock.calls.filter(([path]) => path === '/api/auth/me')).toHaveLength(2)
-      expect(fetchMock.mock.calls.map(([path]) => path)).toContain('/api/visits/501/tasks')
-    },
-  )
+  it('returns to the landing page when there is no session, without reading care data', async () => {
+    const fetchMock = installApi((url) => url.pathname === '/api/auth/me' ? json({}, 401) : undefined)
+    openProgress()
+    expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([path]) => path.startsWith('/api/visits'))).toBe(false)
+  })
+
+  it('links to the landing page to sign in with another account on 403', async () => {
+    installApi((url) => url.pathname === '/api/auth/me' ? json({}, 403) : undefined)
+    openProgress()
+    expect(await screen.findByRole('link', { name: 'Sign in with another account' })).toHaveAttribute('href', '/')
+    expect(screen.queryByText('Home care')).not.toBeInTheDocument()
+  })
 
   it.each([400, 404])('clears all sections when a child endpoint returns %s', async (status) => {
     installApi((url) => url.pathname.endsWith('/timeline') ? json({}, status) : undefined)
