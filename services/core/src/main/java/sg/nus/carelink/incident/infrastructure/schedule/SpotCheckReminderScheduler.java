@@ -5,6 +5,7 @@ import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -30,6 +31,7 @@ class SpotCheckReminderScheduler {
 		this.after = after;
 	}
 
+	@SchedulerLock(name = "incident.spot-check-reminders", lockAtMostFor = "PT1H", lockAtLeastFor = "PT55M")
 	@Scheduled(
 			fixedDelayString = "${carelink.spot-checks.reminder-scan-interval:PT1H}",
 			initialDelayString = "${carelink.spot-checks.reminder-scan-initial-delay:PT3M}")

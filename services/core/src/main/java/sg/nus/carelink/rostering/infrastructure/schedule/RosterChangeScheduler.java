@@ -1,5 +1,6 @@
 package sg.nus.carelink.rostering.infrastructure.schedule;
 
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ class RosterChangeScheduler {
 		this.scan = scan;
 	}
 
+	@SchedulerLock(name = "rostering.change-sweep", lockAtMostFor = "PT5M", lockAtLeastFor = "PT50S")
 	@Scheduled(
 			fixedDelayString = "${carelink.rerostering.scan-interval:PT60S}",
 			initialDelayString = "${carelink.rerostering.scan-initial-delay:PT45S}")

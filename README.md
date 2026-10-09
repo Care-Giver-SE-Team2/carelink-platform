@@ -71,7 +71,7 @@ Prerequisites: **JDK 25**, **Docker** with Compose v2, **Node 22**. For deployme
 kubectl and the AWS CLI. On Windows, run the scripts from Git Bash.
 
 ```bash
-# core and its database, on http://localhost:8080
+# core with its database and Redis, on http://localhost:8080
 scripts/run.sh core
 
 # the front end, on http://localhost:5173 (/api is proxied to port 8080)
@@ -82,7 +82,7 @@ scripts/run.sh down
 ```
 
 The first `run.sh` writes random local database passwords to `.env`, which git ignores; no
-password is ever committed. `scripts/run.sh all` also starts Redis and LocalStack (SQS, SNS).
+password is ever committed. `scripts/run.sh all` also starts LocalStack (SQS, SNS).
 
 Everyday commands:
 

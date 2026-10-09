@@ -2,6 +2,7 @@ package sg.nus.carelink.profile.infrastructure.schedule;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,7 @@ class CredentialExpiryScheduler {
 		this.expiry = expiry;
 	}
 
+	@SchedulerLock(name = "profile.credential-expiry-scan", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
 	@Scheduled(
 			cron = "${carelink.caregiver.expiry-scan-cron:0 0 0 * * *}",
 			zone = "${carelink.caregiver.expiry-scan-zone:Asia/Singapore}")
