@@ -1,8 +1,8 @@
 # Building a service
 
 How a module of core becomes a service of its own. It is written for the owners of visit, report and
-notification, and covers four things: the shape every service has, how a service knows who is signed in, how it
-calls core, and what it may do with the database before the schema split.
+notification, and covers five things: the shape every service has, how a service knows who is signed in, how it
+calls core, how it sends and receives events, and what it may do with the database before the schema split.
 
 What moves, and what replaces each call into core, is in [service-boundaries.md](service-boundaries.md). This
 guide covers how. Inside a service, the modules and layers follow [ARCHITECTURE.md](../../ARCHITECTURE.md), as
@@ -24,6 +24,7 @@ in core.
 | Errors, request context, audit | dependency on `libs/shared` | core's `shared` package: error types and the exception handler, request id and access log, `audit_log` writes, roles |
 | Signed-in user | dependency on `libs/platform-security` | the security chain and `SignedInUsers` |
 | Calls to core | dependency on `libs/core-api` | the `CoreApi` client |
+| Events | dependency on `libs/events` | the outbox and its relay to SNS, the SQS consumer that handles each event once |
 
 ## 2. Step by step
 
@@ -85,6 +86,8 @@ Start from core's `pom.xml` and keep only what the service uses. Most services n
 	<dependency><groupId>sg.nus</groupId><artifactId>platform-security</artifactId><version>${project.version}</version></dependency>
 	<!-- Calls to core -->
 	<dependency><groupId>sg.nus</groupId><artifactId>core-api</artifactId><version>${project.version}</version></dependency>
+	<!-- Events between services, for a service that publishes or handles them -->
+	<dependency><groupId>sg.nus</groupId><artifactId>events</artifactId><version>${project.version}</version></dependency>
 
 	<!-- Testing: the same as core (webmvc-test, security-test, testcontainers-mysql, archunit-junit5, ...) -->
 </dependencies>
@@ -116,7 +119,7 @@ spring:
       ddl-auto: validate
     open-in-view: false
   flyway:
-    # Until the schema split, core migrates the one shared schema (section 5)
+    # Until the schema split, core migrates the one shared schema (section 6)
     enabled: false
 
 management:
@@ -160,7 +163,7 @@ The Redis address comes from `SPRING_DATA_REDIS_HOST` and `SPRING_DATA_REDIS_POR
 ### 2.4 Local run: `docker-compose.yml`
 
 Add an entry like core's. The service starts after core, because core migrates the schema the service
-validates:
+validates. The `CARELINK_EVENTS_*` and `AWS_*` lines are for a service that uses events (section 5):
 
 ```yaml
   visit:
@@ -168,12 +171,19 @@ validates:
     depends_on:
       core:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
     environment:
       DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
       DB_USER: carelink
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
       SPRING_DATA_REDIS_HOST: redis
       CARELINK_COREAPI_BASEURL: http://core:8080
+      CARELINK_EVENTS_TOPICARN: arn:aws:sns:ap-southeast-1:000000000000:carelink-events
+      CARELINK_EVENTS_QUEUEURL: http://localstack:4566/000000000000/carelink-visit
+      CARELINK_EVENTS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test             # LocalStack takes any key
+      AWS_SECRET_ACCESS_KEY: test
     ports:
       - "8081:8080"
     healthcheck:
@@ -202,7 +212,9 @@ env:
 ```
 
 The cloud environment provides the database and Redis settings, the same way for every service: `envFromSecret`
-names the Kubernetes Secret that holds them. The Ingress routes only `/api/**`. Nothing routes `/internal`.
+names the Kubernetes Secret that holds them. It also provides the events topic's ARN and the service's queue URL
+(`CARELINK_EVENTS_TOPICARN`, `CARELINK_EVENTS_QUEUEURL`). The pod's IAM role gives the credentials, so no key is
+set. The Ingress routes only `/api/**`. Nothing routes `/internal`.
 
 ## 3. Who is signed in: `platform-security`
 
@@ -300,7 +312,73 @@ itself is tested in core.
 **A new endpoint** is one change in core: the method in `CoreApi`, the controller method in core, and a case in
 `CoreApiContractTest`. Ask the owner of core, or open the pull request and ask them to review it.
 
-## 5. The database before the schema split
+## 5. Events between services: `events`
+
+A service tells the others what happened by publishing an event, and the services that care handle it. Events
+travel through one SNS topic. Each service has its own SQS queue subscribed to the topic, with a dead-letter
+queue behind it. The event catalogue lists which events exist, who publishes each, and who handles it.
+
+**Publishing.** Call `Events.publish` in the transaction that changes the data the event is about:
+
+```java
+@Transactional
+public void markMissed(Long visitId) {
+	Visit visit = visits.require(visitId);
+	visit.markMissed();
+	events.publish("VisitMissed", new VisitMissed(visit.id(), visit.elderId()));
+}
+```
+
+The event is written to the `outbox_event` table in that transaction, so it goes out only if the transaction
+commits. A relay then publishes it to SNS, normally within a second. Called outside a transaction, `publish`
+throws. The payload is written as JSON: ids and the fields the receivers need, never health details.
+
+**Handling.** Declare one bean per event type the service handles:
+
+```java
+@Component
+class VisitMissedHandler implements EventHandler<VisitMissed> {
+
+	public String type() { return "VisitMissed"; }
+
+	public Class<VisitMissed> payloadType() { return VisitMissed.class; }
+
+	public void handle(VisitMissed event, EventMetadata metadata) {
+		incidents.raiseMissedCheckIn(event.visitId(), event.elderId(), metadata.occurredAt());
+	}
+
+}
+```
+
+`handle` runs in a transaction together with the row in `consumed_message` that marks the event handled.
+SQS may deliver a message twice; the second delivery finds the row and is skipped. If `handle` throws, both roll
+back, and SQS delivers the event again after the queue's visibility timeout. After five receives the message
+goes to the dead-letter queue. An event type the service has no handler for is ignored.
+
+**Settings**, under `carelink.events`:
+
+| Setting | Environment variable | What |
+|---|---|---|
+| `service` | `CARELINK_EVENTS_SERVICE` | the service's name on its events and in `consumed_message`; defaults to `spring.application.name` |
+| `topic-arn` | `CARELINK_EVENTS_TOPICARN` | the topic; the relay runs only when it is set |
+| `queue-url` | `CARELINK_EVENTS_QUEUEURL` | the service's queue; the consumer runs only when it is set |
+| `endpoint` | `CARELINK_EVENTS_ENDPOINT` | LocalStack, for a local run; not set in the cloud |
+| `region` | `CARELINK_EVENTS_REGION` | defaults to `ap-southeast-1` |
+
+Locally, LocalStack in `docker-compose.yml` creates the topic `carelink-events` and the queues
+`carelink-core`, `carelink-visit`, `carelink-report` and `carelink-notification`, each with a dead-letter queue
+(`scripts/localstack/events.sh`). The compose entry in section 2.4 shows the settings. In the cloud, Terraform
+creates the same, plus a filter policy on each subscription, so a queue receives only the types its service
+handles.
+
+**The tables.** `outbox_event` and `consumed_message` ship with the library as a platform migration
+(`db/platform/V2__events.sql`). Core runs it until the schema split, as it runs every migration.
+
+**Testing.** In unit and slice tests, mock `Events` (`@MockitoBean Events events`) and verify what was
+published. A handler is a plain class: call `handle` directly. `EventsIT` in the library runs the whole path
+against MySQL and LocalStack.
+
+## 6. The database before the schema split
 
 Until the schema split, the services share core's database and its one schema:
 
@@ -314,7 +392,7 @@ Until the schema split, the services share core's database and its one schema:
 
 At the split, each service gets its own schema and its own Flyway migrations.
 
-## 6. Scheduled jobs
+## 7. Scheduled jobs
 
 Every service runs at least two replicas, so a scheduled job would run on each of them. Lock every job the way
 core does:
@@ -328,7 +406,7 @@ core does:
 The jobs that still need a lock when they move are `MissedCheckInScheduler` (visit) and `ReportScheduler` and
 `ValueAddedSettlementScheduler` (report).
 
-## 7. Before the first pull request
+## 8. Before the first pull request
 
 - [ ] `scripts/build.sh <name> test` passes: unit, ArchUnit (copy `architecture/LayerDependencyTest.java`) and
       MySQL integration tests, and at least 80% line coverage in the domain packages.
@@ -338,11 +416,9 @@ The jobs that still need a lock when they move are `MissedCheckInScheduler` (vis
       analyses one project per service.
 - [ ] The paths the service takes over are listed for the Ingress.
 
-## 8. Still to come
+## 9. Still to come
 
-- **Events.** The writes to the `notification` table and the cross-service reads in
-  [service-boundaries.md](service-boundaries.md) section 5 become events. The shared library for them (an
-  outbox table written in the same transaction, published to SNS, consumed from SQS, each message handled once)
-  is next on the platform side. Until it exists, keep those writes behind their ports as they are. They still
-  work while there is one schema.
+- **The writes and reads across services.** The writes to the `notification` table and the SQL reads of other
+  services' tables ([service-boundaries.md](service-boundaries.md), section 5) become events. Each owner moves
+  theirs, behind the port the business code already calls.
 - **The schema split** comes last, after the reads across schemas are gone.

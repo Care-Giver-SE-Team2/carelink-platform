@@ -44,7 +44,8 @@ carelink-platform/
 ├─ libs/
 │  ├─ shared/                     core's shared package for every service: errors, request context, access audit, roles
 │  ├─ platform-security/          who is signed in, read from the session core wrote; the security chain of every service but core
-│  └─ core-api/                   core's internal API (/internal/v1) as a Java interface, and its client
+│  ├─ core-api/                   core's internal API (/internal/v1) as a Java interface, and its client
+│  └─ events/                     events between services: the outbox, its relay to SNS, the SQS consumer
 ├─ build/
 │  ├─ Dockerfile                  the Dockerfile of every service: Maven build, then a JRE, non-root
 │  └─ entrypoint.sh               the start-up of every service: JVM settings, time zone, DNS cache, graceful stop
@@ -53,7 +54,8 @@ carelink-platform/
 ├─ scripts/
 │  ├─ build.sh  <service|all>         compile, test, image
 │  ├─ run.sh    <service|all|down>    run locally with docker compose
-│  └─ deploy.sh <service|all> <env>   deploy to staging or demo with Helm
+│  ├─ deploy.sh <service|all> <env>   deploy to staging or demo with Helm
+│  └─ localstack/events.sh            the events topic and queues LocalStack creates for a local run
 ├─ .github/workflows/
 │  ├─ ci.yml                      works out what a commit changed and runs service.yml for those services
 │  └─ service.yml                 the pipeline every service goes through

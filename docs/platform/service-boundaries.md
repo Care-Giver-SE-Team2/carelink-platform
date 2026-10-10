@@ -137,8 +137,14 @@ The platform's own tables go in a separate migration location, `db/platform`, wi
 `flyway_platform_history`. The application's migrations keep numbering V24, V25 and on. Because the two version
 sequences live in different history tables, they can never collide.
 
-| Table | Schema | Purpose |
-|---|---|---|
-| `shedlock` | core | Runs each core scheduled job on one replica only |
-| `outbox_event` | every service | Events written in the same transaction as the business data, then published |
-| `processed_message` | every service that consumes events | Ignores a message it has already handled |
+A library can ship platform migrations too: Flyway finds `db/platform` in every jar on the classpath. Each
+platform migration takes the next free version, listed here.
+
+| Version | Table | Schema | From | Purpose |
+|---|---|---|---|---|
+| V1 | `shedlock` | core | core | Runs each core scheduled job on one replica only |
+| V2 | `outbox_event` | every service that publishes events | `libs/events` | Events written in the same transaction as the business data, then published |
+| V2 | `consumed_message` | every service that handles events | `libs/events` | Ignores a message it has already handled |
+
+The next platform migration is V3. Until the schema split, the services share one schema, so the two events
+tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.

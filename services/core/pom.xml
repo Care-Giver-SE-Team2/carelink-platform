@@ -70,6 +70,12 @@
 			<artifactId>core-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<!-- Events between services: the outbox and its relay. Its tables come with core's platform migrations -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>events</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- Each scheduled job runs on one replica at a time (sg.nus.carelink.platform.SchedulerLocks) -->
 		<dependency>
 			<groupId>net.javacrumbs.shedlock</groupId>
