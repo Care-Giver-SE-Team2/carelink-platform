@@ -73,6 +73,11 @@ class EventTypesTest {
 				.isEqualTo("MEETS_STANDARD");
 		assertThat(json.readValue(json.writeValueAsString(rosterChange), RosterChangeUpdated.class).decidedBy())
 				.isEqualTo("FAMILY");
+		var requested = new NotificationRequested(7L, "CREDENTIAL_EXPIRED", "IN_APP", "Your First aid certificate expired",
+				"Upload the renewed certificate.", "CREDENTIAL", 8732L, null, SingaporeTime.of(HALF_NINE));
+		assertThat(json.readValue(json.writeValueAsString(requested), NotificationRequested.class).recipientUserId())
+				.isEqualTo(7L);
+		assertThat(NotificationRequested.TYPE).isEqualTo("NotificationRequested");
 		assertThat(IncidentRaised.TYPE).isEqualTo("IncidentRaised");
 		assertThat(IncidentUpdated.TYPE).isEqualTo("IncidentUpdated");
 		assertThat(SpotCheckUpdated.TYPE).isEqualTo("SpotCheckUpdated");

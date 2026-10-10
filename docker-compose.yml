@@ -92,15 +92,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
     environment:
       DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
       DB_USER: carelink
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
       # The login made through core, read from the same Redis
       SPRING_DATA_REDIS_HOST: redis
-      # Events: once a NotificationRequested handler exists, add CARELINK_EVENTS_QUEUEURL,
-      # CARELINK_EVENTS_ENDPOINT and the AWS_* keys (docs/platform/building-a-service.md, section 5).
-      # Until then the consumer stays off, so no event is taken from the queue unhandled.
+      # notification takes NotificationRequested from its queue (scripts/localstack/events.sh
+      # subscribes the queue to that event only). It publishes none, so it has no topic setting.
+      CARELINK_EVENTS_QUEUEURL: http://localstack:4566/000000000000/carelink-notification
+      CARELINK_EVENTS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test             # LocalStack takes any key
+      AWS_SECRET_ACCESS_KEY: test
     ports:
       - "8083:8080"
     healthcheck:

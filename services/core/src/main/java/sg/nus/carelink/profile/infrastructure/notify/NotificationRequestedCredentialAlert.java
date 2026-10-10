@@ -1,6 +1,5 @@
 package sg.nus.carelink.profile.infrastructure.notify;
 
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -10,6 +9,9 @@ import java.util.Locale;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.NotificationRequested;
+import sg.nus.carelink.eventtypes.SingaporeTime;
 import sg.nus.carelink.profile.domain.model.Caregiver;
 import sg.nus.carelink.profile.domain.repository.CredentialExpiryAlert;
 import sg.nus.carelink.profile.domain.service.CredentialExpiryScan.Audience;
@@ -17,16 +19,16 @@ import sg.nus.carelink.profile.domain.service.CredentialExpiryScan.Lapse;
 import sg.nus.carelink.shared.security.Role;
 
 /**
- * Writes SYS01's expiry alerts as {@code IN_APP} rows in {@code notification}, the table the
- * in-app inbox reads, the same way incident's NotificationTableAlert does. They stay PENDING:
- * nothing dispatches notifications yet (SUP-02), and whoever builds that will find these
- * already addressed.
+ * Sends SYS01's expiry alerts as {@code NotificationRequested} events, one per recipient, in the
+ * scan's transaction; notification keeps each one for its recipient's in-app inbox. This was one
+ * of the classes that wrote rows into {@code notification} directly, and it is the worked example
+ * for the rest: the port it implements and the code that calls it did not change.
  *
- * <p>Reads {@code app_user}/{@code user_role} for the managers with a plain statement, as the
- * incident alert does; reading is not owning.
+ * <p>Reads {@code app_user}/{@code user_role} for the managers with a plain statement: both
+ * tables stay in core with it.
  */
 @Component
-class NotificationTableCredentialAlert implements CredentialExpiryAlert {
+class NotificationRequestedCredentialAlert implements CredentialExpiryAlert {
 
 	private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
 
@@ -36,19 +38,13 @@ class NotificationTableCredentialAlert implements CredentialExpiryAlert {
 			where u.enabled = true and r.role = :role
 			""";
 
-	private static final String INSERT = """
-			insert into notification
-			    (recipient_user_id, event_type, channel, title, body, resource_type, resource_id, status,
-			     created_at)
-			values (:userId, :eventType, 'IN_APP', :title, :body, 'CREDENTIAL', :credentialId, 'PENDING',
-			        :createdAt)
-			""";
-
 	private final JdbcClient jdbc;
+	private final Events events;
 	private final Clock clock;
 
-	NotificationTableCredentialAlert(JdbcClient jdbc, Clock clock) {
+	NotificationRequestedCredentialAlert(JdbcClient jdbc, Events events, Clock clock) {
 		this.jdbc = jdbc;
+		this.events = events;
 		this.clock = clock;
 	}
 
@@ -92,16 +88,8 @@ class NotificationTableCredentialAlert implements CredentialExpiryAlert {
 	}
 
 	private void write(Long userId, String eventType, String title, String body, Long credentialId) {
-		jdbc.sql(INSERT)
-				.param("userId", userId)
-				.param("eventType", eventType)
-				.param("title", trim(title, 150))
-				.param("body", body)
-				.param("credentialId", credentialId)
-				// From the application's clock rather than the column default, for the reason
-				// incident's NotificationTableAlert gives: the database's clock reads back out of zone.
-				.param("createdAt", Timestamp.valueOf(LocalDateTime.now(clock)))
-				.update();
+		events.publish(NotificationRequested.TYPE, new NotificationRequested(userId, eventType, "IN_APP",
+				trim(title, 150), body, "CREDENTIAL", credentialId, null, SingaporeTime.of(LocalDateTime.now(clock))));
 	}
 
 	private static String trim(String text, int max) {

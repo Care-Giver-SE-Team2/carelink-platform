@@ -224,6 +224,8 @@ management.health.redis.enabled=false
 - `SharedMySql`: one MySQL container for the whole run, with a database of its own for each test class.
 - `SharedRedis`: one Redis container for the whole run.
 - `GlobalExceptionHandlerTestSupport`: the real exception handler, for standalone MockMvc controller tests.
+- `PlatformTablesForTests`: after core's migrations, the platform's own tables (`outbox_event`,
+  `consumed_message`, the scheduler locks), for a test that publishes or handles events. Import it on the test class.
 
 ### 2.6 Deployment: `deploy/values.yaml`
 
@@ -371,8 +373,8 @@ itself is tested in core.
 ## 5. Events between services: `events`
 
 A service tells the others what happened by publishing an event, and the services that care handle it. Events
-travel through one SNS topic. Each service has its own SQS queue subscribed to the topic, with a dead-letter
-queue behind it. [event-catalogue.md](event-catalogue.md) lists which events exist, who publishes each, what it
+travel through one SNS topic. Each service has its own SQS queue, subscribed to the topic for the events the
+service handles (a filter policy on the event's type), with a dead-letter queue behind it. [event-catalogue.md](event-catalogue.md) lists which events exist, who publishes each, what it
 carries, and who handles it.
 
 **Publishing.** Call `Events.publish` in the transaction that changes the data the event is about:
@@ -430,6 +432,24 @@ goes to the dead-letter queue. An event type the service has no handler for is i
 - **Tests.** The adapters' unit tests check each record's fields. `CoreEventsIT` checks, against MySQL, that each
   change leaves its event in `outbox_event`, in the order written, with the times the database keeps, and that a
   rolled-back change leaves none.
+
+**Worked example: notification handles `NotificationRequested`.** It is the first event a service takes off its
+queue. Look at it before you handle your own.
+
+- **The handler** is `notification/messaging/NotificationRequestedHandler`. Like a controller, it is a thin
+  adapter: it turns the event's record into one call to the application layer (`NotificationRequests.keep`).
+- **The subscription.** `scripts/localstack/events.sh` subscribes notification's queue to `NotificationRequested`
+  only. A service that gets its first handler adds its own `subscribe` line there. In the cloud, the Terraform
+  does the same.
+- **Local run.** The compose entry sets `CARELINK_EVENTS_QUEUEURL`, `CARELINK_EVENTS_ENDPOINT` and the `AWS_*`
+  keys, which switches the consumer on.
+- **Tests.** `NotificationRequestedHandlerTest` checks the mapping. `NotificationRequestedIT` publishes to the
+  topic in LocalStack, set up by the same script, and checks that the message is kept and that the queue takes
+  no other type of event. Tests that handle or publish events need the platform's tables (`consumed_message`,
+  `outbox_event`): import `PlatformTablesForTests` from `libs/test-support`.
+- **The publishing side.** core's credential expiry alert (`NotificationRequestedCredentialAlert`) publishes one
+  event per recipient where it used to insert a row. Its integration test now reads the event from
+  `outbox_event`, because core's tests have no notification service to turn it into a row.
 
 **Settings**, under `carelink.events`:
 

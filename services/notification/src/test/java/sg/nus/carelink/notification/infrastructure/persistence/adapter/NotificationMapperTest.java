@@ -24,6 +24,7 @@ class NotificationMapperTest {
 		entity.setResourceType("v7");
 		entity.setResourceId(8L);
 		entity.setStatus(NotificationJpaEntity.Status.PENDING);
+		entity.setCreatedAt(LocalDateTime.of(2026, 9, 6, 10, 10));
 		entity.setSentAt(LocalDateTime.of(2026, 9, 6, 10, 11));
 		entity.setReadAt(LocalDateTime.of(2026, 9, 6, 10, 12));
 
@@ -37,6 +38,7 @@ class NotificationMapperTest {
 		assertThat(domain.resourceType()).isEqualTo(entity.getResourceType());
 		assertThat(domain.resourceId()).isEqualTo(entity.getResourceId());
 		assertThat(domain.status().name()).isEqualTo(entity.getStatus().name());
+		assertThat(domain.createdAt()).isEqualTo(entity.getCreatedAt());
 		assertThat(domain.sentAt()).isEqualTo(entity.getSentAt());
 		assertThat(domain.readAt()).isEqualTo(entity.getReadAt());
 
@@ -50,6 +52,7 @@ class NotificationMapperTest {
 		assertThat(back.getResourceType()).isEqualTo(entity.getResourceType());
 		assertThat(back.getResourceId()).isEqualTo(entity.getResourceId());
 		assertThat(back.getStatus()).isEqualTo(entity.getStatus());
+		assertThat(back.getCreatedAt()).isEqualTo(entity.getCreatedAt());
 		assertThat(back.getSentAt()).isEqualTo(entity.getSentAt());
 		assertThat(back.getReadAt()).isEqualTo(entity.getReadAt());
 	}

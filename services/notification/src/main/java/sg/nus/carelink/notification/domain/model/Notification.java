@@ -1,6 +1,7 @@
 package sg.nus.carelink.notification.domain.model;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -36,6 +37,19 @@ public record Notification(
 
 	public enum Status {
 		PENDING, SENT, READ, FAILED
+	}
+
+	/**
+	 * A message somebody asked for, waiting for its recipient: PENDING until their client next asks
+	 * for the inbox. {@code resourceType} and {@code resourceId} are both null for an account-only
+	 * message.
+	 */
+	public static Notification requested(Long recipientUserId, String eventType, Channel channel, String title,
+			String body, String resourceType, Long resourceId, LocalDateTime createdAt) {
+		return new Notification(null, Objects.requireNonNull(recipientUserId, "recipientUserId"),
+				Objects.requireNonNull(eventType, "eventType"), Objects.requireNonNull(channel, "channel"),
+				Objects.requireNonNull(title, "title"), body, resourceType, resourceId, Status.PENDING,
+				Objects.requireNonNull(createdAt, "createdAt"), null, null);
 	}
 
 	/** Delivered to the inbox and not yet opened: what the bell counts. */

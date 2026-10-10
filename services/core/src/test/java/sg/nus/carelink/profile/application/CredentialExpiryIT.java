@@ -26,9 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
- * SYS01 end to end on real MySQL: the scan stores the new statuses, writes the alerts into
- * notification for the right people, and says nothing new on a second run the same day.
- * Today is 2026-10-04 in Singapore.
+ * SYS01 end to end on real MySQL: the scan stores the new statuses, asks for the alerts for the
+ * right people (NotificationRequested events, which notification turns into inbox messages), and
+ * says nothing new on a second run the same day. Today is 2026-10-04 in Singapore.
  */
 @SpringBootTest
 @Transactional
@@ -90,12 +90,14 @@ class CredentialExpiryIT {
 		assertThat(recipients(8733)).contains(8701L).doesNotContain(8703L);
 		assertThat(recipients(8735)).isEmpty();
 
-		Map<String, Object> devisAlert = jdbc.queryForMap(
-				"select event_type, title, channel, status from notification where resource_id = 8732 and recipient_user_id = 8702");
-		assertThat(devisAlert).containsEntry("event_type", "CREDENTIAL_EXPIRED")
+		Map<String, Object> devisAlert = jdbc.queryForMap("select json_unquote(json_extract(payload, '$.kind')) as kind,"
+				+ " json_unquote(json_extract(payload, '$.title')) as title,"
+				+ " json_unquote(json_extract(payload, '$.channel')) as channel from outbox_event" + CREDENTIAL_ALERTS
+				+ " and json_unquote(json_extract(payload, '$.resourceId')) = '8732'"
+				+ " and json_unquote(json_extract(payload, '$.recipientUserId')) = '8702'");
+		assertThat(devisAlert).containsEntry("kind", "CREDENTIAL_EXPIRED")
 				.containsEntry("title", "Your Dementia care SYS01 certificate expired on 3 Oct 2026")
-				.containsEntry("channel", "IN_APP")
-				.containsEntry("status", "PENDING");
+				.containsEntry("channel", "IN_APP");
 		assertThat(first.expiring()).isGreaterThanOrEqualTo(2);
 		assertThat(first.expired()).isGreaterThanOrEqualTo(1);
 
@@ -109,13 +111,19 @@ class CredentialExpiryIT {
 		return jdbc.queryForObject("select status from credential where id = ?", String.class, id);
 	}
 
+	/** The alerts the scan asked for: NotificationRequested events about a credential, in the outbox. */
+	private static final String CREDENTIAL_ALERTS = " where type = 'NotificationRequested'"
+			+ " and json_unquote(json_extract(payload, '$.resourceType')) = 'CREDENTIAL'";
+
 	private List<Long> recipients(long credentialId) {
-		return jdbc.queryForList("select recipient_user_id from notification where resource_type = 'CREDENTIAL'"
-				+ " and resource_id = ?", Long.class, credentialId);
+		return jdbc.queryForList("select cast(json_unquote(json_extract(payload, '$.recipientUserId')) as unsigned)"
+				+ " from outbox_event" + CREDENTIAL_ALERTS + " and json_unquote(json_extract(payload, '$.resourceId')) = ?",
+				Long.class, String.valueOf(credentialId));
 	}
 
 	private int count() {
-		return jdbc.queryForObject("select count(*) from notification where resource_type = 'CREDENTIAL'"
-				+ " and resource_id between 8731 and 8735", Integer.class);
+		return jdbc.queryForObject("select count(*) from outbox_event" + CREDENTIAL_ALERTS
+				+ " and cast(json_unquote(json_extract(payload, '$.resourceId')) as unsigned) between 8731 and 8735",
+				Integer.class);
 	}
 }

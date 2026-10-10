@@ -69,7 +69,8 @@ public class NotificationJpaEntity {
 	@Column(name = "status", nullable = false)
 	private Status status = Status.PENDING;
 
-	@Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+	/** When the message was requested: written once, on insert, and never updated. */
+	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
 	@Column(name = "sent_at")
@@ -155,6 +156,10 @@ public class NotificationJpaEntity {
 
 	public LocalDateTime getCreatedAt() {
 		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
 	}
 
 	public LocalDateTime getSentAt() {
