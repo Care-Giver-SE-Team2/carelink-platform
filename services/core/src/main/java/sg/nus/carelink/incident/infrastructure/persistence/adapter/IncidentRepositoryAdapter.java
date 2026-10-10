@@ -9,7 +9,10 @@ import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.IncidentRaised;
 import sg.nus.carelink.incident.domain.model.Incident;
 import sg.nus.carelink.incident.domain.model.PageSlice;
 import sg.nus.carelink.incident.domain.repository.IncidentRepository;
@@ -19,6 +22,8 @@ import sg.nus.carelink.incident.infrastructure.persistence.repository.IncidentJp
 /**
  * Implements the domain port with Spring Data. The dependency points infrastructure ->
  * domain, never the other way round (dependency inversion, as in identity).
+ *
+ * <p>A new incident is published as {@code IncidentRaised} in the transaction that saves it.
  */
 @Repository
 class IncidentRepositoryAdapter implements IncidentRepository {
@@ -41,8 +46,11 @@ class IncidentRepositoryAdapter implements IncidentRepository {
 
 	private final IncidentJpaRepository jpa;
 
-	IncidentRepositoryAdapter(IncidentJpaRepository jpa) {
+	private final Events events;
+
+	IncidentRepositoryAdapter(IncidentJpaRepository jpa, Events events) {
 		this.jpa = jpa;
+		this.events = events;
 	}
 
 	@Override
@@ -57,8 +65,13 @@ class IncidentRepositoryAdapter implements IncidentRepository {
     }
 
 	@Override
+	@Transactional
 	public Incident save(Incident incident) {
-		return IncidentMapper.toDomain(jpa.save(IncidentMapper.toEntity(incident)));
+		Incident saved = IncidentMapper.toDomain(jpa.save(IncidentMapper.toEntity(incident)));
+		if (incident.id() == null) {
+			events.publish(IncidentRaised.TYPE, IncidentEventMapper.raised(saved));
+		}
+		return saved;
 	}
 
 	@Override

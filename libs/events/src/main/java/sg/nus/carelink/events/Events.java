@@ -8,18 +8,24 @@ package sg.nus.carelink.events;
  *
  * <pre>{@code
  * @Transactional
- * public void markMissed(Long visitId) {
- *     visit.markMissed();
- *     events.publish("VisitMissed", new VisitMissed(visitId, visit.elderId()));
+ * public Incident save(Incident incident) {
+ *     Incident saved = toDomain(jpa.save(toEntity(incident)));
+ *     if (incident.id() == null) {
+ *         events.publish(IncidentRaised.TYPE, IncidentEventMapper.raised(saved));
+ *     }
+ *     return saved;
  * }
  * }</pre>
+ *
+ * <p>The events and their fields are in {@code docs/platform/event-catalogue.md}; their records are
+ * in {@code libs/event-types}.
  */
 public interface Events {
 
 	/**
 	 * Adds an event to the outbox.
 	 *
-	 * @param type the event's name, as the event catalogue has it, for example {@code VisitMissed}
+	 * @param type the event's name, as the event catalogue has it, for example {@code IncidentRaised}
 	 * @param payload the event's content, written as JSON: ids and the fields the receivers need
 	 * @throws org.springframework.transaction.IllegalTransactionStateException when no transaction
 	 *     is active: an event belongs to the change that caused it

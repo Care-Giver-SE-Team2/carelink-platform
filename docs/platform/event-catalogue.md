@@ -21,7 +21,7 @@ Every event travels in the envelope that `libs/events` writes:
 | `type` | The event's name, as in section 3. |
 | `source` | The service that published it: `core`, `visit`, `report` or `notification`. |
 | `occurredAt` | When the event was published, as an instant in UTC: `"2026-10-12T01:00:03.120Z"`. |
-| `sequence` | The number of the event's outbox row. It increases within a source. Of two changes to one record, the later one has the larger number, as long as the publisher changes the record (which locks it) before it publishes, in the same transaction. This field is added to the envelope with the first producer. |
+| `sequence` | The number of the event's outbox row. It increases within a source. Of two changes to one record, the later one has the larger number, as long as the publisher changes the record (which locks it) before it publishes, in the same transaction. A handler reads it as `EventMetadata.sequence()`. It is null on a message that did not come from an outbox, such as `ReportRequested`. |
 | `payload` | The fields listed in section 3. |
 
 - **Delivery.** At least once, in no particular order.
@@ -35,13 +35,14 @@ Every event travels in the envelope that `libs/events` writes:
 ## 2. Payload rules
 
 - **Times.**
-  - A business time (a visit's start, a check-in, a reading) is Singapore wall-clock time with its offset: `"2026-10-12T09:00:00+08:00"`. Produce it with `localDateTime.atZone(ZoneId.of("Asia/Singapore")).toOffsetDateTime()`.
+  - A business time (a visit's start, a check-in, a reading) is Singapore wall-clock time with its offset, to the second: `"2026-10-12T09:00:00+08:00"`. Produce it with `SingaporeTime.of(localDateTime)` from `libs/event-types`. It rounds to the second the way the database rounds a `DATETIME`, so the event says what the database keeps. A handler turns it back with `SingaporeTime.local(...)`, whatever offset its JSON reader hands it.
   - Never send the value as the database stores it, and never send a time without an offset.
   - A date is an ISO date: `"2026-10-12"`.
 - **Numbers.** Ids are JSON numbers. Readings and amounts are decimal strings (`"37.50"`), read into `BigDecimal`.
 - **Enums** are sent as their names (`"COMPLETED"`).
 - **Facts that belong to a visit.** Every event about a visit carries `elderId` and the visit's `scheduledStart`. So does every event about something that belongs to a visit: a task, a set of readings, the elder's confirmation. In those events the field is called `visitScheduledStart`. A consumer can then file the event under the right elder and week without waiting for the visit's other events.
 - **State, not commands.** An event says what happened and carries the record's state after it. The consumer decides what to do with it.
+- **Records.** Each event's payload is a record in `libs/event-types`, with the event's name as `TYPE`. The publisher builds it and every handler reads the same record.
 - **Sensitive events.** `VitalsRecorded`, `IncidentRaised` and `IncidentUpdated` carry health and care details: readings, an incident's description, a manager's notes.
   - Only the queues of services that need these events subscribe to them.
   - No service logs a payload. Log the type and the id instead.
@@ -55,7 +56,7 @@ Each event is listed with its publisher, its trigger, its handler, and when it g
 
 | Status | Meaning |
 |---|---|
-| **next** | Built now. Core is the first producer. |
+| **published** | Published today. Its record is in `libs/event-types`. |
 | **with the move** | Built when that module moves out of core, by its owner. |
 | **draft** | Fields still to be agreed. |
 | **reserved** | No code produces this fact yet. |
@@ -80,10 +81,13 @@ Each event is listed with its publisher, its trigger, its handler, and when it g
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
-| `IncidentRaised` | incident: the eight `IncidentService` methods that create an incident | An incident is created | report | next |
-| `IncidentUpdated` | incident: every entry added to an incident's timeline. All entries go through `IncidentLogRepository.save`, from `IncidentService` and `EscalationService` | A timeline entry is added | report | next |
-| `SpotCheckUpdated` | incident: `SpotCheckService.request`, `decide`, `moveTo`, `conclude`, `reportNoShow`, `respond`, `withdraw` | A spot check changes | report | next |
-| `RosterChangeUpdated` | rostering: `AbsenceReRosteringService.reroster`, `decide`, `applyDefaultIfStillDue`, `assignByManager`; `RosterChangeScanService.sweep`; `LeaveCoverService.giveToCover` | A roster change is created or settled | report | next |
+| `IncidentRaised` | incident: the eight `IncidentService` methods that create an incident | An incident is created | report | published |
+| `IncidentUpdated` | incident: every entry added to an incident's timeline. All entries go through `IncidentLogRepository.save`, from `IncidentService` and `EscalationService` | A timeline entry is added | report | published |
+| `SpotCheckUpdated` | incident: `SpotCheckService.request`, `decide`, `moveTo`, `conclude`, `reportNoShow`, `respond`, `withdraw` | A spot check changes | report | published |
+| `RosterChangeUpdated` | rostering: `AbsenceReRosteringService.reroster`, `decide`, `applyDefaultIfStillDue`, `assignByManager`; `RosterChangeScanService.sweep`; `LeaveCoverService.giveToCover` | A roster change is created or settled | report | published |
+
+Each of core's events is published where its record is saved, in the repository adapter's `save` and in the same
+transaction, so every method listed publishes it.
 
 **Requests.**
 

@@ -61,12 +61,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
     environment:
       DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
       DB_USER: carelink
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
       # Logins are kept in Redis, so any replica can serve any signed-in user
       SPRING_DATA_REDIS_HOST: redis
+      # core publishes its events to the topic (docs/platform/event-catalogue.md). It handles
+      # none yet, so it has no queue setting.
+      CARELINK_EVENTS_TOPICARN: arn:aws:sns:ap-southeast-1:000000000000:carelink-events
+      CARELINK_EVENTS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test             # LocalStack takes any key
+      AWS_SECRET_ACCESS_KEY: test
     ports:
       - "8080:8080"
     healthcheck:

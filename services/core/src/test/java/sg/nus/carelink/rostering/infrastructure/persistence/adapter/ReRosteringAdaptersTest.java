@@ -7,8 +7,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -16,6 +20,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Sort;
 
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.RosterChangeUpdated;
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
 import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidate;
@@ -77,7 +83,9 @@ class ReRosteringAdaptersTest {
 	@Test
 	void rosterChangeAdapterDelegatesEveryFinder() {
 		RosterChangeJpaRepository jpa = mock(RosterChangeJpaRepository.class);
-		RosterChangeRepositoryAdapter adapter = new RosterChangeRepositoryAdapter(jpa);
+		Events events = mock(Events.class);
+		Clock clock = Clock.fixed(NINE.atZone(ZoneId.of("Asia/Singapore")).toInstant(), ZoneId.of("Asia/Singapore"));
+		RosterChangeRepositoryAdapter adapter = new RosterChangeRepositoryAdapter(jpa, events, clock);
 		RosterChangeJpaEntity row = new RosterChangeJpaEntity();
 		row.setId(1L);
 		row.setAbsenceId(2L);
@@ -98,6 +106,8 @@ class ReRosteringAdaptersTest {
 		assertThat(adapter.findByElderIds(Set.of(4L))).hasSize(1);
 		assertThat(adapter.findByElderIds(Set.of())).isEmpty();
 		assertThat(adapter.findAwaitingFamilyDueBy(NINE)).hasSize(1);
+		verify(events).publish(RosterChangeUpdated.TYPE, new RosterChangeUpdated(1L, 3L, null, 2L, null, null,
+				"AWAITING_FAMILY", null, null, null, OffsetDateTime.of(NINE, ZoneOffset.ofHours(8))));
 	}
 
 	@Test

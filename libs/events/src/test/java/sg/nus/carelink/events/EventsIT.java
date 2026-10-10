@@ -133,6 +133,8 @@ class EventsIT {
 		assertThat(metadata.source()).isEqualTo("visit");
 		assertThat(jdbc.queryForObject("SELECT published_at IS NOT NULL FROM outbox_event WHERE event_id = ?",
 				Boolean.class, metadata.id())).isTrue();
+		assertThat(metadata.sequence()).as("the outbox row's number")
+				.isEqualTo(jdbc.queryForObject("SELECT id FROM outbox_event WHERE event_id = ?", Long.class, metadata.id()));
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM consumed_message WHERE consumer = 'visit' AND message_id = ?",
 				Integer.class, metadata.id())).isEqualTo(1);
 	}
@@ -163,6 +165,7 @@ class EventsIT {
 		EventMetadata metadata = awaitHandled(105L);
 
 		String again = new Envelope(metadata.id(), metadata.type(), metadata.source(), metadata.occurredAt(),
+				metadata.sequence(),
 				json.valueToTree(new VisitMissed(105L, 3L))).toJson(json);
 		try (SqsClient sqs = sqs()) {
 			sqs.sendMessage(message -> message.queueUrl(QUEUE_URL).messageBody(again));

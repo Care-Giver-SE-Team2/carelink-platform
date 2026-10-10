@@ -30,6 +30,7 @@
 		<module>libs/core-api</module>
 		<module>libs/visit-api</module>
 		<module>libs/events</module>
+		<module>libs/event-types</module>
 		<module>libs/test-support</module>
 		<module>services/core</module>
 		<module>services/notification</module>

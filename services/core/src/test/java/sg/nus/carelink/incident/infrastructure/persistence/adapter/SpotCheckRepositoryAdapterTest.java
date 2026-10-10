@@ -3,24 +3,36 @@ package sg.nus.carelink.incident.infrastructure.persistence.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.SpotCheckUpdated;
 import sg.nus.carelink.incident.domain.model.SpotCheck;
 import sg.nus.carelink.incident.infrastructure.persistence.entity.SpotCheckJpaEntity;
 import sg.nus.carelink.incident.infrastructure.persistence.repository.SpotCheckJpaRepository;
 
-/** The adapter delegates to Spring Data and maps at the boundary; nothing else. */
+/**
+ * The adapter delegates to Spring Data and maps at the boundary, and publishes every save as
+ * {@code SpotCheckUpdated}.
+ */
 class SpotCheckRepositoryAdapterTest {
 
 	private final SpotCheckJpaRepository jpa = mock(SpotCheckJpaRepository.class);
-	private final SpotCheckRepositoryAdapter adapter = new SpotCheckRepositoryAdapter(jpa);
+	private final Events events = mock(Events.class);
+	private final Clock clock = Clock.fixed(Instant.parse("2026-10-12T12:00:00Z"), ZoneId.of("Asia/Singapore"));
+	private final SpotCheckRepositoryAdapter adapter = new SpotCheckRepositoryAdapter(jpa, events, clock);
 
 	@Test
 	void findByIdMapsTheEntityToTheDomainModel() {
@@ -50,6 +62,24 @@ class SpotCheckRepositoryAdapterTest {
 		SpotCheck saved = adapter.save(SpotCheckMapper.toDomain(entity));
 
 		assertThat(saved).isNotNull();
+	}
+
+	@Test
+	void everySaveIsPublishedWithTheSpotChecksWholeState() {
+		SpotCheckJpaEntity entity = new SpotCheckJpaEntity();
+		entity.setId(41L);
+		entity.setElderId(101L);
+		entity.setVisitId(812L);
+		entity.setCaregiverId(9L);
+		entity.setProposedTime(LocalDateTime.of(2026, 10, 14, 10, 0));
+		entity.setApprovalStatus(SpotCheckJpaEntity.ApprovalStatus.APPROVED);
+		when(jpa.save(any(SpotCheckJpaEntity.class))).thenReturn(entity);
+
+		adapter.save(SpotCheckMapper.toDomain(entity));
+
+		verify(events).publish(SpotCheckUpdated.TYPE, new SpotCheckUpdated(41L, 101L, 812L, 9L,
+				OffsetDateTime.parse("2026-10-14T10:00:00+08:00"), "APPROVED", null, null, null, null, null,
+				OffsetDateTime.parse("2026-10-12T20:00:00+08:00")));
 	}
 
 	@Test
