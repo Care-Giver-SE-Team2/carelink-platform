@@ -19,6 +19,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -27,9 +29,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * A minimal service that only depends on this library gets core's security rules: anonymous calls
@@ -92,6 +96,14 @@ class ServiceSecurityTest {
 				.andExpect(status().isOk());
 	}
 
+	@Test
+	void aLoginWithoutTheAccountIdIsAnswered401EvenUnderACatchAllHandler() throws Exception {
+		MockHttpSession session = sessionOf("ana", 42L, "Ana Tan", "ROLE_FAMILY");
+		session.removeAttribute(SignedInUserSession.ID);
+
+		mvc.perform(get("/api/me").session(session)).andExpect(status().isUnauthorized());
+	}
+
 	/** A session as core leaves it after sign-in: the security context plus the two user attributes. */
 	private static MockHttpSession sessionOf(String username, long id, String displayName, String... authorities) {
 		MockHttpSession session = new MockHttpSession();
@@ -104,8 +116,19 @@ class ServiceSecurityTest {
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
-	@Import(Endpoints.class)
+	@Import({Endpoints.class, CatchAll.class})
 	static class Service {
+	}
+
+	/** Like the catch-all in core's exception handler, which the services start from. */
+	@RestControllerAdvice
+	static class CatchAll {
+
+		@ExceptionHandler(Exception.class)
+		ProblemDetail onUnexpected(Exception ex) {
+			return ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+		}
+
 	}
 
 	@RestController

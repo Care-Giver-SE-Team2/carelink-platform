@@ -16,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.savedrequest.NullRequestCache;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
  * Security for a service other than core. Sign-in happens in core; a service only reads the shared
@@ -74,6 +75,12 @@ public class ServiceSecurityAutoConfiguration {
 	@ConditionalOnMissingBean
 	SignedInUsers signedInUsers() {
 		return new SignedInUsers();
+	}
+
+	/** {@link SignedInUsers#require()} answers 401, whatever exception handlers the service has. */
+	@Bean
+	HandlerExceptionResolver signedOutIsUnauthorized() {
+		return new SignedOutIsUnauthorized();
 	}
 
 }
