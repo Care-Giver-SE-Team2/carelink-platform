@@ -39,6 +39,15 @@ class ServiceSecurityTest {
 	@Autowired
 	private MockMvc mvc;
 
+	@Autowired
+	private org.springframework.context.ApplicationContext context;
+
+	@Test
+	void theLibrarysChainIsTheOnlyOne() {
+		assertThat(context.getBeanNamesForType(org.springframework.security.web.SecurityFilterChain.class))
+				.containsExactly("serviceSecurityFilterChain");
+	}
+
 	@Test
 	void anAnonymousCallIsRefusedWithoutStartingASession() throws Exception {
 		MvcResult result = mvc.perform(get("/api/me")).andExpect(status().isUnauthorized()).andReturn();
