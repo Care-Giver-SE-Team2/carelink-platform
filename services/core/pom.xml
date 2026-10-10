@@ -52,6 +52,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-session-data-redis</artifactId>
 		</dependency>
+		<!-- The session attributes core writes at sign-in, and every service reads -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>platform-security</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- Each scheduled job runs on one replica at a time (sg.nus.carelink.platform.SchedulerLocks) -->
 		<dependency>
 			<groupId>net.javacrumbs.shedlock</groupId>

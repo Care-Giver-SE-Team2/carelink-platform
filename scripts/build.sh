@@ -3,9 +3,11 @@
 #
 #   scripts/build.sh <service|all> [compile|test|image|all]
 #
-#   compile   compile and package the jar, without tests
+#   compile   compile and package the service and the shared libraries it uses (libs/), without
+#             tests, and install them in the local Maven repository
 #   test      unit tests, architecture tests (ArchUnit), MySQL integration tests
-#             (Testcontainers, needs Docker) and the domain coverage check
+#             (Testcontainers, needs Docker) and the domain coverage check, for the service and
+#             the shared libraries it uses
 #   image     the Docker image from build/Dockerfile, tagged with the commit
 #   all       the three, in that order (the default)
 #
@@ -39,10 +41,11 @@ fi
 
 prefix=${IMAGE_PREFIX:-carelink}
 
+# The service together with the shared libraries it depends on
 maven() {
   local service=$1
   shift
-  ./mvnw -B -ntp -f "services/$service/pom.xml" "$@"
+  ./mvnw -B -ntp -pl "services/$service" -am "$@"
 }
 
 runs() { [ "$stage" = "$1" ] || [ "$stage" = all ]; }
@@ -50,7 +53,9 @@ runs() { [ "$stage" = "$1" ] || [ "$stage" = all ]; }
 for service in $services; do
   if runs compile; then
     echo "==> $service: compile"
-    maven "$service" package -DskipTests
+    # install, not just package: the steps that look at one service on its own (Sonar, the
+    # dependency scan) find the shared libraries in the local Maven repository
+    maven "$service" install -DskipTests
   fi
   if runs test; then
     echo "==> $service: test"
