@@ -224,8 +224,9 @@ management.health.redis.enabled=false
 - `SharedMySql`: one MySQL container for the whole run, with a database of its own for each test class.
 - `SharedRedis`: one Redis container for the whole run.
 - `GlobalExceptionHandlerTestSupport`: the real exception handler, for standalone MockMvc controller tests.
-- `PlatformTablesForTests`: after core's migrations, the platform's own tables (`outbox_event`,
-  `consumed_message`, the scheduler locks), for a test that publishes or handles events. Import it on the test class.
+- `PlatformTablesForTests`: after core's migrations, the platform's migrations, so the database is the one core
+  leaves in production: the platform's tables (`outbox_event`, `consumed_message`, the scheduler locks), and no
+  foreign key between two services' tables. Import it on the service's integration test classes.
 
 ### 2.6 Deployment: `deploy/values.yaml`
 
@@ -480,6 +481,9 @@ Until the schema split, the services share core's database and its one schema:
 
 - Core runs every migration. A service sets `spring.flyway.enabled: false` and validates the schema it finds
   (`ddl-auto: validate`).
+- No foreign key joins the service's tables to another service's: platform migration V3 dropped them
+  ([service-boundaries.md](service-boundaries.md), section 2). Where the service writes another service's id that
+  it has not just read, it checks first that the record exists, through `CoreApi` or `VisitApi`.
 - A service writes only its own tables ([service-boundaries.md](service-boundaries.md), section 1). It reaches
   core's data through `CoreApi`, not through SQL. The SQL reads that still cross a boundary are listed in
   section 5.2 of that document, and each one is removed before the split.

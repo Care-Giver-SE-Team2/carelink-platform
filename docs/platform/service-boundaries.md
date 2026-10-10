@@ -27,9 +27,12 @@ notification service takes over FM05 delivery, the three tables move with it.
 
 ## 2. Foreign keys that cross schemas
 
-17 of the 65 foreign keys cross a schema. Each is dropped at the split. The column stays and keeps the id; the
-service that owns the column checks the reference in code before writing. For example, visit asks core whether
-the elder exists before it creates a visit.
+17 of the 65 foreign keys cross a schema. Platform migration V3 dropped them on 2026-10-11, before the split, so
+that every service is built the way it will run after the split. The column stays and keeps the id, and so does
+the index MySQL made for the key. The service that owns the column checks the reference in code before it writes
+an id it has not just read. For example, visit asks core whether the elder exists before it creates a visit.
+`CrossServiceForeignKeysIT` fails the build if a migration adds such a key again, for example one that an
+upstream sync brings in; drop it in the next platform migration.
 
 | From (schema) | Column | To (schema) | Added in |
 |---|---|---|---|
@@ -174,6 +177,7 @@ platform migration takes the next free version, listed here.
 | V1 | `shedlock` | core | core | Runs each core scheduled job on one replica only |
 | V2 | `outbox_event` | every service that publishes events | `libs/events` | Events written in the same transaction as the business data, then published |
 | V2 | `consumed_message` | every service that handles events | `libs/events` | Ignores a message it has already handled |
+| V3 | none: drops the 17 foreign keys of section 2 | the shared schema | core | No foreign key joins two services' tables |
 
 The next platform migration is V3. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
