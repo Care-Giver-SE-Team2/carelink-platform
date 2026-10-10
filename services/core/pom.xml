@@ -58,6 +58,12 @@
 			<artifactId>platform-security</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<!-- The contract of core's internal API (/internal/v1), which core implements -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>core-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- Each scheduled job runs on one replica at a time (sg.nus.carelink.platform.SchedulerLocks) -->
 		<dependency>
 			<groupId>net.javacrumbs.shedlock</groupId>

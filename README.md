@@ -41,6 +41,9 @@ providers' own systems, build on.
 carelink-platform/
 ├─ services/
 │  └─ core/                       pom.xml, src/, deploy/values.yaml: every service has this shape
+├─ libs/
+│  ├─ platform-security/          who is signed in, read from the session core wrote; the security chain of every service but core
+│  └─ core-api/                   core's internal API (/internal/v1) as a Java interface, and its client
 ├─ build/
 │  ├─ Dockerfile                  the Dockerfile of every service: Maven build, then a JRE, non-root
 │  └─ entrypoint.sh               the start-up of every service: JVM settings, time zone, DNS cache, graceful stop
@@ -60,8 +63,8 @@ carelink-platform/
 └─ ARCHITECTURE.md                inside a service: modules and layers
 ```
 
-The infrastructure code (`infra/`, Terraform), the shared service library (`libs/`) and the
-load tests (`loadtest/`, k6) join this layout as they are written.
+The infrastructure code (`infra/`, Terraform) and the load tests (`loadtest/`, k6) join this
+layout as they are written.
 
 ---
 
@@ -116,7 +119,8 @@ once; a service supplies only its code and one values file.
 **Adding a service:** create `services/<name>/` with a `pom.xml` whose parent is the root
 `pom.xml`, its `src/`, and `deploy/values.yaml`; add it to `<modules>` in the root `pom.xml`
 and to `docker-compose.yml`. The pipeline finds it by its directory, and the scripts take its
-name.
+name. [docs/platform/building-a-service.md](docs/platform/building-a-service.md) walks through
+it, including the signed-in user (`libs/platform-security`) and calls to core (`libs/core-api`).
 
 A change to a shared part reaches every service, so it goes through review like any other
 change, and the pipeline rebuilds every service when one is touched.
