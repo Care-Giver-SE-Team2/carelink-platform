@@ -110,7 +110,7 @@ controllers move with it, and a caller that has switched to the client changes n
 | `VisitScheduling.schedule` | rostering | `POST /internal/v1/visits/schedule` → `{ created, covered }` |
 | `VisitScheduling.cancelUntouchedFrom` | rostering | `POST /internal/v1/visits/cancel-untouched` → `{ count }` |
 | `VisitScheduling.findUncoveredStarted`, `markUncoveredAsException` | rostering | `GET /internal/v1/visits/uncovered-started?since=&now=`; `POST /internal/v1/visits/{visitId}/uncovered-exception` → `{ marked }` |
-| `UpcomingAssignments.unstartedBetween` | rostering | `GET /internal/v1/visits/upcoming-assignments?from=&until=` |
+| `UpcomingAssignments.unstartedBetween` | rostering | `GET /internal/v1/visits/upcoming-assignments?from=&until=`. Done: rostering's `BookedVisits` port has both adapters, the worked example |
 | `StandaloneVisits.schedule`, `find` | report | `POST /internal/v1/visits/standalone` → `{ visitId }`; `GET /internal/v1/visits/{visitId}/state`, or 404 |
 | `VisitScheduleQuery.caregiverIdsForElder`, `hasAssignedVisit` | report | `GET /internal/v1/visits/caregivers-of-elder?elderId=`; `GET /internal/v1/visits/assigned?elderIds=&caregiverId=` → `{ assigned }` |
 | SQL on `visit` in `JdbcSpotCheckLookups` | incident | `GET /internal/v1/visits/{visitId}`; `GET /internal/v1/visits/upcoming?elderId=&from=&until=` |
@@ -118,7 +118,9 @@ controllers move with it, and a caller that has switched to the client changes n
 | SQL on `visit` in `NotificationTableAlert` (the elder's latest caregiver) | incident | `GET /internal/v1/visits/latest-caregiver?elderId=` → `{ caregiverId }`, or 404 |
 
 Times are ISO date-times on Singapore's wall clock, as visit stores them. A caller switches by keeping its port and
-replacing the adapter with one that calls `VisitApi`, as in section 3. The [event catalogue](event-catalogue.md) decides
+replacing the adapter with one that calls `VisitApi`, as in section 3. Until visit moves, a caller in core keeps
+both adapters, switched by `carelink.visit-api.base-url`. Rostering's `BookedVisits` is the worked example
+([building-a-service.md](building-a-service.md), section 4). The [event catalogue](event-catalogue.md) decides
 which facts travel as events instead: report's reads of the visit table become visit's events there, and
 `AbsenceReported` is not built.
 

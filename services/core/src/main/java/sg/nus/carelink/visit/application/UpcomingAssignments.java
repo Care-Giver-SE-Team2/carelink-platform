@@ -5,8 +5,9 @@ import java.util.List;
 
 /**
  * Cross-module contract for UC-MG06: the visits caregivers are booked on and have not yet
- * started, so rostering can count the ones a lapsing certificate puts at risk. Rostering
- * imports this interface only, never visit's domain or infrastructure.
+ * started, so rostering can count the ones a lapsing certificate puts at risk. Rostering asks
+ * its own port, {@code BookedVisits}; only its in-process adapter imports this interface, never
+ * visit's domain or infrastructure. Outside core, {@code VisitApi.unstartedBetween} serves it.
  */
 public interface UpcomingAssignments {
 

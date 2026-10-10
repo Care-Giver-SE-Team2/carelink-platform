@@ -343,6 +343,25 @@ once visit runs on its own, the setting points at visit and nothing else changes
 core: they call visit in-process until it moves, and then their adapters switch to `VisitApi`.
 [service-boundaries.md](service-boundaries.md), section 4, lists which call replaces which.
 
+**Worked example: rostering's `BookedVisits`.** UC-MG06 counts the booked visits that a lapsing certificate puts
+at risk, and the bookings belong to visit. Rostering now asks for them through a port of its own, which can be
+answered either way. Copy it for rostering's other calls and for incident's:
+
+- **The port** belongs to rostering: `rostering/domain/repository/BookedVisits`, in rostering's own terms.
+  `CredentialRiskService` calls it and imports nothing from visit.
+- **Two adapters** live in `rostering/infrastructure/visit`:
+  - `InProcessBookedVisits` calls visit's `UpcomingAssignments` in the same process. It carries `@VisitInCore`.
+  - `VisitApiBookedVisits` calls `VisitApi.unstartedBetween`. It carries `@VisitOutsideCore`.
+- **The switch** is `carelink.visit-api.base-url`. While it is not set, as today, the `@VisitInCore` adapters are
+  active. Once it is set, the `VisitApi` client exists and the `@VisitOutsideCore` adapters are active instead.
+  Both annotations are in core's `platform` package.
+- **Tests.** `BookedVisitsAdaptersTest` checks that exactly one adapter is active either way, and that both give
+  the same bookings. `VisitsAtRiskWithVisitOutsideCoreIT` runs MG06 with the setting on and
+  `@MockitoBean VisitApi visit`: core's database holds no visit, and the answer is the same as in
+  `CredentialReviewIT`. Once visit has moved, a core test that needs visit is written this way.
+- **When visit moves out:** delete every `@VisitInCore` class, and set `carelink.visit-api.base-url` for core
+  (compose and `deploy/values.yaml`). Core tests that seed visit rows change to the double.
+
 **Testing.** In the service's own tests, replace the client with `@MockitoBean CoreApi core`. The contract
 itself is tested in core.
 
