@@ -288,7 +288,6 @@ class FamilyVisitWorkflowIT {
 			assertThat(getJson(caregiver, "/api/visits/501/tasks").toString()).contains("Meal preparation", "PRIVATE-NOTE");
 			assertThat(getJson(family, "/api/intake-applications").path("items")).isEmpty();
 			assertThat(getJson(family, "/api/visits?elderId=101").path("totalElements").longValue()).isEqualTo(2);
-			assertThat(getJson(family, "/api/reports?elderId=101&audience=FAMILY").path("items")).isEmpty();
 		}
 		assertThat(careFacts()).isEqualTo(original);
 	}

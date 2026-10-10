@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,9 +21,10 @@ class CaregiverHealthWorkflowIT extends CaregiverHealthITSupport {
     }
     @MockitoSpyBean CaregiverCommandStore receipts;
 
-    @Test void realMeasurementFeedsFiledReportsAndKeepsHealthSummaryAndHistory() throws Exception {
+    /** Whether a filed report shows the readings is report's to test, now that report runs on its own. */
+    @Test void realMeasurementKeepsHealthSummaryAndHistory() throws Exception {
         long id = plannedVisit();
-        try (var a = browser(caregiverName); var mgr = browser(managerName); var familyBrowser = browser(familyName)) {
+        try (var a = browser(caregiverName); var familyBrowser = browser(familyName)) {
             checkIn(a, id);
             var input = health(1);
             var saved = body(a.post(path(id), input), 201);
@@ -55,17 +54,6 @@ class CaregiverHealthWorkflowIT extends CaregiverHealthITSupport {
             assertThat(a.read(path(id)).toString()).doesNotContain("recordedByUserId", "payloadHash");
             assertThat(familyBrowser.read("/api/visits/" + id).toString()).doesNotContain("healthNote", "Synthetic caregiver observation");
             assertThat(familyBrowser.read("/api/visits/" + id + "/timeline").size()).isEqualTo(2);
-            var today = LocalDate.now(ZoneId.of("Asia/Singapore"));
-            var reports = body(mgr.post("/api/reports/generate", Map.of("elderId", elder, "periodStart", today.toString(), "periodEnd", today.toString())), 202);
-            for (var report : reports) {
-                assertThat(mgr.read("/api/reports/" + report.path("id").asLong()).toString())
-                        .contains("123", "81", "73", "36.7").doesNotContain("Synthetic caregiver observation");
-            }
-            long familyReport = 0;
-            for (var report : reports) { if ("FAMILY".equals(report.path("audience").asString())) familyReport = report.path("id").asLong(); }
-            assertThat(familyReport).isPositive();
-            assertThat(familyBrowser.read("/api/reports/" + familyReport).toString()).contains("123", "36.7").doesNotContain("healthNote", "Synthetic caregiver observation");
-            assertThat(jdbc.queryForObject("select count(*) from report_basis where elder_id=? and facts like '%123%'", Long.class, elder)).isEqualTo(1);
         }
     }
 
