@@ -52,6 +52,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-session-data-redis</artifactId>
 		</dependency>
+		<!-- Error handling, request context, access audit and roles: core's shared package, now shared with every service -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>shared</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- The session attributes core writes at sign-in, and every service reads -->
 		<dependency>
 			<groupId>sg.nus</groupId>

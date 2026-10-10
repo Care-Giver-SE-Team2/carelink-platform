@@ -25,6 +25,7 @@
 	<description>CareLink platform: parent of all services</description>
 
 	<modules>
+		<module>libs/shared</module>
 		<module>libs/platform-security</module>
 		<module>libs/core-api</module>
 		<module>services/core</module>

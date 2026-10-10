@@ -42,6 +42,7 @@ carelink-platform/
 ├─ services/
 │  └─ core/                       pom.xml, src/, deploy/values.yaml: every service has this shape
 ├─ libs/
+│  ├─ shared/                     core's shared package for every service: errors, request context, access audit, roles
 │  ├─ platform-security/          who is signed in, read from the session core wrote; the security chain of every service but core
 │  └─ core-api/                   core's internal API (/internal/v1) as a Java interface, and its client
 ├─ build/
