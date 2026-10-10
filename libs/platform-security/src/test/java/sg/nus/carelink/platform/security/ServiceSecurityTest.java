@@ -43,7 +43,10 @@ class ServiceSecurityTest {
 	void anAnonymousCallIsRefusedWithoutStartingASession() throws Exception {
 		MvcResult result = mvc.perform(get("/api/me")).andExpect(status().isUnauthorized()).andReturn();
 
-		assertThat(result.getRequest().getSession(false)).isNull();
+		jakarta.servlet.http.HttpSession session = result.getRequest().getSession(false);
+		assertThat(session)
+				.as("session holding %s", session == null ? "-" : java.util.Collections.list(session.getAttributeNames()))
+				.isNull();
 	}
 
 	@Test
