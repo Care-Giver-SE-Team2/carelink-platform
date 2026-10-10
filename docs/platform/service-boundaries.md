@@ -54,13 +54,17 @@ the elder exists before it creates a visit.
 ## 3. What core offers visit and report
 
 Today visit and report call core's Java types directly. After the split, each call becomes one of the replacements
-below. Internal endpoints live under `/internal/v1/`. The Ingress does not route them, so they are reachable only
-inside the cluster. Responses carry only the fields the callers use today.
+below. Internal endpoints live under `/internal/v1/`. The Ingress routes only the public paths (`/api/**`), never
+`/internal`, so they are reachable only inside the cluster. Responses carry only the fields the callers use today.
+
+The contract is written once, as the Java interface `CoreApi` in `libs/core-api`: core implements it (the
+`Internal*Controller` classes, checked against the interface by `CoreApiContractTest`), and the other services
+call it through the same interface. [building-a-service.md](building-a-service.md) shows how to call it.
 
 | Call today (core type · method) | Called from | Replacement |
 |---|---|---|
 | `IdentityService.require(username)` → `AppUser` | report (5 classes), visit (1) | **No call.** The signed-in user (id, username, display name, roles) comes from the shared session, through the shared library |
-| `FamilyAccessQuery.readableElderIds`, `requireReadableElder`, `requireWritableElder` | visit (5), report (3) | `GET /internal/v1/family-access/{username}` → `{ readableElderIds, writableElderIds }`; the caller checks membership and answers with the same errors as today |
+| `FamilyAccessQuery.readableElderIds`, `requireReadableElder`, `requireWritableElder` | visit (5), report (3) | `GET /internal/v1/family-access/{username}/elders` → `{ elderIds }`; `GET /internal/v1/family-access/{username}/elders/{elderId}?access=READ\|WRITE` → 204, or 403 as today, which the caller passes on unchanged |
 | `FamilyReadAudit.read(…)` | visit (5), report (1) | **No call.** The calling service records the family's read in its own `audit_log`, through the shared library |
 | `CaregiverDirectory.findPublicProfile` | visit, report | `GET /internal/v1/caregivers/{id}/public-profile` → `{ id, fullName, dialects }` |
 | `CaregiverDirectory.listPublicCredentials` | visit | `GET /internal/v1/caregivers/{id}/public-credentials` → `[{ id, caregiverId, credentialTypeId, credentialTypeName, issuingBody, validFrom, expiryDate, status }]` |
@@ -78,8 +82,9 @@ inside the cluster. Responses carry only the fields the callers use today.
 | `VisitCover.options(visitId)`, `cover(…)` | report (2) | `GET /internal/v1/visits/{visitId}/cover-options`; `POST /internal/v1/visits/{visitId}/cover`. Rostering stays in core and calls visit in turn |
 
 The caller keeps the port it has today and swaps the adapter. For example, visit keeps its own `FamilyAccess`
-interface, and the implementation becomes an HTTP client with a timeout and a retry. The business code that calls
-the port does not change.
+interface, and the implementation becomes a call through `CoreApi`, which has connect and read timeouts. The
+business code that calls the port does not change. The library does not retry: a read can simply be repeated, and
+a `POST` is repeated only by a caller that knows it is safe (the missed check-in scan tries again on its next run).
 
 ## 4. What core needs from visit
 

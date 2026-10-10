@@ -26,6 +26,7 @@
 
 	<modules>
 		<module>libs/platform-security</module>
+		<module>libs/core-api</module>
 		<module>services/core</module>
 	</modules>
 
