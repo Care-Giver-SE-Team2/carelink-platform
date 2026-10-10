@@ -37,7 +37,7 @@
 	<properties>
 		<java.version>25</java.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<archunit.version>1.5.0</archunit.version>
+		<archunit.version>1.5.1</archunit.version>
 		<jacoco.version>0.8.15</jacoco.version>
 		<dependency.check.version>13.0.0</dependency.check.version>
 		<sonar.version>5.7.0.6970</sonar.version>
