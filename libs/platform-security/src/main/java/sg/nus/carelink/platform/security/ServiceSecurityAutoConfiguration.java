@@ -15,6 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 
 /**
  * Security for a service other than core. Sign-in happens in core; a service only reads the shared
@@ -46,10 +47,12 @@ public class ServiceSecurityAutoConfiguration {
 						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
 						.csrfTokenRequestHandler(csrfTokenRequestHandler)
 						.ignoringRequestMatchers("/internal/**"))
-				// A service never starts a session; only core does, at sign-in. Without a request
-				// cache, a rejected anonymous call does not create one either.
+				// A service never starts a session; only core does, at sign-in. A rejected anonymous
+				// call would otherwise start one to save the request for after sign-in: disabling
+				// the request cache is not enough, the exception handling then falls back to a
+				// session-backed cache, so it is replaced with one that saves nothing.
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.NEVER))
-				.requestCache(AbstractHttpConfigurer::disable)
+				.requestCache(cache -> cache.requestCache(new NullRequestCache()))
 				.formLogin(AbstractHttpConfigurer::disable)
 				.httpBasic(AbstractHttpConfigurer::disable)
 				.logout(AbstractHttpConfigurer::disable)
