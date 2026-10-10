@@ -6,9 +6,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * The platform's own tables (the scheduler locks now, the outbox later) are migrated from
- * {@code db/platform} and recorded in a history table of their own, right after the application's
- * migrations.
+ * The platform's own tables (the scheduler locks, and the events tables that libs/events ships in
+ * its jar) are migrated from {@code db/platform}, in every jar on the classpath, and recorded in a
+ * history table of their own, right after the application's migrations.
  *
  * <p>The application's migrations keep numbering V24, V25 and on. Because the two version sequences
  * live in different history tables, a platform table can never take a version number the

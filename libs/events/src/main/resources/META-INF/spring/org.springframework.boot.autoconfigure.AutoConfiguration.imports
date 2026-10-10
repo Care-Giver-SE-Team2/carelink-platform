@@ -1,0 +1,3 @@
+sg.nus.carelink.events.EventsAutoConfiguration
+sg.nus.carelink.events.OutboxRelayAutoConfiguration
+sg.nus.carelink.events.EventConsumerAutoConfiguration

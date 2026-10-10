@@ -16,3 +16,9 @@ spring:
       redis:
         # The same namespace in every service, so a login made through core is seen by all of them
         namespace: carelink:session
+
+carelink:
+  events:
+    # The name core's events carry as their source, and core's name as a consumer
+    # (spring.application.name in application.yml is the application's, "carelink")
+    service: core

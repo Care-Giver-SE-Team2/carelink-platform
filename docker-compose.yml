@@ -44,8 +44,12 @@ services:
     image: localstack/localstack:4.14.0
     environment:
       SERVICES: sqs,sns
+    volumes:
+      # The events topic and each service's queue (libs/events; the cloud creates them with Terraform)
+      - ./scripts/localstack/events.sh:/etc/localstack/init/ready.d/events.sh:ro
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:4566/_localstack/health"]
+      # Healthy once the script above has run, not only once LocalStack answers
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4566/_localstack/init/ready | tr -d ' ' | grep -q '\"completed\":true'"]
       interval: 5s
       timeout: 3s
       retries: 24
