@@ -29,7 +29,7 @@ Every event travels in the envelope that `libs/events` writes:
   - It also drops an update that is older than what it already holds, by the ordering field each event names: `version`, `logId` or `sequence`.
 - **Routing.** There is one SNS topic, `carelink-events`.
   - Each service's queue subscribes with a filter policy on the message attribute `type`, listing the events that service handles. So a service never receives events it has no use for.
-  - The local LocalStack setup still subscribes every queue to every event. The filter policies come with the first consumer.
+  - Locally, `scripts/localstack/events.sh` subscribes notification's and report's queues with their filters. core and visit handle nothing yet, so their queues have no subscription. A service gets its subscription, there and in the Terraform, with its first handler.
 - **Failures.** After five failed receives, a message moves to the service's dead-letter queue.
 
 ## 2. Payload rules
@@ -93,7 +93,7 @@ transaction, so every method listed publishes it.
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
-| `NotificationRequested` | core: the seven classes that insert into `notification` today (incident 3, profile 2, rostering 2); report: two | A message should reach someone | notification | draft |
+| `NotificationRequested` | core: the credential expiry alert (`NotificationRequestedCredentialAlert`) today. The six other core classes that insert into `notification` (incident 3, profile 1, rostering 2), and report's two, change to it | A message should reach someone | notification | published |
 | `ReportRequested` | EventBridge Scheduler, straight into report's queue | Once a week | the report worker | with the report move |
 
 **Not built.**
@@ -251,7 +251,7 @@ The spot check's whole state after each change. Ordering: `sequence`.
 - `decidedBy` is `FAMILY`, `DEFAULT_PLAN` or `MANAGER`. A leave cover is `REPLACED` by `DEFAULT_PLAN`.
 - Ordering: `sequence`.
 
-**`NotificationRequested`** (draft; the notification owner agrees the fields)
+**`NotificationRequested`**
 
 ```json
 { "recipientUserId": 7, "kind": "INCIDENT_RAISED", "channel": "IN_APP", "title": "Urgent care alert: HIGH",
@@ -260,6 +260,7 @@ The spot check's whole state after each change. Ordering: `sequence`.
 ```
 
 - One event per recipient, as the rows are written today. The publisher works out its recipients, as it does today.
+- notification keeps it as a PENDING message, created at `requestedAt`; the inbox delivers it when the recipient next asks. The notification owner may add fields.
 - `elderId` lets the inbox apply the family rule without joining other services' tables. The inbox still asks core whether the reader is bound to that elder.
 
 **`ReportRequested`**

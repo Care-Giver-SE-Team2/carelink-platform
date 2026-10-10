@@ -55,7 +55,13 @@
 			<artifactId>platform-security</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-		<!-- Events between services: notification will take NotificationRequested from its queue -->
+		<!-- The events notification handles, as the records their publishers write -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>event-types</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<!-- Events between services: notification takes NotificationRequested from its queue -->
 		<dependency>
 			<groupId>sg.nus</groupId>
 			<artifactId>events</artifactId>
@@ -88,6 +94,17 @@
 			<groupId>sg.nus</groupId>
 			<artifactId>test-support</artifactId>
 			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- The event handler's test: the queue in LocalStack, as in the local run -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-localstack</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.awaitility</groupId>
+			<artifactId>awaitility</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<!-- Architecture tests: the same layering rules as core -->

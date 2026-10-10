@@ -126,14 +126,18 @@ which facts travel as events instead: report's reads of the visit table become v
 
 ### 5.1 Writes to the notification table → `NotificationRequested` event
 
-Nine classes insert into `notification` directly. Eight implement a port, so only the adapter changes, and
+Nine classes wrote into `notification` directly. Eight implement a port, so only the adapter changes, and
 the business code that raises the alert stays as it is. The ninth, `CarePlanPublishedFamilyNotifier`, listens
 for careplan's `CarePlanPublished` event and changes in the same way.
+
+The credential expiry alert has changed already and is the worked example: it is now
+`NotificationRequestedCredentialAlert`, which publishes one event per recipient instead of inserting a row, and
+notification's `NotificationRequestedHandler` keeps the message. Eight classes are left:
 
 | Module | Classes |
 |---|---|
 | incident | `NotificationTableAlert`, `NotificationTableSpotCheckAlert`, `JdbcFamilyAlertDeliveryStore` |
-| profile | `NotificationTableCredentialAlert`, `CarePlanPublishedFamilyNotifier` |
+| profile | `CarePlanPublishedFamilyNotifier` |
 | rostering | `NotificationTableAbsenceAlert`, `NotificationTableRosterAlert` |
 | report | `NotificationTableValueAddedManagerAlert`, `NotificationTableValueAddedNotifier` |
 

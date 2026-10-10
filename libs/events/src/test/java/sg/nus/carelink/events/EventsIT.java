@@ -69,8 +69,13 @@ class EventsIT {
 		System.setProperty("aws.secretAccessKey", AWS.getSecretKey());
 		TOPIC_ARN = "arn:aws:sns:" + REGION + ":000000000000:carelink-events";
 		awaitInitScript();
-		try (SqsClient sqs = sqs()) {
-			QUEUE_URL = sqs.getQueueUrl(queue -> queue.queueName("carelink-visit")).queueUrl();
+		try (SqsClient sqs = sqs(); SnsClient sns = sns()) {
+			// The test's own queue, subscribed to every event: it publishes types no service handles,
+			// and the services' queues take only the types their filter policies name.
+			QUEUE_URL = sqs.createQueue(queue -> queue.queueName("events-it")).queueUrl();
+			sns.subscribe(subscription -> subscription.topicArn(TOPIC_ARN).protocol("sqs")
+					.endpoint("arn:aws:sqs:" + REGION + ":000000000000:events-it")
+					.attributes(Map.of("RawMessageDelivery", "true")));
 			// A failed handling comes back after one second instead of thirty
 			sqs.setQueueAttributes(queue -> queue.queueUrl(QUEUE_URL)
 					.attributes(Map.of(QueueAttributeName.VISIBILITY_TIMEOUT, "1")));
@@ -78,15 +83,15 @@ class EventsIT {
 	}
 
 	/**
-	 * The script's last step subscribes the fourth queue, so the script is done when the topic has
-	 * four subscriptions. Polled in this thread: this runs in the class's static initializer, and a
-	 * condition run on Awaitility's own thread would wait for that initializer to finish.
+	 * The script's last step subscribes report's queue, the second subscription, so the script is
+	 * done when the topic has two. Polled in this thread: this runs in the class's static
+	 * initializer, and a condition run on Awaitility's own thread would wait for that initializer
+	 * to finish.
 	 */
 	private static void awaitInitScript() {
-		try (SnsClient sns = SnsClient.builder().endpointOverride(AWS.getEndpoint()).region(Region.of(REGION))
-				.credentialsProvider(credentials()).build()) {
+		try (SnsClient sns = sns()) {
 			await().pollInSameThread().atMost(Duration.ofSeconds(90)).pollInterval(Duration.ofMillis(500)).ignoreExceptions()
-					.until(() -> sns.listSubscriptionsByTopic(topic -> topic.topicArn(TOPIC_ARN)).subscriptions().size() == 4);
+					.until(() -> sns.listSubscriptionsByTopic(topic -> topic.topicArn(TOPIC_ARN)).subscriptions().size() == 2);
 		}
 		catch (ConditionTimeoutException notFinished) {
 			throw new IllegalStateException(
@@ -196,6 +201,11 @@ class EventsIT {
 						QueueAttributeName.APPROXIMATE_NUMBER_OF_MESSAGES_NOT_VISIBLE)).attributes();
 		return "0".equals(counts.get(QueueAttributeName.APPROXIMATE_NUMBER_OF_MESSAGES))
 				&& "0".equals(counts.get(QueueAttributeName.APPROXIMATE_NUMBER_OF_MESSAGES_NOT_VISIBLE));
+	}
+
+	private static SnsClient sns() {
+		return SnsClient.builder().endpointOverride(AWS.getEndpoint()).region(Region.of(REGION))
+				.credentialsProvider(credentials()).build();
 	}
 
 	private static SqsClient sqs() {
