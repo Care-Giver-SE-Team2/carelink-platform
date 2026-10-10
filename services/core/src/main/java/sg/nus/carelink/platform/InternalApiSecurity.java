@@ -23,8 +23,15 @@ class InternalApiSecurity {
 
 	static final String INTERNAL_API = "/internal/**";
 
+	/**
+	 * CSRF protection is off on purpose (Sonar java:S4502, reviewed). It stops a forged cross-site
+	 * request from acting with the login a browser holds, and a call here acts with no login at all:
+	 * the chain is stateless and permits every call. A forged request therefore gains nothing that a
+	 * direct one would not. What keeps outsiders away is that the Ingress does not route /internal.
+	 */
 	@Bean
 	@Order(1)
+	@SuppressWarnings("java:S4502")
 	SecurityFilterChain internalApiSecurityFilterChain(HttpSecurity http) throws Exception {
 		http
 				.securityMatcher(INTERNAL_API)
