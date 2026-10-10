@@ -4,7 +4,7 @@ What has to change when visit, report and notification move out of core: which s
 foreign keys cross a schema, what core offers the other services in place of today's in-process calls, and which
 SQL still reads another service's tables.
 
-Generated from the code at `14d3474` (Flyway migrations V1–V23, 50 tables). Owner: core and shared parts. Each
+Generated from the code at `c124099` (Flyway migrations V1–V25, 50 tables). Owner: core and shared parts. Each
 service owner refines their own section when they split the service.
 
 ---
@@ -79,6 +79,7 @@ call it through the same interface. [building-a-service.md](building-a-service.m
 | `CaregiverIncidentGateway.report`, `own`, `list` | visit (1) | `POST /internal/v1/incidents/caregiver-reports`; `GET /internal/v1/incidents/{id}?actor=`; `GET /internal/v1/incidents?visitId=&actor=&page=&size=` |
 | `MissedCheckInIncidentGateway.raise(…)` → incident id | visit (1) | `POST /internal/v1/incidents/missed-check-ins` → `{ incidentId }`. Synchronous because visit stores the id; the missed check-in scan retries on failure |
 | `IncidentService.createElderServiceDispute(…)` | visit (`VisitService`) | `POST /internal/v1/incidents/service-disputes` → `{ incidentId }` |
+| `MissedCheckInPauseEvidence.isSoleIncident(elderId, visitId, incidentId)` | visit (`MissedCheckInResumeService`) | **Not in `CoreApi` yet.** A read: is this incident the visit's only one, raised by the missed check-in scan? It becomes an endpoint under `/internal/v1/incidents/` before visit moves out |
 | `VisitCover.options(visitId)`, `cover(…)` | report (2) | `GET /internal/v1/visits/{visitId}/cover-options`; `POST /internal/v1/visits/{visitId}/cover`. Rostering stays in core and calls visit in turn |
 
 The caller keeps the port it has today and swaps the adapter. For example, visit keeps its own `FamilyAccess`
@@ -104,13 +105,14 @@ decides.
 
 ### 5.1 Writes to the notification table → `NotificationRequested` event
 
-Eight classes insert into `notification` directly. Each implements a port, so only the adapter changes, and
-the business code that raises the alert stays as it is.
+Nine classes insert into `notification` directly. Eight implement a port, so only the adapter changes, and
+the business code that raises the alert stays as it is. The ninth, `CarePlanPublishedFamilyNotifier`, listens
+for careplan's `CarePlanPublished` event and changes in the same way.
 
 | Module | Classes |
 |---|---|
 | incident | `NotificationTableAlert`, `NotificationTableSpotCheckAlert`, `JdbcFamilyAlertDeliveryStore` |
-| profile | `NotificationTableCredentialAlert` |
+| profile | `NotificationTableCredentialAlert`, `CarePlanPublishedFamilyNotifier` |
 | rostering | `NotificationTableAbsenceAlert`, `NotificationTableRosterAlert` |
 | report | `NotificationTableValueAddedManagerAlert`, `NotificationTableValueAddedNotifier` |
 
@@ -122,7 +124,7 @@ the business code that raises the alert stays as it is.
 | report `JdbcValueAddedVisitAssignment` | `absence_report`, `visit` | Calls to core and visit |
 | report `NotificationTableValueAddedManagerAlert` | `app_user`, `user_role` | Recipients go in the event |
 | report `NotificationTableValueAddedNotifier` | `caregiver` | Recipients go in the event |
-| notification `JdbcNotificationInbox` | `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification |
+| notification `JdbcNotificationInbox` | `care_plan`, `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification |
 | notification `JdbcRecipientDirectory` | `app_user`, `user_role` | Recipients go in the event |
 | incident `JdbcSpotCheckLookups` | `visit`, `notification` | Calls to visit; the reminder time kept in core |
 
@@ -134,7 +136,7 @@ The schema split comes after these reads are gone. Until then the four parts sha
 ## 6. Tables the platform adds
 
 The platform's own tables go in a separate migration location, `db/platform`, with their own history table,
-`flyway_platform_history`. The application's migrations keep numbering V24, V25 and on. Because the two version
+`flyway_platform_history`. The application's migrations number on from V25, so the next one is V26. Because the two version
 sequences live in different history tables, they can never collide.
 
 A library can ship platform migrations too: Flyway finds `db/platform` in every jar on the classpath. Each
