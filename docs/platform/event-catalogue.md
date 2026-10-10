@@ -273,12 +273,10 @@ EventBridge Scheduler puts the envelope on report's queue directly.
 - **Master data at generation time.**
   - Some facts rarely change and are read once per report: the elder's profile, the elder's current published care plan (version and weekly hours), the primary caregiver, and caregivers' names.
   - report asks core for them when it generates, and keeps them in the report's facts snapshot, as it does today.
-  - `CoreApi` already answers the primary caregiver (`findPrimaryCaregiverId`) and a caregiver's name (`findCaregiverPublicProfile`).
-  - Two calls are added when report moves: the elder's profile for the report, and the elder's current published plan.
+  - One call answers all of it: `CoreApi.elderReportProfile`. A caregiver's name is `findCaregiverPublicProfile`.
 - **"Is this caregiver free right now?"** Value-added dispatch needs the answer at that moment, so it asks rather than keeping a copy that could lag:
-  - core: is the caregiver on approved leave that day?
-  - visit: does the caregiver have an active visit that overlaps this time?
-  - Both calls are added when report moves.
+  - core: is the caregiver on approved leave that day? `CoreApi.onLeave`
+  - visit: does the caregiver have an active visit that overlaps this time? `VisitApi.caregiverBusy`
 
 ## 5. What report keeps
 

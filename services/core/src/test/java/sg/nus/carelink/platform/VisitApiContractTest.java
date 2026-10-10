@@ -189,6 +189,14 @@ class VisitApiContractTest {
 	}
 
 	@Test
+	void whetherACaregiverIsBusyAtATime() {
+		when(lookups.caregiverBusy(7L, NINE, NINE.plusHours(1))).thenReturn(true);
+
+		assertThat(visit.caregiverBusy(7L, NINE, NINE.plusHours(1)).busy()).isTrue();
+		assertThat(visit.caregiverBusy(9L, NINE, NINE.plusHours(1)).busy()).isFalse();
+	}
+
+	@Test
 	void aCallCarriesNoCsrfTokenAndLeavesNoSession() throws Exception {
 		MvcResult result = mvc.perform(post("/internal/v1/visits/100/call-off")
 						.contentType(MediaType.APPLICATION_JSON)

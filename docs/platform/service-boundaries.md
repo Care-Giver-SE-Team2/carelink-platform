@@ -80,6 +80,10 @@ call it through the same interface. [building-a-service.md](building-a-service.m
 | `MissedCheckInIncidentGateway.raise(…)` → incident id | visit (1) | `POST /internal/v1/incidents/missed-check-ins` → `{ incidentId }`. Synchronous because visit stores the id; the missed check-in scan retries on failure |
 | `IncidentService.createElderServiceDispute(…)` | visit (`VisitService`) | `POST /internal/v1/incidents/service-disputes` → `{ incidentId }` |
 | `MissedCheckInPauseEvidence.isSoleIncident(elderId, visitId, incidentId)` | visit (`MissedCheckInResumeService`) | `GET /internal/v1/incidents/{incidentId}/sole-missed-check-in?elderId=&visitId=` → `{ sole }`: is this incident the visit's only one, raised by the missed check-in scan? |
+| SQL on `app_user`, `user_role` in `JdbcRecipientDirectory` (is the account behind a session still allowed, and with which roles) | notification | `GET /internal/v1/accounts/{username}` → `{ userId, username, displayName, enabled, roles }`, or 404 |
+| SQL on `app_user`, `user_role` in `NotificationTableValueAddedManagerAlert` (every enabled manager) | report | `GET /internal/v1/accounts/with-role/{role}` → `{ userIds }` |
+| SQL on `elder`, `elder_primary_caregiver`, `caregiver`, `care_plan` in `ReportFactsJdbcSource` (the elder a report describes) | report | `GET /internal/v1/elders/{elderId}/report-profile` → the profile, the primary caregiver and the latest published plan, or 404 |
+| SQL on `absence_report` in `JdbcValueAddedVisitAssignment` (is the caregiver away that day) | report | `GET /internal/v1/caregivers/{caregiverId}/on-leave?day=` → `{ onLeave }` |
 | `VisitCover.options(visitId)`, `cover(…)` | report (2) | `GET /internal/v1/visits/{visitId}/cover-options`; `POST /internal/v1/visits/{visitId}/cover`. Rostering stays in core and calls visit in turn |
 
 The caller keeps the port it has today and swaps the adapter. For example, visit keeps its own `FamilyAccess`
@@ -110,6 +114,7 @@ controllers move with it, and a caller that has switched to the client changes n
 | `StandaloneVisits.schedule`, `find` | report | `POST /internal/v1/visits/standalone` → `{ visitId }`; `GET /internal/v1/visits/{visitId}/state`, or 404 |
 | `VisitScheduleQuery.caregiverIdsForElder`, `hasAssignedVisit` | report | `GET /internal/v1/visits/caregivers-of-elder?elderId=`; `GET /internal/v1/visits/assigned?elderIds=&caregiverId=` → `{ assigned }` |
 | SQL on `visit` in `JdbcSpotCheckLookups` | incident | `GET /internal/v1/visits/{visitId}`; `GET /internal/v1/visits/upcoming?elderId=&from=&until=` |
+| SQL on `visit` in `JdbcValueAddedVisitAssignment` (does the caregiver have a visit at that time) | report | `GET /internal/v1/visits/caregiver-busy?caregiverId=&from=&until=` → `{ busy }`. Its times are bound the way JPA writes them, which the SQL it replaces did not do |
 | SQL on `visit` in `NotificationTableAlert` (the elder's latest caregiver) | incident | `GET /internal/v1/visits/latest-caregiver?elderId=` → `{ caregiverId }`, or 404 |
 
 Times are ISO date-times on Singapore's wall clock, as visit stores them. A caller switches by keeping its port and
@@ -136,12 +141,12 @@ for careplan's `CarePlanPublished` event and changes in the same way.
 
 | Class | Reads from other schemas | Direction of the fix |
 |---|---|---|
-| report `ReportFactsJdbcSource` | `care_plan`, `caregiver`, `elder`, `elder_confirmation`, `elder_primary_caregiver`, `incident`, `incident_log`, `roster_change`, `spot_check`, `visit`, `visit_evidence`, `visit_task`, `vital_sign` | A read model in report's schema, filled from events |
-| report `JdbcValueAddedVisitAssignment` | `absence_report`, `visit` | Calls to core and visit |
-| report `NotificationTableValueAddedManagerAlert` | `app_user`, `user_role` | Recipients go in the event |
+| report `ReportFactsJdbcSource` | `care_plan`, `caregiver`, `elder`, `elder_confirmation`, `elder_primary_caregiver`, `incident`, `incident_log`, `roster_change`, `spot_check`, `visit`, `visit_evidence`, `visit_task`, `vital_sign` | A read model in report's schema, filled from events; the elder through `CoreApi.elderReportProfile` |
+| report `JdbcValueAddedVisitAssignment` | `absence_report`, `visit` | `CoreApi.onLeave` and `VisitApi.caregiverBusy` |
+| report `NotificationTableValueAddedManagerAlert` | `app_user`, `user_role` | `CoreApi.enabledAccountsWithRole`; recipients go in the event |
 | report `NotificationTableValueAddedNotifier` | `caregiver` | Recipients go in the event |
-| notification `JdbcNotificationInbox` | `care_plan`, `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification |
-| notification `JdbcRecipientDirectory` | `app_user`, `user_role` | Recipients go in the event |
+| notification `JdbcNotificationInbox` | `care_plan`, `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification; the family rule asks `CoreApi.readableElders` |
+| notification `JdbcRecipientDirectory` | `app_user`, `user_role` | `CoreApi.account` |
 | incident `JdbcSpotCheckLookups` | `visit`, `notification` | Calls to visit (section 4); the reminder time kept in core |
 
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
