@@ -38,8 +38,8 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
             assertThat(detail.path("responderUserId").asLong()).isEqualTo(manager);
             assertThat(detail.path("respondBy").asString()).isEqualTo("2026-10-08T10:30:01");
             assertThat(cg.get("/api/incidents/"+event).statusCode()).isEqualTo(403);
-            assertThat(a.read("/api/notifications/me").path("items").get(0).path("resourceId").asLong()).isEqualTo(event);
-            assertThat(b.read("/api/notifications/me").path("items").get(0).path("resourceId").asLong()).isEqualTo(event);
+            assertThat(incidentNotices(family)).containsExactly(event);
+            assertThat(incidentNotices(secondFamilyUser)).containsExactly(event);
             String path="/api/family/incidents/"+event;
             assertThat(a.read(path).toString()).doesNotContain("responderUserId","latitude");
             body(a.post("/api/incidents/"+event+"/view",null),200);
@@ -118,6 +118,10 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident_log l JOIN incident i ON i.id=l.incident_id WHERE i.visit_id=?",Long.class,id)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE resource_type='INCIDENT' AND recipient_user_id IN (?,?,?,?)",Long.class,manager,caregiverUser,family,secondFamilyUser)).isZero();
     }
+    /** The incidents incident wrote this account a message about; the inbox that shows them is the notification service's. */
+    private List<Long> incidentNotices(long user) {
+        return jdbc.queryForList("SELECT resource_id FROM notification WHERE recipient_user_id=? AND resource_type='INCIDENT' ORDER BY id",Long.class,user);
+    }
     private void assertSystemTransition(long id) {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_state_transition WHERE visit_id=? AND from_state='SCHEDULED' AND to_state='EXCEPTION' AND result='APPLIED' AND actor_user_id IS NULL",Long.class,id)).isZero();
     }
@@ -129,7 +133,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
             assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event WHERE incident_id=?",String.class,event)).isEqualTo("FAILED");
             long profile=jdbc.queryForObject("SELECT id FROM family_member WHERE user_id=?",Long.class,family);
             assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)",String.class,profile,event)).isEqualTo("FAILED");
-            try(var b=browser(secondFamilyName)) { assertThat(b.read("/api/notifications/me").path("items").get(0).path("resourceId").asLong()).isEqualTo(event); }
+            assertThat(incidentNotices(secondFamilyUser)).containsExactly(event);
             assertThat(scan.trigger(id)).isFalse(); assertThat(count("incident",id)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("SCHEDULED");
             assertThat(version(id)).isEqualTo(1);assertSystemTransition(id);
@@ -143,7 +147,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
             body(a.post("/api/incidents/"+event+"/acknowledge",Map.of("responseNote","Already aware")),200);
             clock.at(START.plusSeconds(1801)); assertThat(escalation.sweep()).isGreaterThanOrEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT status FROM incident WHERE id=?",String.class,event)).isEqualTo("UNRESOLVED_ESCALATED");
-            assertThat(a.read("/api/notifications/me").path("items").valueStream().map(row->row.path("eventType").asString()).toList()).contains("INCIDENT_RAISED","INCIDENT_UNRESOLVED");
+            assertThat(jdbc.queryForList("SELECT event_type FROM notification WHERE recipient_user_id=? AND resource_type='INCIDENT' AND resource_id=?",String.class,family,event)).contains("INCIDENT_RAISED","INCIDENT_UNRESOLVED");
             assertThat(a.read("/api/family/incidents/"+event).path("acknowledgeBy")).isEqualTo(before);
             assertThat(a.read("/api/family/incidents/"+event).path("acknowledgement").path("acknowledgedAt").isNull()).isFalse();
             assertThat(escalation.sweep()).isZero(); assertThat(scan.trigger(id)).isFalse();
@@ -164,7 +168,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         else jdbc.update("UPDATE elder_family_binding SET expires_at=? WHERE elder_id=? AND family_member_id=?",LocalDateTime.ofInstant(START,SGT),elder,secondFamily);
         overdue(); scan.trigger(id); long event=incident(id);
         try(var b=browser(secondFamilyName)) {
-            assertThat(b.read("/api/notifications/me").path("totalElements").asInt()).isZero();
+            assertThat(incidentNotices(secondFamilyUser)).isEmpty();
             assertThat(b.get("/api/family/incidents/"+event).statusCode()).isEqualTo(403);
         }
     }

@@ -162,7 +162,9 @@ class FamilyIncidentObserverIT {
 		assertThat(count("notification")).isEqualTo(4);
 		assertThat(jdbc.queryForList("SELECT * FROM family_alert_window ORDER BY family_member_id")).isEqualTo(windows);
 		Browser family = loginAs("family-a");
-		mvc.perform(get("/api/notifications/me").session(family.session())).andExpect(status().isOk());
+		// The family opens their inbox (the notification service), which delivers the waiting messages.
+		jdbc.update("UPDATE notification SET status = 'SENT', sent_at = ? WHERE recipient_user_id = 7 AND status = 'PENDING'",
+				Timestamp.valueOf(LocalDateTime.of(2026, 10, 7, 17, 0)));
 		assertThat(read(family, 601).path("acknowledgeBy").asString()).isEqualTo("2026-10-07T18:00:00+08:00");
 		clock.now = START.plusSeconds(3 * 3600);
 		command(family, 601, "acknowledge", null);

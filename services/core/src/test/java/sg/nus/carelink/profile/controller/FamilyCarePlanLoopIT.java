@@ -73,9 +73,9 @@ class FamilyCarePlanLoopIT {
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id = 7 "
 				+ "AND event_type = 'CARE_PLAN_PUBLISHED' AND resource_type = 'CARE_PLAN' AND resource_id = ?",
 				Integer.class, planId)).isEqualTo(1);
-		family(get("/api/notifications/me"))
-				.andExpect(jsonPath("$.items[0].title").value("Care plan v1 for Tan Mei is ready"))
-				.andExpect(jsonPath("$.items[0].elderId").value(1));
+		assertThat(jdbc.queryForObject("SELECT title FROM notification WHERE recipient_user_id = 7 "
+				+ "AND resource_type = 'CARE_PLAN' AND resource_id = ?", String.class, planId))
+				.isEqualTo("Care plan v1 for Tan Mei is ready");
 
 		family(get("/api/family/elders/1/care-plan"))
 				.andExpect(jsonPath("$.current").doesNotExist())

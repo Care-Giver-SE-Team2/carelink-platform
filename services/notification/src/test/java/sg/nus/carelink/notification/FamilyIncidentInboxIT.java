@@ -1,6 +1,8 @@
-package sg.nus.carelink.incident.controller;
+package sg.nus.carelink.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -9,17 +11,14 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,31 +30,31 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import sg.nus.carelink.incident.application.IncidentFamilyEvents;
 import sg.nus.carelink.testsupport.SharedMySql;
 
-/** FM05 consumer messages through the inbox with current authorization and Singapore time. @author Wang Zhili */
-@SpringBootTest(properties = {"carelink.report.schedule-cron=-", "carelink.escalation.scan-initial-delay=PT1H"})
+/**
+ * FM05 consumer messages through the inbox with current authorization and Singapore time. Each
+ * message is written the way incident writes it when it raises an incident ({@code publish}), and a
+ * signed-in session keeps the roles its account had at sign-in, as core's sign-in leaves it.
+ * @author Wang Zhili
+ */
+@SpringBootTest
 @AutoConfigureMockMvc
 @Import(FamilyIncidentInboxIT.TimeConfiguration.class)
 class FamilyIncidentInboxIT {
 	private static final Instant START = Instant.parse("2026-10-07T08:00:00Z");
+	private static final ZoneId SINGAPORE = ZoneId.of("Asia/Singapore");
 	@Autowired private MockMvc mvc;
 	@Autowired private JdbcTemplate jdbc;
 	@Autowired private InboxClock clock;
-	@Autowired private IncidentFamilyEvents events;
-	@Autowired private PlatformTransactionManager transactions;
 	private final JsonMapper json = JsonMapper.builder().build();
 
 	@DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
@@ -161,25 +160,20 @@ class FamilyIncidentInboxIT {
 		clock.now=START.plusSeconds(1200);
 		assertThat(read(a,id).path("readAt")).isEqualTo(first.path("readAt"));
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isZero();
-		JsonNode detail=fetch(a,"/api/family/incidents/601");
-		assertThat(detail.path("acknowledgement").path("viewedAt").isNull()).isTrue();
-		assertThat(detail.path("acknowledgement").path("acknowledgedAt").isNull()).isTrue();
-		assertThat(detail.path("acknowledgeBy").asString()).isEqualTo("2026-10-07T18:00:00+08:00");
 		assertThat(rows("family_alert_window")).isEqualTo(windows);
 		assertThat(rows("incident")).isEqualTo(incidents);
 	}
 
-	@Test void viewAndAcknowledgementDoNotMarkNotificationsReadAndReadAllPreservesReceipts() throws Exception {
+	@Test void incidentReceiptsDoNotMarkNotificationsReadAndReadAllPreservesThem() throws Exception {
 		publish(601); publish(602);
 		Browser a=login("family-a");
-		submit(a,"/api/incidents/601/view",null);
-		clock.now=START.plusSeconds(60);
-		submit(a,"/api/incidents/601/acknowledge","{\"responseNote\":\"I know\"}");
+		// What the family's view and acknowledgement leave in incident.
+		jdbc.update("INSERT INTO incident_acknowledgement (incident_id,family_member_id,viewed_at,acknowledged_at,response_note) VALUES (601,42,?,?,'I know')",time(16,0),time(16,1));
 		var receipts=rows("incident_acknowledgement"); var windows=rows("family_alert_window");
 		assertThat(state(notification(7,601))).isEqualTo("PENDING");
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isEqualTo(2);
-		assertThat(submit(a,"/api/notifications/me/read-all",null).path("updated").asInt()).isEqualTo(2);
-		assertThat(submit(a,"/api/notifications/me/read-all",null).path("updated").asInt()).isZero();
+		assertThat(submit(a,"/api/notifications/me/read-all").path("updated").asInt()).isEqualTo(2);
+		assertThat(submit(a,"/api/notifications/me/read-all").path("updated").asInt()).isZero();
 		assertThat(rows("incident_acknowledgement")).isEqualTo(receipts);
 		assertThat(rows("family_alert_window")).isEqualTo(windows);
 		assertThat(state(notification(9,601))).isEqualTo("PENDING");
@@ -196,8 +190,8 @@ class FamilyIncidentInboxIT {
 		assertThat(ids(fetch(a,"/api/notifications/me?size=1"))).containsExactly(visible);
 		assertThat(fetch(a,"/api/notifications/me?size=1").path("totalElements").asLong()).isEqualTo(1);
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isEqualTo(1);
-		mvc.perform(write(a,"/api/notifications/"+hidden+"/read",null)).andExpect(status().isNotFound());
-		assertThat(submit(a,"/api/notifications/me/read-all",null).path("updated").asInt()).isEqualTo(1);
+		mvc.perform(write(a,"/api/notifications/"+hidden+"/read")).andExpect(status().isNotFound());
+		assertThat(submit(a,"/api/notifications/me/read-all").path("updated").asInt()).isEqualTo(1);
 		assertThat(state(hidden)).isEqualTo("SENT");
 		assertThat(state(visible)).isEqualTo("READ");
 	}
@@ -206,25 +200,25 @@ class FamilyIncidentInboxIT {
 		publish(601);
 		Browser a=login("family-a");
 		long own=notification(7,601), other=notification(9,601);
-		mvc.perform(write(a,"/api/notifications/"+other+"/read",null)).andExpect(status().isNotFound());
+		mvc.perform(write(a,"/api/notifications/"+other+"/read")).andExpect(status().isNotFound());
 		jdbc.update("DELETE FROM incident WHERE id=601");
 		assertThat(ids(fetch(a,"/api/notifications/me"))).isEmpty();
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isZero();
-		mvc.perform(write(a,"/api/notifications/"+own+"/read",null)).andExpect(status().isNotFound());
-		assertThat(submit(a,"/api/notifications/me/read-all",null).path("updated").asInt()).isZero();
+		mvc.perform(write(a,"/api/notifications/"+own+"/read")).andExpect(status().isNotFound());
+		assertThat(submit(a,"/api/notifications/me/read-all").path("updated").asInt()).isZero();
 	}
 
 	@ParameterizedTest @ValueSource(strings={"PENDING","FAILED","UNKNOWN"})
 	void invalidFamilyStatusFiltersAreRejected(String value) throws Exception {
-		mvc.perform(get("/api/notifications/me").param("status",value).session(login("family-a").session())).andExpect(status().isBadRequest());
+		mvc.perform(get("/api/notifications/me").param("status",value).with(login("family-a").signedIn())).andExpect(status().isBadRequest());
 	}
 
 	@Test void sessionAndCsrfAreRequiredForInboxCommands() throws Exception {
 		mvc.perform(get("/api/notifications/me")).andExpect(status().isUnauthorized());
 		mvc.perform(get("/api/notifications/me/unread-count")).andExpect(status().isUnauthorized());
 		Browser a=login("family-a"); publish(601); long id=notification(7,601);
-		mvc.perform(post("/api/notifications/{id}/read",id).session(a.session())).andExpect(status().isForbidden());
-		mvc.perform(post("/api/notifications/me/read-all").session(a.session())).andExpect(status().isForbidden());
+		mvc.perform(post("/api/notifications/{id}/read",id).with(a.signedIn())).andExpect(status().isForbidden());
+		mvc.perform(post("/api/notifications/me/read-all").with(a.signedIn())).andExpect(status().isForbidden());
 		assertThat(state(id)).isEqualTo("PENDING");
 	}
 
@@ -251,7 +245,7 @@ class FamilyIncidentInboxIT {
 		assertThat(ids(page)).isEmpty();
 		assertThat(page.path("totalElements").asLong()).isZero();
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isZero();
-		assertThat(submit(a,"/api/notifications/me/read-all",null).path("updated").asInt()).isZero();
+		assertThat(submit(a,"/api/notifications/me/read-all").path("updated").asInt()).isZero();
 		assertThat(rows("incident_acknowledgement")).isEmpty();
 	}
 
@@ -262,7 +256,7 @@ class FamilyIncidentInboxIT {
 		Browser manager=login("manager");
 		assertThat(ids(fetch(manager,"/api/notifications/me"))).containsExactly(id);
 		assertThat(read(manager,id).path("status").asString()).isEqualTo("READ");
-		assertThat(submit(manager,"/api/notifications/me/read-all",null).path("updated").asInt()).isZero();
+		assertThat(submit(manager,"/api/notifications/me/read-all").path("updated").asInt()).isZero();
 		assertThat(jdbc.queryForList("SELECT * FROM notification WHERE recipient_user_id IN (7,9) ORDER BY id")).isEqualTo(families);
 		assertThat(rows("incident_acknowledgement")).isEmpty();
 	}
@@ -277,7 +271,7 @@ class FamilyIncidentInboxIT {
 		assertThat(ids(fetch(staff,"/api/notifications/me"))).containsExactly(absence,credential);
 		assertThat(fetch(staff,"/api/notifications/me/unread-count").path("unread").asLong()).isEqualTo(2);
 		assertThat(read(staff,credential).path("status").asString()).isEqualTo("READ");
-		assertThat(submit(staff,"/api/notifications/me/read-all",null).path("updated").asInt()).isEqualTo(1);
+		assertThat(submit(staff,"/api/notifications/me/read-all").path("updated").asInt()).isEqualTo(1);
 		assertThat(jdbc.queryForList("SELECT * FROM notification WHERE recipient_user_id IN (7,9) ORDER BY id")).isEqualTo(families);
 	}
 
@@ -293,14 +287,13 @@ class FamilyIncidentInboxIT {
 			jdbc.update("DELETE FROM app_user WHERE id=7");
 		} else { jdbc.update("DELETE FROM user_role WHERE user_id=7 AND role='FAMILY'"); }
 		for(String path:List.of("/api/notifications/me","/api/notifications/me/unread-count")) {
-			mvc.perform(get(path).session(a.session())).andExpect(status().isForbidden());
+			mvc.perform(get(path).with(a.signedIn())).andExpect(status().isForbidden());
 		}
-		mvc.perform(write(a,"/api/notifications/"+id+"/read",null)).andExpect(status().isForbidden());
-		mvc.perform(write(a,"/api/notifications/me/read-all",null)).andExpect(status().isForbidden());
+		mvc.perform(write(a,"/api/notifications/"+id+"/read")).andExpect(status().isForbidden());
+		mvc.perform(write(a,"/api/notifications/me/read-all")).andExpect(status().isForbidden());
 		assertThat(rows("notification")).isEqualTo(notifications);
 		assertThat(rows("family_alert_window")).isEqualTo(windows);
 		assertThat(rows("incident_acknowledgement")).isEmpty();
-		mvc.perform(get("/api/family/incidents/601").session(a.session())).andExpect(status().isForbidden());
 	}
 
 	@Test void unknownAndOrphanedResourcesAreExcludedBeforePagingCountsAndWrites() throws Exception {
@@ -318,9 +311,9 @@ class FamilyIncidentInboxIT {
 		assertThat(page.path("totalElements").asLong()).isEqualTo(2);
 		assertThat(ids(fetch(a,"/api/notifications/me?page=1&size=1"))).containsExactly(visible);
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isEqualTo(2);
-		for(long id:excluded) { mvc.perform(write(a,"/api/notifications/"+id+"/read",null)).andExpect(status().isNotFound()); }
+		for(long id:excluded) { mvc.perform(write(a,"/api/notifications/"+id+"/read")).andExpect(status().isNotFound()); }
 		assertThat(read(a,account).path("elderId").isNull()).isTrue();
-		assertThat(submit(a,"/api/notifications/me/read-all",null).path("updated").asInt()).isEqualTo(1);
+		assertThat(submit(a,"/api/notifications/me/read-all").path("updated").asInt()).isEqualTo(1);
 		for(long id:excluded) { assertThat(state(id)).isEqualTo("PENDING"); }
 	}
 
@@ -335,11 +328,10 @@ class FamilyIncidentInboxIT {
 		assertThat(page.path("items").get(0).path("sentAt").asString()).isEqualTo("2026-10-07T16:00:00+08:00");
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isEqualTo(1);
 		assertThat(state(hidden)).isEqualTo("PENDING");
-		mvc.perform(write(a,"/api/notifications/"+hidden+"/read",null)).andExpect(status().isNotFound());
+		mvc.perform(write(a,"/api/notifications/"+hidden+"/read")).andExpect(status().isNotFound());
 		clock.now=START.plusSeconds(60);
 		assertThat(read(a,visible).path("readAt").asString()).isEqualTo("2026-10-07T16:01:00+08:00");
-		assertThat(submit(a,"/api/notifications/me/read-all",null).path("updated").asInt()).isZero();
-		mvc.perform(get("/api/family/incidents/601").session(a.session())).andExpect(status().isForbidden());
+		assertThat(submit(a,"/api/notifications/me/read-all").path("updated").asInt()).isZero();
 	}
 
 	@ParameterizedTest @ValueSource(booleans={false,true})
@@ -351,9 +343,9 @@ class FamilyIncidentInboxIT {
 		long account=manual(10,null,null,"IN_APP","PENDING");
 		assertThat(ids(fetch(manager,"/api/notifications/me"))).containsExactly(account);
 		assertThat(fetch(manager,"/api/notifications/me/unread-count").path("unread").asLong()).isEqualTo(1);
-		mvc.perform(get("/api/notifications/me?status=PENDING").session(manager.session())).andExpect(status().isBadRequest());
-		mvc.perform(write(manager,"/api/notifications/"+care+"/read",null)).andExpect(status().isNotFound());
-		assertThat(submit(manager,"/api/notifications/me/read-all",null).path("updated").asInt()).isEqualTo(1);
+		mvc.perform(get("/api/notifications/me?status=PENDING").with(manager.signedIn())).andExpect(status().isBadRequest());
+		mvc.perform(write(manager,"/api/notifications/"+care+"/read")).andExpect(status().isNotFound());
+		assertThat(submit(manager,"/api/notifications/me/read-all").path("updated").asInt()).isEqualTo(1);
 		assertThat(state(care)).isEqualTo("PENDING");
 	}
 
@@ -362,11 +354,29 @@ class FamilyIncidentInboxIT {
 		Browser manager=login("manager"); long id=manual(10,"CREDENTIAL",999L,"IN_APP","PENDING");
 		if(change.equals("DISABLED")) { jdbc.update("UPDATE app_user SET enabled=false WHERE id=10"); }
 		else { jdbc.update("DELETE FROM user_role WHERE user_id=10"); }
-		mvc.perform(get("/api/notifications/me").session(manager.session())).andExpect(status().isForbidden());
-		mvc.perform(get("/api/notifications/me/unread-count").session(manager.session())).andExpect(status().isForbidden());
-		mvc.perform(write(manager,"/api/notifications/"+id+"/read",null)).andExpect(status().isForbidden());
-		mvc.perform(write(manager,"/api/notifications/me/read-all",null)).andExpect(status().isForbidden());
+		mvc.perform(get("/api/notifications/me").with(manager.signedIn())).andExpect(status().isForbidden());
+		mvc.perform(get("/api/notifications/me/unread-count").with(manager.signedIn())).andExpect(status().isForbidden());
+		mvc.perform(write(manager,"/api/notifications/"+id+"/read")).andExpect(status().isForbidden());
+		mvc.perform(write(manager,"/api/notifications/me/read-all")).andExpect(status().isForbidden());
 		assertThat(state(id)).isEqualTo("PENDING");
+	}
+
+	@Test void aFailedReadChangesNothingAndOnlyAnExplicitRetrySavesIt() throws Exception {
+		publish(601); Browser a=login("family-a"); long id=notification(7,601);
+		fetch(a,"/api/notifications/me");
+		var delivered=jdbc.queryForMap("SELECT * FROM notification WHERE id=?",id);
+		jdbc.execute("CREATE TRIGGER fm05_inbox_read_fault BEFORE UPDATE ON notification FOR EACH ROW BEGIN IF NEW.id="+id
+				+" AND NEW.status='READ' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic recipient write failure'; END IF; END");
+		try {
+			mvc.perform(write(a,"/api/notifications/"+id+"/read")).andExpect(status().isInternalServerError());
+			assertThat(jdbc.queryForMap("SELECT * FROM notification WHERE id=?",id)).isEqualTo(delivered);
+		} finally { jdbc.execute("DROP TRIGGER fm05_inbox_read_fault"); }
+		clock.now=START.plusSeconds(360);
+		JsonNode saved=read(a,id);
+		assertThat(saved.path("readAt").asString()).isEqualTo("2026-10-07T16:06:00+08:00");
+		clock.now=START.plusSeconds(420);
+		assertThat(read(a,id)).isEqualTo(saved);
+		assertThat(rows("incident_acknowledgement")).isEmpty();
 	}
 
 	@Test
@@ -378,32 +388,35 @@ class FamilyIncidentInboxIT {
 		assertThat(fetch(a,"/api/notifications/me?size=201").path("size").asInt()).isEqualTo(200);
 	}
 
-	private record Browser(MockHttpSession session,Cookie csrf) { }
-	private Browser login(String username) throws Exception {
-		Cookie token=mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn().getResponse().getCookie("XSRF-TOKEN");
-		assertThat(token).isNotNull();
-		var result=mvc.perform(post("/api/auth/login").cookie(token).header("X-XSRF-TOKEN",token.getValue())
-				.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("username",username,"password","test-password"))))
-				.andExpect(status().isOk()).andReturn();
-		return new Browser((MockHttpSession)result.getRequest().getSession(false),token);
+	private record Browser(String username,List<String> roles) {
+		RequestPostProcessor signedIn() { return user(username).roles(roles.toArray(String[]::new)); }
+	}
+	private Browser login(String username) {
+		return new Browser(username,jdbc.queryForList("SELECT r.role FROM user_role r JOIN app_user u ON u.id=r.user_id WHERE u.username=?",String.class,username));
 	}
 	private JsonNode fetch(Browser browser,String path) throws Exception {
-		return json.readTree(mvc.perform(get(path).session(browser.session())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+		return json.readTree(mvc.perform(get(path).with(browser.signedIn())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
 	}
-	private MockHttpServletRequestBuilder write(Browser browser,String path,String body) {
-		var request=post(path).session(browser.session()).cookie(browser.csrf()).header("X-XSRF-TOKEN",browser.csrf().getValue());
-		return body==null?request:request.contentType(MediaType.APPLICATION_JSON).content(body);
+	private MockHttpServletRequestBuilder write(Browser browser,String path) {
+		return post(path).with(browser.signedIn()).with(csrf());
 	}
-	private JsonNode submit(Browser browser,String path,String body) throws Exception {
-		return json.readTree(mvc.perform(write(browser,path,body)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+	private JsonNode submit(Browser browser,String path) throws Exception {
+		return json.readTree(mvc.perform(write(browser,path)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
 	}
-	private JsonNode read(Browser browser,long id) throws Exception { return submit(browser,"/api/notifications/"+id+"/read",null); }
+	private JsonNode read(Browser browser,long id) throws Exception { return submit(browser,"/api/notifications/"+id+"/read"); }
 	private List<Long> ids(JsonNode page) {
 		List<Long> result=new ArrayList<>(); page.path("items").forEach(item->result.add(item.path("id").asLong())); return result;
 	}
+	/** What incident writes when it raises the incident: a PENDING message and a response window for each bound family member. */
 	private void publish(long incidentId) {
-		new TransactionTemplate(transactions).executeWithoutResult(status->events.raised(UUID.randomUUID(),incidentId,incidentId-500,
-				OffsetDateTime.ofInstant(clock.now,ZoneId.of("Asia/Singapore"))));
+		LocalDateTime now=LocalDateTime.ofInstant(clock.now,SINGAPORE);
+		for(var member:jdbc.queryForList("SELECT f.id,f.user_id FROM elder_family_binding b JOIN family_member f ON f.id=b.family_member_id WHERE b.elder_id=? AND b.status='ACTIVE' ORDER BY f.id",incidentId-500)) {
+			long userId=((Number)member.get("user_id")).longValue();
+			jdbc.update("INSERT INTO notification (recipient_user_id,event_type,channel,title,body,resource_type,resource_id,status,created_at) VALUES (?,'INCIDENT_RAISED','IN_APP','Urgent care alert: HIGH','A FALL incident has been reported. Open the incident details.','INCIDENT',?,'PENDING',?)",
+					userId,incidentId,Timestamp.valueOf(now));
+			jdbc.update("INSERT INTO family_alert_window (incident_id,family_member_id,first_notification_id,opened_at,acknowledge_by) VALUES (?,?,?,?,?)",
+					incidentId,member.get("id"),notification(userId,incidentId),Timestamp.valueOf(now),Timestamp.valueOf(now.plusHours(2)));
+		}
 	}
 	private long notification(long userId,long incidentId) {
 		return jdbc.queryForObject("SELECT MIN(id) FROM notification WHERE recipient_user_id=? AND resource_type='INCIDENT' AND resource_id=?",Long.class,userId,incidentId);

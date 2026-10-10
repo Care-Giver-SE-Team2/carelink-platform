@@ -38,6 +38,8 @@ import sg.nus.carelink.testsupport.SharedMySql;
 
 /** HTTP acceptance from published/assigned care to each family's independent receipts.
  * SQL supplies synthetic identities/bindings and observes durable facts, never the source event.
+ * Each family's messages are observed where incident writes them; the inbox that shows them is the
+ * notification service's, and FamilyIncidentInboxIT there covers it.
  * @author Wang Zhili
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -90,11 +92,11 @@ class FamilyIncidentWorkflowIT {
         var reported = report();
         try (var a = browser(familyAName); var b = browser(familyBName); var manager = browser(managerName)) {
             var managerBefore = manager.read("/api/incidents/" + reported.id());
-            var noticeA = notice(a, reported.id()); var noticeB = notice(b, reported.id());
-            assertThat(noticeA.path("id").asLong()).isNotEqualTo(noticeB.path("id").asLong());
-            assertThat(noticeA.path("status").asString()).isEqualTo("SENT");
-            assertThat(noticeA.path("title").asString()).isEqualTo("Urgent care alert: HIGH");
-            assertThat(noticeA.path("body").asString()).contains("FALL").doesNotContain(DESCRIPTION);
+            var noticeA = notice(familyAUser, reported.id()); var noticeB = notice(familyBUser, reported.id());
+            assertThat(noticeA.get("id")).isNotEqualTo(noticeB.get("id"));
+            assertThat(noticeA.get("status")).isEqualTo("PENDING");
+            assertThat(noticeA.get("title")).isEqualTo("Urgent care alert: HIGH");
+            assertThat((String) noticeA.get("body")).contains("FALL").doesNotContain(DESCRIPTION);
             var detailA = detail(a, reported.id()); var detailB = detail(b, reported.id());
             assertThat(detailA.path("description").asString()).isEqualTo(DESCRIPTION);
             assertThat(detailA.path("visitId").asLong()).isEqualTo(reported.visit());
@@ -102,10 +104,8 @@ class FamilyIncidentWorkflowIT {
             assertThat(detailA.path("acknowledgement").path("familyMemberId").asLong()).isEqualTo(familyA);
             assertThat(detailB.path("acknowledgement").path("familyMemberId").asLong()).isEqualTo(familyB);
             assertEmptyReceipt(detailA); assertEmptyReceipt(detailB);
-            assertThat(a.read("/api/notifications/me/unread-count").path("unread").asInt()).isEqualTo(1);
             clock.at(START.plusSeconds(360));
-            var read = body(a.command("POST", "/api/notifications/" + noticeA.path("id").asLong() + "/read", null), 200);
-            assertThat(read.path("status").asString()).isEqualTo("READ"); assertEmptyReceipt(detail(a, reported.id()));
+            var read = open(noticeA); assertEmptyReceipt(detail(a, reported.id()));
             clock.at(START.plusSeconds(420));
             var viewed = body(a.command("POST", "/api/incidents/" + reported.id() + "/view", null), 200);
             assertThat(viewed.path("viewedAt").asString()).isEqualTo("2026-10-08T10:07:00+08:00");
@@ -117,12 +117,10 @@ class FamilyIncidentWorkflowIT {
             clock.at(START.plusSeconds(540));
             assertThat(body(a.command("POST", "/api/incidents/" + reported.id() + "/acknowledge", Map.of("responseNote", "Must not replace first note")), 200)).isEqualTo(aware);
             assertThat(body(a.command("POST", "/api/incidents/" + reported.id() + "/view", null), 200)).isEqualTo(aware);
-            assertThat(body(a.command("POST", "/api/notifications/" + noticeA.path("id").asLong() + "/read", null), 200)).isEqualTo(read);
+            assertThat(notice(familyAUser, reported.id())).isEqualTo(read);
             assertThat(detail(a, reported.id()).path("acknowledgeBy")).isEqualTo(detailA.path("acknowledgeBy"));
             assertEmptyReceipt(detail(b, reported.id()));
-            assertThat(notice(b, reported.id()).path("status").asString()).isEqualTo("SENT");
-            assertThat(b.read("/api/notifications/me/unread-count").path("unread").asInt()).isEqualTo(1);
-            assertThat(a.read("/api/notifications/me/unread-count").path("unread").asInt()).isZero();
+            assertThat(notice(familyBUser, reported.id())).isEqualTo(noticeB);
             assertThat(manager.read("/api/incidents/" + reported.id())).isEqualTo(managerBefore);
             assertThat(a.read("/api/visits/" + reported.visit()).path("status").asString()).isEqualTo("EXCEPTION");
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=?", Long.class, reported.id())).isEqualTo(1);
@@ -140,11 +138,11 @@ class FamilyIncidentWorkflowIT {
             assertThat(List.of(earlier.statusCode(), response.statusCode())).containsExactlyInAnyOrder(201, 200);
             long id = json.readTree(response.body()).path("report").path("id").asLong();
             assertThat(json.readTree(earlier.body()).path("report").path("id").asLong()).isEqualTo(id);
-            var noticeA = notice(a, id); var noticeB = notice(b, id);
+            var noticeA = notice(familyAUser, id); var noticeB = notice(familyBUser, id);
             var deadline = detail(a, id).path("acknowledgeBy");
             clock.at(START.plusSeconds(600));
             assertThat(body(first.command("POST", "/api/incidents", input), 200).path("replayed").asBoolean()).isTrue();
-            assertThat(notice(a, id)).isEqualTo(noticeA); assertThat(notice(b, id)).isEqualTo(noticeB);
+            assertThat(notice(familyAUser, id)).isEqualTo(noticeA); assertThat(notice(familyBUser, id)).isEqualTo(noticeB);
             assertThat(detail(a, id).path("acknowledgeBy")).isEqualTo(deadline);
             assertEmptyReceipt(detail(a, id)); assertEmptyReceipt(detail(b, id));
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=?", Long.class, id)).isEqualTo(1);
@@ -168,8 +166,8 @@ class FamilyIncidentWorkflowIT {
             clock.at(START.plusSeconds(600));
             assertThat(body(first.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Later overwrite rejected")), 200)).isEqualTo(saved);
             assertEmptyReceipt(detail(other, report.id()));
-            assertThat(notice(first, report.id()).path("status").asString()).isEqualTo("SENT");
-            assertThat(notice(other, report.id()).path("status").asString()).isEqualTo("SENT");
+            assertThat(notice(familyAUser, report.id()).get("status")).isEqualTo("PENDING");
+            assertThat(notice(familyBUser, report.id()).get("status")).isEqualTo("PENDING");
         }
     }
 
@@ -192,20 +190,19 @@ class FamilyIncidentWorkflowIT {
             var receipt = body(family.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Late awareness")), 200);
             assertThat(receipt.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T13:00:00+08:00");
             assertThat(receipt.path("viewedAt").isNull()).isTrue();
-            assertThat(notice(family, report.id()).path("status").asString()).isEqualTo("SENT");
+            assertThat(notice(familyBUser, report.id()).get("status")).isEqualTo("PENDING");
             assertThat(detail(family, report.id()).path("acknowledgeBy")).isEqualTo(original.path("acknowledgeBy"));
             assertThat(manager.read("/api/incidents/" + report.id())).isEqualTo(staffBefore);
         }
     }
 
     @ParameterizedTest @ValueSource(strings = {"revoke", "expire"})
-    void bindingLossAfterInboxFetchRejectsAllCareReadsAndWritesWithoutDeletingHistory(String change) throws Exception {
+    void bindingLossRejectsAllCareReadsAndWritesWithoutDeletingHistory(String change) throws Exception {
         var report = report();
         try (var a = browser(familyAName); var b = browser(familyBName); var elderBrowser = browser(elderName)) {
             if (change.equals("expire")) jdbc.update("UPDATE elder_family_binding SET expires_at=? WHERE elder_id=? AND family_member_id=?",
                     java.sql.Timestamp.valueOf("2026-10-08 10:06:00"), elder, familyA);
-            var notice = notice(a, report.id()); var original = detail(a, report.id());
-            var messages = jdbc.queryForList("SELECT * FROM notification WHERE id=?", notice.path("id").asLong());
+            var notice = notice(familyAUser, report.id()); var original = detail(a, report.id());
             var windows = jdbc.queryForList("SELECT * FROM family_alert_window WHERE incident_id=?", report.id());
             if (change.equals("revoke")) {
                 long binding = 0;
@@ -218,15 +215,11 @@ class FamilyIncidentWorkflowIT {
             assertThat(a.get("/api/family/incidents/" + report.id()).statusCode()).isEqualTo(403);
             assertThat(a.command("POST", "/api/incidents/" + report.id() + "/view", null).statusCode()).isEqualTo(403);
             assertThat(a.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Not allowed" )).statusCode()).isEqualTo(403);
-            assertThat(a.command("POST", "/api/notifications/" + notice.path("id").asLong() + "/read", null).statusCode()).isEqualTo(404);
-            assertThat(a.read("/api/notifications/me").path("totalElements").asInt()).isZero();
-            assertThat(a.read("/api/notifications/me/unread-count").path("unread").asInt()).isZero();
-            assertThat(body(a.command("POST", "/api/notifications/me/read-all", null), 200).path("updated").asInt()).isZero();
-            assertThat(jdbc.queryForList("SELECT * FROM notification WHERE id=?", notice.path("id").asLong())).isEqualTo(messages);
+            assertThat(notice(familyAUser, report.id())).isEqualTo(notice);
             assertThat(jdbc.queryForList("SELECT * FROM family_alert_window WHERE incident_id=?", report.id())).isEqualTo(windows);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident_acknowledgement WHERE incident_id=?", Long.class, report.id())).isZero();
             assertThat(detail(b, report.id()).path("acknowledgeBy")).isEqualTo(original.path("acknowledgeBy"));
-            assertThat(notice(b, report.id()).path("status").asString()).isEqualTo("SENT");
+            assertThat(notice(familyBUser, report.id()).get("status")).isEqualTo("PENDING");
         }
     }
 
@@ -235,13 +228,12 @@ class FamilyIncidentWorkflowIT {
         // Database-boundary failure occurs after routing but before the caregiver source commits.
         jdbc.execute("CREATE TRIGGER fm05_workflow_source_fault BEFORE INSERT ON caregiver_command_receipt FOR EACH ROW BEGIN IF NEW.visit_id="
                 + visit + " AND NEW.action_code='REPORT_INCIDENT' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic source persistence failure'; END IF; END");
-        try (var caregiver = browser(caregiverName); var family = browser(familyAName)) {
+        try (var caregiver = browser(caregiverName)) {
             assertThat(caregiver.command("POST", "/api/incidents", reportInput(visit)).statusCode()).isEqualTo(503);
             var pack = caregiver.read("/api/visits/" + visit + "/work-pack");
             assertThat(pack.path("visit").path("status").asString()).isEqualTo("SCHEDULED");
             assertThat(pack.path("visit").path("version").asInt()).isZero();
             assertThat(caregiver.read("/api/caregivers/me/incidents?visitId=" + visit).path("totalElements").asInt()).isZero();
-            assertThat(family.read("/api/notifications/me").path("totalElements").asInt()).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE elder_id=?", Long.class, elder)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident WHERE visit_id=?", Long.class, visit)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM caregiver_command_receipt WHERE visit_id=?", Long.class, visit)).isZero();
@@ -258,54 +250,43 @@ class FamilyIncidentWorkflowIT {
         try {
             var report = report();
             try (var a = browser(familyAName); var b = browser(familyBName); var caregiver = browser(caregiverName)) {
-                assertThat(a.read("/api/notifications/me").path("totalElements").asInt()).isZero();
+                assertThat(notices(familyAUser, report.id())).isEmpty();
                 assertThat(detail(a, report.id()).path("acknowledgeBy").isNull()).isTrue();
-                var delivered = notice(b, report.id()); var deadline = detail(b, report.id()).path("acknowledgeBy");
+                var delivered = notice(familyBUser, report.id()); var deadline = detail(b, report.id()).path("acknowledgeBy");
                 assertThat(deadline.asString()).isEqualTo("2026-10-08T12:05:00+08:00");
                 assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event WHERE incident_id=?", String.class, report.id())).isEqualTo("FAILED");
                 assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, familyA, report.id())).isEqualTo("FAILED");
                 assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, familyB, report.id())).isEqualTo("CREATED");
                 assertThat(caregiver.read("/api/visits/" + report.visit() + "/work-pack").path("visit").path("status").asString()).isEqualTo("EXCEPTION");
                 assertThat(body(caregiver.command("POST", "/api/incidents", report.input()), 200).path("replayed").asBoolean()).isTrue();
-                assertThat(a.read("/api/notifications/me").path("totalElements").asInt()).isZero();
-                assertThat(notice(b, report.id())).isEqualTo(delivered);
+                assertThat(notices(familyAUser, report.id())).isEmpty();
+                assertThat(notice(familyBUser, report.id())).isEqualTo(delivered);
                 assertThat(detail(b, report.id()).path("acknowledgeBy")).isEqualTo(deadline);
                 assertThat(body(b.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Independent recipient can respond")), 200).path("acknowledgedAt").isNull()).isFalse();
             }
         } finally { jdbc.execute("DROP TRIGGER fm05_workflow_notice_fault"); }
     }
 
-    @ParameterizedTest @ValueSource(strings = {"read", "acknowledge"})
-    void failedRecipientWriteKeepsIndependentFactsAndOnlyExplicitRetrySavesSuccess(String action) throws Exception {
+    @Test void failedAcknowledgementWriteKeepsIndependentFactsAndOnlyExplicitRetrySavesSuccess() throws Exception {
         var report = report();
         try (var family = browser(familyAName)) {
-            var notice = notice(family, report.id()); var deadline = detail(family, report.id()).path("acknowledgeBy");
+            var notice = notice(familyAUser, report.id()); var deadline = detail(family, report.id()).path("acknowledgeBy");
             var viewed = body(family.command("POST", "/api/incidents/" + report.id() + "/view", null), 200);
-            String table = action.equals("read") ? "notification" : "incident_acknowledgement";
-            String condition = action.equals("read") ? "NEW.id=" + notice.path("id").asLong() + " AND NEW.status='READ'"
-                    : "NEW.incident_id=" + report.id() + " AND NEW.family_member_id=" + familyA + " AND NEW.acknowledged_at IS NOT NULL";
-            String path = action.equals("read") ? "/api/notifications/" + notice.path("id").asLong() + "/read"
-                    : "/api/incidents/" + report.id() + "/acknowledge";
-            Map<String, Object> payload = action.equals("read") ? null : Map.of("responseNote", "Explicit retry note");
-            jdbc.execute("CREATE TRIGGER fm05_workflow_write_fault BEFORE UPDATE ON " + table
-                    + " FOR EACH ROW BEGIN IF " + condition + " THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic recipient write failure'; END IF; END");
+            String path = "/api/incidents/" + report.id() + "/acknowledge";
+            Map<String, Object> payload = Map.of("responseNote", "Explicit retry note");
+            jdbc.execute("CREATE TRIGGER fm05_workflow_write_fault BEFORE UPDATE ON incident_acknowledgement FOR EACH ROW BEGIN IF NEW.incident_id="
+                    + report.id() + " AND NEW.family_member_id=" + familyA + " AND NEW.acknowledged_at IS NOT NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic recipient write failure'; END IF; END");
             try {
                 assertThat(family.command("POST", path, payload).statusCode()).isEqualTo(500);
-                assertThat(notice(family, report.id()).path("status").asString()).isEqualTo("SENT");
-                assertThat(notice(family, report.id()).path("readAt").isNull()).isTrue();
+                assertThat(notice(familyAUser, report.id())).isEqualTo(notice);
                 assertThat(detail(family, report.id()).path("acknowledgement")).isEqualTo(viewed);
                 assertThat(detail(family, report.id()).path("acknowledgeBy")).isEqualTo(deadline);
             } finally { jdbc.execute("DROP TRIGGER fm05_workflow_write_fault"); }
             clock.at(START.plusSeconds(360));
             var saved = body(family.command("POST", path, payload), 200);
-            if (action.equals("read")) {
-                assertThat(saved.path("readAt").asString()).isEqualTo("2026-10-08T10:06:00+08:00");
-                assertThat(detail(family, report.id()).path("acknowledgement")).isEqualTo(viewed);
-            } else {
-                assertThat(saved.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T10:06:00+08:00");
-                assertThat(saved.path("viewedAt")).isEqualTo(viewed.path("viewedAt"));
-                assertThat(notice(family, report.id()).path("status").asString()).isEqualTo("SENT");
-            }
+            assertThat(saved.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T10:06:00+08:00");
+            assertThat(saved.path("viewedAt")).isEqualTo(viewed.path("viewedAt"));
+            assertThat(notice(familyAUser, report.id())).isEqualTo(notice);
             clock.at(START.plusSeconds(420));
             assertThat(body(family.command("POST", path, payload), 200)).isEqualTo(saved);
             assertThat(detail(family, report.id()).path("acknowledgeBy")).isEqualTo(deadline);
@@ -315,22 +296,21 @@ class FamilyIncidentWorkflowIT {
     @Test void realChainExhaustionAddsADifferentMessageWithoutResettingWindowOrAwareness() throws Exception {
         var report = report();
         try (var family = browser(familyAName); var other = browser(familyBName); var manager = browser(managerName)) {
-            var raised = notice(family, report.id()); var deadline = detail(family, report.id()).path("acknowledgeBy");
-            var read = body(family.command("POST", "/api/notifications/" + raised.path("id").asLong() + "/read", null), 200);
+            var raised = notice(familyAUser, report.id()); var deadline = detail(family, report.id()).path("acknowledgeBy");
+            var read = open(raised);
             var awareness = body(family.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Already informed")), 200);
             clock.at(START.plusSeconds(360));
             assertThat(body(manager.command("POST", "/api/incidents/" + report.id() + "/escalate", Map.of("reason", "Synthetic chain exhausted")), 200).path("status").asString()).isEqualTo("UNRESOLVED_ESCALATED");
-            var inbox = family.read("/api/notifications/me");
-            assertThat(inbox.path("totalElements").asInt()).isEqualTo(2);
-            assertThat(inbox.path("items").valueStream().map(row -> row.path("eventType").asString()).toList()).containsExactlyInAnyOrder("INCIDENT_RAISED", "INCIDENT_UNRESOLVED");
-            assertThat(inbox.path("items").valueStream().filter(row -> row.path("id").asLong() == raised.path("id").asLong()).findFirst().orElseThrow()).isEqualTo(read);
-            assertThat(family.read("/api/notifications/me/unread-count").path("unread").asInt()).isEqualTo(1);
-            assertThat(other.read("/api/notifications/me").path("totalElements").asInt()).isEqualTo(2);
+            var messages = notices(familyAUser, report.id());
+            assertThat(messages).hasSize(2).contains(read);
+            assertThat(messages).extracting(row -> row.get("event_type")).containsExactlyInAnyOrder("INCIDENT_RAISED", "INCIDENT_UNRESOLVED");
+            assertThat(messages).extracting(row -> row.get("status")).containsExactlyInAnyOrder("READ", "PENDING");
+            assertThat(notices(familyBUser, report.id())).hasSize(2);
             assertThat(detail(family, report.id()).path("acknowledgement")).isEqualTo(awareness);
             assertThat(detail(family, report.id()).path("acknowledgeBy")).isEqualTo(deadline);
             assertEmptyReceipt(detail(other, report.id()));
             assertThat(manager.command("POST", "/api/incidents/" + report.id() + "/escalate", Map.of("reason", "Must not republish" )).statusCode()).isEqualTo(409);
-            assertThat(family.read("/api/notifications/me").path("totalElements").asInt()).isEqualTo(2);
+            assertThat(notices(familyAUser, report.id())).hasSize(2);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=?", Long.class, report.id())).isEqualTo(2);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE incident_id=?", Long.class, report.id())).isEqualTo(2);
         }
@@ -375,13 +355,20 @@ class FamilyIncidentWorkflowIT {
     }
     private record Report(long id, long visit, Map<String, Object> input) { }
     private JsonNode detail(Browser browser, long id) throws Exception { return browser.read("/api/family/incidents/" + id); }
-    private JsonNode notice(Browser browser, long id) throws Exception {
-        var page = browser.read("/api/notifications/me");
-        assertThat(page.path("totalElements").asInt()).isEqualTo(1);
-        var notice = page.path("items").get(0);
-        assertThat(notice.path("resourceType").asString()).isEqualTo("INCIDENT");
-        assertThat(notice.path("resourceId").asLong()).isEqualTo(id);
-        return notice;
+    /** The one message incident wrote this account about the incident. */
+    private Map<String, Object> notice(long user, long id) {
+        var messages = notices(user, id);
+        assertThat(messages).hasSize(1);
+        return messages.getFirst();
+    }
+    private List<Map<String, Object>> notices(long user, long id) {
+        return jdbc.queryForList("SELECT * FROM notification WHERE recipient_user_id=? AND resource_type='INCIDENT' AND resource_id=? ORDER BY id", user, id);
+    }
+    /** Opens the message the way the inbox does, so incident's own facts can be shown not to follow it. */
+    private Map<String, Object> open(Map<String, Object> notice) {
+        var now = java.sql.Timestamp.valueOf(LocalDateTime.ofInstant(clock.instant(), SINGAPORE));
+        jdbc.update("UPDATE notification SET status='READ', sent_at=?, read_at=? WHERE id=?", now, now, notice.get("id"));
+        return jdbc.queryForMap("SELECT * FROM notification WHERE id=?", notice.get("id"));
     }
     private void assertEmptyReceipt(JsonNode detail) {
         var receipt = detail.path("acknowledgement");
