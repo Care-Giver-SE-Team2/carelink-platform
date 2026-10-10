@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<!--
+	  What every service shares with core, in core's own packages (sg.nus.carelink.shared): the error
+	  types and the exception handler that turns them into answers, the request context (request id,
+	  user and access log), the access audit, and the roles. A service whose main class is in
+	  sg.nus.carelink picks these up by component scanning, exactly as core does.
+	-->
+	<parent>
+		<groupId>sg.nus</groupId>
+		<artifactId>carelink-platform</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+		<relativePath>../../pom.xml</relativePath>
+	</parent>
+	<artifactId>shared</artifactId>
+	<name>shared</name>
+	<description>Error handling, request context, access audit and roles, shared by every service</description>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<!-- The access audit writes audit_log through JPA -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<!-- 403 answers and the signed-in user in the request context -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+		</dependency>
+
+		<!-- Testing -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

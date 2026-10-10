@@ -21,6 +21,7 @@ in core.
 | Local run | an entry in `docker-compose.yml` | `scripts/run.sh` |
 | Deployment | `services/<name>/deploy/values.yaml` | `charts/carelink-service`, `scripts/deploy.sh` |
 | Pipeline | — | `ci.yml` finds the service by its directory and runs `service.yml` for it |
+| Errors, request context, audit | dependency on `libs/shared` | core's `shared` package: error types and the exception handler, request id and access log, `audit_log` writes, roles |
 | Signed-in user | dependency on `libs/platform-security` | the security chain and `SignedInUsers` |
 | Calls to core | dependency on `libs/core-api` | the `CoreApi` client |
 
@@ -31,15 +32,15 @@ in core.
 Move the module with `git mv`, in a commit that only moves files, so the history of each class follows it. Keep
 the package names (`sg.nus.carelink.visit…`).
 
-The module also uses classes from core's `shared` package. Copy the ones it uses into the service, because each
-service has its own copy: `shared.error`, `shared.audit`, `shared.security.Role`, and from `shared.web` the
-`GlobalExceptionHandler`, `RequestContextInterceptor` and `WebMvcConfig`. **Do not copy
-`shared.security.SecurityConfig`**: a security chain of the service's own switches `platform-security` off
-(section 3).
+The classes the module uses from core's `shared` package are in `libs/shared`, in the same packages: the error
+types, the exception handler, the request context (request id, user and access log), the access audit and the
+roles. Depend on the library instead of copying them, so every service answers errors the same way. Core's
+login (`shared.security.SecurityConfig`) and its page controllers stay in core. A service gets its security from
+`platform-security` (section 3); a security chain of its own would switch that library off.
 
-Some beans the module relies on are declared by another module of core. Two examples are the `Clock` (in
-incident's `EscalationConfig`) and `@EnableScheduling`. Declare such beans in the service. A start-up failure
-with "No qualifying bean" names the one that is missing.
+Some beans the module relies on are declared by another module of core. `libs/shared` supplies the `Clock` when
+the service has none. Others, such as `@EnableScheduling`, the service declares itself. A start-up failure with
+"No qualifying bean" names the one that is missing.
 
 The main class goes in `sg.nus.carelink`, the same as core's `BackendApplication`, so component scanning covers
 every module package:
@@ -77,6 +78,8 @@ Start from core's `pom.xml` and keep only what the service uses. Most services n
 	<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-validation</artifactId></dependency>
 	<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
 	<dependency><groupId>com.mysql</groupId><artifactId>mysql-connector-j</artifactId><scope>runtime</scope></dependency>
+	<!-- core's shared package: errors, request context, audit, roles -->
+	<dependency><groupId>sg.nus</groupId><artifactId>shared</artifactId><version>${project.version}</version></dependency>
 	<!-- The login core made, read from Redis -->
 	<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-session-data-redis</artifactId></dependency>
 	<dependency><groupId>sg.nus</groupId><artifactId>platform-security</artifactId><version>${project.version}</version></dependency>
