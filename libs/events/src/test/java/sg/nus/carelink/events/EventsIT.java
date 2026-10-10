@@ -4,15 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse.BodyHandlers;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -31,6 +29,7 @@ import org.testcontainers.utility.MountableFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName;
 import tools.jackson.databind.json.JsonMapper;
@@ -68,8 +67,8 @@ class EventsIT {
 		// For the library's clients, which use the default credentials chain
 		System.setProperty("aws.accessKeyId", AWS.getAccessKey());
 		System.setProperty("aws.secretAccessKey", AWS.getSecretKey());
-		awaitInitScript();
 		TOPIC_ARN = "arn:aws:sns:" + REGION + ":000000000000:carelink-events";
+		awaitInitScript();
 		try (SqsClient sqs = sqs()) {
 			QUEUE_URL = sqs.getQueueUrl(queue -> queue.queueName("carelink-visit")).queueUrl();
 			// A failed handling comes back after one second instead of thirty
@@ -78,14 +77,21 @@ class EventsIT {
 		}
 	}
 
-	/** LocalStack runs the script after it reports ready; wait until the script has run, and ran well. */
+	/**
+	 * The script's last step subscribes the fourth queue, so the script is done when the topic has
+	 * four subscriptions. Polled in this thread: this runs in the class's static initializer, and a
+	 * condition run on Awaitility's own thread would wait for that initializer to finish.
+	 */
 	private static void awaitInitScript() {
-		HttpClient http = HttpClient.newHttpClient();
-		HttpRequest ready = HttpRequest.newBuilder(AWS.getEndpoint().resolve("/_localstack/init/ready")).build();
-		String state = await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(500))
-				.until(() -> http.send(ready, BodyHandlers.ofString()).body().replace(" ", ""),
-						body -> body.contains("\"completed\":true"));
-		assertThat(state).as("LocalStack's init scripts").contains("SUCCESSFUL").doesNotContain("ERROR");
+		try (SnsClient sns = SnsClient.builder().endpointOverride(AWS.getEndpoint()).region(Region.of(REGION))
+				.credentialsProvider(credentials()).build()) {
+			await().pollInSameThread().atMost(Duration.ofSeconds(90)).pollInterval(Duration.ofMillis(500)).ignoreExceptions()
+					.until(() -> sns.listSubscriptionsByTopic(topic -> topic.topicArn(TOPIC_ARN)).subscriptions().size() == 4);
+		}
+		catch (ConditionTimeoutException notFinished) {
+			throw new IllegalStateException(
+					"LocalStack's init script did not finish. LocalStack's log:%n%s".formatted(AWS.getLogs()), notFinished);
+		}
 	}
 
 	@Autowired
