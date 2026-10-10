@@ -1,0 +1,13 @@
+# notification in the cluster. Anything not set here comes from charts/carelink-service/values.yaml.
+# Two replicas, one per availability zone. Scaling on its queue (KEDA) comes with the events.
+replicaCount: 2
+
+autoscaling:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 768Mi

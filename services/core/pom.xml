@@ -147,6 +147,13 @@
 			<artifactId>testcontainers-junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Shared test helpers: MySQL and Redis containers, the exception handler for controller tests -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>test-support</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
 		<!-- Architecture tests: turn the layering rules into build-time constraints -->
 		<dependency>
 			<groupId>com.tngtech.archunit</groupId>

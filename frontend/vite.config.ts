@@ -7,6 +7,9 @@ export default defineConfig({
   // Proxy /api to the local backend during development, avoiding CORS configuration
   server: {
     proxy: {
+      // The notification service (scripts/run.sh all starts it on 8083). Listed before /api: the
+      // first matching entry wins.
+      '/api/notifications': 'http://localhost:8083',
       '/api': 'http://localhost:8080',
     },
   },

@@ -8,6 +8,10 @@ What moves, and what replaces each call into core, is in [service-boundaries.md]
 guide covers how. Inside a service, the modules and layers follow [ARCHITECTURE.md](../../ARCHITECTURE.md), as
 in core.
 
+**Worked example: `services/notification`.** It was the first module moved out, and it has every part this guide
+describes: the pom, the main class, both settings files, the test settings, the values file, the compose entry
+and the front end's proxy entry. Start a new service by copying it.
+
 ---
 
 ## 1. What every service has
@@ -89,7 +93,8 @@ Start from core's `pom.xml` and keep only what the service uses. Most services n
 	<!-- Events between services, for a service that publishes or handles them -->
 	<dependency><groupId>sg.nus</groupId><artifactId>events</artifactId><version>${project.version}</version></dependency>
 
-	<!-- Testing: the same as core (webmvc-test, security-test, testcontainers-mysql, archunit-junit5, ...) -->
+	<!-- Testing: webmvc-test, security-test, flyway and flyway-mysql (test scope, see 2.5),
+	     sg.nus:test-support (test scope), archunit-junit5: as in services/notification/pom.xml -->
 </dependencies>
 
 <build>
@@ -119,7 +124,7 @@ spring:
       ddl-auto: validate
     open-in-view: false
   flyway:
-    # Until the schema split, core migrates the one shared schema (section 6)
+    # Until the schema split, core migrates the one shared schema (section 6); tests: 2.5
     enabled: false
 
 management:
@@ -201,7 +206,25 @@ The front end's development server sends every `/api` path to core (`frontend/vi
 takes over some paths, add a proxy entry for them above the `/api` entry: the first matching entry wins. Tell
 the owner of the cloud environment about the same paths, so the Ingress routes them too.
 
-### 2.5 Deployment: `deploy/values.yaml`
+### 2.5 Tests before the schema split
+
+The service never migrates the shared schema, but its integration tests need it. They build it from core's own
+migrations, in `src/test/resources/config/application.properties`:
+
+```properties
+spring.flyway.enabled=true
+spring.flyway.locations=filesystem:../core/src/main/resources/db/migration
+# The login travels in MockMvc in tests, as in core's tests
+spring.autoconfigure.exclude=org.springframework.boot.session.data.redis.autoconfigure.SessionDataRedisAutoConfiguration
+management.health.redis.enabled=false
+```
+
+`libs/test-support` gives every service the same test helpers as core:
+- `SharedMySql`: one MySQL container for the whole run, with a database of its own for each test class.
+- `SharedRedis`: one Redis container for the whole run.
+- `GlobalExceptionHandlerTestSupport`: the real exception handler, for standalone MockMvc controller tests.
+
+### 2.6 Deployment: `deploy/values.yaml`
 
 Copy `services/core/deploy/values.yaml` and change what differs: replicas, resources, autoscaling. The service
 reaches core inside the cluster at `http://core`, the Service the chart creates for the release `core`:
