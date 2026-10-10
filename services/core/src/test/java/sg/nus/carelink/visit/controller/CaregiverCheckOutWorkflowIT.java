@@ -129,22 +129,16 @@ class CaregiverCheckOutWorkflowIT extends MissedCheckInITSupport {
             assertThat(jdbc.queryForObject("SELECT checked_out_at FROM visit WHERE id=?",String.class,id)).isNull();
         }
     }
-    @Test void actualDepartureFeedsExistingElderPendingAndNewReportWithoutPreApproval() throws Exception {
+    /** Whether a filed report counts the visit is report's to test, now that report runs on its own. */
+    @Test void actualDepartureFeedsTheEldersPendingConfirmationsWithoutPreApproval() throws Exception {
         long id=plannedVisit();String elderName="checkout-elder-"+UUID.randomUUID();
         long elderUser=insert("INSERT INTO app_user(username,password_hash,display_name) VALUES (?,'{noop}test-password','Fictional elder')",elderName);
         jdbc.update("INSERT INTO user_role(user_id,role) VALUES (?,'ELDER')",elderUser);
         jdbc.update("UPDATE elder SET user_id=? WHERE id=?",elderUser,elder);
-        try(var cg=browser(caregiverName);var elderBrowser=browser(elderName);var mgr=browser(managerName);var familyBrowser=browser(familyName)) {
+        try(var cg=browser(caregiverName);var elderBrowser=browser(elderName)) {
             body(cg.post("/api/visits/"+id+"/check-in",check(0)),200);
             clock.at(START.plusSeconds(3900));body(cg.post(path(id),departure(1)),200);
             assertThat(elderBrowser.read("/api/elders/me/visits/awaiting-confirmation").toString()).contains("\"visitId\":"+id,"COMPLETED","checkedOutAt");
-            var reports=body(mgr.post("/api/reports/generate",Map.of("elderId",elder,"periodStart","2026-10-08","periodEnd","2026-10-08")),202);
-            assertThat(reports.size()).isEqualTo(3);
-            for(var report:reports) {
-                assertThat(report.path("metrics").path("visitsCompleted").asInt()).isEqualTo(1);
-            }
-            long familyReport=reports.valueStream().filter(r->"FAMILY".equals(r.path("audience").asString())).findFirst().orElseThrow().path("id").asLong();
-            assertThat(familyBrowser.read("/api/reports/"+familyReport).toString()).contains("awaiting the elder's confirmation");
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM elder_confirmation WHERE visit_id=?",Long.class,id)).isZero();
             assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("COMPLETED");
         }

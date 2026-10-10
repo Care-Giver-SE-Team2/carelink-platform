@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: report
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/carelink?connectionTimeZone=Asia/Singapore}
+    username: ${DB_USER:carelink}
+    password: ${DB_PASSWORD:carelink}
+  jpa:
+    hibernate:
+      # The schema is core's until the schema split; this service validates what it finds
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    # Until the schema split, core migrates the one shared schema
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true
+
+# Shown at /actuator/info. APP_COMMIT is set by the Dockerfile from the commit the image was built from.
+info:
+  app:
+    name: report
+    commit: ${APP_COMMIT:unknown}
+
+logging:
+  level:
+    sg.nus.carelink: INFO
+  pattern:
+    # requestId and user are put in the MDC by RequestContextInterceptor (libs/shared)
+    level: "%5p [%X{requestId:-}] [%X{user:-}]"

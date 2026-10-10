@@ -15,7 +15,8 @@ providers' own systems, build on.
 
 | Part | State |
 |---|---|
-| `services/core` | The care domain as one modular service: identity, profile, care plan, rostering, visit, incident, report. visit and report move out into services of their own next |
+| `services/core` | The care domain as one modular service: identity, profile, care plan, rostering, visit, incident. visit moves out into a service of its own next |
+| `services/report` | Weekly reports, value-added services and caregiver reviews. It asks core and visit through their internal APIs |
 | `services/notification` | The in-app inbox, the first module moved out of core and the worked example for the next ones |
 | Build, image, local run | One way for every service: the parent `pom.xml`, `build/Dockerfile`, `build/entrypoint.sh`, `scripts/build.sh`, `scripts/run.sh` |
 | Deployment | One Helm chart and `scripts/deploy.sh`; the cloud environment (Terraform, `infra/`) comes next |
@@ -42,6 +43,7 @@ providers' own systems, build on.
 carelink-platform/
 ├─ services/
 │  ├─ core/                       pom.xml, src/, deploy/values.yaml: every service has this shape
+│  ├─ report/                     weekly reports, value-added services, caregiver reviews
 │  └─ notification/               the in-app inbox: the first service moved out of core
 ├─ libs/
 │  ├─ shared/                     core's shared package for every service: errors, request context, access audit, roles
@@ -50,7 +52,7 @@ carelink-platform/
 │  ├─ visit-api/                  visit's internal API and its client; core serves it until visit moves out
 │  ├─ events/                     events between services: the outbox, its relay to SNS, the SQS consumer
 │  ├─ event-types/                the events in docs/platform/event-catalogue.md as records, shared by publishers and handlers
-│  └─ test-support/               shared test helpers: MySQL and Redis containers, the exception handler
+│  └─ test-support/               shared test helpers: MySQL and Redis containers, the platform's tables, the exception handler
 ├─ build/
 │  ├─ Dockerfile                  the Dockerfile of every service: Maven build, then a JRE, non-root
 │  └─ entrypoint.sh               the start-up of every service: JVM settings, time zone, DNS cache, graceful stop

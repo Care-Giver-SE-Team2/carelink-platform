@@ -84,6 +84,32 @@ services:
       retries: 60
       start_period: 20s
 
+  report:
+    image: ${IMAGE_PREFIX:-carelink}/report:${IMAGE_TAG:-local}
+    depends_on:
+      # core migrates the schema this service validates, and serves the internal APIs it calls
+      core:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
+      DB_USER: carelink
+      DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
+      # The login made through core, read from the same Redis
+      SPRING_DATA_REDIS_HOST: redis
+      CARELINK_COREAPI_BASEURL: http://core:8080
+      # core serves visit's internal API until visit moves out; then this points at visit
+      CARELINK_VISITAPI_BASEURL: http://core:8080
+    ports:
+      - "8082:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 20s
+
   notification:
     image: ${IMAGE_PREFIX:-carelink}/notification:${IMAGE_TAG:-local}
     depends_on:

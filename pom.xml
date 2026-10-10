@@ -33,6 +33,7 @@
 		<module>libs/event-types</module>
 		<module>libs/test-support</module>
 		<module>services/core</module>
+		<module>services/report</module>
 		<module>services/notification</module>
 	</modules>
 

@@ -10,12 +10,9 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
- * core runs on more than one replica. A scheduled job without a lock runs once on every replica:
- * escalations go out twice, reminders are sent twice. This rule fails the build as soon as a new
- * scheduled job in core arrives without a {@code @SchedulerLock}.
- *
- * <p>visit is about to leave core and brings its own answer for its jobs when it does, so it is
- * left out here. report and notification have left, each with its own rule.
+ * report runs on two replicas. A scheduled job without a lock runs once on each of them: weekly
+ * reports would be filed twice, a request settled twice. This rule fails the build as soon as a
+ * scheduled job arrives without a {@code @SchedulerLock}.
  */
 @AnalyzeClasses(
 		packages = "sg.nus.carelink",
@@ -23,12 +20,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 class ScheduledJobLockTest {
 
 	@ArchTest
-	static final ArchRule scheduledJobsInCoreTakeALock =
+	static final ArchRule scheduledJobsTakeALock =
 			methods().that().areAnnotatedWith(Scheduled.class)
-					.and().areDeclaredInClassesThat()
-					.resideOutsideOfPackage("..visit..")
 					.should().beAnnotatedWith(SchedulerLock.class)
-					.because("core runs on several replicas, and a job without a lock runs on each of them")
+					.because("report runs on several replicas, and a job without a lock runs on each of them")
 					.allowEmptyShould(true);
 
 }
