@@ -31,7 +31,7 @@ import sg.nus.carelink.rostering.domain.repository.RosteringCandidateCheckReposi
 import sg.nus.carelink.rostering.domain.repository.RosteringCandidateRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringConstraintRepository;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * In-memory stand-ins for every port UC-MG04 reaches, so the whole re-rostering flow runs as a
