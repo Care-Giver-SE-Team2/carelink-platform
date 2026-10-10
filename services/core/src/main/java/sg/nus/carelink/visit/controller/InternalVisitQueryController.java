@@ -20,8 +20,8 @@ import sg.nus.carelink.visitapi.VisitApi;
 
 /**
  * The report and incident part of visit's internal API ({@link VisitApi}): the work order of an
- * approved extra service and where it stands, which caregivers an elder has had, and the reads of
- * the visit table incident makes today. In front of {@link StandaloneVisits},
+ * approved extra service and where it stands, which caregivers an elder has had, whether a
+ * caregiver is busy at a time, and the reads of the visit table incident makes today. In front of {@link StandaloneVisits},
  * {@link VisitScheduleQuery} and {@link VisitLookups}.
  */
 @RestController
@@ -73,6 +73,13 @@ public class InternalVisitQueryController {
 				.map(visit -> new VisitApi.ElderVisit(visit.visitId(), visit.elderId(), visit.caregiverId(),
 						visit.start(), visit.status(), visit.serviceType()))
 				.toList();
+	}
+
+	@GetMapping("/visits/caregiver-busy")
+	public VisitApi.Busy caregiverBusy(@RequestParam Long caregiverId,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime until) {
+		return new VisitApi.Busy(lookups.caregiverBusy(caregiverId, from, until));
 	}
 
 	@GetMapping("/visits/latest-caregiver")

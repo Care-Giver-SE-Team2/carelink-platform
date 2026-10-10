@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +30,10 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.client.MockMvcClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import sg.nus.carelink.careplan.application.VisitPlanReader;
+import sg.nus.carelink.identity.application.AccountsByRole;
+import sg.nus.carelink.identity.application.UserDirectory;
+import sg.nus.carelink.identity.controller.InternalAccountController;
+import sg.nus.carelink.identity.domain.model.AppUser;
 import sg.nus.carelink.careplan.controller.InternalCarePlanController;
 import sg.nus.carelink.coreapi.CoreApi;
 import sg.nus.carelink.coreapi.CoreApiClients;
@@ -44,18 +49,23 @@ import sg.nus.carelink.profile.application.CaregiverDirectory;
 import sg.nus.carelink.profile.application.CaregiverPublicCredential;
 import sg.nus.carelink.profile.application.CaregiverPublicProfile;
 import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
+import sg.nus.carelink.profile.application.ElderReportProfiles;
 import sg.nus.carelink.profile.application.FamilyAccessQuery;
 import sg.nus.carelink.profile.application.FamilyAlertRecipients;
 import sg.nus.carelink.profile.application.PrimaryCaregiverLookup;
 import sg.nus.carelink.profile.application.ProfileService;
+import sg.nus.carelink.profile.controller.InternalElderReportController;
 import sg.nus.carelink.profile.controller.InternalProfileController;
 import sg.nus.carelink.profile.domain.model.Elder;
 import sg.nus.carelink.profile.domain.model.FamilyMember;
 import sg.nus.carelink.profile.domain.repository.FamilyMemberRepository;
+import sg.nus.carelink.rostering.application.LeaveCalendar;
 import sg.nus.carelink.rostering.application.VisitCover;
+import sg.nus.carelink.rostering.controller.InternalLeaveController;
 import sg.nus.carelink.rostering.controller.InternalVisitCoverController;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
+import sg.nus.carelink.shared.security.Role;
 
 /**
  * Both sides of core's internal API in one test. The client every other service uses (core-api's
@@ -65,7 +75,8 @@ import sg.nus.carelink.shared.error.ResourceNotFound;
  * values, and that their answer, or their error, comes back the way the caller expects.
  */
 @WebMvcTest(controllers = {InternalProfileController.class, InternalCarePlanController.class,
-		InternalIncidentController.class, InternalVisitCoverController.class})
+		InternalIncidentController.class, InternalVisitCoverController.class, InternalAccountController.class,
+		InternalElderReportController.class, InternalLeaveController.class})
 @Import(InternalApiSecurity.class)
 class CoreApiContractTest {
 
@@ -110,6 +121,18 @@ class CoreApiContractTest {
 
 	@MockitoBean
 	private VisitCover visitCover;
+
+	@MockitoBean
+	private UserDirectory users;
+
+	@MockitoBean
+	private AccountsByRole accountsByRole;
+
+	@MockitoBean
+	private ElderReportProfiles reportProfiles;
+
+	@MockitoBean
+	private LeaveCalendar leave;
 
 	private CoreApi core;
 
@@ -305,6 +328,46 @@ class CoreApiContractTest {
 		assertThatThrownBy(() -> core.cover(100L, new CoreApi.CoverRequest(9L, 1L)))
 				.isInstanceOfSatisfying(CoreRuleViolation.class,
 						violation -> assertThat(violation.code()).isEqualTo("CAREGIVER_CANNOT_COVER"));
+	}
+
+	@Test
+	void anAccountAsItStandsNowAndOneThatIsGone() {
+		when(users.findByUsername("tan.family"))
+				.thenReturn(Optional.of(new AppUser(7L, "tan.family", "Tan Family", Set.of(Role.FAMILY), true)));
+
+		assertThat(core.account("tan.family")).isEqualTo(new CoreApi.Account(7L, "tan.family", "Tan Family", true,
+				Set.of("FAMILY")));
+		assertThat(core.findAccount("gone")).isEmpty();
+	}
+
+	@Test
+	void everyEnabledAccountWithARole() {
+		when(accountsByRole.enabledIdsWithRole(Role.MANAGER)).thenReturn(List.of(1L, 4L));
+
+		assertThat(core.enabledAccountsWithRole("MANAGER").userIds()).containsExactly(1L, 4L);
+	}
+
+	@Test
+	void anElderAsAReportDescribesThem() {
+		when(reportProfiles.find(3L)).thenReturn(Optional.of(new ElderReportProfiles.Profile(3L, "Tan Ah Kow", "MALE",
+				LocalDate.of(1941, 5, 2), "ASSISTIVE_CANE", true, "Diabetic", 7L, "Siti Rahman", 2,
+				new BigDecimal("6.50"))));
+
+		CoreApi.ElderReportProfile profile = core.elderReportProfile(3L);
+
+		assertThat(profile.fullName()).isEqualTo("Tan Ah Kow");
+		assertThat(profile.dateOfBirth()).isEqualTo(LocalDate.of(1941, 5, 2));
+		assertThat(profile.primaryCaregiverName()).isEqualTo("Siti Rahman");
+		assertThat(profile.planWeeklyHours()).isEqualByComparingTo("6.5");
+		assertThatThrownBy(() -> core.elderReportProfile(4L)).isInstanceOf(CoreNotFound.class);
+	}
+
+	@Test
+	void whetherACaregiverIsOnLeaveThatDay() {
+		when(leave.onApprovedLeave(7L, LocalDate.of(2026, 10, 14))).thenReturn(true);
+
+		assertThat(core.onLeave(7L, LocalDate.of(2026, 10, 14)).onLeave()).isTrue();
+		assertThat(core.onLeave(7L, LocalDate.of(2026, 10, 15)).onLeave()).isFalse();
 	}
 
 	@Test

@@ -130,6 +130,15 @@ public interface VisitApi {
 	@GetExchange("/visits/latest-caregiver")
 	CaregiverRef latestCaregiver(@RequestParam Long elderId);
 
+	/**
+	 * Whether the caregiver has a visit booked or under way (SCHEDULED, ARRIVED or IN_PROGRESS) that
+	 * overlaps [from, until). A visit with no end counts as an hour long.
+	 */
+	@GetExchange("/visits/caregiver-busy")
+	Busy caregiverBusy(@RequestParam Long caregiverId,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime until);
+
 	/** {@link #latestCaregiver}, with no such visit as empty. */
 	default Optional<Long> findLatestCaregiverId(Long elderId) {
 		try {
@@ -199,6 +208,9 @@ public interface VisitApi {
 	}
 
 	record CaregiverRef(Long caregiverId) {
+	}
+
+	record Busy(boolean busy) {
 	}
 
 }

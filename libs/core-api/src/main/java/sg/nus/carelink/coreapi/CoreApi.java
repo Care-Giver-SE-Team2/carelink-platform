@@ -1,5 +1,6 @@
 package sg.nus.carelink.coreapi;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +27,26 @@ import org.springframework.web.service.annotation.PostExchange;
  */
 @HttpExchange(url = "/internal/v1", accept = "application/json")
 public interface CoreApi {
+
+	// ---------- Accounts (identity) ----------
+
+	/** An account as it stands now: whether it may sign in, and its roles. 404 when there is no such account. */
+	@GetExchange("/accounts/{username}")
+	Account account(@PathVariable String username);
+
+	/** {@link #account}, with an account that does not exist as empty. */
+	default Optional<Account> findAccount(String username) {
+		try {
+			return Optional.of(account(username));
+		}
+		catch (CoreNotFound notFound) {
+			return Optional.empty();
+		}
+	}
+
+	/** The enabled accounts that hold a role, such as every manager a message goes to. */
+	@GetExchange("/accounts/with-role/{role}")
+	AccountIds enabledAccountsWithRole(@PathVariable String role);
 
 	// ---------- Family access (profile) ----------
 
@@ -103,6 +124,13 @@ public interface CoreApi {
 		}
 	}
 
+	/**
+	 * What a report says about an elder, in one call: the profile, the primary caregiver and the latest
+	 * published plan (the one in force when the report is written). 404 when there is no such elder.
+	 */
+	@GetExchange("/elders/{elderId}/report-profile")
+	ElderReportProfile elderReportProfile(@PathVariable Long elderId);
+
 	// ---------- Care plans (careplan) ----------
 
 	/** The published plan a visit follows, with its tasks. */
@@ -144,9 +172,33 @@ public interface CoreApi {
 	@PostExchange("/visits/{visitId}/cover")
 	void cover(@PathVariable Long visitId, @RequestBody CoverRequest request);
 
+	/** Whether the caregiver is on approved leave that day. */
+	@GetExchange("/caregivers/{caregiverId}/on-leave")
+	OnLeave onLeave(@PathVariable Long caregiverId,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day);
+
 	// ---------- Records ----------
 
 	enum Access { READ, WRITE }
+
+	/** @param roles the role names, such as {@code FAMILY} or {@code MANAGER} */
+	record Account(Long userId, String username, String displayName, boolean enabled, Set<String> roles) {
+	}
+
+	record AccountIds(List<Long> userIds) {
+	}
+
+	/**
+	 * @param planVersion null when the elder has no published plan
+	 * @param planWeeklyHours null when the elder has no published plan
+	 */
+	record ElderReportProfile(Long elderId, String fullName, String gender, LocalDate dateOfBirth, String mobilityLevel,
+			Boolean livesAlone, String medicalNotes, Long primaryCaregiverId, String primaryCaregiverName,
+			Integer planVersion, BigDecimal planWeeklyHours) {
+	}
+
+	record OnLeave(boolean onLeave) {
+	}
 
 	record ReadableElders(Set<Long> elderIds) {
 	}

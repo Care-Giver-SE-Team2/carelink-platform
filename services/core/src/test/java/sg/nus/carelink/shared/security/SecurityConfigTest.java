@@ -33,9 +33,10 @@ import org.springframework.http.MediaType;
  */
 // The slice only needs AuthController (its IdentityService is mocked below). The feature
 // modules' controllers would each drag in their service, which is not what this test is
-// about, so they are kept out of the slice.
-@WebMvcTest(excludeFilters = @ComponentScan.Filter(
-		type = FilterType.REGEX, pattern = "sg\\.nus\\.carelink\\.(?!identity\\.).*\\.controller\\..*"))
+// about, so they are kept out of the slice, and so are the internal API's controllers, whose
+// own chain InternalApiIT tests.
+@WebMvcTest(excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
+		pattern = "sg\\.nus\\.carelink\\.((?!identity\\.).*\\.controller\\..*|.*\\.controller\\.Internal\\w*Controller)"))
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
 

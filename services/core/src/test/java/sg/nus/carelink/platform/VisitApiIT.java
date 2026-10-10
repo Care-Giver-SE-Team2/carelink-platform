@@ -24,8 +24,8 @@ import sg.nus.carelink.visitapi.VisitNotFound;
 
 /**
  * visit's internal API in the running application, over real HTTP, for the reads of the visit table
- * incident makes today: the same visits incident's own statements find, at the wall-clock times
- * they were booked for, with a database whose clock is not Singapore's.
+ * incident and report make today: the same visits their own statements find, at the wall-clock
+ * times they were booked for, with a database whose clock is not Singapore's.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"carelink.report.schedule-cron=-",
@@ -95,6 +95,25 @@ class VisitApiIT {
 		assertThat(visit.findVisit(999_999L)).isEmpty();
 		assertThatThrownBy(() -> visit.visit(999_999L)).isInstanceOf(VisitNotFound.class)
 				.hasMessage("Visit [999999] does not exist");
+	}
+
+	@Test
+	void aCaregiverIsBusyWhileABookedVisitOverlapsAndAVisitWithNoEndLastsAnHour() {
+		long elder = elder();
+		long siti = caregiver("Siti Rahman");
+		visit(elder, siti, NINE, "SCHEDULED");
+		visit(elder, siti, NINE.plusHours(3), "CANCELLED");
+		jdbc.update("INSERT INTO visit (elder_id, caregiver_id, scheduled_start, status) VALUES (?, ?, ?, 'SCHEDULED')",
+				elder, siti, Timestamp.valueOf(NINE.plusHours(6)));
+
+		assertThat(visit.caregiverBusy(siti, NINE.plusMinutes(30), NINE.plusMinutes(45)).busy()).isTrue();
+		assertThat(visit.caregiverBusy(siti, NINE.plusHours(1), NINE.plusHours(2)).busy()).as("from the visit's end on")
+				.isFalse();
+		assertThat(visit.caregiverBusy(siti, NINE.plusHours(3), NINE.plusHours(4)).busy()).as("a visit called off")
+				.isFalse();
+		assertThat(visit.caregiverBusy(siti, NINE.plusHours(6).plusMinutes(30), NINE.plusHours(7)).busy())
+				.as("a visit with no end lasts an hour").isTrue();
+		assertThat(visit.caregiverBusy(siti, NINE.plusHours(7), NINE.plusHours(8)).busy()).isFalse();
 	}
 
 	private long elder() {

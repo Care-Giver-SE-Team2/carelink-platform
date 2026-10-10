@@ -12,8 +12,9 @@ import org.springframework.stereotype.Component;
 import sg.nus.carelink.visit.application.VisitLookups;
 
 /**
- * {@link VisitLookups} with the statements incident runs today (in JdbcSpotCheckLookups and
- * NotificationTableAlert), so the answers do not change when incident starts asking visit.
+ * {@link VisitLookups} with the statements incident and report run today (JdbcSpotCheckLookups,
+ * NotificationTableAlert, JdbcValueAddedVisitAssignment), so the answers do not change when they
+ * start asking visit.
  *
  * <p>Times go in and come out as {@link Timestamp}, the way JPA writes visit times, so they land on
  * the same side of the connection's time-zone conversion.
@@ -36,6 +37,15 @@ class JdbcVisitLookups implements VisitLookups {
 			limit 1
 			""";
 
+	/** The value-added assignment's clash check, with its times bound as Timestamps. */
+	private static final String BUSY = """
+			select count(*) from visit
+			where caregiver_id = :caregiverId
+			  and status in ('SCHEDULED', 'ARRIVED', 'IN_PROGRESS')
+			  and scheduled_start < :untilTime
+			  and coalesce(scheduled_end, date_add(scheduled_start, interval 1 hour)) > :fromTime
+			""";
+
 	private final JdbcClient jdbc;
 
 	JdbcVisitLookups(JdbcClient jdbc) {
@@ -55,6 +65,17 @@ class JdbcVisitLookups implements VisitLookups {
 	@Override
 	public Optional<Long> latestCaregiverId(Long elderId) {
 		return jdbc.sql(LATEST_CAREGIVER).param("elderId", elderId).query(Long.class).optional();
+	}
+
+	@Override
+	public boolean caregiverBusy(Long caregiverId, LocalDateTime from, LocalDateTime until) {
+		Long clashes = jdbc.sql(BUSY)
+				.param("caregiverId", caregiverId)
+				.param("fromTime", Timestamp.valueOf(from))
+				.param("untilTime", Timestamp.valueOf(until))
+				.query(Long.class)
+				.single();
+		return clashes != null && clashes > 0;
 	}
 
 	private static ElderVisit elderVisit(ResultSet rs, int row) throws SQLException {
