@@ -1,0 +1,56 @@
+/* Places the plan's sections and task rows; badges, links and states come from the shared family styles. */
+.version {
+  display: grid;
+  gap: 12px;
+}
+
+.group {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 14px;
+  background: var(--fm-card);
+}
+
+.taskName {
+  font-weight: 600;
+}
+
+.when {
+  color: var(--fm-faint);
+  font-size: 13.5px;
+}
+
+/* Elder picker: the same labelled select as "Care for" on Home and Schedule. */
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  margin-bottom: 18px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+
+.picker select {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  background: var(--fm-card);
+  padding: 0 12px;
+  color: var(--fm-ink);
+  font: inherit;
+  font-weight: 600;
+  color-scheme: light;
+}

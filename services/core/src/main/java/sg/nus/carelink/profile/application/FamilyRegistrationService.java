@@ -10,8 +10,8 @@ import sg.nus.carelink.shared.security.Role;
 
 /**
  * A family member signing up from the landing page, before they have any role: creates their
- * FAMILY login and the family profile intake applications hang off, in one transaction. Applying
- * for care for an elder is the next step, made signed in, through IntakeSubmissionService.
+ * FAMILY login and family profile in one transaction. Applying for care for an elder is the next
+ * step, made signed in, through FamilyServiceApplicationService.
  */
 @Service
 public class FamilyRegistrationService {

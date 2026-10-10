@@ -68,18 +68,44 @@ public record CarePlan(
 	}
 
 	/**
-	 * Publishes this draft with the given start date and rolled-up weekly effort (the sum of
-	 * its care_plan_node rows — never entered by hand, see the schema comment on total_hours).
-	 * Only a draft may be published; publishing twice, or publishing a plan that was never
-	 * opened as a draft, is a business rule violation. A start date is required — it is not
-	 * asked for until publish time, matching how the rest of the tree isn't saved until then.
+	 * Saves the manager's work in progress on this draft: its start date so far (may still be
+	 * empty — it is only required to publish). Only a draft can be revised; an issued version is
+	 * never edited in place, the manager opens a new draft instead.
 	 */
-	public CarePlan publish(LocalDate startDate, BigDecimal totalHours) {
+	public CarePlan reviseDraft(LocalDate startDate) {
+		requireDraft();
+		return new CarePlan(
+				id, elderId, createdByUserId, supersedesPlanId, version, Status.DRAFT,
+				totalHours, publishedAt, createdAt, updatedAt,
+				startDate, null, null, null, null);
+	}
+
+	/**
+	 * Checks this plan may be thrown away. Only a draft can be: nothing has been scheduled from
+	 * it, so discarding it leaves the version it would have replaced in force. An issued version
+	 * is history and is stopped instead (see stop).
+	 */
+	public void discard() {
+		requireDraft();
+	}
+
+	private void requireDraft() {
 		if (status != Status.DRAFT) {
 			throw new BusinessRuleViolation(
 					"CARE_PLAN_NOT_DRAFT",
 					"Care plan [%s] is not a draft".formatted(id));
 		}
+	}
+
+	/**
+	 * Publishes this draft with the given start date and rolled-up weekly effort (the sum of
+	 * its care_plan_node rows — never entered by hand, see the schema comment on total_hours).
+	 * Only a draft may be published; publishing twice, or publishing a plan that was never
+	 * opened as a draft, is a business rule violation. A start date is required — it is not
+	 * asked for until publish time; a saved draft may not have one yet.
+	 */
+	public CarePlan publish(LocalDate startDate, BigDecimal totalHours) {
+		requireDraft();
 		if (startDate == null) {
 			throw new BusinessRuleViolation(
 					"CARE_PLAN_START_DATE_REQUIRED",

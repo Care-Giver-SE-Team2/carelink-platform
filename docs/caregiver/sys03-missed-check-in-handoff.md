@@ -8,7 +8,9 @@ Eligible: assigned caregiver, `SCHEDULED`, no check-in, start within the last 24
 
 One `visit_missed_check_in_trigger` row per Visit lifetime references one `SYSTEM_MISSED_CHECKIN / SERVICE / MEDIUM` incident. The narrative distinguishes an assigned-but-absent caregiver from MG03 unassigned and MG04 leave reminders. Other incidents do not suppress SYS03. Resolved incidents, reassignments, new versions and restarts do not reset this ledger. Moving creates a new Visit with its own eligibility.
 
-The alert transitions the locked Visit from `SCHEDULED` to `EXCEPTION`, advances its version once and writes an APPLIED state transition with a null system actor. Both stale and refreshed check-in requests are rejected (409); no check-in record or executable tasks are initialized. Managers can claim/resolve the Incident through the existing console, but resolving it does not resume, finish or check out the Visit. This supersedes the earlier retain-SCHEDULED/late-check-in contract.
+Current rule (2026-10-09): the alert retains `SCHEDULED`, advances the parent version once and does **not** invent a self-transition or pause service. Stale commands receive 409 and must refresh; refreshed check-in remains legal within the existing arrival window. Check-in preserves the Incident/ledger/notifications and does not resolve it. Managers continue their existing incident handling independently. This replaces the earlier EXCEPTION/block-late-check-in policy.
+
+Legacy EXCEPTION compatibility is conservative: a real ledger/linked sole system Incident, unchanged triggering assignee/start, no absence or check-in, exact observedVersion+1 and matching latest system SCHEDULED→EXCEPTION history must all agree. A second incident (even resolved), changed version or missing/ambiguous history blocks recovery. GET never restores state; the locked caregiver check-in rechecks and writes EXCEPTION→ARRIVED→IN_PROGRESS. Other operational EXCEPTIONs stay blocked. No historical rows or notifications are bulk rewritten.
 
 The Visit gateway delegates to `IncidentService.raiseForMissedCheckIn`, which requires the caller's transaction, saves the Incident and REPORTED timeline and calls `routeNewIncident` exactly once. Only the existing routing registers family events; SYS03 never publishes a second raised event or directly creates a family notification.
 
@@ -18,10 +20,10 @@ Staff routing is unchanged: managers and the existing recent-caregiver lookup, n
 
 - Candidates are bounded, keyset-paged by start/id with a fixed round time boundary. A failed record advances the cursor and retries next round, rather than starving later pages.
 - Each record owns a READ_COMMITTED transaction and a refreshed parent Visit write lock. Re-check current assignment/status/time and persistent ledger **after** locking.
-- Visit EXCEPTION, parent version, system state transition, Incident/timeline, staff routing and ledger commit together. Failure rolls all of them back; registered family facts are not delivered on rollback.
+- Unchanged Visit state/advanced version, Incident/timeline, staff routing and ledger commit together. Failure rolls all of them back; registered family facts are not delivered on rollback. No SYS03 pause transition is written.
 - A family consumer fails after source commit: the source remains committed, the existing FM05 failure outcome is recorded, other recipients continue. The scanner does not resend or create another incident.
 - Existing MG04 reassignment/call-off/move retains JPA optimistic locking; stale writes roll back and map to retryable HTTP 409. No decision algorithm is replaced.
-- An assigned SYS03 EXCEPTION is not open to existing MG04 ordinary reassignment/call-off/move. A refreshed manager request is also rejected. Recovery/replacement needs an explicit contract from the manager owner; this batch does not add a manager recovery use case. Plan cancellation also skips this exceptional Visit after locking/re-reading it.
+- New alerts retain SCHEDULED, so refreshed manager requests and plan cancellation follow their existing ordinary rules. The version advance prevents stale overwrites. Reassignment does not reset the once-per-Visit ledger or change the original alert recipient fact. Other EXCEPTION recovery/replacement remains owned by the manager use case; this batch does not add a manager recovery endpoint.
 - Plan cancellation locks/re-reads parent Visits in id order. Plan publication/stop and roster refresh are separate existing transactions: **the plan commits first**. Existing MG03 intentionally retains already-due visits for missed-attendance review; stopping a plan is not retroactive cancellation of overdue work. Future cancellation remains supported. A refresh failure still follows the existing logged/nightly-retry behavior.
 
 ## Configuration and migration
@@ -48,13 +50,13 @@ The demo uses **1-minute lateness / 5-second scan**, not production 10m/60s. Pre
 2. Leave the caregiver unchecked-in. After start +1m and one scan, open manager Incidents: assigned-but-not-checked-in, SERVICE/MEDIUM, system reporter.
 3. Refresh twice: no second SYS03 incident for that Visit.
 4. Family bell → incident detail → view/awareness. Notification read, incident view and awareness are separate; other families remain independent.
-5. Caregiver refreshes work pack: status is **Exception**, no Check in button and execution is blocked. A check-in request with the current version is still 409; checkedInAt stays null and tasks are not initialized.
-6. Manager claims and resolves the incident; the Visit stays EXCEPTION and check-in remains blocked. No recovery is implied by closing the incident.
+5. Caregiver refreshes work pack: status is **Scheduled**, Check in remains available until planned end. Check in writes actual server time and initializes assigned tasks; the original Incident stays recorded.
+6. Caregiver may check out without manager/elder approval, with pending tasks or missing evidence. Visit becomes COMPLETED with actual departure time, not VERIFIED. The original alert is neither deleted nor automatically resolved; see the CG05 handoff.
 7. Repeat with a timely check-in: no SYS03 alert. Cancel/reassign/move examples and both commit orders are additionally covered by real MySQL controlled-concurrency tests.
 
 ## Verification record
 
-The earlier results below are historical evidence for head `6213ad5`, which retained SCHEDULED and allowed legal late check-in. They do not verify the revised EXCEPTION contract. Current implementation/test results are recorded separately in the external plans and the current PR; the new suite adds IncidentService single-route/mandatory-transaction tests and state/timeline/parent-write rollback checks. Existing historical demo alerts are not retroactively rewritten.
+The earlier results below are historical evidence, not verification of the 2026-10-09 check-out/legacy-compatibility implementation. Current local test and manual results are recorded in external 008-plan.md. Existing historical demo alerts are not retroactively rewritten; earlier EXCEPTION-policy evidence also remains historical.
 
 Local full verification on 2026-10-08 before the UTC portability correction: 1,275 unit/architecture tests and 757 real MySQL integration scenarios, zero failures/errors/skips; coverage checks passed (overall backend line coverage 98.17%). The current SYS03 suite includes 15 workflow and 13 controlled-concurrency cases, including source rollback, family-consumer failure, both writer orders, UTC cursor mapping and restart deduplication. Negative/boundary database fixtures are separate from the manager-published positive workflow.
 

@@ -18,6 +18,8 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import sg.nus.carelink.profile.application.ElderCareRequest;
+import sg.nus.carelink.profile.application.ElderCareRequestService;
 import sg.nus.carelink.profile.application.ElderFamilyContact;
 import sg.nus.carelink.profile.application.ElderFamilyContactService;
 import sg.nus.carelink.profile.application.ElderSummary;
@@ -25,6 +27,7 @@ import sg.nus.carelink.profile.application.FamilyElderQueryService;
 import sg.nus.carelink.profile.application.ProfileService;
 import sg.nus.carelink.profile.domain.model.Elder;
 import sg.nus.carelink.profile.domain.model.ElderFamilyBinding;
+import sg.nus.carelink.profile.domain.service.ServiceApplicationProgress;
 
 /** HTTP surface only: status codes for found and not found. Security is tested at the filter-chain level. */
 class ProfileControllerTest {
@@ -32,8 +35,26 @@ class ProfileControllerTest {
 	private final ProfileService service = mock(ProfileService.class);
 	private final FamilyElderQueryService familyElders = mock(FamilyElderQueryService.class);
 	private final ElderFamilyContactService familyContacts = mock(ElderFamilyContactService.class);
+	private final ElderCareRequestService careRequests = mock(ElderCareRequestService.class);
 	private final MockMvc mvc = MockMvcBuilders
-			.standaloneSetup(new ProfileController(service, familyElders, familyContacts)).build();
+			.standaloneSetup(new ProfileController(service, familyElders, familyContacts, careRequests)).build();
+
+	@Test
+	void returnsWhatTheFamilyAppliedFor() throws Exception {
+		when(careRequests.listForElder(1L)).thenReturn(List.of(new ElderCareRequest(
+				ElderCareRequest.Source.INTAKE, 7L, List.of("BATHING", "VITALS"), "Diabetic",
+				LocalDateTime.of(2026, 9, 6, 10, 15), ServiceApplicationProgress.Outcome.PLANNED,
+				List.of(new ServiceApplicationProgress.NeedProgress("BATHING", 1, LocalDate.of(2026, 9, 7)),
+						new ServiceApplicationProgress.NeedProgress("VITALS", 1, LocalDate.of(2026, 9, 7))),
+				null)));
+
+		mvc.perform(get("/api/elders/1/care-requests"))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						[{"source":"INTAKE","applicationId":7,"careNeeds":["BATHING","VITALS"],"notes":"Diabetic",
+						"outcome":"PLANNED","needs":[{"need":"BATHING","plannedVersion":1,"plannedFrom":"2026-09-07"},
+						{"need":"VITALS","plannedVersion":1,"plannedFrom":"2026-09-07"}],"declineReason":null}]"""));
+	}
 
 	@Test
 	void returnsTheEldersFamily() throws Exception {

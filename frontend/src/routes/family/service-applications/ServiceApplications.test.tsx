@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -8,6 +8,12 @@ import type { FamilyElderProfile } from '../../../features/family-elders/api'
 import type { ServiceApplication } from '../../../features/service-applications/api'
 import { serviceApplicationKey } from '../../../features/service-applications/queries'
 
+// The navigation's waiting counts are tested with FamilyLayout and on Home; here they stay at zero so
+// only this page's own requests are made.
+vi.mock('../components/usePendingDecisions', () => ({
+  usePendingDecisions: () => ({ changes: [], spotChecks: [], requests: [], total: 0 }),
+}))
+
 const elder: FamilyElderProfile = {
   id: 1, fullName: 'Tan Mei', gender: 'FEMALE', dateOfBirth: '1948-02-03', phone: '81234567',
   address: '12 Example Road', postalCode: '012345', preferredDialects: 'Hokkien', livesAlone: true,
@@ -15,7 +21,13 @@ const elder: FamilyElderProfile = {
 }
 const second = { ...elder, id: 2, fullName: 'Chen Li', address: '34 Second Road', phone: null }
 const readonly = { ...elder, id: 3, fullName: 'Lim Ai Hua', accessScope: 'READ_ONLY' as const }
-const saved: ServiceApplication = { id: 23, elderId: 1, elderSnapshot: elder, careNeeds: ['BATHING'], notes: 'Morning visits', status: 'SUBMITTED', createdAt: '2026-10-09T01:00:00Z' }
+const saved: ServiceApplication = { id: 23, elderId: 1, elderSnapshot: elder, careNeeds: ['BATHING'], notes: 'Morning visits', status: 'SUBMITTED', createdAt: '2026-10-09T01:00:00Z',
+  outcome: 'SUBMITTED', needs: [{ need: 'BATHING', plannedVersion: null, plannedFrom: null }], declineReason: null, declinedAt: null }
+const catalog = [
+  { code: 'BATHING', label: 'Bathing assistance', category: 'Personal care' },
+  { code: 'MEAL_SUPPORT', label: 'Meal support', category: 'Personal care' },
+  { code: 'VITALS', label: 'Vital-sign check', category: 'Health monitoring' },
+]
 let profiles: FamilyElderProfile[]
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -27,6 +39,7 @@ function install(override?: (path: string, init: RequestInit) => Response | Prom
     if (path === '/api/auth/csrf') { document.cookie = 'XSRF-TOKEN=service-token; path=/'; return new Response(null) }
     if (path === '/api/auth/me') return json({ id: 7, username: 'family', roles: ['FAMILY'] })
     if (path === '/api/elders') return json(profiles)
+    if (path === '/api/care-activities') return json(catalog)
     if (path === '/api/family/elders') return json(profiles)
     if (path.startsWith('/api/family/elders/')) return json(profiles.find((e) => e.id === Number(path.split('/').at(-1))))
     if (path === '/api/family/service-applications' && init.method === 'POST') return json(saved, 201)
@@ -56,14 +69,15 @@ beforeEach(() => { profiles = [elder, second, readonly]; vi.stubGlobal('scrollTo
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/' })
 
 describe('Bound elder service applications', () => {
-  it('redirects the old create URL and submits only existing elderId, distinct care needs and notes with CSRF', async () => {
+  it('redirects the old create URL and submits only existing elderId, catalog care needs and notes with CSRF', async () => {
     const fetch = install(); open('/family/intake/new')
     const user = await fill()
     expect(screen.getByLabelText('Elder')).toHaveValue('1')
     expect(screen.getByText('12 Example Road')).toBeInTheDocument()
     expect(screen.queryByLabelText('Elder full name')).not.toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /Lim Ai Hua/ })).not.toBeInTheDocument()
-    await user.type(screen.getByLabelText('Other care needs'), 'BATHING\n Meal preparation \nMeal preparation')
+    expect(screen.queryByLabelText('Other care needs')).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText('Meal support'))
     await user.type(screen.getByLabelText('Notes for this application (optional)'), ' Morning visits ')
     await user.click(submit())
     expect(await screen.findByRole('heading', { name: 'Application submitted' })).toBeInTheDocument()
@@ -71,7 +85,7 @@ describe('Bound elder service applications', () => {
     const posts = fetch.mock.calls.filter(([, init]) => init.method === 'POST')
     expect(posts).toHaveLength(1)
     expect(posts[0][0]).toBe('/api/family/service-applications')
-    expect(JSON.parse(posts[0][1].body as string)).toEqual({ elderId: 1, careNeeds: ['BATHING', 'Meal preparation'], notes: 'Morning visits' })
+    expect(JSON.parse(posts[0][1].body as string)).toEqual({ elderId: 1, careNeeds: ['BATHING', 'MEAL_SUPPORT'], notes: 'Morning visits' })
     expect(new Headers(posts[0][1].headers).get('X-XSRF-TOKEN')).toBe('service-token')
     expect(posts[0][1].credentials).toBe('include')
     expect(screen.getByText(/waiting for review/)).toBeInTheDocument()
@@ -86,20 +100,22 @@ describe('Bound elder service applications', () => {
     expect(screen.queryByText('81234567')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Bathing assistance')).not.toBeChecked()
     expect(screen.getByLabelText('Notes for this application (optional)')).toHaveValue('')
-    await user.click(screen.getByLabelText('Vital signs monitoring')); await user.click(submit())
+    await user.click(screen.getByLabelText('Vital-sign check')); await user.click(submit())
   })
 
   it('preserves the elder chosen on My elders when entering the application', async () => {
     install(); open('/family/elders/2')
     await screen.findByRole('heading', { name: 'Chen Li' })
-    await userEvent.click(screen.getByRole('link', { name: 'Services' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Care applications' }))
     await userEvent.click(await screen.findByRole('link', { name: 'New service application' }))
     expect(await screen.findByLabelText('Elder')).toHaveValue('2')
   })
 
   it('does not silently choose another person when the shared elder has read-only access', async () => {
     install(); open('/family/elders/3'); await screen.findByRole('heading', { name: 'Lim Ai Hua' })
-    await userEvent.click(screen.getByRole('link', { name: 'Services' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Care applications' }))
     await userEvent.click(await screen.findByRole('link', { name: 'New service application' }))
     expect(await screen.findByLabelText('Elder')).toHaveValue('')
     expect(submit()).toBeDisabled()
@@ -122,15 +138,27 @@ describe('Bound elder service applications', () => {
 
   it('validates services and notes before sending', async () => {
     const fetch = install(); open(); await screen.findByLabelText('Elder'); await userEvent.click(submit())
-    expect(await screen.findByRole('alert')).toHaveTextContent('Choose at least one care service')
-    fireEvent.change(screen.getByLabelText('Other care needs'), { target: { value: 'a'.repeat(101) } }); await userEvent.click(submit())
-    expect(screen.getByRole('alert')).toHaveTextContent('100 characters')
-    fireEvent.change(screen.getByLabelText('Other care needs'), { target: { value: Array.from({ length: 21 }, (_, i) => `Service ${i}`).join('\n') } }); await userEvent.click(submit())
-    expect(screen.getByRole('alert')).toHaveTextContent('up to 20')
-    fireEvent.change(screen.getByLabelText('Other care needs'), { target: { value: 'Meal preparation' } })
+    expect(await screen.findByText('Choose at least one care service.')).toBeInTheDocument()
+    await userEvent.click(screen.getByLabelText('Vital-sign check'))
     fireEvent.change(screen.getByLabelText('Notes for this application (optional)'), { target: { value: 'a'.repeat(2001) } }); await userEvent.click(submit())
-    expect(screen.getByRole('alert')).toHaveTextContent('2000 characters')
+    expect(screen.getByText('Notes must be 2000 characters or fewer.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Notes for this application (optional)')).toHaveAttribute('aria-invalid', 'true')
     expect(fetch.mock.calls.some(([, init]) => init.method === 'POST')).toBe(false)
+  })
+
+  it('offers the care activity catalog, grouped by category, as the only care services', async () => {
+    install(); open(); await screen.findByLabelText('Elder')
+    expect(await screen.findByRole('group', { name: 'Personal care' })).toHaveTextContent('Bathing assistanceMeal support')
+    expect(screen.getByRole('group', { name: 'Health monitoring' })).toHaveTextContent('Vital-sign check')
+  })
+
+  it('does not offer care services it could not load', async () => {
+    let failing = true
+    install((path) => path === '/api/care-activities' && failing ? json({}, 500) : undefined); open()
+    expect(await screen.findByText('Unable to load care services.')).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    failing = false; await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByLabelText('Bathing assistance')).toBeInTheDocument()
   })
 
   it('disables repeat submission while pending and aborts on unmount', async () => {
@@ -250,6 +278,32 @@ describe('Bound elder service applications', () => {
     await waitFor(() => expect(screen.getByLabelText('Elder')).toHaveValue(''))
     expect(screen.queryByText('34 Second Road')).not.toBeInTheDocument()
     expect(submit()).toBeDisabled()
+  })
+
+  it('shows an application the care plan has answered, activity by activity, with a way to the plan', async () => {
+    install((path) => path.endsWith('/service-applications/23') ? json({ ...saved, careNeeds: ['BATHING', 'VITALS'], outcome: 'PLANNED',
+      needs: [{ need: 'BATHING', plannedVersion: 2, plannedFrom: '2026-10-20' }, { need: 'VITALS', plannedVersion: 2, plannedFrom: '2026-10-20' }] }) : undefined)
+    open('/family/service-applications/23')
+    expect(await screen.findByText('Planned')).toBeInTheDocument()
+    expect(screen.getByText(/Everything you asked for is in your elder's care plan/)).toBeInTheDocument()
+    expect(await screen.findByText(/Bathing assistance — In care plan v2 from 20 Oct 2026/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'See the care plan' })).toHaveAttribute('href', '/family/care-plan')
+  })
+
+  it('tells the family why the care team declined an application', async () => {
+    install((path) => path.endsWith('/service-applications/23') ? json({ ...saved, status: 'DECLINED', outcome: 'DECLINED',
+      declineReason: 'No caregiver free for morning visits yet', declinedAt: '2026-10-10T02:00:00Z' }) : undefined)
+    open('/family/service-applications/23')
+    expect(await screen.findByText('Declined')).toBeInTheDocument()
+    expect(screen.getByText('Reason: No caregiver free for morning visits yet')).toBeInTheDocument()
+    expect(screen.getByText(/Bathing assistance — Not in the care plan yet/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'See the care plan' })).not.toBeInTheDocument()
+  })
+
+  it('badges each application in the list with its outcome', async () => {
+    install((path) => path.includes('/service-applications?') ? json({ items: [{ ...saved, outcome: 'PLANNED' }], page: 0, size: 20, totalElements: 1 }) : undefined)
+    open('/family/service-applications')
+    expect(within(await screen.findByRole('link', { name: /SERVICE APPLICATION #23/ })).getByText('Planned')).toBeInTheDocument()
   })
 
   it('rejects invalid detail references without requesting a record', async () => {

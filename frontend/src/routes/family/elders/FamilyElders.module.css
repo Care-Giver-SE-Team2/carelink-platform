@@ -16,9 +16,12 @@
   text-decoration: none;
 }
 .eyebrow {
+  margin-bottom: 8px !important;
   color: var(--fm-accent);
-  font-size: 12px !important;
-  letter-spacing: 0.1em;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  line-height: 1.2 !important;
   text-transform: uppercase;
 }
 .content {
@@ -78,6 +81,10 @@
   gap: 12px;
   flex-wrap: wrap;
 }
+/* Stays at the right whether or not the binding-requests link sits beside it. */
+.refresh {
+  margin-left: auto;
+}
 .details {
   margin: 16px 0 22px;
 }
@@ -125,6 +132,53 @@
   font-size: 16px;
   font-weight: 400;
   color-scheme: light;
+}
+.field input[aria-invalid='true'] {
+  border-color: var(--fm-urgent);
+}
+.fieldError,
+.fieldHint {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.fieldError {
+  color: var(--fm-urgent);
+}
+.fieldHint {
+  color: var(--fm-muted);
+}
+.choices {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.choices legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 4px 12px;
+}
+.choiceGrid label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 15px;
+}
+.choiceGrid input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--fm-accent);
 }
 .notice {
   color: var(--fm-accent);

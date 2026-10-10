@@ -1,10 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ManagerShell } from '../components/ManagerShell'
 import { UserIdentity } from '../components/UserIdentity'
-import { ACTIVITY_CATALOG, activityCategory } from '../data/carePlans'
 import type { PlanNode, SubPlanNode, TaskNode } from '../data/carePlans'
+import { careNeedLabel, groupCareActivities, useCareActivities } from '../../../features/careplan/careActivities'
+import {
+  requestedNeedStatus,
+  requestedNeeds,
+  seedPlanFromRequests,
+  unscheduledTasks,
+  useElderCareRequests,
+} from '../lib/familyRequests'
+import type { RequestedNeedStatus } from '../lib/familyRequests'
 import { useElder } from '../lib/useElder'
 import { useElderFamily } from '../lib/useElderFamily'
 import { useCarePlanVersions } from '../lib/useCarePlanVersions'
@@ -25,13 +33,12 @@ import {
   weeklyHours,
   weeklyHoursOfTree,
 } from '../lib/planTree'
-import {
-  createCarePlanDraft,
-  fetchCarePlanNodes,
-  fetchLatestCarePlan,
-  publishCarePlan,
-} from '../../../shared/api/careplan'
-import type { CarePlanResponse, PlanNodePayload } from '../../../shared/api/careplan'
+import { fetchCarePlanNodes, fetchLatestCarePlan, publishCarePlan } from '../../../shared/api/careplan'
+import type { CarePlanNodeResponse, CarePlanResponse, PlanNodePayload } from '../../../shared/api/careplan'
+import { declineServiceApplication } from '../../../shared/api/profile'
+import type { ElderCareRequest } from '../../../shared/api/profile'
+import { useDraftAutosave } from '../lib/useDraftAutosave'
+import type { DraftSaveState } from '../lib/useDraftAutosave'
 import {
   BackLink,
   Badge,
@@ -49,9 +56,11 @@ import {
   PlanTreeView,
   SidePanel,
   SplitLayout,
+  TextArea,
 } from '../../../shared/components/ui'
-import type { BadgeStatus, SelectGroup } from '../../../shared/components/ui'
+import type { BadgeStatus, SelectGroup, TagTone } from '../../../shared/components/ui'
 import { PlanTreeEditor } from '../components/PlanTreeEditor'
+import { FamilyRequestsPanel } from '../components/FamilyRequestsPanel'
 import { StopCarePlanButton } from '../components/StopCarePlanButton'
 import { StopCarePlanDialog } from '../components/StopCarePlanDialog'
 import { VersionHistoryList } from '../components/VersionHistoryList'
@@ -59,10 +68,13 @@ import type { VersionEntry } from '../components/VersionHistoryList'
 import type { DayScheduleValue } from '../components/weekdays'
 import styles from './CarePlan.module.css'
 
-const ACTIVITY_OPTIONS: SelectGroup[] = ACTIVITY_CATALOG.map((group) => ({
-  group: group.category,
-  items: group.activities.map((activity) => ({ value: activity, label: activity })),
-}))
+/** How the rail tags each care need the family asked for, against the plan being edited. */
+const REQUESTED_NEED_TAG: Record<RequestedNeedStatus, { label: string; tone: TagTone }> = {
+  planned: { label: 'In plan', tone: 'accent' },
+  unscheduled: { label: 'Set days', tone: 'danger' },
+  missing: { label: 'Not in plan', tone: 'muted' },
+  uncatalogued: { label: 'Own words', tone: 'muted' },
+}
 
 /** Local-date "yyyy-MM-dd" — lexically comparable with the plan's ISO start date. */
 function todayIso(): string {
@@ -88,6 +100,7 @@ function toPlanNodePayloads(nodes: PlanNode[]): PlanNodePayload[] {
 function taskToPayload(node: TaskNode, groupName: string | null): PlanNodePayload {
   return {
     groupName,
+    activityCode: node.activityCode,
     name: node.name,
     visits: node.visits.map((v) => ({ day: v.day, startTime: v.startTime, minutes: v.minutes })),
     evidenceType: node.evidence,
@@ -108,6 +121,8 @@ export default function CarePlan() {
   const { data: family } = useElderFamily(elderId)
   const { data: versions } = useCarePlanVersions(elderId)
   const { data: currentUser } = useCurrentUser()
+  const { data: catalog } = useCareActivities()
+  const { data: careRequests } = useElderCareRequests(elderId)
   const queryClient = useQueryClient()
 
   const [tree, setTree] = useState<PlanNode[]>([])
@@ -133,6 +148,28 @@ export default function CarePlan() {
   const totalHours = useMemo(() => weeklyHoursOfTree(tree), [tree])
   const { subPlans, tasks } = useMemo(() => countTree(tree), [tree])
   const treeItems = useMemo(() => toPlanTreeItems(tree), [tree])
+  const unscheduled = useMemo(() => unscheduledTasks(tree), [tree])
+  const needs = useMemo(() => requestedNeeds(careRequests ?? []), [careRequests])
+  const activityOptions = useMemo<SelectGroup[]>(
+    () =>
+      groupCareActivities(catalog ?? []).map((group) => ({
+        group: group.category,
+        items: group.activities.map(({ label }) => ({ value: label, label })),
+      })),
+    [catalog],
+  )
+  /** Whether the first draft has been filled in from the family's applications (done once, only for an elder with no plan). */
+  const [seeded, setSeeded] = useState(false)
+  /** Bumped by every manager edit (never by loading a plan), so only edits are saved to the draft. */
+  const [revision, setRevision] = useState(0)
+  const scheduledRevision = useRef(0)
+  const [showDiscardModal, setShowDiscardModal] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
+  const [discardError, setDiscardError] = useState<string | null>(null)
+  const [declineTarget, setDeclineTarget] = useState<ElderCareRequest | null>(null)
+  const [declineReason, setDeclineReason] = useState('')
+  const [declining, setDeclining] = useState(false)
+  const [declineError, setDeclineError] = useState<string | null>(null)
 
   useEffect(() => {
     if (elder && currentUser) {
@@ -159,23 +196,49 @@ export default function CarePlan() {
     enabled: latestPlan != null,
   })
 
-  useEffect(() => {
-    if (!latestPlan || !planNodes) return
-    setTree(fromCarePlanNodeResponses(planNodes))
-    setVersion(latestPlan.status === 'DRAFT' ? latestPlan.version - 1 : latestPlan.version)
-    setStartDate(latestPlan.startDate ?? '')
-    if (latestPlan.status === 'PUBLISHED') {
+  /** Shows a plan version as loaded from the backend, discarding any local edits. */
+  function showPlan(plan: CarePlanResponse, nodes: CarePlanNodeResponse[]) {
+    setTree(fromCarePlanNodeResponses(nodes))
+    setVersion(plan.status === 'DRAFT' ? plan.version - 1 : plan.version)
+    setStartDate(plan.startDate ?? '')
+    if (plan.status === 'PUBLISHED') {
       setStatus('published')
-    } else if (latestPlan.status === 'STOPPED') {
+    } else if (plan.status === 'STOPPED') {
       setStatus('stopped')
       setStopInfo({
-        effectiveDate: latestPlan.stopEffectiveDate ?? '',
-        reason: latestPlan.stopReason ?? '',
+        effectiveDate: plan.stopEffectiveDate ?? '',
+        reason: plan.stopReason ?? '',
       })
     } else {
       setStatus('draft')
     }
+  }
+
+  useEffect(() => {
+    if (!latestPlan || !planNodes) return
+    showPlan(latestPlan, planNodes)
   }, [latestPlan, planNodes])
+
+  // An elder with no plan yet starts from what the family applied for, so the first draft holds
+  // exactly the activities they chose. latestPlan is undefined while loading and null once the
+  // backend has confirmed there is no plan; a first draft saved with nothing in it is filled in
+  // the same way. The filled-in draft is only saved once the manager edits it.
+  const emptyFirstDraft = latestPlan?.status === 'DRAFT' && latestPlan.version === 1 && planNodes?.length === 0
+  useEffect(() => {
+    if (seeded || !(latestPlan === null || emptyFirstDraft) || !careRequests || !catalog) return
+    setSeeded(true)
+    setTree(seedPlanFromRequests(requestedNeeds(careRequests), catalog))
+  }, [seeded, latestPlan, emptyFirstDraft, careRequests, catalog])
+
+  const autosave = useDraftAutosave(elder?.id, latestPlan?.status === 'DRAFT' ? latestPlan.id : null)
+  const scheduleSave = autosave.schedule
+
+  // Every edit saves the whole draft once the manager pauses; loading a plan never does.
+  useEffect(() => {
+    if (revision === scheduledRevision.current) return
+    scheduledRevision.current = revision
+    scheduleSave({ startDate, nodes: toPlanNodePayloads(tree) })
+  }, [revision, tree, startDate, scheduleSave])
 
   // A draft saved on the backend compares against the published version it supersedes.
   useEffect(() => {
@@ -202,6 +265,12 @@ export default function CarePlan() {
   // Editing (add/edit/delete sub-plans and tasks) is only available once the manager has
   // entered draft mode via "Edit plan" — opening a published plan starts read-only.
   const editable = !locked && status === 'draft'
+  /** Whether the backend holds a draft, or is about to, for Discard to throw away. */
+  const hasDraft = latestPlan?.status === 'DRAFT' || autosave.state !== 'idle'
+  /** Catalog activities the family applied for that this version doesn't include — named before publishing. */
+  const leftOut = needs
+    .filter((need) => requestedNeedStatus(need, catalog ?? [], tree) === 'missing')
+    .map((need) => careNeedLabel(catalog, need))
 
   function toggleCollapsed(id: string) {
     setCollapsed((prev) => {
@@ -219,9 +288,14 @@ export default function CarePlan() {
     }
   }
 
+  function markEdited() {
+    setRevision((n) => n + 1)
+  }
+
   function removeTask(taskId: string) {
     enterDraft(totalHours)
     setTree((prev) => removeNode(prev, taskId))
+    markEdited()
   }
 
   function findTask(taskId: string): TaskNode | undefined {
@@ -245,6 +319,7 @@ export default function CarePlan() {
       visits: visitsFromDaySchedule(schedule),
     }
     setTree((prev) => updateTask(prev, task.id, updated))
+    markEdited()
     setEditingTaskId(null)
   }
 
@@ -252,21 +327,24 @@ export default function CarePlan() {
     if (!deleteTarget) return
     enterDraft(totalHours)
     setTree((prev) => removeNode(prev, deleteTarget.id))
+    markEdited()
     setDeleteTarget(null)
   }
 
   function submitAddSubPlan(activity: string, schedule: DayScheduleValue) {
     enterDraft(totalHours)
+    const catalogActivity = catalog?.find((a) => a.label === activity)
     const task: TaskNode = {
       id: `task-${Date.now()}`,
       type: 'task',
+      activityCode: catalogActivity?.code ?? null,
       name: activity,
       visits: visitsFromDaySchedule(schedule),
       evidence: 'CHECKLIST',
     }
     // Activities are filed under their catalog category, so a second activity from the same
     // category joins the existing sub-plan rather than starting a new one.
-    const groupName = activityCategory(activity) ?? activity
+    const groupName = catalogActivity?.category ?? activity
     const existing = tree.find((n): n is SubPlanNode => n.type === 'subplan' && n.name === groupName)
     if (existing) {
       setTree((prev) =>
@@ -286,18 +364,8 @@ export default function CarePlan() {
       }
       setTree((prev) => [...prev, subplan])
     }
+    markEdited()
     setAddPanelOpen(false)
-  }
-
-  /** The draft this publish writes to: reuses one already open on the backend, or opens one.
-   * Only called from the publish dialog, which only renders once the elder guard above has
-   * passed, but that narrowing doesn't reach this nested function declaration. */
-  async function getOrCreateDraftPlanId(): Promise<number> {
-    const currentElderId = elder!.id
-    const latest = await fetchLatestCarePlan(currentElderId)
-    if (latest && latest.status === 'DRAFT') return latest.id
-    const created = await createCarePlanDraft(currentElderId)
-    return created.id
   }
 
   async function publish() {
@@ -305,8 +373,12 @@ export default function CarePlan() {
     setPublishing(true)
     setPublishError(null)
     try {
-      const planId = await getOrCreateDraftPlanId()
+      // Publish the draft the edits were saved to (or open one), once any pending save has landed.
+      await autosave.settle()
+      const planId = await autosave.openDraft()
       const published = await publishCarePlan(planId, startDate, toPlanNodePayloads(tree))
+      autosave.published()
+      void queryClient.invalidateQueries({ queryKey: ['carePlan', 'latest', elder!.id] })
       refreshVersions()
       setVersion(published.version)
       setStatus('published')
@@ -317,6 +389,48 @@ export default function CarePlan() {
       setPublishError(err instanceof Error ? err.message : 'Could not publish this plan.')
     } finally {
       setPublishing(false)
+    }
+  }
+
+  /** Throws the draft away: back to the version in force, or to what the family applied for. */
+  async function discardDraft() {
+    setDiscarding(true)
+    setDiscardError(null)
+    try {
+      await autosave.discard()
+      setShowDiscardModal(false)
+      setPriorPublishedHours(undefined)
+      if (latestPlan?.status === 'DRAFT') {
+        // The draft was loaded with the page: reload what the elder has now.
+        setSeeded(false)
+        await queryClient.invalidateQueries({ queryKey: ['carePlan', 'latest', elder!.id] })
+      } else if (latestPlan && planNodes) {
+        showPlan(latestPlan, planNodes)
+      } else {
+        setStartDate('')
+        setSeeded(false)
+      }
+      refreshVersions()
+    } catch (err) {
+      setDiscardError(err instanceof Error ? err.message : 'Could not discard this draft.')
+    } finally {
+      setDiscarding(false)
+    }
+  }
+
+  /** Tells the family the care team won't plan their application, and why. */
+  async function declineApplication() {
+    if (!declineTarget || !declineReason.trim()) return
+    setDeclining(true)
+    setDeclineError(null)
+    try {
+      await declineServiceApplication(declineTarget.applicationId, declineReason.trim())
+      await queryClient.invalidateQueries({ queryKey: ['elderCareRequests', elderId] })
+      setDeclineTarget(null)
+    } catch (err) {
+      setDeclineError(err instanceof Error ? err.message : 'Could not decline this application.')
+    } finally {
+      setDeclining(false)
     }
   }
 
@@ -388,10 +502,16 @@ export default function CarePlan() {
         actions={
           !locked && (
             <>
+              {editable && <DraftSaveStatus state={autosave.state} onRetry={() => void autosave.retry()} />}
+              {editable && hasDraft && (
+                <Button variant="ghost" onClick={() => setShowDiscardModal(true)}>
+                  Discard draft
+                </Button>
+              )}
               {editable && <Button onClick={() => setAddPanelOpen(true)}>Add sub-plan</Button>}
               <Button
                 variant="primary"
-                disabled={editable && (tasks === 0 || !startDate)}
+                disabled={editable && (tasks === 0 || !startDate || unscheduled.length > 0)}
                 onClick={() => (editable ? setShowPublishModal(true) : enterDraft(totalHours))}
               >
                 {editable ? `Publish v${version + 1}` : 'Edit plan'}
@@ -401,9 +521,28 @@ export default function CarePlan() {
         }
       >
         <Field label="Starts" inline>
-          {(id) => <DateInput id={id} value={startDate} disabled={!editable} onChange={setStartDate} />}
+          {(id) => (
+            <DateInput
+              id={id}
+              value={startDate}
+              disabled={!editable}
+              onChange={(value) => {
+                setStartDate(value)
+                markEdited()
+              }}
+            />
+          )}
         </Field>
       </PageHeader>
+
+      {editable && unscheduled.length > 0 && (
+        <div className={styles.banner}>
+          <Callout tone="info" role="status">
+            Set days and times for {unscheduled.map((task) => task.name).join(', ')} before publishing — the family
+            chose these activities, not when they happen.
+          </Callout>
+        </div>
+      )}
 
       {editable ? (
         <PlanTreeEditor
@@ -422,7 +561,7 @@ export default function CarePlan() {
           onSaveTask={submitEditTask}
           onCancelEdit={() => setEditingTaskId(null)}
           adding={addPanelOpen}
-          activityOptions={ACTIVITY_OPTIONS}
+          activityOptions={activityOptions}
           onAdd={submitAddSubPlan}
           onCancelAdd={() => setAddPanelOpen(false)}
         />
@@ -459,6 +598,19 @@ export default function CarePlan() {
             { label: 'Continuity', value: continuityLabel(elder.continuityPreference) },
           ]}
         />,
+        careRequests && careRequests.length > 0 && (
+          <FamilyRequestsPanel
+            key="requested"
+            requests={careRequests}
+            label={(need) => careNeedLabel(catalog, need)}
+            needTag={(need) => REQUESTED_NEED_TAG[requestedNeedStatus(need, catalog ?? [], tree)]}
+            onDecline={(request) => {
+              setDeclineTarget(request)
+              setDeclineReason('')
+              setDeclineError(null)
+            }}
+          />
+        ),
         history.length > 0 && (
           <div key="history" className={styles.railGroup}>
             <Eyebrow>Version history</Eyebrow>
@@ -502,9 +654,74 @@ export default function CarePlan() {
             {priorPublishedHours !== undefined ? ` (from ${formatHoursFixed(priorPublishedHours)})` : ''}.
             Upcoming visits that haven't started are rescheduled to match.
           </BodyText>
+          {leftOut.length > 0 && (
+            <Callout tone="info">
+              The family asked for {leftOut.join(', ')}, which {leftOut.length === 1 ? 'is' : 'are'} not in this
+              version. You can still publish.
+            </Callout>
+          )}
           {publishError && (
             <Callout tone="danger" role="alert">
               {publishError}
+            </Callout>
+          )}
+        </ConfirmDialog>
+      )}
+
+      {showDiscardModal && (
+        <ConfirmDialog
+          tone="danger"
+          eyebrow="Discard draft"
+          title={`Discard draft v${version + 1}?`}
+          meta={elder.name}
+          confirmLabel={discarding ? 'Discarding…' : 'Discard draft'}
+          busy={discarding}
+          onConfirm={discardDraft}
+          onCancel={() => setShowDiscardModal(false)}
+        >
+          <BodyText>
+            {version > 0
+              ? `Your changes are thrown away and v${version} stays in force.`
+              : 'Your changes are thrown away and the plan goes back to what the family applied for.'}
+          </BodyText>
+          {discardError && (
+            <Callout tone="danger" role="alert">
+              {discardError}
+            </Callout>
+          )}
+        </ConfirmDialog>
+      )}
+
+      {declineTarget && (
+        <ConfirmDialog
+          tone="danger"
+          eyebrow="Decline application"
+          title={`Decline service application #${declineTarget.applicationId}?`}
+          meta={elder.name}
+          confirmLabel={declining ? 'Declining…' : 'Decline'}
+          busy={declining}
+          confirmDisabled={!declineReason.trim()}
+          onConfirm={declineApplication}
+          onCancel={() => setDeclineTarget(null)}
+        >
+          <BodyText>
+            The family is told it won't be added to the care plan, with your reason. If you later add everything it
+            asked for, it shows as planned instead.
+          </BodyText>
+          <Field label="Reason for the family">
+            {(id) => (
+              <TextArea
+                id={id}
+                value={declineReason}
+                onChange={setDeclineReason}
+                maxLength={255}
+                disabled={declining}
+              />
+            )}
+          </Field>
+          {declineError && (
+            <Callout tone="danger" role="alert">
+              {declineError}
             </Callout>
           )}
         </ConfirmDialog>
@@ -544,5 +761,29 @@ export default function CarePlan() {
         </ConfirmDialog>
       )}
     </ManagerShell>
+  )
+}
+
+/** Where the draft stands on the backend, beside the editor's actions. */
+function DraftSaveStatus({ state, onRetry }: { state: DraftSaveState; onRetry: () => void }) {
+  if (state === 'failed') {
+    return (
+      <span aria-live="polite">
+        <MetaText as="span" tone="danger">
+          Couldn't save draft
+        </MetaText>{' '}
+        <Button variant="ghost" onClick={onRetry}>
+          Retry
+        </Button>
+      </span>
+    )
+  }
+  const text = { idle: '', pending: 'Unsaved changes', saving: 'Saving…', saved: 'Draft saved' }[state]
+  return (
+    <span aria-live="polite">
+      <MetaText as="span" tone="faint">
+        {text}
+      </MetaText>
+    </span>
   )
 }

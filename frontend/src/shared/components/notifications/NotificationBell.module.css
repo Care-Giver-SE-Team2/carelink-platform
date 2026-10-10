@@ -40,6 +40,18 @@
   flex: none;
 }
 
+/* Floating, it is the only control in the corner rather than one of a header's row, so it gets a
+   full 44px touch target and a larger glyph. */
+.floating .bell {
+  width: 44px;
+  height: 44px;
+}
+
+.floating .bell svg {
+  width: 24px;
+  height: 24px;
+}
+
 .root .bell:hover {
   border-color: var(--text);
 }

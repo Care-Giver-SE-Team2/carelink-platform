@@ -20,6 +20,6 @@ public class ElderAccountRegistrationController {
     @ResponseStatus(HttpStatus.CREATED)
     public ElderAccountRegistrationResponse register(@Valid @RequestBody ElderAccountRegistrationRequest request) {
         return new ElderAccountRegistrationResponse(
-                registrations.register(request.username(), request.password()), request.username());
+                registrations.register(request.fullName(), request.username(), request.password()), request.username());
     }
 }

@@ -11,10 +11,8 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
 import sg.nus.carelink.visit.domain.model.MissedCheckInTrigger;
-import sg.nus.carelink.visit.domain.model.VisitStateTransition;
 import sg.nus.carelink.visit.domain.repository.MissedCheckInRepository;
 import sg.nus.carelink.visit.domain.repository.VisitCommandRepository;
-import sg.nus.carelink.visit.domain.repository.VisitStateTransitionRepository;
 import sg.nus.carelink.visit.domain.service.MissedCheckInPolicy;
 
 /** A bounded keyset round; each fact commits independently and retries only on the next round. */
@@ -27,19 +25,17 @@ public class MissedCheckInScanService {
     private final VisitCommandRepository visits;
     private final MissedCheckInRepository triggers;
     private final MissedCheckInIncidentGateway incidents;
-    private final VisitStateTransitionRepository transitions;
     private final MissedCheckInPolicy policy;
     private final Settings settings;
     private final Clock clock;
     public MissedCheckInScanService(PlatformTransactionManager manager, VisitCommandRepository visits,
             MissedCheckInRepository triggers, MissedCheckInIncidentGateway incidents,
-            VisitStateTransitionRepository transitions, MissedCheckInPolicy policy,
+            MissedCheckInPolicy policy,
             Settings settings, Clock clock) {
         tx = new TransactionTemplate(manager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         this.visits = visits; this.triggers = triggers; this.incidents = incidents;
-        this.transitions = transitions;
         this.policy = policy; this.settings = settings; this.clock = clock;
     }
     public Outcome scan() {
@@ -79,10 +75,8 @@ public class MissedCheckInScanService {
             if (current.isEmpty() || !policy.eligible(current.get(), observedAt) || triggers.exists(visitId)) return false;
             var visit = current.get();
             var dueAt = policy.dueAt(visit);
-            var exceptional = visit.reportedException(observedAt);
-            visits.save(exceptional);
-            transitions.save(new VisitStateTransition(null, visit.id(), visit.status().name(),
-                    exceptional.status().name(), null, VisitStateTransition.Result.APPLIED, null, observedAt));
+            // Alert facts advance the parent version, but do not pause service or invent a transition.
+            visits.save(visit);
             Long incident = incidents.raise(visit.elderId(), visit.id(), dueAt, observedAt);
             triggers.save(new MissedCheckInTrigger(visit.id(), incident, visit.caregiverId(), visit.scheduledStart(),
                     dueAt, visit.version(), observedAt));

@@ -57,7 +57,9 @@
 /* Phone: the first section sits 18px under the header (or the elder picker). */
 @media (max-width: 899px) {
   .header + .columns > .column:first-child > section:first-child .sectionLabel,
-  .picker + .columns > .column:first-child > section:first-child .sectionLabel {
+  .picker + .columns > .column:first-child > section:first-child .sectionLabel,
+  .header + .answer .sectionLabel,
+  .picker + .answer .sectionLabel {
     margin-top: 18px !important;
   }
 }
@@ -294,6 +296,74 @@ p.card {
   text-decoration: none;
 }
 
+/* Needs your answer: amber-edged rows, each a link to where it is answered. */
+.answer .sectionLabel {
+  color: var(--fm-pending);
+}
+
+.answerList {
+  margin: 0;
+  border: 1px solid var(--fm-pending-line);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.answerList li + li {
+  border-top: 1px solid var(--fm-line-row);
+}
+
+.answerList a {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 14px 40px 14px 16px;
+  color: var(--fm-ink) !important;
+  text-decoration: none;
+}
+
+.answerList a::after {
+  content: '›';
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  color: var(--fm-muted);
+  font-size: 22px;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.answerList a:hover {
+  background: var(--fm-pending-tint);
+}
+
+.answerKind {
+  color: var(--fm-pending);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.answerTitle {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.answerMeta {
+  color: var(--fm-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.answerMeta strong {
+  color: var(--fm-pending);
+  font-weight: 600;
+}
+
 /* Phone: the two columns simply stack. */
 .columns {
   composes: split from '../components/FamilyScreen.module.css';
@@ -352,6 +422,18 @@ p.card {
 
   .sectionLabel {
     margin: 26px 0 12px !important;
+  }
+
+  .answer {
+    margin-bottom: 26px;
+  }
+
+  .answer .sectionLabel {
+    margin-top: 0 !important;
+  }
+
+  .answerList a {
+    padding: 16px 48px 16px 22px;
   }
 
   .column > :first-child .sectionLabel,

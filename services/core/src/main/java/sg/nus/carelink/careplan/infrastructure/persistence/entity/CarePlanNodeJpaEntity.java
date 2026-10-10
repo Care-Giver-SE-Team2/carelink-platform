@@ -50,6 +50,10 @@ public class CarePlanNodeJpaEntity {
 	@Column(name = "group_name", length = 150)
 	private String groupName;
 
+	/** care activity catalog code; null for a task outside the catalog */
+	@Column(name = "activity_code", length = 50)
+	private String activityCode;
+
 	@Column(name = "name", nullable = false, length = 150)
 	private String name;
 
@@ -109,6 +113,14 @@ public class CarePlanNodeJpaEntity {
 
 	public void setGroupName(String groupName) {
 		this.groupName = groupName;
+	}
+
+	public String getActivityCode() {
+		return activityCode;
+	}
+
+	public void setActivityCode(String activityCode) {
+		this.activityCode = activityCode;
 	}
 
 	public String getName() {

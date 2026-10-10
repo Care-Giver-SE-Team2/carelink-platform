@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   afterEach,
   describe,
@@ -111,6 +112,15 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={client}>
+      <FamilyValueAddedServicesPage />
+    </QueryClientProvider>,
+  )
+}
+
 function prepare() {
   mockedSelected
     .mockReturnValue({
@@ -144,9 +154,7 @@ describe(
           [pending],
         )
 
-      render(
-        <FamilyValueAddedServicesPage />,
-      )
+      renderPage()
 
       expect(
         await screen.findByText(
@@ -208,9 +216,7 @@ describe(
             '2026-10-07T17:10:00',
         })
 
-      render(
-        <FamilyValueAddedServicesPage />,
-      )
+      renderPage()
 
       const user =
         userEvent.setup()
@@ -278,9 +284,7 @@ describe(
             '2026-10-07T17:10:00',
         })
 
-      render(
-        <FamilyValueAddedServicesPage />,
-      )
+      renderPage()
 
       await userEvent
         .setup()
@@ -315,9 +319,7 @@ describe(
       mockedFetch
         .mockResolvedValue([])
 
-      render(
-        <FamilyValueAddedServicesPage />,
-      )
+      renderPage()
 
       expect(
         await screen.findByText(
@@ -340,9 +342,7 @@ describe(
           new Error('network'),
         )
 
-      render(
-        <FamilyValueAddedServicesPage />,
-      )
+      renderPage()
 
       expect(
         await screen.findByRole(

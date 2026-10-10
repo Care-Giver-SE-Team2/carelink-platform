@@ -161,6 +161,7 @@ function toTaskNode(node: CarePlanNodeResponse): TaskNode {
   return {
     id: `task-${node.id}`,
     type: 'task',
+    activityCode: node.activityCode,
     name: node.name,
     // The backend sends LocalTime as "HH:mm:ss"; the tree keeps "HH:mm".
     visits: node.visits.map((v) => ({ ...v, startTime: v.startTime.slice(0, 5) })),

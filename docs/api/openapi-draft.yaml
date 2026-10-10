@@ -2459,7 +2459,9 @@ paths:
       description: >-
         UC-CG04 caregiver HTTP reporting is implemented in openapi.yaml with server-derived identity/elder,
         current visit assignment, version and UUID command receipt. This old body/response is superseded.
-        MG03 has an uncovered-visit scan; assigned-caregiver missed check-in SYS03 remains unimplemented.
+        MG03 has an uncovered-visit scan; assigned-caregiver missed check-in SYS03 is implemented as a
+        non-blocking, once-per-Visit alert. The current CG03 check-in and CG05 check-out command contracts
+        are in openapi.yaml; this superseded draft does not define their authoritative schemas.
       requestBody:
         required: true
         content:

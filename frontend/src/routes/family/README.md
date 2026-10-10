@@ -33,7 +33,7 @@
 
 FM01 页面已接入现有后端接口：
 
-- `/family` 转到 `/family/home`（首页：当前／下一次服务、本周概况）；底部标签栏为 Home · Schedule · Reports（周摘要）· Services（申请）· Account。
+- `/family` 转到 `/family/home`（首页：待您回复的事项、当前／下一次服务、本周概况）；手机底部标签栏为 Home · Schedule · Reports（周摘要）· Applications（申请）· Menu，Menu 弹出全部页面（按 Care / Needs your answer / Your service 分组，Account 在最后）；桌面侧栏同样分组，Account 固定在底部。待回复数量显示在 Menu 及各页面旁。
 - `/family/account`：账户页，显示关注的老人、通知方式和帮助；退出登录只在此页。
 - 桌面（≥ 900px）：底部标签栏换成左侧导航栏（关注的老人切换、四个栏目、底部账户入口）。首页、周排程、周摘要为左右两栏，报告详情最宽 1060px，其余页面为 640px 单栏。所选老人在各页共享（`components/FamilyElderContext.tsx`）；报告页仍以 URL 的 `elderId` 为准。桌面版的特殊标记由 `useIsDesktop()` 控制，手机版行为和请求不变。
 - `/family/intake`：本人旧建档申请历史列表，按状态筛选、每页 20 条、刷新。
@@ -109,24 +109,13 @@ FM05 家属异常详情入口为 `/family/incidents/:id`，支持直接链接和
 - 离线或页面隐藏时暂停请求并隐藏详情；再次同时在线且可见时，重新确认会话并读取最新个人窗口／回执，重复恢复事件不会重复加载。同一账号的未提交备注保留在本页内存；账号变化或拒绝访问后清除。中断的知悉不自动重发：服务端已有回执则显示首次结果，否则明确提示未能确认保存，保留备注供主动重试。401／403 后不随恢复事件自动重试，403 可手动重新校验权限。
 - 新 API／投影及请求生命周期位于 `features/incidents/familyApi.ts`、`familyTypes.ts`、`useFamilyIncident.ts`；页面和局部 CSS 位于 `routes/family/incidents/`。没有修改主管代码或通用铃铛。通知组件作者可将 FAMILY／INCIDENT 通知链接接到 `/family/incidents/{resourceId}`；真实事件来源、旧家属发送交接和铃铛跳转仍是独立联调事项。
 
-提交行为：
-
-- 调用 POST `/api/intake-applications` 前初始化 CSRF；Session Cookie 随请求发送，申请人和审核字段由后端确定。
-- 必填内容去除首尾空白后校验；姓名、地址、邮编和方言分别最多 100、255、10、100 个 Unicode 码点。年龄可留空，填写时为后端支持的非负整数；邮编保持字符串，不限制为六位数字。
-- 护理需求可多选并逐行补充，去除重复项；空的可选内容不发送 `null`。不发送客户端指定的申请人、角色、状态或审核信息。
-- 从 CSRF 初始化开始禁用表单和提交按钮，避免重复点击。失败时保留当前页输入；401 返回首页（未提交的输入不保留）。403 提示检查会话保护或家属权限。
-- POST 结果不明时不自动重发；提示在新标签页查看本人申请，保留原表单。POST 已确认成功而详情读取失败时仍显示保存的申请编号。
-- 表单输入只保存在当前页面内存中；刷新或离开表单不保留草稿。提交仅创建待审核申请，不执行审批或创建正式老人档案。
-
 代码位置：
 
 - `features/reports/useFamilyReportPage.ts`、`useFamilyReport.ts`、`useFamilyWeeklySummary.ts`：家属报告列表、详情和周摘要的身份校验、请求和取消；`api.ts`／`types.ts` 明确家属详情及摘要投影，更正不含内部作者 ID；`routes/family/reports/` 管理页面、URL 选择、状态反馈与样式，`ReportNotes.tsx` 复用详情与摘要的完整性和更正展示。
-- `routes/family/intake/`：页面、表单交互与样式；浏览器 URL 的分页和筛选状态留在页面中管理。
-- `features/intake/api.ts`：申请提交、列表、详情接口的路径、参数编码和返回类型。
-- `features/intake/intakeForm.ts`：表单类型、字段校验和提交参数转换。
-- `features/intake/useIntakeSubmission.ts`：CSRF 初始化、提交状态、防重复点击和请求取消。
+- `routes/family/intake/`：旧建档申请历史的页面与样式；浏览器 URL 的分页和筛选状态留在页面中管理。
+- `features/intake/api.ts`：旧建档申请列表、详情接口的路径、参数编码和返回类型。
 - `features/intake/useIntakeQueries.ts`：`useIntakeApplications` 与 `useIntakeApplication` 管理查询、刷新、错误和取消；页面只传业务参数。
-- `features/intake/types.ts`、`presentation.ts`：请求/响应类型和展示转换。
+- `features/intake/types.ts`、`presentation.ts`：响应类型和展示转换。
 - `features/auth/api.ts`、`types.ts`：`initialiseCsrf` 初始化 CSRF，`signInWithSession` 封装 Session 登录，并声明登录参数和返回用户类型。登录表单只在首页。
 
 共用 `shared/api/client.ts` 增加 `ApiError.status` 并支持空成功响应；原有调用方式、错误 message、Session 和 CSRF 行为保留。合并时请同步这一公共改动。

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ApiError } from '../../../shared/api/client'
@@ -7,16 +7,11 @@ import {
   fetchFamilyValueAddedServices,
 } from '../../../features/value-added-services/api'
 import type { ValueAddedServiceRequest } from '../../../features/value-added-services/types'
+import {
+  BOOKING_TIME_CODES, MIN_NOTICE_HOURS, STEP_MINUTES, bookingHint, bookingTimeError, bookingWindow,
+} from '../../../features/value-added-services/bookingTime'
+import { problemCode, serverFieldErrors } from '../../../shared/validation/serverErrors'
 import styles from './FamilyValueAddedServices.module.css'
-
-/** The server asks for at least this much notice; the picker starts there. */
-const MIN_NOTICE_HOURS = 2
-
-function earliestRequestTime(now = new Date()): string {
-  const earliest = new Date(now.getTime() + MIN_NOTICE_HOURS * 60 * 60 * 1000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${earliest.getFullYear()}-${pad(earliest.getMonth() + 1)}-${pad(earliest.getDate())}T${pad(earliest.getHours())}:${pad(earliest.getMinutes())}`
-}
 
 /**
  * A family member books an extra service for the elder they follow. Booking it is their
@@ -36,6 +31,8 @@ export function FamilyValueAddedRequestForm({
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<{ schedule?: string; note?: string }>({})
+  const id = useId()
   const [sent, setSent] = useState<string | null>(null)
 
   const services = catalogue.data ?? []
@@ -43,10 +40,16 @@ export function FamilyValueAddedRequestForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!chosen || !schedule) {
-      setError('Choose a service and a date and time.')
+    if (!chosen) {
+      setError('Choose a service.')
       return
     }
+    const found = {
+      schedule: bookingTimeError(schedule, chosen.durationMinutes),
+      note: [...note.trim()].length > 1000 ? 'Use 1000 characters or fewer.' : undefined,
+    }
+    setFieldErrors(found)
+    if (found.schedule || found.note) return
     setBusy(true)
     setError(null)
     setSent(null)
@@ -62,7 +65,10 @@ export function FamilyValueAddedRequestForm({
       setNote('')
       setSent(`${chosen.name} is booked. The care team has been told.`)
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to book the service.')
+      const fields = serverFieldErrors(cause, { requestedSchedule: 'schedule', specialInstructions: 'note' })
+      if (BOOKING_TIME_CODES.has(problemCode(cause) ?? '') && cause instanceof ApiError) setFieldErrors({ schedule: cause.message })
+      else if (fields.schedule || fields.note) setFieldErrors(fields)
+      else setError(cause instanceof ApiError ? cause.message : 'Unable to book the service.')
     } finally {
       setBusy(false)
     }
@@ -77,7 +83,7 @@ export function FamilyValueAddedRequestForm({
     <p className={styles.muted}>Booking it is your approval: it goes straight to the care team. Ask at least {MIN_NOTICE_HOURS} hours ahead.</p>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {sent && <p role="status">{sent}</p>}
-    <form className={styles.form} onSubmit={(event) => void submit(event)}>
+    <form className={styles.form} noValidate onSubmit={(event) => void submit(event)}>
       <label>
         <span>Service</span>
         <select value={chosen?.id ?? ''} disabled={busy} onChange={(event) => setServiceId(Number(event.target.value))}>
@@ -85,15 +91,22 @@ export function FamilyValueAddedRequestForm({
         </select>
       </label>
       {chosen?.description && <p className={styles.muted}>{chosen.description} · about {chosen.durationMinutes / 60} h</p>}
-      <label>
-        <span>Date and time</span>
-        <input type="datetime-local" min={earliestRequestTime()} value={schedule} disabled={busy}
-          onChange={(event) => setSchedule(event.target.value)} />
-      </label>
-      <label>
-        <span>Instructions for the caregiver (optional)</span>
-        <textarea value={note} maxLength={1000} disabled={busy} onChange={(event) => setNote(event.target.value)} />
-      </label>
+      <div className={styles.formField}>
+        <label htmlFor={`${id}-schedule`}>Date and time</label>
+        <input id={`${id}-schedule`} type="datetime-local" {...bookingWindow()} step={STEP_MINUTES * 60} value={schedule}
+          disabled={busy} aria-invalid={!!fieldErrors.schedule}
+          aria-describedby={[fieldErrors.schedule && `${id}-schedule-error`, chosen && `${id}-schedule-hint`].filter(Boolean).join(' ') || undefined}
+          onChange={(event) => { setSchedule(event.target.value); setFieldErrors((current) => ({ ...current, schedule: undefined })) }} />
+        {fieldErrors.schedule && <span id={`${id}-schedule-error`} className={styles.fieldError}>{fieldErrors.schedule}</span>}
+        {chosen && <span id={`${id}-schedule-hint`} className={styles.fieldHint}>{bookingHint(chosen.durationMinutes)}</span>}
+      </div>
+      <div className={styles.formField}>
+        <label htmlFor={`${id}-note`}>Instructions for the caregiver (optional)</label>
+        <textarea id={`${id}-note`} value={note} maxLength={1000} disabled={busy} aria-invalid={!!fieldErrors.note}
+          aria-describedby={fieldErrors.note ? `${id}-note-error` : undefined}
+          onChange={(event) => { setNote(event.target.value); setFieldErrors((current) => ({ ...current, note: undefined })) }} />
+        {fieldErrors.note && <span id={`${id}-note-error`} className={styles.fieldError}>{fieldErrors.note}</span>}
+      </div>
       <div className={styles.actions}>
         <button type="submit" disabled={busy}>{busy ? 'Booking...' : 'Book service'}</button>
       </div>

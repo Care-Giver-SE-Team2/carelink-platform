@@ -36,6 +36,7 @@ Implemented definitions are in `docs/api/openapi.yaml`; superseded draft operati
 - GET `/api/caregivers/me/incidents`: own page, optional visit filter, size 1–50.
 - GET `/api/caregivers/me/incidents/{id}`: own safe receipt; foreign/missing uniformly unavailable.
 - POST `/api/visits/{visitId}/check-in`: command identity and GPS/manual location.
+- POST `/api/visits/{visitId}/check-out`: command identity only; server departure time and COMPLETED, independent of task/evidence completeness and elder/manager approval. See [CG05 handoff](cg05-check-out-handoff.md).
 - POST `/api/visits/{visitId}/tasks/{taskId}/complete`: command identity, DONE/SKIPPED/REFUSED and bounded text.
 - GET `/api/visits/{visitId}/tasks`: server-selected caregiver or original FAMILY projection. A projection query cannot override role.
 - GET work-pack: backward-compatible `execution` context (server time/window, allowed actions, checked times, location source).
@@ -48,4 +49,4 @@ Run frontend lint/coverage/build, backend `./mvnw clean verify -Pintegration`, a
 
 For a visual demo, use the isolated local CareLink demo and separate caregiver/manager/family sessions. Create current-day visits through normal plan/assignment operations; old slice-1 dates are not an execution demo. Read the manual steps in the external 002/003 plans and record observed results, not guessed screenshots.
 
-Not included in CG04/CG03 basic execution: vital signs, evidence upload, check-out/CG05, independent elder confirmation, restoring an exception visit, offline commands or new notification channels. SYS03 assigned-caregiver missed-check-in scanning is delivered in the subsequent batch; see [SYS03 handoff](sys03-missed-check-in-handoff.md). In-app notification rows are not proof of SMS/email delivery.
+Later delivered slices add [CG03 health records](cg03-health-records-handoff.md), [CG05 self check-out](cg05-check-out-handoff.md), and [non-blocking SYS03](sys03-missed-check-in-handoff.md), including strictly proven legacy SYS03-only check-in compatibility. Still excluded here: evidence upload, general exception recovery, offline commands or new completion notification channels. Existing elder confirmation is a separate downstream step, not check-out approval. In-app notification rows are not proof of SMS/email delivery.

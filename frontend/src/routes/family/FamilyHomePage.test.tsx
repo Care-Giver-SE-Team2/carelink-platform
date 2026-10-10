@@ -46,6 +46,9 @@ function installApi(items: FamilyVisit[], override?: (url: URL) => Response | un
     if (url.pathname === '/api/caregivers/31') return Promise.resolve(json(caregiver))
     if (url.pathname === '/api/caregivers/31/credentials') return Promise.resolve(json(credentials))
     if (url.pathname === '/api/visits/101/tasks') return Promise.resolve(json(tasks))
+    if (['/api/roster-changes', '/api/spot-checks', '/api/family/value-added-service-requests'].includes(url.pathname)) {
+      return Promise.resolve(json([]))
+    }
     throw new Error(`Unexpected API request: ${path}`)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -110,6 +113,44 @@ describe('Family home', () => {
     expect(within(week).getByRole('link', { name: 'read →' })).toHaveAttribute('href', '/family/reports/weekly?elderId=21')
     expect(new URL(fetchMock.mock.calls.find(([path]) => path.startsWith('/api/visits?'))![0], 'http://localhost').searchParams.get('dateFrom'))
       .toBe('2026-09-28')
+  })
+
+  it('lists what waits on the family first, soonest reply first, each opening where it is answered', async () => {
+    const change = {
+      id: 1, elderId: 21, elderName: 'Tan Mei', visitStart: '2026-09-30T10:00', visitEnd: null, usualCaregiverName: 'Siti Rahmah',
+      status: 'AWAITING_FAMILY', respondBy: '2026-09-29T18:00', suggestedCaregiverId: null, options: [], outcome: null,
+      decidedBy: null, decidedAt: null, assignedCaregiver: null, rescheduledStart: null, note: null,
+    }
+    installApi([visit], (url) => {
+      if (url.pathname === '/api/roster-changes') {
+        return json([{ ...change, id: 2, respondBy: '2026-09-30T08:00' }, change, { ...change, id: 3, status: 'SETTLED' }])
+      }
+      if (url.pathname === '/api/family/value-added-service-requests' && url.searchParams.get('elderId') === '21') {
+        return json([{ id: 5, elderId: 21, valueAddedServiceId: 1, serviceName: 'Hospital escort', requestedByFamilyMemberId: null,
+          approvingFamilyMemberId: null, visitId: null, requestedSchedule: '2026-10-02T09:00:00', specialInstructions: null,
+          status: 'PENDING_APPROVAL', decidedAt: null, createdAt: '2026-09-27T09:00:00' }])
+      }
+      return undefined
+    })
+    openFamily('/family/home')
+
+    const answer = (await screen.findByRole('heading', { name: 'Needs your answer · 3' })).parentElement!
+    const rows = within(answer).getAllByRole('link')
+    expect(rows.map((row) => row.getAttribute('href'))).toEqual(['/family/changes', '/family/changes', '/family/extra-services'])
+    expect(rows[0]).toHaveTextContent('Reply by Tue 29 Sep, 18:00')
+    expect(rows[1]).toHaveTextContent('Reply by Wed 30 Sep, 08:00')
+    expect(rows[0]).toHaveTextContent("Siti Rahmah can't come on Wed 30 Sep, 10:00")
+    expect(rows[2]).toHaveTextContent('Approve Hospital escort?')
+    expect(rows[2]).toHaveTextContent('Requested for Fri 2 Oct, 09:00')
+    // Two elders are linked, so each change names whose visit it is.
+    expect(rows[0]).toHaveTextContent('Tan Mei · ')
+  })
+
+  it('shows no answer card when nothing is waiting', async () => {
+    installApi([visit])
+    openFamily('/family/home')
+    await screen.findByRole('heading', { name: 'Happening now' })
+    expect(screen.queryByRole('heading', { name: /Needs your answer/ })).not.toBeInTheDocument()
   })
 
   it('shows the next visit when none is under way, without task counts', async () => {

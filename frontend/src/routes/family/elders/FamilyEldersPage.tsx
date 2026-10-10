@@ -14,8 +14,9 @@ export function FamilyEldersPage() {
     </header>
     <div className={styles.content}>
       <div className={styles.actions}>
-        <Link to="/family/family-bindings">Review binding requests →</Link>
-        <button type="button" onClick={() => void elders.refetch()} disabled={elders.isFetching}>Refresh</button>
+        {/* With no elders yet, the empty card below carries the only link there. */}
+        {!!elders.data?.length && <Link to="/family/family-bindings">Review binding requests →</Link>}
+        <button type="button" className={styles.refresh} onClick={() => void elders.refetch()} disabled={elders.isFetching}>Refresh</button>
       </div>
       {elders.isPending ? <p role="status">Loading your elders…</p> : elders.isError ? <div className={styles.card} role="alert">
         <p>Unable to load your elders. Please try again.</p>

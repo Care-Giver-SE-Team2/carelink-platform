@@ -9,25 +9,30 @@ import org.hibernate.validator.constraints.CodePointLength;
 
 import sg.nus.carelink.profile.domain.model.Elder;
 import sg.nus.carelink.profile.domain.model.ElderBasicDetails;
+import sg.nus.carelink.shared.validation.OnOrAfter;
+import sg.nus.carelink.shared.validation.SingaporeFormats;
 
 /** Full replacement of family-editable details only; null optional fields clear their values. */
 public record FamilyElderUpdateRequest(
-        @NotBlank @CodePointLength(max = 100) String fullName,
+        @NotBlank @CodePointLength(max = 100)
+        @Pattern(regexp = SingaporeFormats.PERSON_NAME, message = SingaporeFormats.PERSON_NAME_MESSAGE) String fullName,
         Elder.Gender gender,
-        @PastOrPresent LocalDate dateOfBirth,
-        @CodePointLength(max = 20) String phone,
+        @PastOrPresent(message = "Enter a date that is not in the future")
+        @OnOrAfter(value = "1900-01-01", message = "Enter a date from 1900 onwards") LocalDate dateOfBirth,
+        @Pattern(regexp = SingaporeFormats.PHONE, message = SingaporeFormats.PHONE_MESSAGE) String phone,
         @CodePointLength(max = 255) String address,
-        @Pattern(regexp = "[0-9]{6}") String postalCode,
-        @CodePointLength(max = 100) String preferredDialects,
+        @Pattern(regexp = SingaporeFormats.POSTAL_CODE, message = SingaporeFormats.POSTAL_CODE_MESSAGE) String postalCode,
+        @CodePointLength(max = 100)
+        @Pattern(regexp = SingaporeFormats.DIALECT_LIST, message = SingaporeFormats.DIALECT_LIST_MESSAGE) String preferredDialects,
         Boolean livesAlone,
         Elder.MobilityLevel mobilityLevel) {
 
     public FamilyElderUpdateRequest {
-        fullName = clean(fullName);
-        phone = clean(phone);
+        fullName = SingaporeFormats.normalizeName(fullName);
+        phone = SingaporeFormats.normalizePhone(phone);
         address = clean(address);
         postalCode = clean(postalCode);
-        preferredDialects = clean(preferredDialects);
+        preferredDialects = SingaporeFormats.normalizeDialects(preferredDialects);
     }
 
     public ElderBasicDetails toDetails() {

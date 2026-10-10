@@ -26,8 +26,17 @@ export default function ExecutionPanel({ pack, command }: { pack: WorkPack; comm
         </fieldset>
       </form> : <p>Check-in is blocked: {state.blockedReason === 'VISIT_CHECK_IN_WINDOW' ? 'outside the time window' : state.blockedReason === 'VISIT_TASKS_REQUIRED' ? 'no valid plan task assigned — contact your manager' : 'current visit state or service strategy does not permit check-in'}.</p>}
     </>}
-    {pack.visit.status === 'EXCEPTION' && <p className={styles.readOnly}>Execution paused. Reporting or resolving an incident does not automatically resume this visit.</p>}
-    <p className={styles.readOnly}>Task results are not check-out. Evidence upload, check-out and elder confirmation are not included in this delivery.</p>
+    {state.checkedOutAt && <p>Checked out: {visitTime(state.checkedOutAt)} (SGT) · Completed</p>}
+    {state.allowedActions.includes('CHECK_OUT') && <>
+      <p>Check out records the end of your service. No manager or elder approval is required.</p>
+      {pack.tasks.some(task => task.status === 'PENDING') && <p className={styles.readOnly}>Some tasks are still pending. You may check out; their recorded status will not change.</p>}
+      {pack.requiredEvidenceKinds.length > 0 && <p className={styles.readOnly}>Evidence cannot be uploaded or verified here yet. Missing evidence does not prevent check-out.</p>}
+      <p className={styles.readOnly}>Save any task or health drafts you want to keep before checking out. New task results and health readings cannot be submitted after check-out.</p>
+      <button className={styles.button} disabled={command.blocked} onClick={() => command.finishVisit(pack.visit.id, pack.visit.version)}>Check out</button>
+    </>}
+    {pack.visit.status === 'EXCEPTION' && !check && <p className={styles.readOnly}>Execution paused. Reporting or resolving an incident does not automatically resume this visit.</p>}
+    {pack.visit.status === 'EXCEPTION' && check && <p className={styles.readOnly}>This previous missed-check-in alert does not prevent check-in. The alert remains recorded.</p>}
+    <p className={styles.readOnly}>Task results are not check-out. Evidence upload is not included here; elder confirmation is a separate step after service completion.</p>
   </section>
 }
 export function ExecutionTasks({ pack, command }: { pack: WorkPack; command: ReturnType<typeof useExecutionCommands> }) {

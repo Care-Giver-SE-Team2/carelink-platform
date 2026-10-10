@@ -46,4 +46,9 @@ class CarePlanRepositoryAdapter implements CarePlanRepository {
 	public CarePlan save(CarePlan carePlan) {
 		return CarePlanMapper.toDomain(jpa.save(CarePlanMapper.toEntity(carePlan)));
 	}
+
+	@Override
+	public void deleteById(Long id) {
+		jpa.deleteById(id);
+	}
 }

@@ -65,7 +65,8 @@ describe('FM09 caregiver review and renewal decision', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Submit review' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose a caregiver and review period.')
+    expect(screen.getByText('Choose the first day of the period.')).toBeInTheDocument()
+    expect(screen.getByText('Choose the last day of the period.')).toBeInTheDocument()
     expect(mockedCreate).not.toHaveBeenCalled()
   })
 

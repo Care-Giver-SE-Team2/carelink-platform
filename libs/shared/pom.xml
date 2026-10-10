@@ -5,7 +5,7 @@
 	<!--
 	  What every service shares with core, in core's own packages (sg.nus.carelink.shared): the error
 	  types and the exception handler that turns them into answers, the request context (request id,
-	  user and access log), the access audit, and the roles. A service whose main class is in
+	  user and access log), the access audit, the roles, and the validation constraints. A service whose main class is in
 	  sg.nus.carelink picks these up by component scanning, exactly as core does.
 	-->
 	<parent>
@@ -27,6 +27,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<!-- Bean Validation constraints the request bodies use (shared.validation) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 		<!-- 403 answers and the signed-in user in the request context -->
 		<dependency>

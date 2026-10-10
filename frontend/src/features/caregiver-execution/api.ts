@@ -1,6 +1,11 @@
 import { api } from '../../shared/api/client'
 export type CommandResult = { visitId: number; visitVersion: number; savedState: string | null; taskId: number | null; replayed: boolean }
 export type CommandIdentity = { expectedVersion: number; clientRequestId: string }
+export type CheckOutResult = { visitId: number; visitVersion: number; savedState: string; checkedInAt: string; checkedOutAt: string; replayed: boolean }
+export async function checkOut(id: number, input: CommandIdentity, signal?: AbortSignal) {
+  await api('/auth/csrf', { signal })
+  return api<CheckOutResult>(`/visits/${id}/check-out`, { method: 'POST', body: JSON.stringify(input), signal })
+}
 export type CheckInInput = CommandIdentity & { locationSource: 'GPS' | 'MANUAL_LOCATION_NOTE'; latitude?: number; longitude?: number; accuracy?: number; locationNote?: string; clientCapturedAt?: string }
 export type TaskInput = CommandIdentity & { status: 'DONE' | 'SKIPPED' | 'REFUSED'; outcome: string; caregiverNote: string }
 async function write(path: string, input: unknown, signal?: AbortSignal) {

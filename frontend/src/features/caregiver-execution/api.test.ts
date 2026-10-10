@@ -1,7 +1,16 @@
 import { expect,it,vi } from 'vitest'
 import { api } from '../../shared/api/client'
-import { checkIn,completeTask,getHealthRecords,saveHealthRecord } from './api'
+import { checkIn,checkOut,completeTask,getHealthRecords,saveHealthRecord } from './api'
 vi.mock('../../shared/api/client',()=>({api:vi.fn()}))
+it('checks out once with CSRF and only the immutable command identity',async()=>{
+  vi.clearAllMocks();const signal=new AbortController().signal
+  const input={expectedVersion:7,clientRequestId:'checkout-key'}
+  await checkOut(3,input,signal)
+  expect(api).toHaveBeenNthCalledWith(1,'/auth/csrf',{signal})
+  expect(api).toHaveBeenNthCalledWith(2,'/visits/3/check-out',{method:'POST',body:JSON.stringify(input),signal})
+  expect(api).toHaveBeenCalledTimes(2)
+  vi.clearAllMocks()
+})
 it('sends caregiver commands once with CSRF bootstrap and the exact visit/task route',async()=>{
   const signal=new AbortController().signal
   const input={expectedVersion:0,clientRequestId:'uuid',locationSource:'MANUAL_LOCATION_NOTE' as const,locationNote:'doorway'}

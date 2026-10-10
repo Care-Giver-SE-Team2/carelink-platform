@@ -18,6 +18,8 @@ public record CarePlanNode(
 		Long id,
 		Long carePlanId,
 		String groupName,
+		/** The CareActivity code this task delivers; null for a task outside the catalog. */
+		String activityCode,
 		String name,
 		String scheduleDays,
 		BigDecimal durationPerVisit,

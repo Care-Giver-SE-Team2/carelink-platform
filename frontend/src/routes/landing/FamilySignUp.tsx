@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { initialiseCsrf, signInWithSession } from '../../features/auth/api'
 import { ApiError } from '../../shared/api/client'
 import { registerFamily } from '../../shared/api/profile'
+import { serverFieldErrors } from '../../shared/validation/serverErrors'
+import { normalizeName, normalizeSgPhone, personNameError, phoneError } from '../../shared/validation/sg'
 import styles from './Landing.module.css'
 import signUpStyles from './FamilySignUp.module.css'
 
@@ -14,10 +16,8 @@ type Errors = Partial<Record<keyof Values, string>>
 /** Mirrors the format checks on profile.controller.dto.FamilyRegistrationRequest. */
 function validate(values: Values): Errors {
   const errors: Errors = {}
-  const fullName = values.fullName.trim()
-  if (!fullName) errors.fullName = 'Enter your full name.'
-  else if ([...fullName].length > 100) errors.fullName = 'Use 100 characters or fewer.'
-  if (!/^\+?[0-9 ()-]{6,20}$/.test(values.phone.trim())) errors.phone = 'Enter a phone number.'
+  errors.fullName = personNameError(values.fullName, 'Enter your full name.')
+  errors.phone = values.phone.trim() ? phoneError(values.phone, { mobile: true }) : 'Enter your mobile number.'
   if (!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(values.username))
     errors.username = 'Use 3 to 64 lower-case letters, digits, dots, dashes or underscores.'
   if (values.password.length < 8) errors.password = 'Use at least 8 characters.'
@@ -28,7 +28,8 @@ function validate(values: Values): Errors {
 /**
  * Public sign-up for a family member applying for care for an elder. Reached from the landing
  * page's "No account yet?" card, so it sits outside every RequireRole. Creates a FAMILY account,
- * signs in with it, and continues to the care application form.
+ * signs in with it, and continues to family bindings: the elder links the account by its username,
+ * and only once that is accepted can the family apply for care services.
  */
 export default function FamilySignUp() {
   const navigate = useNavigate()
@@ -58,15 +59,17 @@ export default function FamilySignUp() {
       await registerFamily({
         username: values.username,
         password: values.password,
-        fullName: values.fullName.trim(),
-        phone: values.phone.trim(),
+        fullName: normalizeName(values.fullName),
+        phone: normalizeSgPhone(values.phone) ?? values.phone.trim(),
       })
     } catch (failure) {
       setBusy(false)
       if (failure instanceof ApiError && failure.status === 409) {
         setErrors({ username: 'That username is taken. Choose another.' })
       } else if (failure instanceof ApiError && failure.status === 400) {
-        setError('Please check your details and try again.')
+        const fields = serverFieldErrors(failure)
+        if (Object.keys(fields).length) setErrors(fields)
+        else setError('Please check your details and try again.')
       } else {
         setError('Unable to create your account. Check your connection and try again.')
       }
@@ -75,7 +78,7 @@ export default function FamilySignUp() {
 
     try {
       await signInWithSession({ username: values.username, password: values.password })
-      navigate('/family/intake/new', { replace: true })
+      navigate('/family/family-bindings', { replace: true })
     } catch {
       setBusy(false)
       setError('Your account was created, but signing in failed. Sign in from the home page to continue.')
@@ -121,19 +124,19 @@ export default function FamilySignUp() {
               <li>
                 <span className={signUpStyles.stepTitle}>Create your family account</span>
                 <span className={signUpStyles.stepText}>
-                  You use it to send the application and follow its progress.
+                  You use it to request care and follow its progress.
                 </span>
               </li>
               <li>
-                <span className={signUpStyles.stepTitle}>Tell us about your loved one</span>
+                <span className={signUpStyles.stepTitle}>Link to your loved one</span>
                 <span className={signUpStyles.stepText}>
-                  Their address, mobility and the care they need. Takes about ten minutes.
+                  Give them your username. They send you a request from their CareLink account, and you accept it.
                 </span>
               </li>
               <li>
-                <span className={signUpStyles.stepTitle}>Hear back from a care manager</span>
+                <span className={signUpStyles.stepTitle}>Request care services</span>
                 <span className={signUpStyles.stepText}>
-                  A care manager replies within two working days.
+                  Choose the care they need, and a care manager plans it.
                 </span>
               </li>
             </ol>
@@ -142,7 +145,7 @@ export default function FamilySignUp() {
 
         <form className={styles.formColumn} onSubmit={handleSubmit} aria-busy={busy} noValidate>
           <h2 className={styles.formTitle}>Create your family account</h2>
-          <p className={styles.formSubtitle}>Step 1 of 2. Next: the care application.</p>
+          <p className={styles.formSubtitle}>Step 1 of 3. Next: link to your loved one.</p>
 
           <div className={styles.fields}>
             <div>
@@ -170,6 +173,7 @@ export default function FamilySignUp() {
                 type="tel"
                 autoComplete="tel"
                 inputMode="tel"
+                maxLength={15}
                 placeholder="9123 4567"
                 className={styles.textInput}
                 onChange={(event) => update('phone', event.target.value)}

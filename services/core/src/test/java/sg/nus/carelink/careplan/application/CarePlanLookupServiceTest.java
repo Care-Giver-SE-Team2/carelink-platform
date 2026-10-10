@@ -140,7 +140,7 @@ class CarePlanLookupServiceTest {
 
 	private static CarePlanNode node(Long carePlanId, String scheduleDays) {
 		return new CarePlanNode(
-				null, carePlanId, null, "Task", scheduleDays, new BigDecimal("1.0"), new BigDecimal("2.0"),
+				null, carePlanId, null, null, "Task", scheduleDays, new BigDecimal("1.0"), new BigDecimal("2.0"),
 				CarePlanNode.EvidenceType.NONE, 1, LocalDateTime.of(2026, 9, 6, 10, 8),
 				LocalDateTime.of(2026, 9, 6, 10, 8), List.of());
 	}

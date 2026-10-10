@@ -4,12 +4,17 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sg.nus.carelink.profile.domain.model.ServiceApplication;
 import sg.nus.carelink.profile.domain.model.ServiceApplicationPage;
 import sg.nus.carelink.profile.domain.repository.ElderRepository;
 import sg.nus.carelink.profile.domain.repository.ServiceApplicationRepository;
+import sg.nus.carelink.profile.domain.service.ServiceApplicationProgress.PlanVersion;
+import sg.nus.carelink.profile.domain.service.ServiceApplicationProgress.Progress;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 
 /** Family submission and reads only. Management of the submitted request is a separate use case. */
@@ -21,14 +26,29 @@ public class FamilyServiceApplicationService {
     private final ElderRepository elders;
     private final ServiceApplicationRepository applications;
     private final Clock clock;
+    private final CareRequestProgress progress;
 
-    public FamilyServiceApplicationService(FamilyIdentityQuery identity, FamilyAccessQuery access,
-            ElderRepository elders, ServiceApplicationRepository applications, Clock clock) {
+    FamilyServiceApplicationService(FamilyIdentityQuery identity, FamilyAccessQuery access,
+            ElderRepository elders, ServiceApplicationRepository applications, Clock clock,
+            CareRequestProgress progress) {
         this.identity = identity;
         this.access = access;
         this.elders = elders;
         this.applications = applications;
         this.clock = clock;
+        this.progress = progress;
+    }
+
+    /**
+     * How far the care plan has answered each application, by id. Call only with applications
+     * this family was allowed to read (list or get), since it reads their elders' plans.
+     */
+    public Map<Long, Progress> progress(List<ServiceApplication> readable) {
+        Map<Long, List<PlanVersion>> versionsByElder = readable.stream()
+                .map(ServiceApplication::elderId).distinct()
+                .collect(Collectors.toMap(Function.identity(), progress::versions));
+        return readable.stream().collect(Collectors.toMap(ServiceApplication::id,
+                application -> progress.of(application, versionsByElder.get(application.elderId()))));
     }
 
     @Transactional

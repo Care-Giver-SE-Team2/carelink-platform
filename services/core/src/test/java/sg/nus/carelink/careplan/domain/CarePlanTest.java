@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Test;
 
+import sg.nus.carelink.careplan.domain.model.CareActivity;
 import sg.nus.carelink.careplan.domain.model.CarePlan;
 import sg.nus.carelink.careplan.domain.model.EffectivePeriod;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
@@ -184,5 +185,42 @@ class CarePlanTest {
 
 		assertThat(draft.effectivePeriod(null)).isEmpty();
 		assertThat(legacy.effectivePeriod(null)).isEmpty();
+	}
+
+	@Test
+	void revisingADraftKeepsItADraftWithTheStartDateSoFar() {
+		CarePlan draft = CarePlan.startDraft(10L, 99L, null);
+
+		assertThat(draft.reviseDraft(null).startDate()).isNull();
+		CarePlan revised = draft.reviseDraft(LocalDate.of(2026, 11, 2));
+		assertThat(revised.status()).isEqualTo(CarePlan.Status.DRAFT);
+		assertThat(revised.startDate()).isEqualTo(LocalDate.of(2026, 11, 2));
+		assertThat(revised.version()).isEqualTo(draft.version());
+	}
+
+	@Test
+	void onlyADraftCanBeRevisedOrDiscarded() {
+		CarePlan published = CarePlan.startDraft(10L, 99L, null).publish(LocalDate.of(2026, 4, 1), BigDecimal.ONE);
+
+		assertThatThrownBy(() -> published.reviseDraft(null))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_NOT_DRAFT");
+		assertThatThrownBy(published::discard)
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_NOT_DRAFT");
+		CarePlan.startDraft(10L, 99L, null).discard();
+	}
+
+	@Test
+	void aTaskMayNameACatalogActivityOrNone() {
+		CareActivity.requireKnownOrAbsent("BATHING");
+		CareActivity.requireKnownOrAbsent(null);
+
+		assertThatThrownBy(() -> CareActivity.requireKnownOrAbsent("Bathing assistance"))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_UNKNOWN_ACTIVITY");
 	}
 }

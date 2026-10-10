@@ -5,15 +5,19 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import sg.nus.carelink.careplan.application.CarePlanService;
@@ -23,6 +27,7 @@ import sg.nus.carelink.careplan.controller.dto.CarePlanNodeResponse;
 import sg.nus.carelink.careplan.controller.dto.CreateCarePlanRequest;
 import sg.nus.carelink.careplan.controller.dto.PlanNodeRequest;
 import sg.nus.carelink.careplan.controller.dto.PublishCarePlanRequest;
+import sg.nus.carelink.careplan.controller.dto.SaveCarePlanDraftRequest;
 import sg.nus.carelink.careplan.controller.dto.StopCarePlanRequest;
 import sg.nus.carelink.careplan.domain.model.CarePlan;
 import sg.nus.carelink.identity.application.UserDirectory;
@@ -82,6 +87,22 @@ public class CarePlanController {
 		return ResponseEntity.created(URI.create("/api/care-plans/" + created.id())).body(created);
 	}
 
+	/** Saves the editor's work in progress on a draft; nothing is scheduled from it. */
+	@PutMapping("/{id}/draft")
+	@PreAuthorize("hasRole('MANAGER')")
+	public CarePlan saveDraft(@PathVariable Long id, @Valid @RequestBody SaveCarePlanDraftRequest request) {
+		return service.saveDraft(id, request.startDate(),
+				request.nodes().stream().map(CarePlanController::toInput).toList());
+	}
+
+	/** Throws a draft away; an issued version is refused (409) — stop it instead. */
+	@DeleteMapping("/{id}")
+	@PreAuthorize("hasRole('MANAGER')")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void discardDraft(@PathVariable Long id) {
+		service.discardDraft(id);
+	}
+
 	@PostMapping("/{id}/publish")
 	@PreAuthorize("hasRole('MANAGER')")
 	public CarePlan publish(@PathVariable Long id, @Valid @RequestBody PublishCarePlanRequest request) {
@@ -104,6 +125,7 @@ public class CarePlanController {
 	private static PlanNodeInput toInput(PlanNodeRequest request) {
 		return new PlanNodeInput(
 				request.groupName(),
+				request.activityCode(),
 				request.name(),
 				request.visits() == null
 						? List.of()

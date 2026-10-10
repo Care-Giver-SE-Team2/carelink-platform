@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../../../shared/api/client'
 import { useFamilyElders } from '../../../features/family-account/useFamilyAccount'
-import {
-  decideValueAddedServiceRequest,
-  fetchFamilyValueAddedServiceRequests,
-} from '../../../features/value-added-services/api'
+import { decideValueAddedServiceRequest } from '../../../features/value-added-services/api'
 import type { ValueAddedServiceRequest } from '../../../features/value-added-services/types'
+import {
+  familyRequestsKey,
+  useFamilyValueAddedRequests,
+} from '../../../features/value-added-services/useValueAddedServiceQueries'
 import { useSelectedElder } from '../components/selectedElder'
 import { FamilyValueAddedRequestForm } from './FamilyValueAddedRequestForm'
 import styles from './FamilyValueAddedServices.module.css'
@@ -14,31 +16,28 @@ export function FamilyValueAddedServicesPage() {
   const elders = useFamilyElders()
   const { elderId } = useSelectedElder()
   const selectedElderId = elderId ?? elders.data?.[0]?.id ?? null
-  const [requests, setRequests] = useState<ValueAddedServiceRequest[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const client = useQueryClient()
+  const query = useFamilyValueAddedRequests(selectedElderId)
+  const requests = query.data ?? []
+  const loading = query.isLoading
+  const [decideError, setDecideError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
+  const loadError = query.error ? (query.error instanceof ApiError ? query.error.message : 'Unable to load service requests.') : null
+  const error = decideError ?? loadError
 
-  useEffect(() => {
-    if (selectedElderId === null) return
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    fetchFamilyValueAddedServiceRequests(selectedElderId)
-      .then((items) => !cancelled && setRequests(items))
-      .catch((cause) => !cancelled && setError(cause instanceof ApiError ? cause.message : 'Unable to load service requests.'))
-      .finally(() => !cancelled && setLoading(false))
-    return () => { cancelled = true }
-  }, [selectedElderId])
+  // Patching the cached list keeps the navigation's waiting count in step with this page.
+  function setRequests(update: (current: ValueAddedServiceRequest[]) => ValueAddedServiceRequest[]) {
+    client.setQueryData<ValueAddedServiceRequest[]>(familyRequestsKey(selectedElderId), (current) => update(current ?? []))
+  }
 
   async function decide(id: number, decision: 'APPROVED' | 'REJECTED') {
     setBusyId(id)
-    setError(null)
+    setDecideError(null)
     try {
       const updated = await decideValueAddedServiceRequest(id, decision)
       setRequests((current) => current.map((item) => item.id === id ? updated : item))
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to record the decision.')
+      setDecideError(cause instanceof ApiError ? cause.message : 'Unable to record the decision.')
     } finally {
       setBusyId(null)
     }

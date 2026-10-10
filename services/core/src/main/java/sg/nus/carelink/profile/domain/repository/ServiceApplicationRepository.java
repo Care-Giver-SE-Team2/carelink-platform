@@ -1,5 +1,6 @@
 package sg.nus.carelink.profile.domain.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import sg.nus.carelink.profile.domain.model.ServiceApplication;
@@ -10,4 +11,6 @@ public interface ServiceApplicationRepository {
     ServiceApplication save(ServiceApplication application);
     Optional<ServiceApplication> findById(Long id);
     ServiceApplicationPage findForApplicant(Long familyId, Set<Long> readableElderIds, int page, int size);
+    /** Every service application made for this elder, by any family member, newest first. */
+    List<ServiceApplication> findByElderId(Long elderId);
 }

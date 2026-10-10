@@ -24,7 +24,7 @@ import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.json.JsonMapper;
 import sg.nus.carelink.testsupport.SharedMySql;
 
-/** Family sign-up through the real security filters and MySQL: sign up, sign in, then apply for care. */
+/** Family sign-up through the real security filters and MySQL: sign up, then sign in with family access. */
 @SpringBootTest
 @AutoConfigureMockMvc
 class FamilyRegistrationApiIT {
@@ -53,7 +53,7 @@ class FamilyRegistrationApiIT {
 	}
 
 	@Test
-	void anAnonymousVisitorCanSignUpSignInAndApplyForCare() throws Exception {
+	void anAnonymousVisitorCanSignUpAndSignInWithFamilyAccess() throws Exception {
 		Cookie token = csrf();
 		mvc.perform(post("/api/family-registrations").cookie(token).header("X-XSRF-TOKEN", token.getValue())
 				.contentType(MediaType.APPLICATION_JSON).content(SIGN_UP))
@@ -63,7 +63,7 @@ class FamilyRegistrationApiIT {
 		assertThat(jdbc.queryForObject("SELECT role FROM user_role r JOIN app_user u ON u.id = r.user_id "
 				+ "WHERE u.username = 'lim.family'", String.class)).isEqualTo("FAMILY");
 		assertThat(jdbc.queryForObject("SELECT phone FROM family_member f JOIN app_user u ON u.id = f.user_id "
-				+ "WHERE u.username = 'lim.family'", String.class)).isEqualTo("91234567");
+				+ "WHERE u.username = 'lim.family'", String.class)).isEqualTo("+6591234567");
 
 		var login = mvc.perform(post("/api/auth/login").cookie(token).header("X-XSRF-TOKEN", token.getValue())
 				.contentType(MediaType.APPLICATION_JSON)
@@ -72,15 +72,11 @@ class FamilyRegistrationApiIT {
 				.andExpect(jsonPath("$.roles[0]").value("FAMILY"))
 				.andReturn();
 		var session = (MockHttpSession) login.getRequest().getSession(false);
-		Cookie signedInToken = csrf(session);
 
-		mvc.perform(post("/api/intake-applications").session(session).cookie(signedInToken)
-				.header("X-XSRF-TOKEN", signedInToken.getValue()).contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"targetElderName":"Lim Ah Kow","targetAddress":"12 Example Road","postalCode":"123456"}
-						"""))
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.status").value("SUBMITTED"));
+		// No elder has linked the new account yet, so there is nothing to apply for, but the family pages open.
+		mvc.perform(get("/api/family/service-applications").session(session))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.totalElements").value(0));
 	}
 
 	@Test
@@ -106,11 +102,6 @@ class FamilyRegistrationApiIT {
 
 	private Cookie csrf() throws Exception {
 		return mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk())
-				.andReturn().getResponse().getCookie("XSRF-TOKEN");
-	}
-
-	private Cookie csrf(MockHttpSession session) throws Exception {
-		return mvc.perform(get("/api/auth/csrf").session(session)).andExpect(status().isOk())
 				.andReturn().getResponse().getCookie("XSRF-TOKEN");
 	}
 }

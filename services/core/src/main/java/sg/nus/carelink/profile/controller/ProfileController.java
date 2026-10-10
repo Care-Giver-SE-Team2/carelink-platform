@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import sg.nus.carelink.profile.application.ElderCareRequest;
+import sg.nus.carelink.profile.application.ElderCareRequestService;
 import sg.nus.carelink.profile.application.ElderFamilyContact;
 import sg.nus.carelink.profile.application.ElderFamilyContactService;
 import sg.nus.carelink.profile.application.ProfileService;
@@ -27,12 +29,14 @@ public class ProfileController {
 	private final ProfileService service;
 	private final FamilyElderQueryService familyElders;
 	private final ElderFamilyContactService familyContacts;
+	private final ElderCareRequestService careRequests;
 
 	public ProfileController(ProfileService service, FamilyElderQueryService familyElders,
-			ElderFamilyContactService familyContacts) {
+			ElderFamilyContactService familyContacts, ElderCareRequestService careRequests) {
 		this.service = service;
 		this.familyElders = familyElders;
 		this.familyContacts = familyContacts;
+		this.careRequests = careRequests;
 	}
 
 	@GetMapping("/{id}")
@@ -46,6 +50,13 @@ public class ProfileController {
 	@PreAuthorize("hasRole('MANAGER')")
 	public ResponseEntity<List<ElderFamilyContact>> family(@PathVariable Long id) {
 		return ResponseEntity.of(familyContacts.listForElder(id));
+	}
+
+	/** The care the elder's family has applied for, newest first — the starting point of the care plan. */
+	@GetMapping("/{id}/care-requests")
+	@PreAuthorize("hasRole('MANAGER')")
+	public List<ElderCareRequest> careRequests(@PathVariable Long id) {
+		return careRequests.listForElder(id);
 	}
 
 	/**

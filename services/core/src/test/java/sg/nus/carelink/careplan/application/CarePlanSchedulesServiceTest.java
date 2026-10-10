@@ -34,7 +34,7 @@ class CarePlanSchedulesServiceTest {
 				new ScheduledVisit(DayOfWeek.MONDAY, EIGHT, 30), new ScheduledVisit(DayOfWeek.WEDNESDAY, EIGHT, 45)));
 
 		assertThat(schedules.forElder(42L)).containsExactly(new PlanSchedule(plan.id(), 42L, 1, OCT_1, null,
-				List.of(new Task(bathing.id(), "Personal care", "Bathing assistance", List.of(
+				List.of(new Task(bathing.id(), "Personal care", "BATHING", "Bathing assistance", List.of(
 						new Slot(DayOfWeek.MONDAY, EIGHT, 30), new Slot(DayOfWeek.WEDNESDAY, EIGHT, 45))))));
 	}
 
@@ -61,7 +61,7 @@ class CarePlanSchedulesServiceTest {
 	}
 
 	private static CarePlanNode task(Long planId, String name, ScheduledVisit... visits) {
-		return new CarePlanNode(null, planId, "Personal care", name, null, null, null,
+		return new CarePlanNode(null, planId, "Personal care", "BATHING", name, null, null, null,
 				CarePlanNode.EvidenceType.NONE, 0, null, null, List.of(visits));
 	}
 }

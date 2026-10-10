@@ -101,7 +101,7 @@
   font-size: 12.5px;
 }
 
-/* Single-column pages opt in; on desktop their content keeps a 640px reading width, left-aligned. */
+/* Single-column pages opt in; on desktop their content keeps a 640px reading width, centred under the header. */
 .page {
   overflow-wrap: anywhere;
 }
@@ -123,7 +123,9 @@
   }
 
   .page > :not(.band) {
+    width: 100%;
     max-width: 640px;
+    margin-inline: auto;
   }
 
   /*

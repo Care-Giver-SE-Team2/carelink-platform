@@ -17,18 +17,18 @@ class ElderAccountRegistrationServiceTest {
     private final ElderAccountRegistrationService service = new ElderAccountRegistrationService(accounts, elders);
 
     @Test
-    void registersLoginAndMinimumElderProfile() {
-        when(accounts.register("elder.new", "elder.new", "password123", Role.ELDER)).thenReturn(42L);
+    void registersLoginAndMinimumElderProfileUnderTheChosenName() {
+        when(accounts.register("elder.new", "Tan Ah Mah", "password123", Role.ELDER)).thenReturn(42L);
         when(elders.save(any(Elder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(service.register("elder.new", "password123")).isEqualTo(42L);
+        assertThat(service.register("Tan Ah Mah", "elder.new", "password123")).isEqualTo(42L);
 
         var elderCaptor = org.mockito.ArgumentCaptor.forClass(Elder.class);
         verify(elders).save(elderCaptor.capture());
         Elder elder = elderCaptor.getValue();
         assertThat(elder.id()).isNull();
         assertThat(elder.userId()).isEqualTo(42L);
-        assertThat(elder.fullName()).isEqualTo("elder.new");
+        assertThat(elder.fullName()).isEqualTo("Tan Ah Mah");
         assertThat(elder.continuityPreference()).isEqualTo(Elder.ContinuityPreference.PREFERRED);
         assertThat(elder.phone()).isNull();
         assertThat(elder.address()).isNull();
@@ -41,17 +41,17 @@ class ElderAccountRegistrationServiceTest {
         when(accounts.register(any(), any(), any(), eq(Role.ELDER)))
                 .thenThrow(new BusinessRuleViolation("USERNAME_TAKEN", "That username is already taken"));
 
-        assertThatThrownBy(() -> service.register("taken", "password123"))
+        assertThatThrownBy(() -> service.register("Tan Ah Mah", "taken", "password123"))
                 .isInstanceOf(BusinessRuleViolation.class);
         verifyNoInteractions(elders);
     }
 
     @Test
     void propagatesProfilePersistenceFailureForTransactionalRollback() {
-        when(accounts.register("elder.new", "elder.new", "password123", Role.ELDER)).thenReturn(42L);
+        when(accounts.register("elder.new", "Tan Ah Mah", "password123", Role.ELDER)).thenReturn(42L);
         when(elders.save(any(Elder.class))).thenThrow(new IllegalStateException("database failure"));
 
-        assertThatThrownBy(() -> service.register("elder.new", "password123"))
+        assertThatThrownBy(() -> service.register("Tan Ah Mah", "elder.new", "password123"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("database failure");
     }

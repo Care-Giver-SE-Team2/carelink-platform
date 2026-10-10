@@ -255,16 +255,11 @@ class FamilyScheduleWorkflowIT {
 			assertThat(auditRows()).isEmpty();
 
 			login(family, "family-a");
-			var submission = HttpRequest.newBuilder(uri("/api/intake-applications")).timeout(Duration.ofSeconds(10))
-					.header("Content-Type", "application/json")
-					.header("X-XSRF-TOKEN", cookie(family, "XSRF-TOKEN").getValue())
-					.POST(HttpRequest.BodyPublishers.ofString("""
-							{"targetElderName":"New elder","targetAddress":"12 Example Road","postalCode":"123456"}
-							""")).build();
-			var submitted = family.client().send(submission, HttpResponse.BodyHandlers.ofString());
-			assertThat(submitted.statusCode()).as("FM01 submission: %s", submitted.body()).isEqualTo(201);
-			var application = json.readTree(submitted.body());
-			long applicationId = application.path("id").longValue();
+			jdbc.update("INSERT INTO intake_application (id, applicant_family_member_id, target_elder_name, target_address, "
+						+ "postal_code, status, created_at) VALUES (901, 42, 'New elder', '12 Example Road', '123456', 'SUBMITTED', "
+						+ "'2026-09-20 10:00:00')");
+			long applicationId = 901L;
+			var application = getJson(family, "/api/intake-applications/" + applicationId);
 			assertThat(application.path("applicantFamilyMemberId").longValue()).isEqualTo(42L);
 			assertThat(application.path("status").asString()).isEqualTo("SUBMITTED");
 			assertThat(application.path("elderId").isNull()).isTrue();

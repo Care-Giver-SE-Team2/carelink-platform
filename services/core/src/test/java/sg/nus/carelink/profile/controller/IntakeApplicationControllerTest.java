@@ -1,8 +1,6 @@
 package sg.nus.carelink.profile.controller;
 
-import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,7 +9,6 @@ import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -19,20 +16,21 @@ import sg.nus.carelink.identity.application.UserDirectory;
 import sg.nus.carelink.identity.domain.model.AppUser;
 import sg.nus.carelink.profile.application.InMemoryFamilyMemberRepository;
 import sg.nus.carelink.profile.application.InMemoryIntakeApplicationRepository;
-import sg.nus.carelink.profile.application.IntakeSubmissionService;
 import sg.nus.carelink.profile.application.IntakeQueryService;
 import sg.nus.carelink.profile.domain.model.FamilyMember;
-import sg.nus.carelink.profile.domain.repository.ElderRepository;
+import sg.nus.carelink.profile.domain.model.IntakeApplication;
 import sg.nus.carelink.shared.security.Role;
 
 /**
- * Checks HTTP mapping and validation without a database; IntakeSubmissionApiIT verifies real security and storage.
+ * Checks HTTP mapping and validation without a database; IntakeListingApiIT and IntakeDetailApiIT verify real
+ * security and storage.
  *
  * @author Wang Zhili
  */
 class IntakeApplicationControllerTest {
 
 	private MockMvc mvc;
+	private InMemoryIntakeApplicationRepository applications;
 
 	@BeforeEach
 	void prepareControllerWithInMemoryStorage() {
@@ -50,21 +48,14 @@ class IntakeApplicationControllerTest {
 		};
 		var families = new InMemoryFamilyMemberRepository();
 		families.save(new FamilyMember(42L, 7L, "Family A", null, null, null, null));
-		var applications = new InMemoryIntakeApplicationRepository();
-		// No elder on record, so the duplicate check never refuses here.
-		var submissions = new IntakeSubmissionService(users, families, applications, mock(ElderRepository.class));
+		applications = new InMemoryIntakeApplicationRepository();
 		var queries = new IntakeQueryService(users, families, applications);
-		mvc = MockMvcBuilders.standaloneSetup(new IntakeApplicationController(submissions, queries)).build();
+		mvc = MockMvcBuilders.standaloneSetup(new IntakeApplicationController(queries)).build();
 	}
 
 	@Test
 	void readsTheDetailsOfAnApplicationSubmittedByTheCurrentFamily() throws Exception {
-		mvc.perform(post("/api/intake-applications").principal(() -> "family-a")
-				.contentType(MediaType.APPLICATION_JSON).content("""
-						{"targetElderName":"Tan Mei","targetAddress":"12 Example Road","postalCode":"123456"}
-						"""))
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.id").value(1));
+		applications.save(submitted(42L));
 
 		mvc.perform(get("/api/intake-applications/1").principal(() -> "family-a"))
 				.andExpect(status().isOk())
@@ -92,43 +83,22 @@ class IntakeApplicationControllerTest {
 	}
 
 	@Test
-	void returnsTheFamilyProjectionFromTheSubmissionService() throws Exception {
-		mvc.perform(post("/api/intake-applications").principal(() -> "family-a")
-				.contentType(MediaType.APPLICATION_JSON).content("""
-						{"targetElderName":" Tan Mei ","targetAddress":"12 Example Road","postalCode":"123456"}
-						"""))
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.applicantFamilyMemberId").value(42))
-				.andExpect(jsonPath("$.targetElderName").value("Tan Mei"))
-				.andExpect(jsonPath("$.status").value("SUBMITTED"))
-				.andExpect(jsonPath("$.careNeeds").isEmpty())
-				.andExpect(jsonPath("$.createdAt").value("2026-09-15T10:00:00Z"))
-				.andExpect(jsonPath("$.reviewedByUserId").doesNotExist());
+	void listsTheFamilyProjectionOfTheCurrentFamilysApplications() throws Exception {
+		applications.save(submitted(42L));
 
 		mvc.perform(get("/api/intake-applications").principal(() -> "family-a").param("status", "SUBMITTED"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.items[0].targetElderName").value("Tan Mei"))
 				.andExpect(jsonPath("$.items[0].applicantFamilyMemberId").value(42))
+				.andExpect(jsonPath("$.items[0].careNeeds").isEmpty())
+				.andExpect(jsonPath("$.items[0].createdAt").value("2026-09-15T10:00:00Z"))
 				.andExpect(jsonPath("$.items[0].reviewedByUserId").doesNotExist())
 				.andExpect(jsonPath("$.totalElements").value(1));
 	}
 
-	@Test
-	void validatesRequestFieldsBeforeCallingTheSubmissionService() throws Exception {
-		mvc.perform(post("/api/intake-applications").principal(() -> "family-a")
-				.contentType(MediaType.APPLICATION_JSON).content("""
-						{"targetElderName":" ","targetAddress":"12 Example Road","postalCode":"123456"}
-						"""))
-				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	void rejectsCallerSuppliedOwnershipDuringJsonParsing() throws Exception {
-		mvc.perform(post("/api/intake-applications").principal(() -> "family-a")
-				.contentType(MediaType.APPLICATION_JSON).content("""
-						{"targetElderName":"Tan Mei","targetAddress":"12 Example Road","postalCode":"123456",
-						 "applicantFamilyMemberId":7}
-						"""))
-				.andExpect(status().isBadRequest());
+	private static IntakeApplication submitted(Long familyMemberId) {
+		return new IntakeApplication(null, familyMemberId, "Tan Mei", null, "12 Example Road", "123456",
+				IntakeApplication.MobilityLevel.INDEPENDENT, null, null, null, IntakeApplication.Status.SUBMITTED,
+				null, null, null, null, null);
 	}
 }

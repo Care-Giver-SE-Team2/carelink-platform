@@ -57,7 +57,10 @@ class FamilyRegistrationControllerTest {
 			"lim family | chosen-password | Lim Wei Ling | 91234567",
 			"lim.family | short           | Lim Wei Ling | 91234567",
 			"lim.family | chosen-password | ' '          | 91234567",
-			"lim.family | chosen-password | Lim Wei Ling | call me"})
+			"lim.family | chosen-password | Lim Wei Ling | call me",
+			"lim.family | chosen-password | Lim Wei Ling | 61234567",
+			"lim.family | chosen-password | Lim Wei Ling | 1234 5678",
+			"lim.family | chosen-password | Lim Wei 2    | 91234567"})
 	void rejectsMalformedDetails(String username, String password, String fullName, String phone) throws Exception {
 		mvc.perform(post("/api/family-registrations").contentType(MediaType.APPLICATION_JSON).content("""
 				{"username":"%s","password":"%s","fullName":"%s","phone":"%s"}

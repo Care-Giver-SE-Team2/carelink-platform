@@ -5,8 +5,11 @@ import { updateFamilyElderProfile } from '../../../features/family-elders/api'
 import type { ElderBasicDetails } from '../../../features/family-elders/api'
 import { elderProfileKey, refreshFamilyElders, useFamilyElderProfile } from '../../../features/family-elders/queries'
 import { ApiError } from '../../../shared/api/client'
+import { serverFieldErrors } from '../../../shared/validation/serverErrors'
+import { formatSgPhone } from '../../../shared/validation/sg'
 import { useSelectedElder } from '../components/selectedElder'
 import { ElderProfileForm } from './ElderProfileForm'
+import type { ProfileErrors } from './ElderProfileForm'
 import styles from './FamilyElders.module.css'
 
 export function FamilyElderProfilePage() {
@@ -22,6 +25,7 @@ function ElderProfile({ id }: { id: number }) {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<ProfileErrors>({})
   const [saved, setSaved] = useState(false)
   const [accessLost, setAccessLost] = useState(false)
 
@@ -31,7 +35,7 @@ function ElderProfile({ id }: { id: number }) {
 
   async function save(details: ElderBasicDetails) {
     if (busy) return
-    setBusy(true); setError(''); setSaved(false)
+    setBusy(true); setError(''); setFieldErrors({}); setSaved(false)
     try {
       const updated = await updateFamilyElderProfile(id, details)
       client.setQueryData(elderProfileKey(id), updated)
@@ -42,6 +46,9 @@ function ElderProfile({ id }: { id: number }) {
         // A binding can be revoked while the form is open. Stop showing cached protected details.
         setAccessLost(true); setEditing(false)
         await refreshFamilyElders(client)
+      } else if (Object.keys(serverFieldErrors(failure)).length) {
+        setFieldErrors(serverFieldErrors(failure))
+        setError('Some details need correcting. Your changes have not been saved.')
       } else setError('Unable to save details. Your changes have not been saved. Please try again.')
     } finally { setBusy(false) }
   }
@@ -62,8 +69,8 @@ function ElderProfile({ id }: { id: number }) {
   const mobility = { INDEPENDENT: 'Independent', ASSISTIVE_CANE: 'Uses a walking aid', WHEELCHAIR_BEDBOUND: 'Wheelchair / bedbound' }
   const rows = [
     ['Full name', elder.fullName], ['Date of birth', elder.dateOfBirth],
-    ['Gender', elder.gender?.toLowerCase()], ['Phone', elder.phone], ['Home address', elder.address],
-    ['Postal code', elder.postalCode], ['Preferred dialects', elder.preferredDialects],
+    ['Gender', elder.gender?.toLowerCase()], ['Phone', elder.phone && formatSgPhone(elder.phone)], ['Home address', elder.address],
+    ['Postal code', elder.postalCode], ['Preferred languages', elder.preferredDialects?.split(',').join(', ')],
     ['Lives alone', elder.livesAlone === null ? null : elder.livesAlone ? 'Yes' : 'No'],
     ['Mobility', elder.mobilityLevel ? mobility[elder.mobilityLevel] : null],
   ]
@@ -80,13 +87,13 @@ function ElderProfile({ id }: { id: number }) {
         fullName: elder.fullName, gender: elder.gender, dateOfBirth: elder.dateOfBirth,
         phone: elder.phone, address: elder.address, postalCode: elder.postalCode,
         preferredDialects: elder.preferredDialects, livesAlone: elder.livesAlone, mobilityLevel: elder.mobilityLevel,
-      }} busy={busy} error={error} onSave={(details) => void save(details)} onCancel={() => setEditing(false)} /> :
+      }} busy={busy} error={error} serverErrors={fieldErrors} onSave={(details) => void save(details)} onCancel={() => setEditing(false)} /> :
         <section className={styles.card}>
           <h2>Basic details</h2>
           <dl className={styles.details}>{rows.map(([label, value]) => <div key={label}>
             <dt>{label}</dt><dd>{value || 'Not recorded'}</dd>
           </div>)}</dl>
-          {elder.accessScope === 'FULL' && <button disabled={busy} onClick={() => { setError(''); setSaved(false); setEditing(true) }}>Edit basic details</button>}
+          {elder.accessScope === 'FULL' && <button disabled={busy} onClick={() => { setError(''); setFieldErrors({}); setSaved(false); setEditing(true) }}>Edit basic details</button>}
         </section>}
     </div>
   </div>

@@ -23,6 +23,7 @@ final class CarePlanNodeMapper {
 				e.getId(),
 				e.getCarePlanId(),
 				e.getGroupName(),
+				e.getActivityCode(),
 				e.getName(),
 				e.getScheduleDays(),
 				e.getDurationPerVisit(),
@@ -39,6 +40,7 @@ final class CarePlanNodeMapper {
 		e.setId(d.id());
 		e.setCarePlanId(d.carePlanId());
 		e.setGroupName(d.groupName());
+		e.setActivityCode(d.activityCode());
 		e.setName(d.name());
 		e.setScheduleDays(d.scheduleDays());
 		e.setDurationPerVisit(d.durationPerVisit());

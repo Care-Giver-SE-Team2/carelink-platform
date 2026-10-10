@@ -11,6 +11,7 @@ import sg.nus.carelink.careplan.domain.model.CarePlanNode;
  */
 public record PlanNodeInput(
 		String groupName,
+		String activityCode,
 		String name,
 		List<VisitInput> visits,
 		CarePlanNode.EvidenceType evidenceType) {

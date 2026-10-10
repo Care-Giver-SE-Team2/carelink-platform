@@ -30,16 +30,17 @@ class ElderAccountRegistrationControllerTest {
     }
 
     @Test
-    void registersWithTrimmedUsernameAndNeverReturnsPassword()
+    void registersWithTrimmedNameAndUsernameAndNeverReturnsPassword()
             throws Exception {
 
-        when(service.register("elder.new", "password123"))
+        when(service.register("Tan Ah Mah", "elder.new", "password123"))
                 .thenReturn(42L);
 
         mvc.perform(post("/api/elder-registrations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
+                          "fullName": "  Tan Ah Mah  ",
                           "username": "  elder.new  ",
                           "password": "password123"
                         }
@@ -49,7 +50,7 @@ class ElderAccountRegistrationControllerTest {
                 .andExpect(jsonPath("$.username").value("elder.new"))
                 .andExpect(jsonPath("$.password").doesNotExist());
 
-        verify(service).register("elder.new", "password123");
+        verify(service).register("Tan Ah Mah", "elder.new", "password123");
     }
 
     @ParameterizedTest
@@ -65,10 +66,55 @@ class ElderAccountRegistrationControllerTest {
 
         String json = """
                 {
+                  "fullName": "Tan Ah Mah",
                   "username": "%s",
                   "password": "password123"
                 }
                 """.formatted(username);
+
+        mvc.perform(post("/api/elder-registrations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "",
+            "   ",
+            "12345",
+            "Tan_Ah_Mah"
+    })
+    void rejectsBlankOrNonNameValues(String fullName) throws Exception {
+
+        String json = """
+                {
+                  "fullName": "%s",
+                  "username": "elder.new",
+                  "password": "password123"
+                }
+                """.formatted(fullName);
+
+        mvc.perform(post("/api/elder-registrations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void rejectsNameLongerThanTheProfileAllows() throws Exception {
+
+        String json = """
+                {
+                  "fullName": "%s",
+                  "username": "elder.new",
+                  "password": "password123"
+                }
+                """.formatted("a".repeat(101));
 
         mvc.perform(post("/api/elder-registrations")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -88,6 +134,7 @@ class ElderAccountRegistrationControllerTest {
 
         String json = """
                 {
+                  "fullName": "Tan Ah Mah",
                   "username": "elder.new",
                   "password": "%s"
                 }
@@ -109,6 +156,7 @@ class ElderAccountRegistrationControllerTest {
 
         String json = """
                 {
+                  "fullName": "Tan Ah Mah",
                   "username": "elder.new",
                   "password": "%s"
                 }

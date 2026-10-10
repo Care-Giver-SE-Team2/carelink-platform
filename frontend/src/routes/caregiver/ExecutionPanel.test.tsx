@@ -3,17 +3,18 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import WorkPackPage from './WorkPackPage'
 import { getWorkPack, type WorkPack } from '../../features/caregiver/api'
-import { checkIn, completeTask } from '../../features/caregiver-execution/api'
+import { checkIn, checkOut, completeTask } from '../../features/caregiver-execution/api'
 import { ApiError } from '../../shared/api/client'
 vi.mock('../../features/caregiver/api',()=>({getWorkPack:vi.fn()}))
-vi.mock('../../features/caregiver-execution/api',()=>({checkIn:vi.fn(),completeTask:vi.fn()}))
-const execution={allowedActions:['TASK_RESULT','REPORT_INCIDENT'],blockedReason:null,serverNow:'2026-10-07T12:00:00',checkInOpensAt:'2026-10-07T11:30:00',checkInClosesAt:'2026-10-07T13:00:00',checkedInAt:'2026-10-07T12:00:00',checkedOutAt:null,lateArrival:false,locationSource:'MANUAL_LOCATION_NOTE'}
+vi.mock('../../features/caregiver-execution/api',()=>({checkIn:vi.fn(),checkOut:vi.fn(),completeTask:vi.fn()}))
+const execution={allowedActions:['TASK_RESULT','REPORT_INCIDENT','CHECK_OUT'],blockedReason:null,serverNow:'2026-10-07T12:00:00',checkInOpensAt:'2026-10-07T11:30:00',checkInClosesAt:'2026-10-07T13:00:00',checkedInAt:'2026-10-07T12:00:00',checkedOutAt:null,lateArrival:false,locationSource:'MANUAL_LOCATION_NOTE'}
 const pack:WorkPack={visit:{id:3,elderId:4,elderName:'Mei',serviceType:'Care',scheduledStart:'2026-10-07T12:00:00',scheduledEnd:'2026-10-07T13:00:00',status:'IN_PROGRESS',version:1},elder:{elderId:4,preferredName:'Mei',serviceAddress:'Private address',postalSector:'North',languageNeeds:[],accessNotes:null,emergencyNotes:null},carePlanId:7,carePlanVersion:1,serviceInstructions:['Hygiene'],tasks:[{id:9,name:'Hygiene',status:'PENDING',outcome:null,caregiverNote:null}],requiredEvidenceKinds:['CHECKLIST'],execution}
 function mount() {render(<MemoryRouter initialEntries={['/caregiver/visits/3']}><Routes><Route path="/caregiver/visits/:visitId" element={<WorkPackPage/>}/></Routes></MemoryRouter>)}
 beforeEach(()=>{
   vi.clearAllMocks();vi.mocked(getWorkPack).mockResolvedValue(structuredClone(pack))
   vi.mocked(completeTask).mockResolvedValue({visitId:3,visitVersion:2,savedState:'IN_PROGRESS',taskId:9,replayed:false})
   vi.mocked(checkIn).mockResolvedValue({visitId:3,visitVersion:1,savedState:'IN_PROGRESS',taskId:null,replayed:false})
+  vi.mocked(checkOut).mockResolvedValue({visitId:3,visitVersion:2,savedState:'COMPLETED',checkedInAt:execution.checkedInAt,checkedOutAt:'2026-10-07T14:00:00',replayed:false})
 })
 it('preserves a task draft across a manual refresh and saves once with the displayed parent version',async()=>{
   mount();await screen.findByText('Private address')
@@ -63,4 +64,32 @@ it('shows an extra service as such, with check-in offered and no care plan',asyn
   expect(card.getByText('Bring the wheelchair')).toBeInTheDocument()
   expect(screen.queryByRole('region',{name:'Assigned care plan'})).toBeNull()
   expect(screen.getByText('Assigned plan tasks will be initialized when you check in.')).toBeInTheDocument()
+})
+it('checks out with pending tasks and missing evidence without approval, and becomes read-only',async()=>{
+  mount();await screen.findByRole('button',{name:'Check out'})
+  expect(screen.getByText(/Some tasks are still pending/)).toBeInTheDocument()
+  expect(screen.getByText(/Missing evidence does not prevent/)).toBeInTheDocument()
+  vi.mocked(getWorkPack).mockResolvedValue({...pack,visit:{...pack.visit,status:'COMPLETED',version:2},execution:{...execution,allowedActions:['REPORT_INCIDENT'],checkedOutAt:'2026-10-07T14:00:00'}})
+  fireEvent.click(screen.getByRole('button',{name:'Check out'}));await screen.findByText(/Checked out:/)
+  expect(checkOut).toHaveBeenCalledWith(3,expect.objectContaining({expectedVersion:1,clientRequestId:expect.any(String)}),expect.any(AbortSignal))
+  expect(screen.queryByRole('button',{name:'Check out'})).toBeNull()
+  expect(screen.queryByRole('button',{name:'Save task result'})).toBeNull()
+  expect(screen.getByText('Pending')).toBeInTheDocument()
+  expect(screen.getByRole('link',{name:'Report incident'})).toBeInTheDocument()
+})
+it('keeps checkout identity and version across unknown-result refresh and explicit retry',async()=>{
+  vi.mocked(checkOut).mockRejectedValue(new TypeError('Network'));mount();await screen.findByRole('button',{name:'Check out'})
+  fireEvent.click(screen.getByRole('button',{name:'Check out'}));await screen.findByText(/Result unknown/)
+  expect(screen.getByRole('button',{name:'Save task result'})).toBeDisabled()
+  fireEvent.click(screen.getByRole('button',{name:'Refresh'}));await waitFor(()=>expect(getWorkPack).toHaveBeenCalledTimes(2))
+  expect(checkOut).toHaveBeenCalledTimes(1)
+  fireEvent.click(await screen.findByRole('button',{name:'Retry same request'}));await waitFor(()=>expect(checkOut).toHaveBeenCalledTimes(2))
+  expect(vi.mocked(checkOut).mock.calls[0][1]).toEqual(vi.mocked(checkOut).mock.calls[1][1])
+})
+it('allows only a server-proven historic missed-check-in exception to show check-in',async()=>{
+  vi.mocked(getWorkPack).mockResolvedValue({...pack,visit:{...pack.visit,status:'EXCEPTION'},execution:{...execution,checkedInAt:null,allowedActions:['CHECK_IN']}})
+  mount();await screen.findByRole('button',{name:'Check in and start service'})
+  expect(screen.queryByText(/Execution paused/)).toBeNull()
+  expect(screen.getByText(/previous missed-check-in alert/)).toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Check out'})).toBeNull()
 })

@@ -19,6 +19,7 @@ import sg.nus.carelink.careplan.domain.model.CarePlanNode;
 public record CarePlanNodeResponse(
 		Long id,
 		String groupName,
+		String activityCode,
 		String name,
 		List<VisitRequest> visits,
 		CarePlanNode.EvidenceType evidenceType,
@@ -34,7 +35,7 @@ public record CarePlanNodeResponse(
 
 	private static CarePlanNodeResponse of(CarePlanNode node) {
 		return new CarePlanNodeResponse(
-				node.id(), node.groupName(), node.name(), visitsFrom(node), node.evidenceType(), node.weeklyHours());
+				node.id(), node.groupName(), node.activityCode(), node.name(), visitsFrom(node), node.evidenceType(), node.weeklyHours());
 	}
 
 	/** "Mon", "Tue", …: the labels the editor sends and ScheduleDays.dayOf reads back. */

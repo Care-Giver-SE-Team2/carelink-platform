@@ -1,14 +1,26 @@
 import { api } from '../../shared/api/client'
 import type { ElderBasicDetails } from '../family-elders/api'
 
+/** What the family is told: PLANNED once every activity is in a published care plan version (this outranks
+ * a decline), DECLINED by the care team with a reason, SUBMITTED otherwise. Worked out by the server. */
+export type ServiceApplicationOutcome = 'SUBMITTED' | 'PLANNED' | 'DECLINED'
+
+/** One requested activity and the first care plan version that planned it, if any. */
+export type ServiceApplicationNeed = { need: string; plannedVersion: number | null; plannedFrom: string | null }
+
 export type ServiceApplication = {
   id: number
   elderId: number
   elderSnapshot: ElderBasicDetails
   careNeeds: string[]
   notes: string | null
-  status: 'SUBMITTED'
+  /** What was recorded; see outcome for what to show. */
+  status: 'SUBMITTED' | 'DECLINED'
   createdAt: string
+  outcome: ServiceApplicationOutcome
+  needs: ServiceApplicationNeed[]
+  declineReason: string | null
+  declinedAt: string | null
 }
 export type ServiceApplicationPage = {
   items: ServiceApplication[]; page: number; size: number; totalElements: number

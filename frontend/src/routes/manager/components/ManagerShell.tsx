@@ -6,7 +6,6 @@ import type { NavItem } from '../../../shared/components/ui'
 import { useHeaderUser } from '../lib/useHeaderUser'
 import { useCertificationReviewCount } from '../lib/useCertifications'
 import { useOpenExceptionCount } from '../lib/useOpenExceptionCount'
-import { usePendingApplicationCount } from '../lib/useApplications'
 import { usePendingCaregiverApplicationCount } from '../lib/useCaregiverApplications'
 import { useExtraServicesNeedingCaregiverCount } from '../lib/useExtraServices'
 import styles from './ManagerShell.module.css'
@@ -15,7 +14,6 @@ const POLICY_LINES = ['no-entry wait 10m', 'family window 2h', 'cert warning 30d
 
 function navItems(
   openExceptions: number | undefined,
-  pendingApplications: number | undefined,
   pendingCaregiverApplications: number | undefined,
   certificationsToReview: number | undefined,
   extraServicesNeedingCaregiver: number | undefined,
@@ -26,7 +24,6 @@ function navItems(
     { label: 'Absences', href: '/manager/absences' },
     { label: 'Exceptions', href: '/manager/exceptions', count: openExceptions, countTone: 'danger' },
     { label: 'Elders', href: '/manager/elders' },
-    { label: 'Applications', href: '/manager/applications', count: pendingApplications, countTone: 'accent' },
     { label: 'Caregivers', href: '/manager/caregivers', count: pendingCaregiverApplications, countTone: 'accent' },
     { label: 'Certifications', href: '/manager/certifications', count: certificationsToReview, countTone: 'neutral' },
     { label: 'Extra services', href: '/manager/extra-services', count: extraServicesNeedingCaregiver, countTone: 'danger' },
@@ -43,8 +40,7 @@ function navItems(
  * `headerContext` replaces the header's live clock (e.g. a breadcrumb); `headerRight`
  * replaces its user block with page-specific status (e.g. the Care plan screen's publish
  * state). The Exceptions count is the number of incidents that still need attention; the
- * Applications count is the family applications waiting for an answer; the Caregivers count is
- * the caregiver applications waiting for one; the Certifications count
+ * Caregivers count is the caregiver applications waiting for an answer; the Certifications count
  * is the submitted certificates waiting for the manager's review; the Extra services count is the
  * approved extra services whose visit nobody holds yet.
  */
@@ -60,7 +56,6 @@ export function ManagerShell({
   const navigate = useNavigate()
   const user = useHeaderUser()
   const { data: openExceptions } = useOpenExceptionCount()
-  const { data: pendingApplications } = usePendingApplicationCount()
   const { data: pendingCaregiverApplications } = usePendingCaregiverApplicationCount()
   const { data: certificationsToReview } = useCertificationReviewCount()
   const { data: extraServicesNeedingCaregiver } = useExtraServicesNeedingCaregiverCount()
@@ -79,7 +74,6 @@ export function ManagerShell({
           label="Manager console"
           items={navItems(
             openExceptions,
-            pendingApplications,
             pendingCaregiverApplications,
             certificationsToReview,
             extraServicesNeedingCaregiver,

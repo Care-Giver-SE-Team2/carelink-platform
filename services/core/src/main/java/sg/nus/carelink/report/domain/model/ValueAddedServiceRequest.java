@@ -2,6 +2,7 @@ package sg.nus.carelink.report.domain.model;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Objects;
 
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
@@ -36,13 +37,47 @@ public record ValueAddedServiceRequest(
         Objects.requireNonNull(status, "status");
     }
 
-    /** A new request must be for at least {@link #MIN_NOTICE} from now. */
-    public static void requireEnoughNotice(LocalDateTime requestedSchedule, LocalDateTime now) {
+    /** How far ahead a service can be booked; past this the care team cannot promise staff. */
+    public static final Duration MAX_ADVANCE = Duration.ofDays(90);
+
+    /** Visits run within these hours, Singapore time: starting no earlier, finishing no later. */
+    public static final LocalTime DAY_START = LocalTime.of(8, 0);
+    public static final LocalTime DAY_END = LocalTime.of(20, 0);
+
+    /** Start times fall on the hour or the half hour. */
+    public static final int STEP_MINUTES = 30;
+
+    /**
+     * A new request must start at least {@link #MIN_NOTICE} and at most {@link #MAX_ADVANCE} from
+     * now, on a {@link #STEP_MINUTES} step, and fit between {@link #DAY_START} and {@link #DAY_END}
+     * for the service's whole length.
+     */
+    public static void requireBookableTime(LocalDateTime requestedSchedule, Duration length, LocalDateTime now) {
         Objects.requireNonNull(requestedSchedule, "requestedSchedule");
+        Objects.requireNonNull(length, "length");
         if (requestedSchedule.isBefore(now.plus(MIN_NOTICE))) {
             throw new BusinessRuleViolation(
                     "VALUE_ADDED_SERVICE_TOO_SOON",
                     "Choose a time at least " + MIN_NOTICE.toHours() + " hours from now.");
+        }
+        if (requestedSchedule.isAfter(now.plus(MAX_ADVANCE))) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_TOO_FAR",
+                    "Choose a time within the next " + MAX_ADVANCE.toDays() + " days.");
+        }
+        if (requestedSchedule.getMinute() % STEP_MINUTES != 0 || requestedSchedule.getSecond() != 0) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_OFF_STEP",
+                    "Choose a time on the hour or half hour.");
+        }
+        LocalDateTime end = requestedSchedule.plus(length);
+        if (requestedSchedule.toLocalTime().isBefore(DAY_START)
+                || !end.toLocalDate().equals(requestedSchedule.toLocalDate())
+                || end.toLocalTime().isAfter(DAY_END)) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_OUTSIDE_HOURS",
+                    "Choose a time between " + DAY_START + " and " + DAY_END + "; this service needs to finish by "
+                            + DAY_END + ".");
         }
     }
 

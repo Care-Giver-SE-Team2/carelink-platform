@@ -32,6 +32,11 @@ class ServiceApplicationRepositoryAdapter implements ServiceApplicationRepositor
         entity.setNotes(application.notes());
         entity.setStatus(application.status().name());
         entity.setCreatedAt(application.createdAt());
+        if (application.decline() != null) {
+            entity.setDeclinedAt(application.decline().at());
+            entity.setDeclinedByUserId(application.decline().byUserId());
+            entity.setDeclineReason(application.decline().reason());
+        }
         return toDomain(jpa.saveAndFlush(entity));
     }
 
@@ -48,9 +53,16 @@ class ServiceApplicationRepositoryAdapter implements ServiceApplicationRepositor
         return new ServiceApplicationPage(items.stream().map(this::toDomain).toList(), page, size, total);
     }
 
+    @Override
+    public List<ServiceApplication> findByElderId(Long elderId) {
+        return jpa.findByElderIdOrderByCreatedAtDescIdDesc(elderId).stream().map(this::toDomain).toList();
+    }
+
     private ServiceApplication toDomain(ServiceApplicationJpaEntity entity) {
         return new ServiceApplication(entity.getId(), entity.getApplicantFamilyMemberId(), entity.getElderId(),
                 JSON.readValue(entity.getElderSnapshot(), ElderBasicDetails.class), entity.getCareNeeds(), entity.getNotes(),
-                ServiceApplication.Status.valueOf(entity.getStatus()), entity.getCreatedAt());
+                ServiceApplication.Status.valueOf(entity.getStatus()), entity.getCreatedAt(),
+                entity.getDeclinedAt() == null ? null : new ServiceApplication.Decline(
+                        entity.getDeclineReason(), entity.getDeclinedByUserId(), entity.getDeclinedAt()));
     }
 }

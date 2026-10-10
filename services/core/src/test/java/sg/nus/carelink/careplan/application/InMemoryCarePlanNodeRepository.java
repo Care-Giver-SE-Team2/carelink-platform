@@ -29,7 +29,7 @@ class InMemoryCarePlanNodeRepository implements CarePlanNodeRepository {
 	public CarePlanNode save(CarePlanNode carePlanNode) {
 		CarePlanNode stored = carePlanNode.id() == null
 				? new CarePlanNode(nextId, carePlanNode.carePlanId(), carePlanNode.groupName(),
-						carePlanNode.name(),
+						carePlanNode.activityCode(), carePlanNode.name(),
 						carePlanNode.scheduleDays(), carePlanNode.durationPerVisit(), carePlanNode.weeklyHours(),
 						carePlanNode.evidenceType(), carePlanNode.displayOrder(), carePlanNode.createdAt(),
 						carePlanNode.updatedAt(), carePlanNode.visits())

@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { checkIn, completeTask, saveHealthRecord, type CheckInInput, type TaskInput, type HealthInput, type HealthFlag } from '../../features/caregiver-execution/api'
+import { checkIn, checkOut, completeTask, saveHealthRecord, type CommandIdentity, type CheckInInput, type TaskInput, type HealthInput, type HealthFlag } from '../../features/caregiver-execution/api'
 import { isAccessFailure, useSelfServiceWrite } from './selfService'
 import { unknownResult } from './commandErrors'
 
 type TaskDraft = { status: 'DONE' | 'SKIPPED' | 'REFUSED'; outcome: string; caregiverNote: string }
-type Attempt = { visitId: number } & ({ kind: 'CHECK_IN'; input: CheckInInput } | { kind: 'TASK_RESULT'; taskId: number; input: TaskInput } | { kind: 'HEALTH_RECORD'; input: HealthInput })
+type Attempt = { visitId: number } & ({ kind: 'CHECK_IN'; input: CheckInInput } | { kind: 'CHECK_OUT'; input: CommandIdentity } | { kind: 'TASK_RESULT'; taskId: number; input: TaskInput } | { kind: 'HEALTH_RECORD'; input: HealthInput })
 export type HealthDraft = { systolic: string; diastolic: string; pulse: string; temperature: string; healthFlag: HealthFlag | ''; healthNote: string }
 const blankHealth: HealthDraft = { systolic: '', diastolic: '', pulse: '', temperature: '', healthFlag: '', healthNote: '' }
 /** Mounted in the work-pack query owner, so a return refresh does not erase drafts. */
 export function useExecutionCommands(reload: () => void) {
   const write = useSelfServiceWrite()
   const [attempt, setAttempt] = useState<Attempt | null>(null)
+  const inFlight = useRef(false)
+  const retainedAttempt = useRef<Attempt | null>(null)
   const [drafts, setDrafts] = useState<Record<number, TaskDraft>>({})
   const [mode, setMode] = useState<'GPS' | 'MANUAL_LOCATION_NOTE'>('GPS')
   const [note, setNote] = useState('')
@@ -25,20 +27,26 @@ export function useExecutionCommands(reload: () => void) {
   const [healthAccessError, setHealthAccessError] = useState<unknown>(null)
   const accessError = healthAccessError ?? (isAccessFailure(write.error) ? write.error : null)
   function clearProtected() {
+    retainedAttempt.current = null
     generation.current++; setDrafts({}); setAttempt(null); setNote(''); setFix(null); setSaved(''); setValidation(''); setLocating(false)
     setHealthDraft(blankHealth); setHealthEditing(false)
   }
   function send(next: Attempt) {
+    // Guard synchronously too: a second click before React renders must not replace the retry key.
+    if (inFlight.current || (retainedAttempt.current !== null && retainedAttempt.current !== next)) return
+    inFlight.current = true; retainedAttempt.current = next
     setAttempt(next); setSaved(''); setValidation('')
     void write.send<unknown>(signal => {
       if (next.kind === 'CHECK_IN') return checkIn(next.visitId, next.input, signal)
+      if (next.kind === 'CHECK_OUT') return checkOut(next.visitId, next.input, signal)
       if (next.kind === 'HEALTH_RECORD') return saveHealthRecord(next.visitId, next.input, signal)
       return completeTask(next.visitId, next.taskId, next.input, signal)
     }, () => {
       if (next.kind === 'TASK_RESULT') setDrafts(old => { const copy = { ...old }; delete copy[next.taskId]; return copy })
       if (next.kind === 'HEALTH_RECORD') { setHealthDraft(blankHealth); setHealthEditing(false) }
+      retainedAttempt.current = null
       setAttempt(null); setNote(''); setFix(null); setSaved(next.kind === 'HEALTH_RECORD' ? 'Health record saved. Reloading the work pack…' : 'Saved on the server. Reloading the work pack…'); reload()
-    })
+    }).finally(() => { inFlight.current = false })
   }
   function locate() {
     if (!navigator.geolocation) { setValidation('Location is unavailable. You may choose a clearly marked manual location note.'); return }
@@ -57,7 +65,7 @@ export function useExecutionCommands(reload: () => void) {
     anotherMeasurement: () => { setHealthDraft(blankHealth); setHealthEditing(true); setSaved(''); setValidation('') },
     blocked: write.pending || attempt !== null || locating,
     uncertain: write.error != null && unknownResult(write.error),
-    send, retry: () => { if (attempt) send(attempt) }, edit: () => { setAttempt(null); write.clearError(); reload() }, recover: () => { setHealthAccessError(null); write.clearError(); reload() },
+    send, retry: () => { if (attempt) send(attempt) }, edit: () => { retainedAttempt.current = null; setAttempt(null); write.clearError(); reload() }, recover: () => { setHealthAccessError(null); write.clearError(); reload() },
     recordHealth: (visitId: number, version: number) => {
       const { systolic, diastolic, pulse, temperature, healthFlag, healthNote } = healthDraft
       if (!healthFlag) { setValidation('Select a health observation.'); return }
@@ -71,6 +79,9 @@ export function useExecutionCommands(reload: () => void) {
       send({ kind: 'HEALTH_RECORD', visitId, input: { systolic: systolic ? Number(systolic) : null, diastolic: diastolic ? Number(diastolic) : null,
         pulse: pulse ? Number(pulse) : null, temperature: temperature ? Number(temperature) : null, healthFlag, healthNote: healthNote.trim() || null,
         expectedVersion: version, clientRequestId: crypto.randomUUID() } })
+    },
+    finishVisit: (visitId: number, version: number) => {
+      send({ kind: 'CHECK_OUT', visitId, input: { expectedVersion: version, clientRequestId: crypto.randomUUID() } })
     },
     start: (visitId: number, version: number) => {
       if (mode === 'GPS' && !fix) { setValidation('Obtain a GPS fix before checking in.'); return }

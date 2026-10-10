@@ -19,11 +19,10 @@ public class ElderAccountRegistrationService {
     }
 
     @Transactional
-    public Long register(String username, String password) {
-        Long userId = accounts.register(username, username, password, Role.ELDER);
-        // full_name is NOT NULL in the current schema. The username is a temporary label,
-        // not a verified personal name. Family members may update the profile later.
-        elders.save(new Elder(null, userId, username, null, null, null, null,
+    public Long register(String fullName, String username, String password) {
+        Long userId = accounts.register(username, fullName, password, Role.ELDER);
+        // Only the name is asked at sign-up; family members may add the other details later.
+        elders.save(new Elder(null, userId, fullName, null, null, null, null,
                 null, null, null, null, null, Elder.ContinuityPreference.PREFERRED,
                 null, null, null));
         return userId;

@@ -51,6 +51,7 @@ describe('weeklyHours', () => {
     const walk: TaskNode = {
       id: 't',
       type: 'task',
+      activityCode: 'COMPANIONSHIP_WALK',
       name: 'Companionship walk',
       evidence: 'CHECKLIST',
       visits: [

@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import sg.nus.carelink.visit.domain.model.Visit;
 
-/** SYS03 eligibility; an accepted alert transitions the locked Visit to EXCEPTION and closes check-in. */
+/** SYS03 eligibility; an accepted alert records missed attendance without pausing service. */
 public record MissedCheckInPolicy(Duration lateThreshold, Duration lookback) {
     public MissedCheckInPolicy {
         Objects.requireNonNull(lateThreshold, "lateThreshold");

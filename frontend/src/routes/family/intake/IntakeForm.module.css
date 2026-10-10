@@ -1,12 +1,4 @@
-.intro {
-  font-size: 13.5px;
-  color: var(--fm-muted);
-  background: var(--fm-accent-tint);
-  border-radius: 14px;
-  padding: 12px 13px;
-  margin-bottom: 18px !important;
-}
-/* Phone: one column. The side wrapper dissolves, so the intro leads and next steps and submit follow the sections. */
+/* Phone: one column. The side wrapper dissolves, so next steps and submit follow the sections. */
 .form {
   display: flex;
   flex-direction: column;
@@ -14,10 +6,6 @@
 }
 .side {
   display: contents;
-}
-.side > .intro {
-  order: -1;
-  margin-bottom: 6px !important;
 }
 .form > .errorSummary {
   margin-bottom: 0;
@@ -36,6 +24,12 @@
   line-height: 1;
   text-transform: uppercase;
   color: var(--fm-accent);
+}
+.side .next p {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--fm-muted);
 }
 .next ol {
   display: grid;
@@ -125,6 +119,15 @@
 }
 .form textarea {
   resize: vertical;
+}
+/* Own chevron, inset like the text, so the arrow doesn't sit against the rounded border. Stroke is --fm-muted. */
+.form select {
+  appearance: none;
+  padding-right: 48px;
+  background: var(--fm-card)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 7.5l5 5 5-5' fill='none' stroke='%235c6e68' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    right 18px center / 18px no-repeat;
+  cursor: pointer;
 }
 .form input::placeholder,
 .form textarea::placeholder {
@@ -240,15 +243,23 @@
   width: 100%;
   margin-top: 0 !important;
 }
+/* Cancel: a secondary button beneath submit, the same size so the pair reads as one block. */
 .submitArea a {
   order: 2;
   display: grid;
   place-items: center;
-  min-height: 44px;
-  font-size: 13.5px;
-  font-weight: 500;
+  min-height: 52px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 16px;
+  background: var(--fm-card);
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 600;
   text-decoration: none;
-  color: var(--fm-muted);
+  color: var(--fm-secondary);
+}
+.submitArea a:hover {
+  background: var(--fm-note);
 }
 .srOnly {
   position: absolute;
@@ -293,9 +304,6 @@
     grid-row: 1 / span 2;
     position: sticky;
     top: 26px;
-  }
-  .side > .intro {
-    margin-bottom: 0 !important;
   }
   .submitArea {
     justify-items: start;

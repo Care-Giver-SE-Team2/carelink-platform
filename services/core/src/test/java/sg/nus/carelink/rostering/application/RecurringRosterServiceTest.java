@@ -117,7 +117,7 @@ class RecurringRosterServiceTest {
 	private static PlanSchedule plan(Long id, LocalDate from, LocalDate until, Map<DayOfWeek, LocalTime> days) {
 		List<Slot> slots = days.entrySet().stream().map(e -> new Slot(e.getKey(), e.getValue(), 30)).toList();
 		return new PlanSchedule(id, 42L, 1, from, until,
-				List.of(new Task(id * 10, "Personal care", "Bathing assistance", slots)));
+				List.of(new Task(id * 10, "Personal care", "BATHING", "Bathing assistance", slots)));
 	}
 
 	private static final class RecordingVisitScheduling implements VisitScheduling {

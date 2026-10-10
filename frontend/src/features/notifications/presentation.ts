@@ -35,6 +35,8 @@ export function linkFor(item: Pick<NotificationItem, 'resourceType' | 'resourceI
     },
     // An extra-service request, answered or followed on each side's Extra services screen.
     VALUE_ADDED_REQUEST: { family: '/family/extra-services', manager: '/manager/extra-services' },
+    // A newly published care plan version, read on the family's Care plan page.
+    CARE_PLAN: { family: '/family/care-plan' },
   }
   return (item.resourceType && routes[item.resourceType]?.[portal]) || null
 }

@@ -1,7 +1,6 @@
 import { api } from '../../shared/api/client'
 import type {
   IntakeApplication,
-  IntakeApplicationCreateRequest,
   IntakeApplicationPage,
   IntakeListQuery,
 } from './types'
@@ -31,31 +30,4 @@ export function listIntakeApplications(
  */
 export function getIntakeApplication(id: string, signal?: AbortSignal): Promise<IntakeApplication> {
   return api<IntakeApplication>('/intake-applications/' + encodeURIComponent(id), { signal })
-}
-
-/**
- * Submits family-supplied details without automatically retrying a write.
- * @param input Elder information and requested care
- * @param signal Cancels the request
- * @return The saved application, including its server-assigned identifier
- * @author Wang Zhili
- */
-export async function submitIntakeApplication(
-  input: IntakeApplicationCreateRequest,
-  signal?: AbortSignal,
-): Promise<IntakeApplication> {
-  const application = await api<IntakeApplication>('/intake-applications', {
-    method: 'POST',
-    body: JSON.stringify(input),
-    signal,
-  })
-  if (
-    !application ||
-    !Number.isSafeInteger(application.id) ||
-    application.id <= 0 ||
-    application.status !== 'SUBMITTED'
-  ) {
-    throw new Error('The submission response could not be confirmed')
-  }
-  return application
 }
