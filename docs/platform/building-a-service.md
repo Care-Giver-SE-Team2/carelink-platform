@@ -12,6 +12,14 @@ in core.
 describes: the pom, the main class, both settings files, the test settings, the values file, the compose entry
 and the front end's proxy entry. Start a new service by copying it.
 
+**Worked example of the boundary files: `services/report`.** report used core's and visit's classes in ten
+files. Each of those types became a port of report's own in `report/application`, with the same methods, so the
+business code kept its shape; the adapters behind the ports call `CoreApi` and `VisitApi`
+(`report/infrastructure/core`, `…/visit`) and turn core's and visit's 404 and 409 back into the errors report threw
+before. The signed-in account comes from the shared session (`report/infrastructure/security`). Its integration
+tests show a service tested on its own: the session core leaves after sign-in (`report/support/SignedInSessions`)
+and a `CoreApi` double (`@MockitoBean`).
+
 ---
 
 ## 1. What every service has

@@ -9,38 +9,32 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.profile.application.CaregiverDirectory;
-import sg.nus.carelink.profile.application.CaregiverPublicProfile;
-import sg.nus.carelink.profile.application.FamilyAccessQuery;
-import sg.nus.carelink.profile.domain.model.FamilyMember;
-import sg.nus.carelink.profile.domain.repository.FamilyMemberRepository;
+import sg.nus.carelink.report.application.CaregiverDirectory.CaregiverPublicProfile;
 import sg.nus.carelink.report.domain.model.CaregiverReview;
 import sg.nus.carelink.report.domain.repository.CaregiverReviewRepository;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.visit.domain.repository.VisitScheduleQuery;
 
 /** Application service for FM09 caregiver review and renewal decisions. */
 @Service
 @Transactional
 public class CaregiverReviewService {
 
-    private final IdentityService identity;
-    private final FamilyMemberRepository families;
+    private final Accounts accounts;
+    private final FamilyMembers families;
     private final FamilyAccessQuery familyAccess;
     private final CaregiverDirectory caregivers;
     private final VisitScheduleQuery visits;
     private final CaregiverReviewRepository reviews;
 
     public CaregiverReviewService(
-            IdentityService identity,
-            FamilyMemberRepository families,
+            Accounts accounts,
+            FamilyMembers families,
             FamilyAccessQuery familyAccess,
             CaregiverDirectory caregivers,
             VisitScheduleQuery visits,
             CaregiverReviewRepository reviews) {
-        this.identity = identity;
+        this.accounts = accounts;
         this.families = families;
         this.familyAccess = familyAccess;
         this.caregivers = caregivers;
@@ -78,7 +72,7 @@ public class CaregiverReviewService {
             CaregiverReview.RenewalDecision renewalDecision) {
 
         familyAccess.requireWritableElder(username, elderId);
-        FamilyMember family = currentFamily(username);
+        Long familyId = currentFamilyId(username);
 
         if (!visits.hasAssignedVisit(Set.of(elderId), caregiverId)) {
             throw new AccessDeniedException(
@@ -89,7 +83,7 @@ public class CaregiverReviewService {
                 .orElseThrow(() -> new ResourceNotFound("Caregiver", caregiverId));
 
         if (reviews.existsForPeriod(
-                family.id(), elderId, caregiverId, periodStart, periodEnd)) {
+                familyId, elderId, caregiverId, periodStart, periodEnd)) {
             throw new BusinessRuleViolation(
                     "CAREGIVER_REVIEW_ALREADY_SUBMITTED",
                     "A review for this caregiver and period has already been submitted");
@@ -97,7 +91,7 @@ public class CaregiverReviewService {
 
         CaregiverReview saved = reviews.save(
                 CaregiverReview.submit(
-                        family.id(),
+                        familyId,
                         elderId,
                         caregiverId,
                         periodStart,
@@ -111,10 +105,10 @@ public class CaregiverReviewService {
         return new ReviewView(saved, caregiver.fullName());
     }
 
-    private FamilyMember currentFamily(String username) {
-        var account = identity.require(username);
-        return families.findByUserId(account.id())
-                .orElseThrow(() -> new ResourceNotFound("FamilyMember", account.id()));
+    private Long currentFamilyId(String username) {
+        Long userId = accounts.idOf(username);
+        return families.findIdByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFound("FamilyMember", userId));
     }
 
     private ReviewView view(CaregiverReview review) {

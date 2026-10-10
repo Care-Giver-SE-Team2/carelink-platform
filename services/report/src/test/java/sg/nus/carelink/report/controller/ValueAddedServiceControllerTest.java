@@ -8,13 +8,11 @@ import static org.mockito.Mockito.when;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.identity.domain.model.AppUser;
+import sg.nus.carelink.report.application.Accounts;
 import sg.nus.carelink.report.application.ValueAddedServiceDispatchService;
 import sg.nus.carelink.report.application.ValueAddedServiceRequestService;
 import sg.nus.carelink.report.controller.dto.ValueAddedServiceDecisionRequest;
@@ -23,11 +21,10 @@ import sg.nus.carelink.report.controller.dto.ValueAddedServiceRequestResponse;
 import sg.nus.carelink.report.controller.dto.ValueAddedServiceResponse;
 import sg.nus.carelink.report.domain.model.ValueAddedService;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
-import sg.nus.carelink.shared.security.Role;
 
 class ValueAddedServiceControllerTest {
 
-    private IdentityService identity;
+    private Accounts accounts;
     private ValueAddedServiceRequestService service;
     private ValueAddedServiceDispatchService dispatch;
     private ValueAddedServiceController controller;
@@ -37,13 +34,13 @@ class ValueAddedServiceControllerTest {
 
     @BeforeEach
     void setUp() {
-        identity = mock(IdentityService.class);
+        accounts = mock(Accounts.class);
         service = mock(ValueAddedServiceRequestService.class);
         dispatch = mock(ValueAddedServiceDispatchService.class);
 
         controller =
                 new ValueAddedServiceController(
-                        identity,
+                        accounts,
                         service,
                         dispatch
                 );
@@ -54,15 +51,9 @@ class ValueAddedServiceControllerTest {
         familyPrincipal =
                 () -> "family_test";
 
-        when(identity.require("elder_test"))
+        when(accounts.idOf("elder_test"))
                 .thenReturn(
-                        new AppUser(
-                                1L,
-                                "elder_test",
-                                "Test Elder",
-                                Set.of(Role.ELDER),
-                                true
-                        )
+                        1L
                 );
     }
 

@@ -1,17 +1,12 @@
 package sg.nus.carelink.report.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import java.net.CookieManager;
-import java.net.CookiePolicy;
-import java.net.HttpCookie;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.sql.Timestamp;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -25,27 +20,40 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import sg.nus.carelink.coreapi.CoreApi;
+import sg.nus.carelink.report.support.SeededFamilyAccess;
+import sg.nus.carelink.report.support.SignedInSessions;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
- * MG07 generation to FM04 reading over real HTTP sessions and isolated MySQL.
- * Care facts and active bindings are fixtures; report content is generated through the API.
+ * MG07 generation to FM04 reading through report's API and isolated MySQL. Care facts and active
+ * bindings are fixtures; report content is generated through the API. Each browser holds the
+ * session core leaves after sign-in, and a {@code CoreApi} double answers family access from the
+ * seeded bindings ({@link SeededFamilyAccess}).
+ *
+ * <p>Signing in and out, the elder list, intake applications and the visit schedule belong to core
+ * and visit, and are tested there.
  *
  * @author Wang Zhili
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-		properties = {"carelink.report.schedule-cron=-", "carelink.escalation.scan-initial-delay=PT1H"})
+@SpringBootTest(properties = "carelink.report.schedule-cron=-")
+@AutoConfigureMockMvc
 @Import(FamilyReportWorkflowIT.FixedTime.class)
 class FamilyReportWorkflowIT {
 
@@ -58,10 +66,15 @@ class FamilyReportWorkflowIT {
 		SharedMySql.register(registry, FamilyReportWorkflowIT.class, "+05:00", "connectionTimeZone=Asia/Singapore");
 	}
 
-	@LocalServerPort
-	private int port;
+	@Autowired
+	private MockMvc mvc;
 	@Autowired
 	private JdbcTemplate jdbc;
+	@Autowired
+	private Clock clock;
+	/** core, which answers report's questions about family access */
+	@MockitoBean
+	private CoreApi core;
 	private final JsonMapper json = JsonMapper.builder().build();
 
 	@TestConfiguration(proxyBeanMethods = false)
@@ -75,6 +88,7 @@ class FamilyReportWorkflowIT {
 
 	@BeforeEach
 	void prepareIsolatedCareFacts() {
+		SeededFamilyAccess.answer(core, jdbc, clock);
 		for (String table : List.of("audit_log", "intake_application", "report_amendment", "report", "incident_log",
 				"incident", "vital_sign", "visit_task", "visit_evidence", "visit", "elder_family_binding", "elder",
 				"family_member", "caregiver", "user_role", "app_user")) {
@@ -133,9 +147,6 @@ class FamilyReportWorkflowIT {
 			var originalReports = jdbc.queryForList("SELECT * FROM report ORDER BY id");
 
 			login(family, "family-a");
-			assertThat(getJson(family, "/api/auth/me").path("id").longValue()).isEqualTo(7);
-			assertThat(getJson(family, "/api/elders")).extracting(node -> node.path("id").longValue())
-					.containsExactlyInAnyOrder(101L, 102L);
 			var first = getJson(family, "/api/reports?elderId=101&audience=FAMILY&page=0&size=1");
 			assertThat(first.path("totalElements").longValue()).isEqualTo(2);
 			assertThat(first.path("items")).hasSize(1);
@@ -166,11 +177,11 @@ class FamilyReportWorkflowIT {
 			assertThat(jdbc.queryForList("SELECT * FROM report ORDER BY id")).isEqualTo(originalReports);
 			assertThat(jdbc.queryForList("SELECT * FROM report_amendment")).isEmpty();
 			var audits = audits();
-			assertThat(audits).hasSize(5).extracting(Audit::actor).containsOnly(7L);
+			assertThat(audits).hasSize(4).extracting(Audit::actor).containsOnly(7L);
 			assertThat(audits).extracting(Audit::result).containsOnly("OK");
-			assertThat(audits).extracting(Audit::resource).containsExactly("ELDER", "REPORT", "REPORT", "REPORT", "ELDER");
-			assertThat(audits.get(1).detail()).contains("FM04_LIST_REPORTS;", "page=0", "size=1");
-			assertThat(audits.get(4).detail()).contains("FM04_READ_WEEKLY_SUMMARY;", "weekStart=2026-09-21");
+			assertThat(audits).extracting(Audit::resource).containsExactly("REPORT", "REPORT", "REPORT", "ELDER");
+			assertThat(audits.get(0).detail()).contains("FM04_LIST_REPORTS;", "page=0", "size=1");
+			assertThat(audits.get(3).detail()).contains("FM04_READ_WEEKLY_SUMMARY;", "weekStart=2026-09-21");
 			assertThat(audits.toString()).doesNotContain(OBSERVATION, "128", "Slipped", "test-password");
 		}
 	}
@@ -255,7 +266,6 @@ class FamilyReportWorkflowIT {
 			long id = reportId(generate(manager, 101, "2026-09-21", "2026-09-27"), "FAMILY");
 			jdbc.update("UPDATE elder_family_binding SET expires_at = ? WHERE id = 701", Timestamp.valueOf(NOW.plusSeconds(1)));
 			login(family, "family-a");
-			String session = cookie(family, "JSESSIONID").getValue();
 			getJson(family, "/api/reports/" + id);
 			getJson(family, "/api/elders/101/weekly-summary?weekStart=2026-09-21");
 			if (change.equals("REVOKED")) {
@@ -264,69 +274,9 @@ class FamilyReportWorkflowIT {
 				jdbc.update("UPDATE elder_family_binding SET expires_at = ? WHERE id = 701", Timestamp.valueOf(NOW));
 			}
 			for (String path : reportPaths(id)) assertDenied(family, path, 403);
-			assertThat(getJson(family, "/api/elders")).extracting(node -> node.path("id").longValue()).containsExactly(102L);
 			assertThat(getJson(family, "/api/reports").path("items")).isEmpty();
-			assertThat(getJson(family, "/api/auth/me").path("id").longValue()).isEqualTo(7);
-			assertThat(cookie(family, "JSESSIONID").getValue()).isEqualTo(session);
 			assertThat(audits()).filteredOn(audit -> audit.result().equals("DENIED")).hasSize(3)
 					.extracting(Audit::actor).containsOnly(7L);
-		}
-	}
-
-	@Test
-	void logoutInvalidatesOldSessionCookiesAcrossListDetailAndSummary() throws Exception {
-		try (var manager = browser(); var family = browser(); var replay = browser(); var fresh = browser()) {
-			login(manager, "manager");
-			long id = reportId(generate(manager, 101, "2026-09-21", "2026-09-27"), "FAMILY");
-			login(family, "family-a");
-			getJson(family, "/api/reports/" + id);
-			String oldSession = cookie(family, "JSESSIONID").getValue();
-			var request = HttpRequest.newBuilder(uri("/api/auth/logout")).timeout(Duration.ofSeconds(10))
-					.header("X-XSRF-TOKEN", cookie(family, "XSRF-TOKEN").getValue())
-					.POST(HttpRequest.BodyPublishers.noBody()).build();
-			assertThat(family.client().send(request, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(204);
-			var oldCookie = new HttpCookie("JSESSIONID", oldSession);
-			oldCookie.setPath("/");
-			oldCookie.setVersion(0);
-			replay.cookies().getCookieStore().add(uri("/"), oldCookie);
-			for (var client : List.of(family, replay, fresh)) {
-				for (String path : reportPaths(id)) assertDenied(client, path, 401);
-			}
-			assertThat(audits()).hasSize(1);
-			login(family, "family-a");
-			assertThat(cookie(family, "JSESSIONID").getValue()).isNotEqualTo(oldSession);
-			assertThat(getJson(family, "/api/reports/" + id).path("id").longValue()).isEqualTo(id);
-			assertThat(audits()).hasSize(2).extracting(Audit::result).containsOnly("OK");
-		}
-	}
-
-	@Test
-	void familyReportReadingPreservesIntakeScheduleAndManagerContracts() throws Exception {
-		try (var manager = browser(); var family = browser(); var other = browser()) {
-			login(manager, "manager");
-			var generated = generate(manager, 101, "2026-09-21", "2026-09-27");
-			assertThat(getJson(manager, "/api/reports?elderId=101").path("items")).hasSize(3);
-			assertThat(getJson(manager, "/api/elders")).hasSize(3);
-			assertThat(audits()).isEmpty();
-			login(family, "family-a");
-			getJson(family, "/api/reports/" + reportId(generated, "FAMILY"));
-			jdbc.update("INSERT INTO intake_application (id, applicant_family_member_id, target_elder_name, target_address, "
-						+ "postal_code, status, created_at) VALUES (901, 42, 'New elder', '12 Example Road', '123456', 'SUBMITTED', "
-						+ "'2026-09-20 10:00:00')");
-			var application = getJson(family, "/api/intake-applications/901");
-			assertThat(application.path("applicantFamilyMemberId").longValue()).isEqualTo(42);
-			assertThat(application.path("status").asString()).isEqualTo("SUBMITTED");
-			assertThat(getJson(family, "/api/intake-applications").path("items")).containsExactly(application);
-			assertThat(getJson(family, "/api/intake-applications/" + application.path("id").longValue())).isEqualTo(application);
-			var schedule = getJson(family, "/api/visits?elderId=101&dateFrom=2026-09-21&dateTo=2026-09-27");
-			assertThat(schedule.path("totalElements").longValue()).isEqualTo(3);
-			assertThat(schedule.path("items")).extracting(node -> node.path("id").longValue()).containsExactly(201L, 202L, 203L);
-			assertThat(getJson(family, "/api/caregivers/501").path("fullName").asString()).isEqualTo("Caregiver Mei");
-			login(other, "family-b");
-			assertThat(getJson(other, "/api/intake-applications").path("items")).isEmpty();
-			assertDenied(other, "/api/intake-applications/" + application.path("id").longValue(), 403);
-			assertThat(getJson(manager, "/api/reports?elderId=101").path("items")).hasSize(3);
-			assertThat(audits()).hasSize(3).extracting(Audit::resource).containsExactly("REPORT", "VISIT", "CAREGIVER");
 		}
 	}
 
@@ -336,9 +286,9 @@ class FamilyReportWorkflowIT {
 	}
 
 	private void assertDenied(Browser browser, String path, int status) throws Exception {
-		var response = get(browser, path);
-		assertThat(response.statusCode()).as("GET %s: %s", path, response.body()).isEqualTo(status);
-		assertThat(response.body()).doesNotContain("Walked two laps", "OTHER-FAMILY", "Systolic", "Slipped", "Caregiver Mei", "New elder");
+		var response = read(browser, path);
+		assertThat(response.getStatus()).as("GET %s: %s", path, response.getContentAsString()).isEqualTo(status);
+		assertThat(response.getContentAsString()).doesNotContain("Walked two laps", "OTHER-FAMILY", "Systolic", "Slipped", "Caregiver Mei", "New elder");
 	}
 
 	private void visit(long id, long elderId, String start, String status) {
@@ -368,46 +318,30 @@ class FamilyReportWorkflowIT {
 	}
 
 	private Browser browser() {
-		var cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
-		return new Browser(HttpClient.newBuilder().cookieHandler(cookies).connectTimeout(Duration.ofSeconds(5))
-				.followRedirects(HttpClient.Redirect.NEVER).version(HttpClient.Version.HTTP_1_1).build(), cookies);
+		return new Browser();
 	}
 
-	private void login(Browser browser, String username) throws Exception {
-		assertThat(get(browser, "/api/auth/csrf").statusCode()).isEqualTo(200);
-		assertThat(cookie(browser, "XSRF-TOKEN").isHttpOnly()).isFalse();
-		assertThat(postJson(browser, "/api/auth/login", Map.of("username", username, "password", "test-password"), 200)
-				.path("username").asString()).isEqualTo(username);
-		assertThat(cookie(browser, "JSESSIONID").isHttpOnly()).isTrue();
-	}
-
-	private HttpCookie cookie(Browser browser, String name) {
-		return browser.cookies().getCookieStore().getCookies().stream().filter(cookie -> cookie.getName().equals(name))
-				.findFirst().orElseThrow(() -> new AssertionError("Missing response cookie: " + name));
+	/** Signs in through core: the browser now holds the session core leaves behind. */
+	private void login(Browser browser, String username) {
+		browser.session = new SignedInSessions(jdbc).of(username);
 	}
 
 	private JsonNode postJson(Browser browser, String path, Object body, int expectedStatus) throws Exception {
-		var request = HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(10))
-				.header("Content-Type", "application/json").header("X-XSRF-TOKEN", cookie(browser, "XSRF-TOKEN").getValue())
-				.POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
-		var response = browser.client().send(request, HttpResponse.BodyHandlers.ofString());
-		assertThat(response.statusCode()).as("POST %s: %s", path, response.body()).isEqualTo(expectedStatus);
-		return json.readTree(response.body());
+		var response = mvc.perform(post(path).session(browser.session).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)))
+				.andReturn().getResponse();
+		assertThat(response.getStatus()).as("POST %s: %s", path, response.getContentAsString()).isEqualTo(expectedStatus);
+		return json.readTree(response.getContentAsString());
 	}
 
 	private JsonNode getJson(Browser browser, String path) throws Exception {
-		var response = get(browser, path);
-		assertThat(response.statusCode()).as("GET %s: %s", path, response.body()).isEqualTo(200);
-		return json.readTree(response.body());
+		var response = read(browser, path);
+		assertThat(response.getStatus()).as("GET %s: %s", path, response.getContentAsString()).isEqualTo(200);
+		return json.readTree(response.getContentAsString());
 	}
 
-	private HttpResponse<String> get(Browser browser, String path) throws Exception {
-		return browser.client().send(HttpRequest.newBuilder(uri(path)).timeout(Duration.ofSeconds(10)).GET().build(),
-				HttpResponse.BodyHandlers.ofString());
-	}
-
-	private URI uri(String path) {
-		return URI.create("http://127.0.0.1:" + port + path);
+	private MockHttpServletResponse read(Browser browser, String path) throws Exception {
+		return mvc.perform(get(path).session(browser.session)).andReturn().getResponse();
 	}
 
 	private List<Audit> audits() {
@@ -415,9 +349,14 @@ class FamilyReportWorkflowIT {
 				(row, index) -> new Audit(row.getLong("actor_user_id"), row.getString("resource_type"), row.getString("result"), row.getString("detail")));
 	}
 
-	private record Browser(HttpClient client, CookieManager cookies) implements AutoCloseable {
+	/** One person's browser: the session they signed in with, as core left it. */
+	private static final class Browser implements AutoCloseable {
+		private MockHttpSession session = new MockHttpSession();
+
 		@Override
-		public void close() { client.close(); }
+		public void close() {
+			session.invalidate();
+		}
 	}
 
 	private record Audit(long actor, String resource, String result, String detail) {

@@ -20,27 +20,19 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.security.access.AccessDeniedException;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.identity.domain.model.AppUser;
-import sg.nus.carelink.profile.application.CaregiverDirectory;
-import sg.nus.carelink.profile.application.CaregiverPublicProfile;
-import sg.nus.carelink.profile.application.FamilyAccessQuery;
-import sg.nus.carelink.profile.domain.model.FamilyMember;
-import sg.nus.carelink.profile.domain.repository.FamilyMemberRepository;
+import sg.nus.carelink.report.application.CaregiverDirectory.CaregiverPublicProfile;
 import sg.nus.carelink.report.domain.model.CaregiverReview;
 import sg.nus.carelink.report.domain.repository.CaregiverReviewRepository;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.shared.security.Role;
-import sg.nus.carelink.visit.domain.repository.VisitScheduleQuery;
 
 class CaregiverReviewServiceTest {
 
     private static final LocalDate START = LocalDate.of(2026, 9, 1);
     private static final LocalDate END = LocalDate.of(2026, 9, 30);
 
-    private IdentityService identity;
-    private FamilyMemberRepository families;
+    private Accounts accounts;
+    private FamilyMembers families;
     private FamilyAccessQuery familyAccess;
     private CaregiverDirectory caregivers;
     private VisitScheduleQuery visits;
@@ -49,13 +41,13 @@ class CaregiverReviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        identity = mock(IdentityService.class);
-        families = mock(FamilyMemberRepository.class);
+        accounts = mock(Accounts.class);
+        families = mock(FamilyMembers.class);
         familyAccess = mock(FamilyAccessQuery.class);
         caregivers = mock(CaregiverDirectory.class);
         visits = mock(VisitScheduleQuery.class);
         reviews = mock(CaregiverReviewRepository.class);
-        service = new CaregiverReviewService(identity, families, familyAccess, caregivers, visits, reviews);
+        service = new CaregiverReviewService(accounts, families, familyAccess, caregivers, visits, reviews);
     }
 
     @Test
@@ -158,8 +150,8 @@ class CaregiverReviewServiceTest {
     @Test
     void missingFamilyProfileIsReported() {
         when(visits.hasAssignedVisit(Set.of(21L), 31L)).thenReturn(true);
-        when(identity.require("family_test")).thenReturn(account());
-        when(families.findByUserId(3L)).thenReturn(Optional.empty());
+        when(accounts.idOf("family_test")).thenReturn(3L);
+        when(families.findIdByUserId(3L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> submit()).isInstanceOf(ResourceNotFound.class);
         verify(reviews, never()).save(any());
@@ -172,13 +164,8 @@ class CaregiverReviewServiceTest {
     }
 
     private void prepareFamily() {
-        when(identity.require("family_test")).thenReturn(account());
-        when(families.findByUserId(3L)).thenReturn(Optional.of(
-                new FamilyMember(11L, 3L, "Test Family", null, null, null, null)));
-    }
-
-    private AppUser account() {
-        return new AppUser(3L, "family_test", "Test Family", Set.of(Role.FAMILY), true);
+        when(accounts.idOf("family_test")).thenReturn(3L);
+        when(families.findIdByUserId(3L)).thenReturn(Optional.of(11L));
     }
 
     private CaregiverPublicProfile caregiver() {

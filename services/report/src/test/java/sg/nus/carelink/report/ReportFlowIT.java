@@ -68,8 +68,7 @@ import sg.nus.carelink.testsupport.SharedMySql;
 @SpringBootTest
 @Import(ReportFlowIT.FixedClockConfig.class)
 @TestPropertySource(properties = {
-		// Keep the escalation sweep out of the way, and drive the weekly run by hand.
-		"carelink.escalation.scan-initial-delay=PT1H",
+		// Drive the weekly run by hand.
 		"carelink.report.schedule-cron=-"
 })
 class ReportFlowIT {

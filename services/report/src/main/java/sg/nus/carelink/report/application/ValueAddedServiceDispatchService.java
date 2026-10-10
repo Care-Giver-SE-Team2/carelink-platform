@@ -11,18 +11,13 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.profile.application.ProfileService;
 import sg.nus.carelink.report.application.ValueAddedNotifier.Why;
 import sg.nus.carelink.report.domain.model.ValueAddedService;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRepository;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRequestRepository;
-import sg.nus.carelink.rostering.application.VisitCover;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.visit.application.StandaloneVisits;
-import sg.nus.carelink.visit.application.VisitReassignment;
 
 /**
  * An extra service once it has been asked for: the manager's overview, a caregiver for a
@@ -31,7 +26,8 @@ import sg.nus.carelink.visit.application.VisitReassignment;
  * reports never read "booked" for a service that cannot happen: a request nobody answered lapses,
  * and one whose visit failed before anybody started on it is closed.
  *
- * <p>Visits are read and changed only through the visit and rostering modules' contracts.
+ * <p>Visits are read and changed only through visit's and rostering's internal APIs, behind this
+ * module's own ports.
  */
 @Service
 @Transactional
@@ -51,8 +47,8 @@ public class ValueAddedServiceDispatchService {
     private final StandaloneVisits standaloneVisits;
     private final VisitReassignment visits;
     private final VisitCover cover;
-    private final IdentityService identity;
-    private final ProfileService profiles;
+    private final Accounts accounts;
+    private final Elders elders;
     private final ValueAddedNotifier notifier;
     private final Clock clock;
 
@@ -63,8 +59,8 @@ public class ValueAddedServiceDispatchService {
             StandaloneVisits standaloneVisits,
             VisitReassignment visits,
             VisitCover cover,
-            IdentityService identity,
-            ProfileService profiles,
+            Accounts accounts,
+            Elders elders,
             ValueAddedNotifier notifier,
             Clock clock) {
         this.requests = requests;
@@ -72,8 +68,8 @@ public class ValueAddedServiceDispatchService {
         this.standaloneVisits = standaloneVisits;
         this.visits = visits;
         this.cover = cover;
-        this.identity = identity;
-        this.profiles = profiles;
+        this.accounts = accounts;
+        this.elders = elders;
         this.notifier = notifier;
         this.clock = clock;
     }
@@ -97,7 +93,7 @@ public class ValueAddedServiceDispatchService {
     /** Puts a caregiver on a dispatched visit that has none, and tells them and the family. */
     public ManagedRequest assignCaregiver(Long requestId, Long caregiverId, String username) {
         ValueAddedServiceRequest request = requireRequest(requestId);
-        cover.cover(dispatchedVisitId(request), caregiverId, identity.require(username).id());
+        cover.cover(dispatchedVisitId(request), caregiverId, accounts.idOf(username));
         String name = serviceName(request);
         notifier.caregiverAssigned(request, name, caregiverId);
         return managed(request, name);
@@ -109,13 +105,13 @@ public class ValueAddedServiceDispatchService {
      */
     public ManagedRequest cancel(Long requestId, String username) {
         ValueAddedServiceRequest request = requireRequest(requestId);
-        return managed(cancel(request, identity.require(username).id(), CANCEL_REASON, Why.BY_MANAGER),
+        return managed(cancel(request, accounts.idOf(username), CANCEL_REASON, Why.BY_MANAGER),
                 serviceName(request));
     }
 
     /** The elder withdraws their own request, on the same terms as a manager's cancellation. */
     public ValueAddedServiceRequest cancelForElderUser(Long userId, Long requestId) {
-        Long elderId = profiles.requireElderByUserId(userId).id();
+        Long elderId = elders.requireElderIdOfUser(userId);
         ValueAddedServiceRequest request = requests.findById(requestId)
                 .filter(found -> found.elderId().equals(elderId))
                 .orElseThrow(() -> new ResourceNotFound("Value-added service request", requestId));

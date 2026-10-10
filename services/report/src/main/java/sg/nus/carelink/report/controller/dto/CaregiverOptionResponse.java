@@ -1,6 +1,6 @@
 package sg.nus.carelink.report.controller.dto;
 
-import sg.nus.carelink.rostering.application.VisitCover;
+import sg.nus.carelink.report.application.VisitCover;
 
 /**
  * One caregiver in the picker for a dispatched visit.

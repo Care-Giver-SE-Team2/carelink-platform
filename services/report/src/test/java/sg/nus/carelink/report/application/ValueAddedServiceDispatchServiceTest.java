@@ -17,16 +17,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.identity.domain.model.AppUser;
-import sg.nus.carelink.profile.application.ProfileService;
-import sg.nus.carelink.profile.domain.model.Elder;
 import sg.nus.carelink.report.application.ValueAddedNotifier.Why;
 import sg.nus.carelink.report.application.ValueAddedServiceDispatchService.ManagedRequest;
 import sg.nus.carelink.report.domain.model.ValueAddedService;
@@ -34,12 +29,8 @@ import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest.Status;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRepository;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRequestRepository;
-import sg.nus.carelink.rostering.application.VisitCover;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.shared.security.Role;
-import sg.nus.carelink.visit.application.StandaloneVisits;
-import sg.nus.carelink.visit.application.VisitReassignment;
 
 class ValueAddedServiceDispatchServiceTest {
 
@@ -51,7 +42,7 @@ class ValueAddedServiceDispatchServiceTest {
     private VisitReassignment visits;
     private StandaloneVisits standaloneVisits;
     private VisitCover cover;
-    private ProfileService profiles;
+    private Elders elders;
     private ValueAddedNotifier notifier;
     private ValueAddedServiceDispatchService service;
 
@@ -67,18 +58,18 @@ class ValueAddedServiceDispatchServiceTest {
         visits = mock(VisitReassignment.class);
         standaloneVisits = mock(StandaloneVisits.class);
         cover = mock(VisitCover.class);
-        profiles = mock(ProfileService.class);
+        elders = mock(Elders.class);
         notifier = mock(ValueAddedNotifier.class);
-        IdentityService identity = mock(IdentityService.class);
-        when(identity.require("manager")).thenReturn(new AppUser(11L, "manager", "Manager", Set.of(Role.MANAGER), true));
+        Accounts accounts = mock(Accounts.class);
+        when(accounts.idOf("manager")).thenReturn(11L);
         ValueAddedService escort = new ValueAddedService(2L, "Hospital escort", null,
                 ValueAddedService.Status.AVAILABLE, null, null);
         when(services.findAll()).thenReturn(List.of(escort));
         when(services.findById(2L)).thenReturn(Optional.of(escort));
         when(requests.save(any())).thenAnswer(call -> call.getArgument(0));
         Clock clock = Clock.fixed(now.atZone(SINGAPORE).toInstant(), SINGAPORE);
-        service = new ValueAddedServiceDispatchService(requests, services, standaloneVisits, visits, cover, identity,
-                profiles, notifier, clock);
+        service = new ValueAddedServiceDispatchService(requests, services, standaloneVisits, visits, cover, accounts,
+                elders, notifier, clock);
     }
 
     @Test
@@ -255,7 +246,7 @@ class ValueAddedServiceDispatchServiceTest {
 
     @Test
     void theElderWithdrawsOnlyTheirOwnRequest() {
-        when(profiles.requireElderByUserId(30L)).thenReturn(elder(7L));
+        when(elders.requireElderIdOfUser(30L)).thenReturn(7L);
         found(request(1L, Status.PENDING_APPROVAL, null));
         when(requests.findById(2L)).thenReturn(Optional.of(new ValueAddedServiceRequest(2L, 8L, 2L, null, null, null,
                 SCHEDULE, null, Status.PENDING_APPROVAL, null, null, null)));
@@ -301,10 +292,5 @@ class ValueAddedServiceDispatchServiceTest {
         verify(requests).save(saved.capture());
         assertThat(saved.getValue().id()).isEqualTo(2L);
         assertThat(saved.getValue().status()).isEqualTo(Status.CANCELLED);
-    }
-
-    private static Elder elder(Long id) {
-        return new Elder(id, 30L, "Mdm Tan", null, null, null, null, null, null, null, null, null,
-                Elder.ContinuityPreference.PREFERRED, null, null, null);
     }
 }

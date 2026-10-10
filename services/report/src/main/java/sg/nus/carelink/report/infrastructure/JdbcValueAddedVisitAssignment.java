@@ -6,23 +6,27 @@ import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
-import sg.nus.carelink.profile.application.PrimaryCaregiverLookup;
+import sg.nus.carelink.coreapi.CoreApi;
 import sg.nus.carelink.report.application.ValueAddedVisitAssignment;
 
-/** Uses the established primary-caregiver assignment, excluding leave and overlapping visits. */
+/**
+ * Uses the established primary-caregiver assignment, from core, excluding leave and overlapping
+ * visits. The leave and the overlap are still read with SQL from core's and visit's tables; they
+ * become CoreApi.onLeave and VisitApi.caregiverBusy before the schema split.
+ */
 @Component
 public class JdbcValueAddedVisitAssignment implements ValueAddedVisitAssignment {
-    private final PrimaryCaregiverLookup primary;
+    private final CoreApi core;
     private final JdbcClient jdbc;
 
-    public JdbcValueAddedVisitAssignment(PrimaryCaregiverLookup primary, JdbcClient jdbc) {
-        this.primary = primary;
+    public JdbcValueAddedVisitAssignment(CoreApi core, JdbcClient jdbc) {
+        this.core = core;
         this.jdbc = jdbc;
     }
 
     @Override
     public Optional<Long> chooseCaregiver(Long elderId, LocalDateTime start, LocalDateTime end) {
-        Optional<Long> candidate = primary.findRosterableCaregiverId(elderId);
+        Optional<Long> candidate = core.findPrimaryCaregiverId(elderId);
         if (candidate.isEmpty()) return Optional.empty();
         Long caregiverId = candidate.get();
         Long leave = jdbc.sql("""

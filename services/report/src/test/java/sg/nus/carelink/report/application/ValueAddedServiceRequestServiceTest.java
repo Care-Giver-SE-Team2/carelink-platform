@@ -16,27 +16,17 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.identity.domain.model.AppUser;
-import sg.nus.carelink.profile.application.FamilyAccessQuery;
-import sg.nus.carelink.profile.application.ProfileService;
-import sg.nus.carelink.profile.domain.model.Elder;
-import sg.nus.carelink.profile.domain.model.FamilyMember;
-import sg.nus.carelink.profile.domain.repository.FamilyMemberRepository;
 import sg.nus.carelink.report.domain.model.ValueAddedService;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRepository;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRequestRepository;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.shared.security.Role;
-import sg.nus.carelink.visit.application.StandaloneVisits;
 
 class ValueAddedServiceRequestServiceTest {
 
@@ -71,9 +61,9 @@ class ValueAddedServiceRequestServiceTest {
                     0
             );
 
-    private IdentityService identity;
-    private ProfileService profiles;
-    private FamilyMemberRepository families;
+    private Accounts accounts;
+    private Elders elders;
+    private FamilyMembers families;
     private FamilyAccessQuery familyAccess;
     private ValueAddedServiceRepository services;
     private ValueAddedServiceRequestRepository requests;
@@ -86,19 +76,19 @@ class ValueAddedServiceRequestServiceTest {
 
     @BeforeEach
     void setUp() {
-        identity =
+        accounts =
                 mock(
-                        IdentityService.class
+                        Accounts.class
                 );
 
-        profiles =
+        elders =
                 mock(
-                        ProfileService.class
+                        Elders.class
                 );
 
         families =
                 mock(
-                        FamilyMemberRepository.class
+                        FamilyMembers.class
                 );
 
         familyAccess =
@@ -126,8 +116,8 @@ class ValueAddedServiceRequestServiceTest {
         notifier = mock(ValueAddedNotifier.class);
         service =
                 new ValueAddedServiceRequestService(
-                        identity,
-                        profiles,
+                        accounts,
+                        elders,
                         families,
                         familyAccess,
                         services,
@@ -212,14 +202,14 @@ class ValueAddedServiceRequestServiceTest {
 
     @Test
     void listsRequestsForAuthenticatedElderProfile() {
-        Elder elder =
+        Long elder =
                 elder();
 
         ValueAddedServiceRequest request =
                 pendingRequest();
 
         when(
-                profiles.requireElderByUserId(
+                elders.requireElderIdOfUser(
                         1L
                 )
         ).thenReturn(
@@ -242,8 +232,8 @@ class ValueAddedServiceRequestServiceTest {
                 request
         );
 
-        verify(profiles)
-                .requireElderByUserId(
+        verify(elders)
+                .requireElderIdOfUser(
                         1L
                 );
 
@@ -256,7 +246,7 @@ class ValueAddedServiceRequestServiceTest {
     @Test
     void elderCreatesPendingApprovalRequest() {
         when(
-                profiles.requireElderByUserId(
+                elders.requireElderIdOfUser(
                         1L
                 )
         ).thenReturn(
@@ -371,7 +361,7 @@ class ValueAddedServiceRequestServiceTest {
                 );
 
         when(
-                profiles.requireElderByUserId(
+                elders.requireElderIdOfUser(
                         1L
                 )
         ).thenReturn(
@@ -418,7 +408,7 @@ class ValueAddedServiceRequestServiceTest {
     @Test
     void unknownCatalogueServiceIsRejected() {
         when(
-                profiles.requireElderByUserId(
+                elders.requireElderIdOfUser(
                         1L
                 )
         ).thenReturn(
@@ -800,66 +790,28 @@ class ValueAddedServiceRequestServiceTest {
     }
 
     private void prepareFamily() {
-        AppUser account =
-                new AppUser(
-                        3L,
-                        "family_test",
-                        "Test Family",
-                        Set.of(
-                                Role.FAMILY
-                        ),
-                        true
-                );
-
-        FamilyMember family =
-                new FamilyMember(
-                        20L,
-                        3L,
-                        "Test Family",
-                        null,
-                        null,
-                        null,
-                        null
-                );
-
         when(
-                identity.require(
+                accounts.idOf(
                         "family_test"
                 )
         ).thenReturn(
-                account
+                3L
         );
 
         when(
-                families.findByUserId(
+                families.findIdByUserId(
                         3L
                 )
         ).thenReturn(
                 Optional.of(
-                        family
+                        20L
                 )
         );
     }
 
-    private Elder elder() {
-        return new Elder(
-                10L,
-                1L,
-                "Test Elder",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                Elder.ContinuityPreference.PREFERRED,
-                null,
-                null,
-                null
-        );
+    /** The elder of elder account 1. */
+    private Long elder() {
+        return 10L;
     }
 
     private ValueAddedService availableService() {
@@ -955,7 +907,7 @@ class ValueAddedServiceRequestServiceTest {
 
     @Test
     void elderRequestNeedsTwoHoursNoticeAndTellsTheFamily() {
-        when(profiles.requireElderByUserId(1L)).thenReturn(elder());
+        when(elders.requireElderIdOfUser(1L)).thenReturn(elder());
         when(services.findById(2L)).thenReturn(Optional.of(availableService()));
         when(requests.save(any(ValueAddedServiceRequest.class))).thenAnswer(call -> call.getArgument(0));
 

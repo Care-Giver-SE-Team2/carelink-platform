@@ -1,6 +1,7 @@
 package sg.nus.carelink.report.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -15,7 +16,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,6 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.JsonNode;
@@ -40,6 +41,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.domain.model.Report;
+import sg.nus.carelink.coreapi.CoreApi;
+import sg.nus.carelink.report.support.SeededFamilyAccess;
+import sg.nus.carelink.report.support.SignedInSessions;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
@@ -47,7 +51,7 @@ import sg.nus.carelink.testsupport.SharedMySql;
  *
  * @author Wang Zhili
  */
-@SpringBootTest(properties = {"report.schedule-cron=-", "escalation.scan-initial-delay=PT1H"})
+@SpringBootTest(properties = "carelink.report.schedule-cron=-")
 @AutoConfigureMockMvc
 @Import(FamilyReportListIT.FixedTime.class)
 class FamilyReportListIT {
@@ -70,6 +74,11 @@ class FamilyReportListIT {
 	@Autowired
 	private JdbcTemplate jdbc;
 	@Autowired
+	private Clock clock;
+	/** core, which answers report's questions about family access; see SeededFamilyAccess */
+	@MockitoBean
+	private CoreApi core;
+	@Autowired
 	private ReportService reports;
 	private final JsonMapper json = JsonMapper.builder().build();
 
@@ -84,6 +93,7 @@ class FamilyReportListIT {
 
 	@BeforeEach
 	void prepareIsolatedReports() {
+		SeededFamilyAccess.answer(core, jdbc, clock);
 		jdbc.update("DELETE FROM audit_log");
 		jdbc.update("DELETE FROM report_amendment");
 		jdbc.update("DELETE FROM report");
@@ -264,13 +274,11 @@ class FamilyReportListIT {
 	@Test
 	void writeEndpointsRemainManagerOnly() throws Exception {
 		var session = loginAs("family-a");
-		Cookie token = mvc.perform(get("/api/auth/csrf").session(session)).andReturn().getResponse().getCookie("XSRF-TOKEN");
-		assertThat(token).isNotNull();
-		mvc.perform(post(PATH + "/generate").session(session).cookie(token).header("X-XSRF-TOKEN", token.getValue())
+		mvc.perform(post(PATH + "/generate").session(session).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"elderId\":101,\"periodStart\":\"2026-09-21\",\"periodEnd\":\"2026-09-27\"}"))
 				.andExpect(status().isForbidden());
-		mvc.perform(post(PATH + "/301/amendments").session(session).cookie(token).header("X-XSRF-TOKEN", token.getValue())
+		mvc.perform(post(PATH + "/301/amendments").session(session).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Family cannot amend\"}"))
 				.andExpect(status().isForbidden());
 	}
@@ -355,16 +363,8 @@ class FamilyReportListIT {
 				""", elderId, familyId, scope, bindingStatus, "ACTIVE".equals(bindingStatus) ? NOW.minusDays(1) : null, expiresAt);
 	}
 
-	private MockHttpSession loginAs(String username) throws Exception {
-		Cookie token = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk())
-				.andReturn().getResponse().getCookie("XSRF-TOKEN");
-		assertThat(token).isNotNull();
-		var result = mvc.perform(post("/api/auth/login").cookie(token).header("X-XSRF-TOKEN", token.getValue())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(json.writeValueAsString(Map.of("username", username, "password", "test-password"))))
-				.andExpect(status().isOk()).andReturn();
-		var session = (MockHttpSession) result.getRequest().getSession(false);
-		assertThat(session).isNotNull();
-		return session;
+	/** The session core leaves after {@code username} signs in. */
+	private MockHttpSession loginAs(String username) {
+		return new SignedInSessions(jdbc).of(username);
 	}
 }

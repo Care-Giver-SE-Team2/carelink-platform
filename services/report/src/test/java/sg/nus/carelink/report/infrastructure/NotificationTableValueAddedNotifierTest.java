@@ -17,7 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-import sg.nus.carelink.profile.application.FamilyAlertRecipients;
+import sg.nus.carelink.coreapi.CoreApi;
 import sg.nus.carelink.report.application.ValueAddedNotifier.Why;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 
@@ -29,7 +29,7 @@ class NotificationTableValueAddedNotifierTest {
     private JdbcClient.StatementSpec statement;
     private JdbcClient.MappedQuerySpec<String> names;
     private JdbcClient.MappedQuerySpec<Long> ids;
-    private FamilyAlertRecipients families;
+    private CoreApi core;
     private NotificationTableValueAddedNotifier notifier;
 
     @SuppressWarnings("unchecked")
@@ -43,11 +43,11 @@ class NotificationTableValueAddedNotifierTest {
         when(statement.query(String.class)).thenReturn(names);
         when(statement.query(Long.class)).thenReturn(ids);
         when(names.optional()).thenReturn(Optional.of("Tan Ah Kow"));
-        families = mock(FamilyAlertRecipients.class);
-        when(families.familyMemberIds(10L)).thenReturn(List.of(20L, 21L));
-        when(families.resolve(10L, 20L)).thenReturn(new FamilyAlertRecipients.Candidate(20L, 3L, null));
-        when(families.resolve(10L, 21L)).thenReturn(new FamilyAlertRecipients.Candidate(21L, 4L, "BINDING_EXPIRED"));
-        notifier = new NotificationTableValueAddedNotifier(jdbc, families);
+        core = mock(CoreApi.class);
+        when(core.familyMemberIds(10L)).thenReturn(List.of(20L, 21L));
+        when(core.alertRecipient(10L, 20L)).thenReturn(new CoreApi.AlertRecipient(20L, 3L, null));
+        when(core.alertRecipient(10L, 21L)).thenReturn(new CoreApi.AlertRecipient(21L, 4L, "BINDING_EXPIRED"));
+        notifier = new NotificationTableValueAddedNotifier(jdbc, core);
     }
 
     @Test

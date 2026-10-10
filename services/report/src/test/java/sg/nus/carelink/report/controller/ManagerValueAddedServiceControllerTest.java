@@ -17,7 +17,7 @@ import sg.nus.carelink.report.controller.dto.CaregiverAssignmentRequest;
 import sg.nus.carelink.report.controller.dto.CaregiverOptionResponse;
 import sg.nus.carelink.report.controller.dto.ManagedValueAddedServiceRequestResponse;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
-import sg.nus.carelink.rostering.application.VisitCover;
+import sg.nus.carelink.report.application.VisitCover;
 
 class ManagerValueAddedServiceControllerTest {
 

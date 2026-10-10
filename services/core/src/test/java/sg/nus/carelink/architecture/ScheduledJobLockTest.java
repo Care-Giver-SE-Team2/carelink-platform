@@ -14,8 +14,8 @@ import org.springframework.scheduling.annotation.Scheduled;
  * escalations go out twice, reminders are sent twice. This rule fails the build as soon as a new
  * scheduled job in core arrives without a {@code @SchedulerLock}.
  *
- * <p>visit, report and notification are about to leave core; each brings its own answer for its
- * jobs when it does, so they are left out here.
+ * <p>visit is about to leave core and brings its own answer for its jobs when it does, so it is
+ * left out here. report and notification have left, each with its own rule.
  */
 @AnalyzeClasses(
 		packages = "sg.nus.carelink",
@@ -26,7 +26,7 @@ class ScheduledJobLockTest {
 	static final ArchRule scheduledJobsInCoreTakeALock =
 			methods().that().areAnnotatedWith(Scheduled.class)
 					.and().areDeclaredInClassesThat()
-					.resideOutsideOfPackages("..visit..", "..report..", "..notification..")
+					.resideOutsideOfPackage("..visit..")
 					.should().beAnnotatedWith(SchedulerLock.class)
 					.because("core runs on several replicas, and a job without a lock runs on each of them")
 					.allowEmptyShould(true);

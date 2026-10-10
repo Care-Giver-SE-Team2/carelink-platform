@@ -8,18 +8,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.profile.application.FamilyAccessQuery;
-import sg.nus.carelink.profile.application.ProfileService;
-import sg.nus.carelink.profile.domain.model.FamilyMember;
-import sg.nus.carelink.profile.domain.repository.FamilyMemberRepository;
 import sg.nus.carelink.report.domain.model.ValueAddedService;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRepository;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRequestRepository;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.visit.application.StandaloneVisits;
 
 /**
  * Application service for UC-EL02 and UC-FM08: the elder or a family member asks, the family
@@ -29,9 +23,9 @@ import sg.nus.carelink.visit.application.StandaloneVisits;
 @Service
 @Transactional
 public class ValueAddedServiceRequestService {
-    private final IdentityService identity;
-    private final ProfileService profiles;
-    private final FamilyMemberRepository families;
+    private final Accounts accounts;
+    private final Elders elders;
+    private final FamilyMembers families;
     private final FamilyAccessQuery familyAccess;
     private final ValueAddedServiceRepository services;
     private final ValueAddedServiceRequestRepository requests;
@@ -43,9 +37,9 @@ public class ValueAddedServiceRequestService {
 
     @Autowired
     public ValueAddedServiceRequestService(
-            IdentityService identity,
-            ProfileService profiles,
-            FamilyMemberRepository families,
+            Accounts accounts,
+            Elders elders,
+            FamilyMembers families,
             FamilyAccessQuery familyAccess,
             ValueAddedServiceRepository services,
             ValueAddedServiceRequestRepository requests,
@@ -54,8 +48,8 @@ public class ValueAddedServiceRequestService {
             ValueAddedVisitAssignment assignment,
             ValueAddedManagerAlert managerAlert,
             ValueAddedNotifier notifier) {
-        this.identity = identity;
-        this.profiles = profiles;
+        this.accounts = accounts;
+        this.elders = elders;
         this.families = families;
         this.familyAccess = familyAccess;
         this.services = services;
@@ -75,7 +69,7 @@ public class ValueAddedServiceRequestService {
     /** UC-EL02: list the current elder's own requests. */
     @Transactional(readOnly = true)
     public List<ValueAddedServiceRequest> listForElderUser(Long userId) {
-        Long elderId = profiles.requireElderByUserId(userId).id();
+        Long elderId = elders.requireElderIdOfUser(userId);
         return requests.findByElderId(elderId);
     }
 
@@ -85,7 +79,7 @@ public class ValueAddedServiceRequestService {
             Long serviceId,
             LocalDateTime requestedSchedule,
             String specialInstructions) {
-        Long elderId = profiles.requireElderByUserId(userId).id();
+        Long elderId = elders.requireElderIdOfUser(userId);
         ValueAddedService service = requireAvailable(serviceId);
         ValueAddedServiceRequest.requireBookableTime(requestedSchedule, service.duration(), now());
         ValueAddedServiceRequest saved = requests.save(ValueAddedServiceRequest.requestedByElder(
@@ -104,13 +98,13 @@ public class ValueAddedServiceRequestService {
             Long serviceId,
             LocalDateTime requestedSchedule,
             String specialInstructions) {
-        FamilyMember family = requireFamily(username);
+        Long familyId = requireFamilyId(username);
         familyAccess.requireWritableElder(username, elderId);
         ValueAddedService service = requireAvailable(serviceId);
         ValueAddedServiceRequest.requireBookableTime(requestedSchedule, service.duration(), now());
         ValueAddedServiceRequest pending = requests.save(ValueAddedServiceRequest.requestedByFamily(
-                elderId, serviceId, family.id(), requestedSchedule, specialInstructions));
-        return dispatch(pending, family.id(), service);
+                elderId, serviceId, familyId, requestedSchedule, specialInstructions));
+        return dispatch(pending, familyId, service);
     }
 
     /** UC-FM08: list requests for an elder that the current family account may read. */
@@ -125,12 +119,12 @@ public class ValueAddedServiceRequestService {
      * to assign the primary caregiver and alerts managers about the assignment result.
      */
     public ValueAddedServiceRequest decideForFamily(String username, Long requestId, Decision decision) {
-        FamilyMember family = requireFamily(username);
+        Long familyId = requireFamilyId(username);
         ValueAddedServiceRequest request = requireRequest(requestId);
         familyAccess.requireWritableElder(username, request.elderId());
 
         if (decision == Decision.REJECTED) {
-            return requests.save(request.reject(family.id(), now()));
+            return requests.save(request.reject(familyId, now()));
         }
 
         ValueAddedService service = requireService(request.valueAddedServiceId());
@@ -148,7 +142,7 @@ public class ValueAddedServiceRequestService {
             throw new BusinessRuleViolation("VALUE_ADDED_SERVICE_TOO_LATE",
                     "It is too close to the requested time to arrange this service. Ask for another time.");
         }
-        return dispatch(request, family.id(), service);
+        return dispatch(request, familyId, service);
     }
 
     /**
@@ -187,10 +181,10 @@ public class ValueAddedServiceRequestService {
         return service;
     }
 
-    private FamilyMember requireFamily(String username) {
-        var account = identity.require(username);
-        return families.findByUserId(account.id())
-                .orElseThrow(() -> new ResourceNotFound("Family member for user", account.id()));
+    private Long requireFamilyId(String username) {
+        Long userId = accounts.idOf(username);
+        return families.findIdByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFound("Family member for user", userId));
     }
 
     private ValueAddedServiceRequest requireRequest(Long id) {

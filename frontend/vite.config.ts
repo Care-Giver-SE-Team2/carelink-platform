@@ -10,6 +10,14 @@ export default defineConfig({
       // The notification service (scripts/run.sh all starts it on 8083). Listed before /api: the
       // first matching entry wins.
       '/api/notifications': 'http://localhost:8083',
+      // The report service (8082): weekly reports, value-added services, caregiver reviews. The
+      // weekly summary shares /api/elders/{id} with core, so it is matched by its full path.
+      '/api/reports': 'http://localhost:8082',
+      '/api/value-added-service-requests': 'http://localhost:8082',
+      '/api/family/caregiver-reviews': 'http://localhost:8082',
+      '/api/family/value-added-service': 'http://localhost:8082',
+      '/api/elders/me/value-added-service': 'http://localhost:8082',
+      '^/api/elders/[^/]+/weekly-summary': 'http://localhost:8082',
       '/api': 'http://localhost:8080',
     },
   },

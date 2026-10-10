@@ -1,6 +1,7 @@
 package sg.nus.carelink.report.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -14,7 +15,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,11 +31,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import sg.nus.carelink.coreapi.CoreApi;
+import sg.nus.carelink.report.support.SeededFamilyAccess;
+import sg.nus.carelink.report.support.SignedInSessions;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
@@ -43,7 +47,7 @@ import sg.nus.carelink.testsupport.SharedMySql;
  *
  * @author Wang Zhili
  */
-@SpringBootTest(properties = {"carelink.report.schedule-cron=-", "carelink.escalation.scan-initial-delay=PT1H"})
+@SpringBootTest(properties = "carelink.report.schedule-cron=-")
 @AutoConfigureMockMvc
 @Import(FamilyReportDetailIT.FixedTime.class)
 class FamilyReportDetailIT {
@@ -63,6 +67,11 @@ class FamilyReportDetailIT {
 	private MockMvc mvc;
 	@Autowired
 	private JdbcTemplate jdbc;
+	@Autowired
+	private Clock clock;
+	/** core, which answers report's questions about family access; see SeededFamilyAccess */
+	@MockitoBean
+	private CoreApi core;
 	private final JsonMapper json = JsonMapper.builder().build();
 
 	@TestConfiguration(proxyBeanMethods = false)
@@ -76,6 +85,7 @@ class FamilyReportDetailIT {
 
 	@BeforeEach
 	void prepareIsolatedReports() {
+		SeededFamilyAccess.answer(core, jdbc, clock);
 		jdbc.update("DELETE FROM audit_log");
 		jdbc.update("DELETE FROM report_amendment");
 		jdbc.update("DELETE FROM report");
@@ -367,10 +377,7 @@ class FamilyReportDetailIT {
 	}
 
 	private JsonNode managerPost(MockHttpSession session, String path, Map<String, ?> body, int expectedStatus) throws Exception {
-		Cookie token = mvc.perform(get("/api/auth/csrf").session(session)).andExpect(status().isOk())
-				.andReturn().getResponse().getCookie("XSRF-TOKEN");
-		assertThat(token).isNotNull();
-		var response = mvc.perform(post(path).session(session).cookie(token).header("X-XSRF-TOKEN", token.getValue())
+		var response = mvc.perform(post(path).session(session).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)))
 				.andExpect(status().is(expectedStatus)).andReturn().getResponse();
 		return json.readTree(response.getContentAsString());
@@ -389,16 +396,8 @@ class FamilyReportDetailIT {
 				""", id, elderId, audience, reportStatus, reportContent, NOW);
 	}
 
-	private MockHttpSession loginAs(String username) throws Exception {
-		Cookie token = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk())
-				.andReturn().getResponse().getCookie("XSRF-TOKEN");
-		assertThat(token).isNotNull();
-		var result = mvc.perform(post("/api/auth/login").cookie(token).header("X-XSRF-TOKEN", token.getValue())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(json.writeValueAsString(Map.of("username", username, "password", "test-password"))))
-				.andExpect(status().isOk()).andReturn();
-		var session = (MockHttpSession) result.getRequest().getSession(false);
-		assertThat(session).isNotNull();
-		return session;
+	/** The session core leaves after {@code username} signs in. */
+	private MockHttpSession loginAs(String username) {
+		return new SignedInSessions(jdbc).of(username);
 	}
 }

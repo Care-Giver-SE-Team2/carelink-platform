@@ -1,5 +1,6 @@
 package sg.nus.carelink.report.infrastructure.schedule;
 
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,7 +12,8 @@ import sg.nus.carelink.report.application.ValueAddedServiceDispatchService;
  * Nothing but a trigger: keeps extra-service requests in step with their visits
  * ({@link ValueAddedServiceDispatchService#settleWithVisits}) and follows up the ones the family
  * has not answered ({@link ValueAddedServiceDispatchService#followUpUnanswered}). Which requests
- * and why is decided there. Every five minutes by default ({@code carelink.value-added.settle-interval}).
+ * and why is decided there. Every five minutes by default ({@code carelink.value-added.settle-interval}),
+ * on one replica at a time.
  */
 @Component
 class ValueAddedSettlementScheduler {
@@ -24,6 +26,7 @@ class ValueAddedSettlementScheduler {
         this.dispatch = dispatch;
     }
 
+    @SchedulerLock(name = "report.value-added-settlement", lockAtMostFor = "PT5M", lockAtLeastFor = "PT4M")
     @Scheduled(fixedDelayString = "${carelink.value-added.settle-interval:PT5M}",
             initialDelayString = "${carelink.value-added.settle-initial-delay:PT1M}")
     void settle() {

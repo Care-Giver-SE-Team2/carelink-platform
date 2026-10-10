@@ -7,6 +7,11 @@ SQL still reads another service's tables.
 Generated from the code at `c124099` (Flyway migrations V1–V25, 50 tables). Owner: core and shared parts. Each
 service owner refines their own section when they split the service.
 
+**Where the move stands.** notification and report run as services of their own. report reaches core and visit
+only through ports of its own (`report/application`), whose adapters call `CoreApi` and `VisitApi`
+(`report/infrastructure/core`, `…/visit`); its calls in sections 3 and 4 are done. visit is still in core. The SQL
+and writes in section 5 still run until their owners replace them, which comes before the schema split.
+
 ---
 
 ## 1. Which schema owns each table
@@ -56,8 +61,8 @@ upstream sync brings in; drop it in the next platform migration.
 
 ## 3. What core offers visit and report
 
-Today visit and report call core's Java types directly. After the split, each call becomes one of the replacements
-below. Internal endpoints live under `/internal/v1/`. The Ingress routes only the public paths (`/api/**`), never
+visit calls core's Java types directly; report, which has moved, already calls the replacements below. After the
+split, every call is one of them. Internal endpoints live under `/internal/v1/`. The Ingress routes only the public paths (`/api/**`), never
 `/internal`, so they are reachable only inside the cluster. Responses carry only the fields the callers use today.
 
 The contract is written once, as the Java interface `CoreApi` in `libs/core-api`: core implements it (the

@@ -40,10 +40,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.identity.domain.model.AppUser;
-import sg.nus.carelink.report.application.ReportService;
+import sg.nus.carelink.report.application.Accounts;
 import sg.nus.carelink.report.application.FamilyReportQueryService;
+import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.domain.model.Report;
 import sg.nus.carelink.report.domain.model.ReportAmendment;
 import sg.nus.carelink.report.domain.model.ReportMetrics;
@@ -52,7 +51,6 @@ import sg.nus.carelink.report.domain.service.ReportAssembler;
 import sg.nus.carelink.report.support.ReportFixtures;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.shared.security.Role;
 import sg.nus.carelink.shared.web.GlobalExceptionHandlerTestSupport;
 
 /**
@@ -66,25 +64,25 @@ import sg.nus.carelink.shared.web.GlobalExceptionHandlerTestSupport;
  */
 class ReportControllerTest {
 
-	private static final AppUser MANAGER =
-			new AppUser(11L, "alice", "Alice Tan", Set.of(Role.MANAGER), true);
+	/** The signed-in manager's account id. */
+	private static final Long MANAGER = 11L;
 
 	/** The numbers of the week in ReportFixtures, as its basis would hold them. */
 	private static final ReportMetrics METRICS = new ReportMetrics(
 			3, 2, new BigDecimal("66.67"), 1, 1, new BigDecimal("3.50"), 2, false);
 
 	private final ReportService service = mock(ReportService.class);
-	private final IdentityService identity = mock(IdentityService.class);
+	private final Accounts accounts = mock(Accounts.class);
 
 	private MockMvc mvc;
 
 	@BeforeEach
 	void setUp() {
 		mvc = MockMvcBuilders
-				.standaloneSetup(new ReportController(service, identity, mock(FamilyReportQueryService.class)))
+				.standaloneSetup(new ReportController(service, accounts, mock(FamilyReportQueryService.class)))
 				.setControllerAdvice(GlobalExceptionHandlerTestSupport.instance())
 				.build();
-		when(identity.require(anyString())).thenReturn(MANAGER);
+		when(accounts.idOf(anyString())).thenReturn(MANAGER);
 	}
 
 	private static RequestPostProcessor asManager() {

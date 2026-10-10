@@ -13,11 +13,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-import sg.nus.carelink.profile.application.PrimaryCaregiverLookup;
+import sg.nus.carelink.coreapi.CoreApi;
 
 class JdbcValueAddedVisitAssignmentTest {
     private static final LocalDateTime START = LocalDateTime.of(2026, 10, 24, 10, 0);
-    private PrimaryCaregiverLookup primary;
+    private CoreApi core;
     private JdbcClient jdbc;
     private JdbcClient.StatementSpec statement;
     private JdbcClient.MappedQuerySpec<Long> countQuery;
@@ -26,25 +26,25 @@ class JdbcValueAddedVisitAssignmentTest {
     @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
-        primary = mock(PrimaryCaregiverLookup.class);
+        core = mock(CoreApi.class);
         jdbc = mock(JdbcClient.class);
         statement = mock(JdbcClient.StatementSpec.class, RETURNS_SELF);
         countQuery = mock(JdbcClient.MappedQuerySpec.class);
         when(jdbc.sql(anyString())).thenReturn(statement);
         when(statement.query(Long.class)).thenReturn(countQuery);
-        assignment = new JdbcValueAddedVisitAssignment(primary, jdbc);
+        assignment = new JdbcValueAddedVisitAssignment(core, jdbc);
     }
 
     @Test
     void noPrimaryCaregiverReturnsEmptyWithoutQueryingDatabase() {
-        when(primary.findRosterableCaregiverId(1L)).thenReturn(Optional.empty());
+        when(core.findPrimaryCaregiverId(1L)).thenReturn(Optional.empty());
         assertThat(assignment.chooseCaregiver(1L, START, START.plusHours(3))).isEmpty();
         verifyNoInteractions(jdbc);
     }
 
     @Test
     void approvedLeaveExcludesPrimaryCaregiverAndSkipsOverlapQuery() {
-        when(primary.findRosterableCaregiverId(1L)).thenReturn(Optional.of(7L));
+        when(core.findPrimaryCaregiverId(1L)).thenReturn(Optional.of(7L));
         when(countQuery.single()).thenReturn(1L);
         assertThat(assignment.chooseCaregiver(1L, START, START.plusHours(3))).isEmpty();
         verify(jdbc, times(1)).sql(anyString());
@@ -53,7 +53,7 @@ class JdbcValueAddedVisitAssignmentTest {
 
     @Test
     void overlappingVisitAnywhereInTheServicesLengthExcludesPrimaryCaregiver() {
-        when(primary.findRosterableCaregiverId(1L)).thenReturn(Optional.of(7L));
+        when(core.findPrimaryCaregiverId(1L)).thenReturn(Optional.of(7L));
         when(countQuery.single()).thenReturn(0L, 1L);
         assertThat(assignment.chooseCaregiver(1L, START, START.plusHours(3))).isEmpty();
         verify(jdbc, times(2)).sql(anyString());
@@ -63,7 +63,7 @@ class JdbcValueAddedVisitAssignmentTest {
 
     @Test
     void availablePrimaryCaregiverIsChosen() {
-        when(primary.findRosterableCaregiverId(1L)).thenReturn(Optional.of(7L));
+        when(core.findPrimaryCaregiverId(1L)).thenReturn(Optional.of(7L));
         when(countQuery.single()).thenReturn(0L, 0L);
         assertThat(assignment.chooseCaregiver(1L, START, START.plusHours(3))).contains(7L);
         verify(jdbc, times(2)).sql(anyString());

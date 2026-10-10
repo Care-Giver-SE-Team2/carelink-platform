@@ -1,0 +1,25 @@
+# Settings that make report one of the platform's services. Spring Boot reads this file on top of
+# application.yml (classpath:/config/ comes after classpath:/).
+#
+# The Redis address comes from SPRING_DATA_REDIS_HOST and SPRING_DATA_REDIS_PORT (default
+# localhost:6379); docker-compose.yml sets them for a local run.
+spring:
+  data:
+    redis:
+      repositories:
+        # Redis holds sessions only; the repositories here are JPA repositories
+        enabled: false
+  session:
+    data:
+      redis:
+        # The same namespace as core, so the login made through core is seen here
+        namespace: carelink:session
+
+carelink:
+  core-api:
+    # For a run outside Docker; overridden by CARELINK_COREAPI_BASEURL
+    base-url: http://localhost:8080
+  visit-api:
+    # core serves visit's internal API until visit moves out; then this points at visit.
+    # Overridden by CARELINK_VISITAPI_BASEURL
+    base-url: http://localhost:8080

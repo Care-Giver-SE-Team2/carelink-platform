@@ -1,5 +1,6 @@
 package sg.nus.carelink.report.infrastructure.schedule;
 
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +18,7 @@ import sg.nus.carelink.report.application.ReportService;
  * ({@code carelink.report.schedule-cron}, {@code carelink.report.schedule-zone}); a cron of
  * {@code -} switches the run off. A run that fails is logged by the scheduler with its cause
  * and files nothing - the whole run is one transaction - and the next run, or a manager's
- * Generate, simply tries again.
+ * Generate, simply tries again. With two replicas, the lock lets one of them run it.
  */
 @Component
 class ReportScheduler {
@@ -28,6 +29,7 @@ class ReportScheduler {
 		this.reports = reports;
 	}
 
+	@SchedulerLock(name = "report.weekly-reports", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
 	@Scheduled(
 			cron = "${carelink.report.schedule-cron:0 0 23 * * SUN}",
 			zone = "${carelink.report.schedule-zone:Asia/Singapore}")

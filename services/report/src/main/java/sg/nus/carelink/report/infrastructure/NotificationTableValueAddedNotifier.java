@@ -9,7 +9,7 @@ import java.util.Objects;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
-import sg.nus.carelink.profile.application.FamilyAlertRecipients;
+import sg.nus.carelink.coreapi.CoreApi;
 import sg.nus.carelink.report.application.ValueAddedNotifier;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 
@@ -31,11 +31,11 @@ public class NotificationTableValueAddedNotifier implements ValueAddedNotifier {
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ENGLISH);
 
     private final JdbcClient jdbc;
-    private final FamilyAlertRecipients families;
+    private final CoreApi core;
 
-    public NotificationTableValueAddedNotifier(JdbcClient jdbc, FamilyAlertRecipients families) {
+    public NotificationTableValueAddedNotifier(JdbcClient jdbc, CoreApi core) {
         this.jdbc = jdbc;
-        this.families = families;
+        this.core = core;
     }
 
     @Override
@@ -85,10 +85,10 @@ public class NotificationTableValueAddedNotifier implements ValueAddedNotifier {
     }
 
     private void toFamily(ValueAddedServiceRequest request, String event, String title, String body) {
-        List<Long> users = families.familyMemberIds(request.elderId()).stream()
-                .map(id -> families.resolve(request.elderId(), id))
-                .filter(FamilyAlertRecipients.Candidate::eligible)
-                .map(FamilyAlertRecipients.Candidate::userId)
+        List<Long> users = core.familyMemberIds(request.elderId()).stream()
+                .map(id -> core.alertRecipient(request.elderId(), id))
+                .filter(CoreApi.AlertRecipient::eligible)
+                .map(CoreApi.AlertRecipient::userId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();

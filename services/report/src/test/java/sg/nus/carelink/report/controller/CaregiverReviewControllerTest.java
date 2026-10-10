@@ -13,7 +13,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import sg.nus.carelink.profile.application.CaregiverPublicProfile;
+import sg.nus.carelink.report.application.CaregiverDirectory.CaregiverPublicProfile;
 import sg.nus.carelink.report.application.CaregiverReviewService;
 import sg.nus.carelink.report.controller.dto.CaregiverReviewCreateRequest;
 import sg.nus.carelink.report.controller.dto.CaregiverReviewResponse;

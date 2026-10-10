@@ -19,7 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.Valid;
 
-import sg.nus.carelink.identity.application.IdentityService;
+import sg.nus.carelink.report.application.Accounts;
 import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.application.FamilyReportQueryService;
 import sg.nus.carelink.report.controller.dto.FamilyReportDetailResponse;
@@ -51,12 +51,12 @@ import sg.nus.carelink.report.domain.model.ReportPage;
 public class ReportController {
 
 	private final ReportService service;
-	private final IdentityService identity;
+	private final Accounts accounts;
 	private final FamilyReportQueryService familyReports;
 
-	public ReportController(ReportService service, IdentityService identity, FamilyReportQueryService familyReports) {
+	public ReportController(ReportService service, Accounts accounts, FamilyReportQueryService familyReports) {
 		this.service = service;
-		this.identity = identity;
+		this.accounts = accounts;
 		this.familyReports = familyReports;
 	}
 
@@ -75,7 +75,7 @@ public class ReportController {
 			@Valid @RequestBody ReportRequests.Generate body,
 			Principal principal) {
 
-		Long requestedBy = identity.require(principal.getName()).id();
+		Long requestedBy = accounts.idOf(principal.getName());
 		List<Report> filed = service.generate(body.elderId(), body.periodStart(), body.periodEnd(), requestedBy);
 		Map<Long, ReportMetrics> metrics = service.metricsFor(filed);
 		return filed.stream().map(report -> ReportResponses.ReportView.of(report, metrics)).toList();
@@ -125,7 +125,7 @@ public class ReportController {
 			@Valid @RequestBody ReportRequests.Amend body,
 			Principal principal) {
 
-		Long author = identity.require(principal.getName()).id();
+		Long author = accounts.idOf(principal.getName());
 		return ReportResponses.Amendment.of(service.amend(id, body.kindOrCorrection(), body.note(), author));
 	}
 }

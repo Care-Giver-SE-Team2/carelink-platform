@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
-import sg.nus.carelink.identity.application.IdentityService;
+import sg.nus.carelink.report.application.Accounts;
 import sg.nus.carelink.report.application.ValueAddedServiceDispatchService;
 import sg.nus.carelink.report.application.ValueAddedServiceRequestService;
 import sg.nus.carelink.report.controller.dto.FamilyValueAddedServiceRequestCreate;
@@ -29,13 +29,13 @@ import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 @RestController
 @RequestMapping("/api")
 public class ValueAddedServiceController {
-    private final IdentityService identity;
+    private final Accounts accounts;
     private final ValueAddedServiceRequestService service;
     private final ValueAddedServiceDispatchService dispatch;
 
-    public ValueAddedServiceController(IdentityService identity, ValueAddedServiceRequestService service,
+    public ValueAddedServiceController(Accounts accounts, ValueAddedServiceRequestService service,
             ValueAddedServiceDispatchService dispatch) {
-        this.identity = identity;
+        this.accounts = accounts;
         this.service = service;
         this.dispatch = dispatch;
     }
@@ -49,7 +49,7 @@ public class ValueAddedServiceController {
     @GetMapping("/elders/me/value-added-service-requests")
     @PreAuthorize("hasRole('ELDER')")
     public List<ValueAddedServiceRequestResponse> elderRequests(Principal principal) {
-        Long userId = identity.require(principal.getName()).id();
+        Long userId = accounts.idOf(principal.getName());
         return responses(service.listForElderUser(userId));
     }
 
@@ -59,7 +59,7 @@ public class ValueAddedServiceController {
     public ValueAddedServiceRequestResponse create(
             @Valid @RequestBody ValueAddedServiceRequestCreate request,
             Principal principal) {
-        Long userId = identity.require(principal.getName()).id();
+        Long userId = accounts.idOf(principal.getName());
         ValueAddedServiceRequest saved = service.requestForElderUser(
                 userId, request.valueAddedServiceId(), request.requestedSchedule(), request.specialInstructions());
         return response(saved);
@@ -69,7 +69,7 @@ public class ValueAddedServiceController {
     @PostMapping("/elders/me/value-added-service-requests/{id}/cancellation")
     @PreAuthorize("hasRole('ELDER')")
     public ValueAddedServiceRequestResponse withdraw(@PathVariable Long id, Principal principal) {
-        Long userId = identity.require(principal.getName()).id();
+        Long userId = accounts.idOf(principal.getName());
         return response(dispatch.cancelForElderUser(userId, id));
     }
 
