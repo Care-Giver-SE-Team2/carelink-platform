@@ -4,8 +4,9 @@ import sg.nus.carelink.notification.domain.model.Notification;
 import sg.nus.carelink.notification.infrastructure.persistence.entity.NotificationJpaEntity;
 
 /**
- * JPA entity <-> domain model for notification, both directions, column by column. Database-managed
- * columns (created_at, updated_at) are read but never written back. Covered by NotificationMapperTest.
+ * JPA entity <-> domain model for notification, both directions, column by column. created_at is the
+ * time the message was requested: the entity writes it on insert and never updates it. Covered by
+ * NotificationMapperTest.
  */
 final class NotificationMapper {
 
@@ -39,6 +40,7 @@ final class NotificationMapper {
 		e.setResourceType(d.resourceType());
 		e.setResourceId(d.resourceId());
 		e.setStatus(d.status() == null ? null : NotificationJpaEntity.Status.valueOf(d.status().name()));
+		e.setCreatedAt(d.createdAt());
 		e.setSentAt(d.sentAt());
 		e.setReadAt(d.readAt());
 		return e;
