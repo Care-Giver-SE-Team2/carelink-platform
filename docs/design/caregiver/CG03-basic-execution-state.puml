@@ -1,5 +1,5 @@
 @startuml
-title CG03 basic execution and CG04 pause (implemented scope)
+title CG03 late arrival, CG05 self check-out and CG04 pause
 hide empty description
 [*] --> SCHEDULED : manager publishes and assigns
 SCHEDULED --> ARRIVED : check-in / authorized + window + plan tasks
@@ -9,12 +9,18 @@ IN_PROGRESS : task writes advance parent version, not Visit state
 SCHEDULED --> EXCEPTION : incident / start reached
 ARRIVED --> EXCEPTION : incident
 IN_PROGRESS --> EXCEPTION : incident
-EXCEPTION : execution commands blocked
+SCHEDULED : SYS03 records alert and advances version, no state change
+EXCEPTION --> ARRIVED : only proven legacy SYS03 / locked check-in
+IN_PROGRESS --> COMPLETED : caregiver check-out / server departure time
+COMPLETED : pending tasks and evidence remain unchanged
+COMPLETED : elder confirmation is a separate subsequent step
+EXCEPTION : ordinary execution commands blocked
 EXCEPTION : manager resolves Incident, not Visit
 state "Terminal Visit (existing)" as Terminal
 Terminal : supplemental incident preserves terminal status
 note bottom of IN_PROGRESS
 All-DONE is not COMPLETED.
-Check-out/evidence/CG05 are future scope.
+Check-out is explicit, not gated on task/evidence completeness.
+Evidence upload remains future scope.
 end note
 @enduml

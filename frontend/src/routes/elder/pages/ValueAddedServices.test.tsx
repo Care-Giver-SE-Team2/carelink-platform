@@ -10,6 +10,7 @@ import {
 } from 'react-router-dom'
 import {
   afterEach,
+  beforeEach,
   describe,
   expect,
   it,
@@ -93,7 +94,16 @@ const catalogue = [
   },
 ]
 
+// The picker's earliest time is "now" plus the notice period, and the form refuses a time before
+// it, so pin the clock before the times the tests type in. Only Date is faked; user-event still
+// needs real timers.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 1, 9, 0))
+})
+
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   vi.clearAllMocks()
 })
@@ -196,12 +206,10 @@ describe(
         )
 
       expect(
-        screen.getByRole(
-          'alert',
+        screen.getByText(
+          'Choose a date and time.',
         ),
-      ).toHaveTextContent(
-        'Choose a service and requested date/time.',
-      )
+      ).toBeInTheDocument()
 
       expect(
         mockedCreate,

@@ -10,4 +10,5 @@ public interface ServiceApplicationJpaRepository extends JpaRepository<ServiceAp
     long countByApplicantFamilyMemberIdAndElderIdIn(Long familyId, Set<Long> elderIds);
     List<ServiceApplicationJpaEntity> findByApplicantFamilyMemberIdAndElderIdIn(
             Long familyId, Set<Long> elderIds, Pageable pageable);
+    List<ServiceApplicationJpaEntity> findByElderIdOrderByCreatedAtDescIdDesc(Long elderId);
 }

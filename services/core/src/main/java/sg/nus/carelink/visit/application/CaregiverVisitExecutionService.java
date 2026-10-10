@@ -13,6 +13,8 @@ import sg.nus.carelink.visit.domain.repository.*;
 public class CaregiverVisitExecutionService {
     private static final String CHECK_IN = "CHECK_IN";
     private static final String TASK_RESULT = "TASK_RESULT";
+    private static final String CHECK_OUT = "CHECK_OUT";
+    private final MissedCheckInResumeService resume;
     private final CaregiverCommandExecutor executor;
     private final CaregiverCommandStore receipts;
     private final VisitCommandRepository visits;
@@ -22,8 +24,9 @@ public class CaregiverVisitExecutionService {
     private final VisitPlanReader plans;
     private final VisitExecutionPolicy policy;
     public CaregiverVisitExecutionService(CaregiverCommandExecutor executor, CaregiverCommandStore receipts, VisitCommandRepository visits,
-            VisitTaskRepository tasks, VisitStateTransitionRepository transitions, VisitCheckInRepository checkIns, VisitPlanReader plans, VisitExecutionPolicy policy) {
+            VisitTaskRepository tasks, VisitStateTransitionRepository transitions, VisitCheckInRepository checkIns, VisitPlanReader plans, VisitExecutionPolicy policy, MissedCheckInResumeService resume) {
         this.executor=executor;this.receipts=receipts;this.visits=visits;this.tasks=tasks;this.transitions=transitions;this.checkIns=checkIns;this.plans=plans;this.policy=policy;
+        this.resume=resume;
     }
     public ExecutionResult checkIn(String username, Long id, Integer version, UUID key, CheckInLocation loc) {
         String hash=CommandFingerprint.of(id,version,loc.source(),loc.latitude(),loc.longitude(),loc.accuracy(),loc.note(),loc.clientCapturedAt());
@@ -31,13 +34,17 @@ public class CaregiverVisitExecutionService {
             var previous=receipts.find(actor.userId(),key);
             if(previous.isPresent()) { var r=previous.get();r.requireSame(CHECK_IN,id,hash);return new ExecutionResult(id,r.version(),"IN_PROGRESS",null,true); }
             CaregiverCommandExecutor.version(visit,version);
-            var now=executor.now();policy.requireWindow(visit,now);
-            var arrived=VisitStateFactory.forVisit(visit).arrive(visit,now);
+            var observedNow=executor.now();policy.requireWindow(visit,observedNow);
+            // Visit arrival/departure columns are DATETIME(0): avoid rounding arrival
+            // into the future and accidentally imposing a one-second minimum stay.
+            var now=observedNow.truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            var state=VisitStateFactory.forVisit(visit); // Validate the supported service strategy on both paths.
+            var arrived=visit.status()==Visit.Status.EXCEPTION ? resume.arrive(visit,now) : state.arrive(visit,now);
             materialize(visit);
             var started=VisitStateFactory.forVisit(arrived).start(arrived);
             checkIns.save(id,actor.userId(),key,loc,now);
             var saved=visits.save(started);
-            transitions.save(new VisitStateTransition(null,id,Visit.Status.SCHEDULED.name(),Visit.Status.ARRIVED.name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));
+            transitions.save(new VisitStateTransition(null,id,visit.status().name(),Visit.Status.ARRIVED.name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));
             transitions.save(new VisitStateTransition(null,id,Visit.Status.ARRIVED.name(),Visit.Status.IN_PROGRESS.name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));
             receipts.audit(actor.userId(),id,CHECK_IN,"OK","SAVED");
             receipts.save(new CaregiverCommandReceipt(actor.userId(),key,CHECK_IN,id,hash,id,saved.version(),now));
@@ -83,5 +90,25 @@ public class CaregiverVisitExecutionService {
         });
     }
     public record TaskCommand(String status,String outcome,String caregiverNote,Integer expectedVersion,UUID clientRequestId) {}
+    public CheckOutResult checkOut(String username, Long id, Integer version, UUID key) {
+        String hash=CommandFingerprint.of(id,version);
+        return executor.execute(username,id,CHECK_OUT,Visit.Status.COMPLETED.name(),(actor,visit)->{
+            var previous=receipts.find(actor.userId(),key);
+            if(previous.isPresent()) {
+                var r=previous.get();r.requireSame(CHECK_OUT,id,hash);
+                return new CheckOutResult(id,r.version(),"COMPLETED",visit.checkedInAt(),r.occurredAt(),true);
+            }
+            CaregiverCommandExecutor.version(visit,version);
+            var now=executor.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            var completed=VisitStateFactory.forVisit(visit).checkOut(visit,now);
+            var saved=visits.save(completed);
+            transitions.save(new VisitStateTransition(null,id,visit.status().name(),saved.status().name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));
+            receipts.audit(actor.userId(),id,CHECK_OUT,"OK","SAVED");
+            receipts.save(new CaregiverCommandReceipt(actor.userId(),key,CHECK_OUT,id,hash,id,saved.version(),now));
+            return new CheckOutResult(id,saved.version(),saved.status().name(),saved.checkedInAt(),now,false);
+        });
+    }
+    public record CheckOutResult(Long visitId,Integer visitVersion,String savedState,java.time.LocalDateTime checkedInAt,
+            java.time.LocalDateTime checkedOutAt,boolean replayed) {}
     public record ExecutionResult(Long visitId,Integer visitVersion,String savedState,Long taskId,boolean replayed) {}
 }

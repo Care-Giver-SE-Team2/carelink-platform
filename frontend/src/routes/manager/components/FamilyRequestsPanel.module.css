@@ -1,0 +1,9 @@
+.panel {
+  display: grid;
+  gap: 12px;
+}
+
+.request {
+  display: grid;
+  gap: 6px;
+}

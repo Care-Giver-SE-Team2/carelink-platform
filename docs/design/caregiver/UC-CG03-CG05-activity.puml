@@ -1,5 +1,5 @@
 @startuml UC-CG03-CG05-activity
-title UC-CG03 + UC-CG05 — Execute Home Visit to Independent Service Confirmation
+title UC-CG03 + UC-CG05 — Late Arrival and Self Check-out
 
 skinparam backgroundColor white
 skinparam shadowing false
@@ -21,8 +21,10 @@ end note
 
 |System / Visit state|
 :Verify assignee, time window and current state;
+:Retain SYS03 alert without pausing service;
 if (Legal state transition?) then (yes)
   :Append SCHEDULED → ARRIVED
+  (or proven legacy SYS03 EXCEPTION → ARRIVED)
   [VisitStateTransition = APPLIED];
 else (no)
   :Append rejected transition
@@ -44,10 +46,10 @@ repeat
   note right
   Object written: VisitTask
   end note
-  :Capture required evidence and vital signs;
+  :Optionally record vital signs;
   note right
-  Objects written: VisitEvidence,
-  VitalSign
+  VitalSign / health observation.
+  Evidence upload remains future scope.
   end note
 
   if (Care exception found?) then (yes)
@@ -62,31 +64,27 @@ repeat
   endif
 
   |System / Visit state|
-  :Validate completed tasks and required evidence;
-repeat while (Anything missing or rejected?) is (yes)
+  :Keep actual task and material status;
+repeat while (Continue care?) is (yes)
 
 |Caregiver|
-:Check out and submit visit completion;
+:Review non-blocking missing-material notice;
+:Click Check out;
 |System / Visit state|
+:Verify assignee, version, real check-in and time order;
+:Record server departure time;
 :Append IN_PROGRESS → COMPLETED
 [VisitStateTransition = APPLIED];
 :Set Visit = COMPLETED
 (awaiting elder);
-:Create permitted VISIT_COMPLETED notifications;
-
-|Family Notification|
-:Receive service-completion notification
-when subscription and access scope allow it;
+:Preserve pending tasks, health facts and existing alerts;
 
 |Elder|
-:Review the completed visit independently;
+:May review the completed visit independently (existing EL01);
 if (Confirm service?) then (yes)
   |System / Visit state|
   :Create ElderConfirmation = CONFIRMED;
-  |Manager|
-  :Audit/verify visit when required;
-  |System / Visit state|
-  :Set Visit = VERIFIED;
+  :Keep Visit = COMPLETED;
   stop
 elseif (Dispute?) then (yes)
   |System / Visit state|
@@ -95,9 +93,8 @@ and open Incident;
   |Manager|
   :Hand off to UC-MG05;
   stop
-else (no response by deadline)
-  |System / Visit state|
-  :Set Visit = AUTO_CLOSED;
+else (no response)
+  :No additional approval is needed for check-out;
   stop
 endif
 @enduml

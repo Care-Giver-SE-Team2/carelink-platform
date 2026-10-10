@@ -56,7 +56,6 @@ beforeEach(() => {
   vi.spyOn(incidentsApi, 'listIncidentQueue').mockImplementation(async ({ size }) => ({ items: [], page: 0, size, totalElements: 0 }))
   vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue({ id: 1, username: 'tml', displayName: 'Tan Mei Ling', roles: ['MANAGER'] })
   vi.spyOn(profileApi, 'fetchCredentialRegister').mockResolvedValue([])
-  vi.spyOn(profileApi, 'fetchIntakeReviews').mockResolvedValue([])
   vi.spyOn(profileApi, 'fetchCaregivers').mockResolvedValue([
     { id: 9, fullName: 'Farah Aziz', sector: 'S31', status: 'AVAILABLE', assignable: true },
   ])

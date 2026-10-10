@@ -343,6 +343,8 @@ class FamilyIncidentWorkflowIT {
             long plan = body(manager.command("POST", "/api/care-plans", Map.of("elderId", elder)), 201).path("id").asLong();
             body(manager.command("POST", "/api/care-plans/" + plan + "/publish", Map.of("startDate", start.toLocalDate().toString(), "nodes", List.of(Map.of(
                     "groupName", "Personal care", "name", "FM05 workflow care", "evidenceType", "CHECKLIST", "visits", List.of(Map.of("day", "THURSDAY", "startTime", "10:05", "minutes", 60)))))), 200);
+            // Publishing also tells the family the plan is ready; these tests count incident messages only.
+            jdbc.update("DELETE FROM notification WHERE resource_type = 'CARE_PLAN'");
             for (var row : manager.read("/api/visits/roster?date=2026-10-08")) {
                 if (row.path("carePlanId").asLong() == plan) {
                     assertThat(row.path("caregiverId").asLong()).isEqualTo(caregiver);

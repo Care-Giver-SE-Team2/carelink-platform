@@ -6,6 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Report } from '../../features/reports/types'
 import FamilyHome from './index'
 
+// The navigation's waiting counts are tested with FamilyLayout and on Home; here they stay at zero so
+// only this page's own requests are made.
+vi.mock('./components/usePendingDecisions', () => ({
+  usePendingDecisions: () => ({ changes: [], spotChecks: [], requests: [], total: 0 }),
+}))
+
 const family = { id: 11, username: 'family_test', displayName: 'Family Test', roles: ['FAMILY'] }
 const elders = [
   { id: 21, fullName: 'Tan Mei', dateOfBirth: null, address: null, sector: null, planStatus: 'published', planVersion: 1, nextVisitDate: null },
@@ -319,7 +325,7 @@ describe('Family care report list', () => {
     },
   )
 
-  it('keeps applications, the weekly schedule and the weekly summary reachable through the tab bar', async () => {
+  it('keeps applications, the weekly schedule and the weekly summary reachable through the tab bar and Menu', async () => {
     installApi((url) => ['/api/visits', '/api/family/service-applications'].includes(url.pathname)
       ? json({ items: [], page: 0, size: 20, totalElements: 0 }) : undefined)
     openReports()
@@ -327,7 +333,8 @@ describe('Family care report list', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('link', { name: 'Schedule' }))
     expect(await screen.findByRole('heading', { name: 'No visits this week' })).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: 'Services' }))
+    await user.click(screen.getByRole('button', { name: 'Menu' }))
+    await user.click(screen.getByRole('link', { name: 'Care applications' }))
     expect(await screen.findByRole('heading', { name: 'No service applications yet' })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Reports' }))
     expect(await screen.findByRole('heading', { name: 'Weekly summary' })).toBeInTheDocument()

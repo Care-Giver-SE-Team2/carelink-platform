@@ -6,9 +6,11 @@ import { credentialPresentation } from '../../../features/schedule/credentialPre
 import { ageOn, serviceLabel, singaporeToday, visitStatusLabels, visitTime, visitWeekday, weekStart } from '../../../features/schedule/presentation'
 import type { FamilyVisit } from '../../../features/schedule/types'
 import { useFamilyVisitTasks } from '../../../features/visits/useFamilyVisitTasks'
+import { visitTime as localTime } from '../../../features/absences/presentation'
 import { ScheduleFeedback } from '../schedule/ScheduleFeedback'
 import { useSelectedElder } from '../components/selectedElder'
 import { useIsDesktop } from '../components/useIsDesktop'
+import { usePendingDecisions } from '../components/usePendingDecisions'
 import styles from './FamilyHome.module.css'
 
 const liveStates: FamilyVisit['status'][] = ['ARRIVED', 'IN_PROGRESS']
@@ -32,7 +34,8 @@ function longDate(date: string) {
 }
 
 /**
- * The family member's landing screen: the visit under way (or the next one), and how this week is going.
+ * The family member's landing screen: anything waiting on their answer, the visit under way (or the
+ * next one), and how this week is going.
  */
 export function FamilyHomePage() {
   const [today] = useState(singaporeToday)
@@ -63,6 +66,7 @@ export function FamilyHomePage() {
         {data.elders.map((item) => <option key={item.id} value={item.id}>{item.fullName}</option>)}
       </select>
     </div>}
+    <NeedsAnswer showElder={(data?.elders.length ?? 0) > 1} />
     {data && data.elders.length === 0 && <section className={styles.empty}>
       <h2>No linked elders yet</h2>
       <p>Once a care application is approved and your link is confirmed, today's care appears here.</p>
@@ -98,6 +102,45 @@ export function FamilyHomePage() {
       </section>
     </div>}
   </div>
+}
+
+/**
+ * What the care team is waiting on the family to decide, soonest deadline first, each row opening the
+ * page where it is answered. Hidden when nothing is waiting.
+ */
+function NeedsAnswer({ showElder }: { showElder: boolean }) {
+  const pending = usePendingDecisions()
+  if (pending.total === 0) return null
+  const elder = (name: string) => showElder ? `${name} · ` : ''
+  const changes = [...pending.changes].sort((a, b) => (a.respondBy ?? '~').localeCompare(b.respondBy ?? '~'))
+  return <section className={styles.answer} aria-labelledby="home-answer">
+    <h2 id="home-answer" className={styles.sectionLabel}>Needs your answer · {pending.total}</h2>
+    <ul className={styles.answerList}>
+      {changes.map((change) => <li key={`change-${change.id}`}>
+        <Link to="/family/changes">
+          <span className={styles.answerKind}>Visit change</span>
+          <span className={styles.answerTitle}>{change.usualCaregiverName} can't come on {localTime(change.visitStart)}</span>
+          <span className={styles.answerMeta}>
+            {elder(change.elderName)}{change.respondBy ? <strong>Reply by {localTime(change.respondBy)}</strong> : 'Choose who comes instead'}
+          </span>
+        </Link>
+      </li>)}
+      {pending.spotChecks.map((check) => <li key={`check-${check.id}`}>
+        <Link to="/family/spot-checks">
+          <span className={styles.answerKind}>Spot check</span>
+          <span className={styles.answerTitle}>A manager asks to join {check.caregiverName}'s visit</span>
+          <span className={styles.answerMeta}>{elder(check.elderName)}{localTime(check.visitTime)}</span>
+        </Link>
+      </li>)}
+      {pending.requests.map((request) => <li key={`request-${request.id}`}>
+        <Link to="/family/extra-services">
+          <span className={styles.answerKind}>Extra service</span>
+          <span className={styles.answerTitle}>Approve {request.serviceName}?</span>
+          <span className={styles.answerMeta}>{request.requestedSchedule ? `Requested for ${localTime(request.requestedSchedule)}` : 'No time requested'}</span>
+        </Link>
+      </li>)}
+    </ul>
+  </section>
 }
 
 /** Desktop only: the rest of today's visits after the one shown above. Hidden when there are none. */

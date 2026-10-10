@@ -1,5 +1,6 @@
 /**
- * Care plan tree types for the editor, plus the activity catalog the "Add sub-plan" picker offers.
+ * Care plan tree types for the editor. The activities the "Add sub-plan" picker offers come from
+ * GET /api/care-activities (features/careplan/careActivities.ts) — the same catalog families apply from.
  *
  * A task's weekly effort is derived from its `visits` (one entry per scheduled day, each carrying
  * its own per-visit minutes — durations can vary by day) and rolled up through its sub-plan,
@@ -15,6 +16,8 @@ export type DayVisit = { day: string; startTime: string; minutes: number }
 export type TaskNode = {
   id: string
   type: 'task'
+  /** The catalog activity this task delivers, kept when the manager renames the task; null outside the catalog. */
+  activityCode: string | null
   name: string
   visits: DayVisit[]
   evidence: EvidenceType
@@ -29,25 +32,3 @@ export type SubPlanNode = {
 }
 
 export type PlanNode = TaskNode | SubPlanNode
-
-/**
- * Grouped catalog for the "Add sub-plan" step 1 picker: selecting an activity
- * both names the sub-plan and determines the single task it starts with — see
- * the handoff ("no separate preset-label step"). This is product configuration,
- * not mock data: the backend stores a task's name and group as free text and
- * keeps no catalog of its own.
- */
-export const ACTIVITY_CATALOG: { category: string; activities: string[] }[] = [
-  { category: 'Personal care', activities: ['Bathing assistance', 'Grooming', 'Meal support'] },
-  { category: 'Health monitoring', activities: ['Vital-sign check'] },
-  { category: 'Medication support', activities: ['Morning reminder', 'Evening reminder'] },
-  {
-    category: 'Social and mobility',
-    activities: ['Companionship walk', 'Light exercise', 'Errand accompaniment'],
-  },
-]
-
-/** The catalog category an activity belongs to, which is the sub-plan it's filed under. */
-export function activityCategory(activity: string): string | undefined {
-  return ACTIVITY_CATALOG.find((group) => group.activities.includes(activity))?.category
-}

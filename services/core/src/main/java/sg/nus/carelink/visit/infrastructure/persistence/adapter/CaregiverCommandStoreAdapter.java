@@ -24,7 +24,7 @@ class CaregiverCommandStoreAdapter implements CaregiverCommandStore {
     }
     public void save(CaregiverCommandReceipt r) {
         jdbc.update("insert into caregiver_command_receipt(actor_user_id,client_request_id,action_code,visit_id,payload_hash,result_id,visit_version,occurred_at) values (?,?,?,?,?,?,?,?)",
-                r.actorUserId(), r.clientRequestId().toString(), r.action(), r.visitId(), r.payloadHash(), r.resultId(), r.version(), r.occurredAt());
+                r.actorUserId(), r.clientRequestId().toString(), r.action(), r.visitId(), r.payloadHash(), r.resultId(), r.version(), java.sql.Timestamp.valueOf(r.occurredAt()));
     }
     public void audit(Long actor, Long visit, String action, String result, String reason) {
         jdbc.update("insert into audit_log(actor_user_id,action,resource_type,resource_id,result,detail) values (?,?,'VISIT_EXECUTION',?,?,?)",

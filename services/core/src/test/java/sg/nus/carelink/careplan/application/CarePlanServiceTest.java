@@ -54,7 +54,7 @@ class CarePlanServiceTest {
 	void listsAnEldersVersionsNewestFirst() {
 		CarePlan first = service.createDraft(42L, 7L);
 		service.publish(first.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
-				null, "Vital-sign check", List.of(new VisitInput("Mon", EIGHT, 15)), CarePlanNode.EvidenceType.READING)));
+				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Mon", EIGHT, 15)), CarePlanNode.EvidenceType.READING)));
 		service.createDraft(42L, 7L);
 		service.createDraft(43L, 7L);
 
@@ -83,6 +83,7 @@ class CarePlanServiceTest {
 		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(
 				new PlanNodeInput(
 						"Personal care",
+						"BATHING",
 						"Bathing assistance",
 						List.of(new VisitInput("Mon", EIGHT, 30), new VisitInput("Wed", EIGHT, 30), new VisitInput("Fri", EIGHT, 30)),
 						CarePlanNode.EvidenceType.CHECKLIST)));
@@ -100,7 +101,7 @@ class CarePlanServiceTest {
 	void publishingAnAlreadyPublishedPlanIsRejected() {
 		CarePlan draft = service.createDraft(42L, 7L);
 		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST));
 		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks);
 
@@ -114,7 +115,7 @@ class CarePlanServiceTest {
 	void publishingWithoutAStartDateIsRejected() {
 		CarePlan draft = service.createDraft(42L, 7L);
 		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST));
 
 		assertThatThrownBy(() -> service.publish(draft.id(), null, tasks))
@@ -127,7 +128,7 @@ class CarePlanServiceTest {
 	void publishingATaskWithNoVisitsIsRejected() {
 		CarePlan draft = service.createDraft(42L, 7L);
 		List<PlanNodeInput> tasks = List.of(
-				new PlanNodeInput("Personal care", "Bathing assistance", List.of(), CarePlanNode.EvidenceType.CHECKLIST));
+				new PlanNodeInput("Personal care", "BATHING", "Bathing assistance", List.of(), CarePlanNode.EvidenceType.CHECKLIST));
 
 		assertThatThrownBy(() -> service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks))
 				.isInstanceOf(BusinessRuleViolation.class)
@@ -136,10 +137,98 @@ class CarePlanServiceTest {
 	}
 
 	@Test
+	void savesADraftWithUnscheduledTasksAndNoStartDateYet() {
+		CarePlan draft = service.createDraft(42L, 7L);
+
+		CarePlan saved = service.saveDraft(draft.id(), null, List.of(
+				new PlanNodeInput("Personal care", "BATHING", "Bathing assistance", List.of(), CarePlanNode.EvidenceType.CHECKLIST),
+				new PlanNodeInput("Health monitoring", "VITALS", "Vital-sign check",
+						List.of(new VisitInput("Mon", EIGHT, 15)), CarePlanNode.EvidenceType.READING)));
+
+		assertThat(saved.status()).isEqualTo(CarePlan.Status.DRAFT);
+		assertThat(service.findNodes(draft.id()))
+				.extracting(CarePlanNode::activityCode, CarePlanNode::scheduleDays, CarePlanNode::visits)
+				.containsExactly(
+						tuple("BATHING", null, List.of()),
+						tuple("VITALS", "MON", List.of(new ScheduledVisit(DayOfWeek.MONDAY, EIGHT, 15))));
+		assertThat(events).isEmpty();
+	}
+
+	@Test
+	void savingADraftAgainReplacesItsTasksAndKeepsTheStartDate() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		service.saveDraft(draft.id(), null, List.of(
+				new PlanNodeInput("Personal care", "BATHING", "Bathing assistance", List.of(), CarePlanNode.EvidenceType.CHECKLIST)));
+
+		CarePlan saved = service.saveDraft(draft.id(), LocalDate.of(2026, 11, 2), List.of(
+				new PlanNodeInput("Personal care", "GROOMING", "Grooming", List.of(), CarePlanNode.EvidenceType.CHECKLIST)));
+
+		assertThat(saved.startDate()).isEqualTo(LocalDate.of(2026, 11, 2));
+		assertThat(service.findNodes(draft.id())).extracting(CarePlanNode::name).containsExactly("Grooming");
+	}
+
+	@Test
+	void anIssuedVersionCannotBeSavedAsADraftOrDiscarded() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
+				"Personal care", "BATHING", "Bathing assistance",
+				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST));
+		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks);
+
+		assertThatThrownBy(() -> service.saveDraft(published.id(), null, tasks))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_NOT_DRAFT");
+		assertThatThrownBy(() -> service.discardDraft(published.id()))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_NOT_DRAFT");
+		assertThat(service.findNodes(published.id())).hasSize(1);
+	}
+
+	@Test
+	void discardingADraftRemovesItAndLeavesThePublishedVersionInForce() {
+		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
+				"Personal care", "BATHING", "Bathing assistance",
+				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST));
+		CarePlan published = service.publish(service.createDraft(42L, 7L).id(), LocalDate.of(2026, 4, 1), tasks);
+		CarePlan draft = service.createDraft(42L, 7L);
+		service.saveDraft(draft.id(), null, tasks);
+
+		service.discardDraft(draft.id());
+
+		assertThat(service.findCarePlan(draft.id())).isEmpty();
+		assertThat(service.findNodes(draft.id())).isEmpty();
+		assertThat(service.findLatestByElderId(42L)).contains(published);
+	}
+
+	@Test
+	void aTaskNamingAnActivityOutsideTheCatalogIsRejected() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
+				"Personal care", "SWIMMING", "Swimming", List.of(), CarePlanNode.EvidenceType.CHECKLIST));
+
+		assertThatThrownBy(() -> service.saveDraft(draft.id(), null, tasks))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_UNKNOWN_ACTIVITY");
+	}
+
+	@Test
+	void aTaskOutsideTheCatalogMayHaveNoActivityCode() {
+		CarePlan draft = service.createDraft(42L, 7L);
+
+		service.saveDraft(draft.id(), null, List.of(
+				new PlanNodeInput(null, null, "Read the newspaper aloud", List.of(), CarePlanNode.EvidenceType.NONE)));
+
+		assertThat(service.findNodes(draft.id()).getFirst().activityCode()).isNull();
+	}
+
+	@Test
 	void stopsAPublishedPlanAndKeepsItsNodes() {
 		CarePlan draft = service.createDraft(42L, 7L);
 		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST));
 		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks);
 
@@ -167,7 +256,7 @@ class CarePlanServiceTest {
 	@Test
 	void publishingANewDraftSupersedesThePreviousPublishedPlan() {
 		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST));
 		CarePlan firstDraft = service.createDraft(42L, 7L);
 		CarePlan firstPublished = service.publish(firstDraft.id(), LocalDate.of(2026, 4, 1), tasks);
@@ -184,7 +273,7 @@ class CarePlanServiceTest {
 		CarePlan draft = service.createDraft(42L, 7L);
 
 		service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Fri", LocalTime.of(8, 0), 60), new VisitInput("Mon", LocalTime.of(8, 0), 30),
 						new VisitInput("Wed", LocalTime.of(16, 30), 45)),
 				CarePlanNode.EvidenceType.CHECKLIST)));
@@ -202,7 +291,7 @@ class CarePlanServiceTest {
 	void publishingATaskThatSchedulesADayTwiceIsRejected() {
 		CarePlan draft = service.createDraft(42L, 7L);
 		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", EIGHT, 30), new VisitInput("Monday", EIGHT, 15)),
 				CarePlanNode.EvidenceType.CHECKLIST));
 
@@ -216,7 +305,7 @@ class CarePlanServiceTest {
 	void publishingADayWithNoStartTimeIsRejected() {
 		CarePlan draft = service.createDraft(42L, 7L);
 		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", null, 30)), CarePlanNode.EvidenceType.CHECKLIST));
 
 		assertThatThrownBy(() -> service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks))
@@ -234,7 +323,7 @@ class CarePlanServiceTest {
 				new VisitInput("Sun", EIGHT, 30));
 
 		service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(
-				new PlanNodeInput("Personal care", "Bathing assistance", everyDay, CarePlanNode.EvidenceType.CHECKLIST)));
+				new PlanNodeInput("Personal care", "BATHING", "Bathing assistance", everyDay, CarePlanNode.EvidenceType.CHECKLIST)));
 
 		assertThat(service.findNodes(draft.id()).getFirst().scheduleDays()).isEqualTo("DAILY");
 	}
@@ -253,11 +342,14 @@ class CarePlanServiceTest {
 	void announcesTheScheduleChangeWhenAPlanIsPublishedAndWhenItIsStopped() {
 		CarePlan draft = service.createDraft(42L, 7L);
 		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST)));
 		service.stop(published.id(), LocalDate.of(2026, 9, 22), "Elder moved away", 9L);
 
-		assertThat(events).containsExactly(new CarePlanScheduleChanged(42L), new CarePlanScheduleChanged(42L));
+		assertThat(events).containsExactly(
+				new CarePlanScheduleChanged(42L),
+				new CarePlanPublished(42L, published.id(), 1, LocalDate.of(2026, 4, 1)),
+				new CarePlanScheduleChanged(42L));
 	}
 
 	@Test

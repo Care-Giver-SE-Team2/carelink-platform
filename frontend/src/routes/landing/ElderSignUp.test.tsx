@@ -39,13 +39,16 @@ function open() {
   </MemoryRouter>)
 }
 
-async function fill(username = 'elder.new', password = 'password123', confirm = password) {
+async function fill(username = 'elder.new', password = 'password123', confirm = password, fullName = '  Tan Ah Mah ') {
   const user = userEvent.setup()
-  await user.type(screen.getByLabelText('Username'), username)
-  await user.type(screen.getByLabelText('Password', { exact: true }), password)
-  await user.type(screen.getByLabelText('Confirm password'), confirm)
+  if (fullName) await user.type(screen.getByLabelText('Your full name'), fullName)
+  await user.type(screen.getByLabelText('Choose a username'), username)
+  await user.type(screen.getByLabelText('Choose a password'), password)
+  await user.type(screen.getByLabelText('Type the password again'), confirm)
   return user
 }
+
+const submit = { name: 'Create account and continue' }
 
 afterEach(() => {
   cleanup()
@@ -54,43 +57,45 @@ afterEach(() => {
 })
 
 describe('Elder self-registration', () => {
-  it('creates the account, logs in and opens Elder workspace', async () => {
+  it('creates the account under the elder\'s name, logs in and opens Elder workspace', async () => {
     const fetchMock = server()
     open()
     const user = await fill()
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    await user.click(screen.getByRole('button', submit))
     expect(await screen.findByRole('heading', { name: 'Elder workspace' })).toBeTruthy()
     const registration = fetchMock.mock.calls.find(([url]) => url === '/api/elder-registrations')!
-    expect(JSON.parse(registration[1].body)).toEqual({ username: 'elder.new', password: 'password123' })
+    expect(JSON.parse(registration[1].body)).toEqual({ fullName: 'Tan Ah Mah', username: 'elder.new', password: 'password123' })
     expect(new Headers(registration[1].headers).get('X-XSRF-TOKEN')).toBe('elder-token')
     const login = fetchMock.mock.calls.find(([url]) => url === '/api/auth/login')!
     expect(JSON.parse(login[1].body)).toEqual({ username: 'elder.new', password: 'password123' })
+  })
+
+  it('checks the details beside each field before sending anything', async () => {
+    const fetchMock = server()
+    open()
+    const user = await fill('-bad', 'short', 'short', '   ')
+    await user.click(screen.getByRole('button', submit))
+    expect(screen.getByText('Enter your full name.')).toBeTruthy()
+    expect(screen.getByText('Use at least 8 characters.')).toBeTruthy()
+    expect(screen.getByLabelText('Choose a username').getAttribute('aria-invalid')).toBe('true')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('blocks mismatched passwords before making requests', async () => {
     const fetchMock = server()
     open()
     const user = await fill('elder.new', 'password123', 'different123')
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(screen.getByRole('alert').textContent).toContain('Passwords do not match')
+    await user.click(screen.getByRole('button', submit))
+    expect(screen.getByText('The passwords do not match.')).toBeTruthy()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('blocks invalid usernames and short passwords', async () => {
-    const fetchMock = server()
-    open()
-    const user = await fill('BadName', 'short')
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(screen.getByRole('alert').textContent).toContain('Username must be')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('shows duplicate username and does not log in', async () => {
+  it('asks for another username when the chosen one is taken, and does not log in', async () => {
     const fetchMock = server(409)
     open()
     const user = await fill()
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Username is already taken.')
+    await user.click(screen.getByRole('button', submit))
+    expect(await screen.findByText('That username is taken. Choose another.')).toBeTruthy()
     expect(fetchMock.mock.calls.some(([url]) => url === '/api/auth/login')).toBe(false)
   })
 
@@ -98,7 +103,7 @@ describe('Elder self-registration', () => {
     server(201, 401)
     open()
     const user = await fill()
-    await user.click(screen.getByRole('button', { name: 'Create account' }))
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Account created'))
+    await user.click(screen.getByRole('button', submit))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Your account was created'))
   })
 })

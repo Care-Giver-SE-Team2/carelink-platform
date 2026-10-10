@@ -33,14 +33,16 @@ public class CaregiverWorkService {
     private final sg.nus.carelink.visit.domain.model.VisitExecutionPolicy policy;
     private final sg.nus.carelink.visit.domain.repository.VisitCheckInRepository checkIns;
     private final sg.nus.carelink.visit.domain.repository.VisitInstructionRepository instructions;
+    private final MissedCheckInResumeService resume;
 
     public CaregiverWorkService(VisitRepository visits, VisitTaskRepository tasks, CaregiverWorkDirectory directory,
             VisitPlanReader plans, AccessAudit audit, Clock clock, sg.nus.carelink.visit.domain.model.VisitExecutionPolicy policy,
             sg.nus.carelink.visit.domain.repository.VisitCheckInRepository checkIns,
-            sg.nus.carelink.visit.domain.repository.VisitInstructionRepository instructions) {
+            sg.nus.carelink.visit.domain.repository.VisitInstructionRepository instructions, MissedCheckInResumeService resume) {
         this.visits = visits; this.tasks = tasks; this.directory = directory;
         this.plans = plans; this.audit = audit; this.clock = clock;
         this.policy = policy; this.checkIns = checkIns; this.instructions = instructions;
+        this.resume = resume;
     }
 
     public CaregiverWorkDirectory.Profile profile(String username) { return directory.require(username); }
@@ -118,12 +120,15 @@ public class CaregiverWorkService {
         try { visit.reportedException(now); actions.add("REPORT_INCIDENT"); } catch (BusinessRuleViolation _) { /* unavailable */ }
         try {
             var state = sg.nus.carelink.visit.domain.model.VisitStateFactory.forVisit(visit);
-            if (visit.status() == Visit.Status.SCHEDULED) {
+            if (visit.status() == Visit.Status.SCHEDULED || resume.permits(visit)) {
                 if (!hasPlanTasks) reason = "VISIT_TASKS_REQUIRED";
                 else { policy.requireWindow(visit, now); actions.add("CHECK_IN"); }
             } else if (visit.status() == Visit.Status.IN_PROGRESS) {
                 state.requireTaskResult(); actions.add("TASK_RESULT");
-                if (visit.checkedInAt() != null) actions.add("HEALTH_RECORD");
+                if (visit.checkedInAt() != null) {
+                    actions.add("HEALTH_RECORD");
+                    if (visit.checkedOutAt() == null && !now.truncatedTo(ChronoUnit.SECONDS).isBefore(visit.checkedInAt())) actions.add("CHECK_OUT");
+                }
             }
             else reason = "VISIT_EXECUTION_NOT_ALLOWED";
         } catch (BusinessRuleViolation blocked) { reason = blocked.code(); }

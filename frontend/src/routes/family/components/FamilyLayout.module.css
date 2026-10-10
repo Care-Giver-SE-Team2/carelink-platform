@@ -15,14 +15,15 @@
   bottom: 0;
   z-index: 3;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 8px 12px calc(env(safe-area-inset-bottom) + 8px);
   border-top: 1px solid var(--fm-line-card);
   background: var(--fm-card);
 }
 
-.tabBar a {
+.tabBar a,
+.tabBar button {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -36,15 +37,49 @@
   text-decoration: none;
 }
 
-.tabBar a[aria-current='page'] {
+.tabBar button {
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tabBar a[aria-current='page'],
+.tabBar button[data-current] {
   background: var(--fm-accent-tint);
   color: var(--fm-accent);
   font-weight: 600;
 }
 
+/* A label never spills into the next tab; a column too narrow for it ends it with an ellipsis. */
+.tabLabel {
+  max-width: 100%;
+  overflow: hidden;
+  padding-inline: 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The Menu icon carries the total waiting count at its top-right corner. */
+.menuIcon {
+  position: relative;
+  display: flex;
+}
+
+.menuIcon > span {
+  position: absolute;
+  top: -6px;
+  left: 14px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  box-shadow: 0 0 0 2px var(--fm-card);
+}
+
 @media (min-width: 600px) {
   .tabBar {
-    grid-template-columns: repeat(5, minmax(0, 104px));
+    grid-template-columns: repeat(4, minmax(0, 112px));
     justify-content: center;
   }
 }

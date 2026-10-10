@@ -10,6 +10,12 @@ import { NOTIFICATIONS_CHANGED_EVENT } from '../../features/notifications/api'
 import { FamilyIncidentPage } from './incidents/FamilyIncidentPage'
 import type { FamilyIncidentAcknowledgement } from '../../features/incidents/familyTypes'
 
+// The navigation's waiting counts are tested with FamilyLayout and on Home; here they stay at zero so
+// only this page's own requests are made.
+vi.mock('./components/usePendingDecisions', () => ({
+  usePendingDecisions: () => ({ changes: [], spotChecks: [], requests: [], total: 0 }),
+}))
+
 const family = { id: 7, username: 'family-a', displayName: 'Family A', roles: ['FAMILY'] }
 const emptyReceipt = { id: null, incidentId: 601, familyMemberId: 42, viewedAt: null, acknowledgedAt: null, responseNote: null }
 const viewed = { ...emptyReceipt, id: 51, viewedAt: '2026-10-07T16:10:00+08:00' }

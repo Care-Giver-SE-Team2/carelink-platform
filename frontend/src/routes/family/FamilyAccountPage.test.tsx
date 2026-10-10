@@ -5,6 +5,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FamilyHome from './index'
 
+// The navigation's waiting counts are tested with FamilyLayout and on Home; here they stay at zero so
+// only this page's own requests are made.
+vi.mock('./components/usePendingDecisions', () => ({
+  usePendingDecisions: () => ({ changes: [], spotChecks: [], requests: [], total: 0 }),
+}))
+
 const family = { id: 11, username: 'wei_ling', displayName: 'Lim Wei Ling', roles: ['FAMILY'] }
 const elders = [
   { id: 21, fullName: 'Chan Bee Choo', dateOfBirth: '1948-03-02', address: null, sector: 'AMK', planStatus: 'published', planVersion: 1, nextVisitDate: null },
@@ -65,7 +71,8 @@ describe('Family account', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Lim Wei Ling' })).toBeInTheDocument()
     expect(screen.getByText('LW')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute('aria-current', 'page')
+    // On a phone Account lives in the Menu, which shows as the current tab.
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('data-current')
     expect(document.title).toBe('Account · CareLink')
 
     const following = screen.getByRole('region', { name: 'Following' })

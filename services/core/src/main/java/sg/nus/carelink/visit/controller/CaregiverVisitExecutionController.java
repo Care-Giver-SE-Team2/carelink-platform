@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import sg.nus.carelink.visit.application.CaregiverVisitExecutionService;
 import sg.nus.carelink.visit.controller.dto.CaregiverCheckInRequest;
 import sg.nus.carelink.visit.controller.dto.CaregiverTaskResultRequest;
+import sg.nus.carelink.visit.controller.dto.CaregiverCheckOutRequest;
 
 @RestController
 @RequestMapping("/api/visits")
@@ -21,5 +22,9 @@ public class CaregiverVisitExecutionController {
     @PostMapping("/{visitId}/tasks/{taskId}/complete")
     public CaregiverVisitExecutionService.ExecutionResult result(Authentication auth,@PathVariable Long visitId,@PathVariable Long taskId,@Valid @RequestBody CaregiverTaskResultRequest input) {
         return service.taskResult(auth.getName(),visitId,taskId,new CaregiverVisitExecutionService.TaskCommand(input.status(),input.outcome(),input.caregiverNote(),input.expectedVersion(),input.clientRequestId()));
+    }
+    @PostMapping("/{visitId}/check-out")
+    public CaregiverVisitExecutionService.CheckOutResult checkOut(Authentication auth,@PathVariable Long visitId,@Valid @RequestBody CaregiverCheckOutRequest input) {
+        return service.checkOut(auth.getName(),visitId,input.expectedVersion(),input.clientRequestId());
     }
 }

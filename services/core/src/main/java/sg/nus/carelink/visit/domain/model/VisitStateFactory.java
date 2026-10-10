@@ -36,6 +36,8 @@ public final class VisitStateFactory {
         INSTANCE;
         @Override
         public void requireTaskResult() { /* The state permits this command; task rules still apply. */ }
+        @Override
+        public Visit checkOut(Visit visit, LocalDateTime now) { return visit.checkedOutAt(now); }
     }
     private enum Blocked implements VisitExecutionState { INSTANCE }
 }

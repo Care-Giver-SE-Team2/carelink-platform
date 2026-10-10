@@ -5,6 +5,12 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FamilyHome from './index'
 
+// The navigation's waiting counts are tested with FamilyLayout and on Home; here they stay at zero so
+// only this page's own requests are made.
+vi.mock('./components/usePendingDecisions', () => ({
+  usePendingDecisions: () => ({ changes: [], spotChecks: [], requests: [], total: 0 }),
+}))
+
 const family = { id: 7, username: 'family-a', displayName: 'Family A', roles: ['FAMILY'] }
 const visit = {
   id: 501, elderId: 101, caregiverId: 201, serviceType: 'Home care', status: 'IN_PROGRESS',

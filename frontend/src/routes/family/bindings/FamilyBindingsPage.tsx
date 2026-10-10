@@ -4,6 +4,7 @@ import { refreshFamilyElders } from '../../../features/family-elders/queries'
 import { useSelectedElder } from '../components/selectedElder'
 import { decideIncomingFamilyBinding, getIncomingFamilyBindings } from '../../../features/family-binding/api'
 import type { IncomingFamilyBinding } from '../../../features/family-binding/api'
+import styles from '../elders/FamilyElders.module.css'
 
 export function FamilyBindingsPage() {
   const client = useQueryClient()
@@ -34,25 +35,32 @@ export function FamilyBindingsPage() {
     finally { setBusy(null) }
   }
 
-  return <section style={{ padding: '2rem', maxWidth: 860 }}>
-    <p>YOUR FAMILY'S CARE</p>
-    <h1>Family bindings</h1>
-    <p>Review requests from elders who would like to share their care information with you.</p>
-    <button type="button" onClick={() => void refresh()}>Refresh</button>
-    {error && <p role="alert">{error}</p>}
-    {notice && <p role="status">{notice}</p>}
-    {loading ? <p>Loading bindings...</p> : bindings.length === 0 ? <p>No binding requests.</p> :
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {bindings.map(binding => <li key={binding.id} style={{ border: '1px solid #d5dedb', borderRadius: 12, padding: 20, marginTop: 16 }}>
-          <h2>{binding.elderName}</h2>
-          <p>Relationship: {binding.relationship.replaceAll('_', ' ')}</p>
-          <p>Access: {binding.accessScope === 'FULL' ? 'Full access' : 'Read-only'}</p>
-          <p>Status: {binding.status.replaceAll('_', ' ')}</p>
-          {binding.status === 'PENDING_CONFIRMATION' && <div style={{ display: 'flex', gap: 12 }}>
-            <button type="button" disabled={busy !== null} onClick={() => void decide(binding.id, true)}>Confirm binding</button>
-            <button type="button" disabled={busy !== null} onClick={() => void decide(binding.id, false)}>Reject binding</button>
-          </div>}
-        </li>)}
-      </ul>}
-  </section>
+  // Laid out like My elders, which links here: the same header band, action row and cards.
+  return <div className={styles.page}>
+    <header className={styles.header}>
+      <p className={styles.eyebrow}>Your family's care</p>
+      <h1>Family bindings</h1>
+      <p>Review requests from elders who would like to share their care information with you.</p>
+    </header>
+    <div className={styles.content}>
+      <div className={styles.actions}>
+        <button type="button" onClick={() => void refresh()}>Refresh</button>
+      </div>
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      {notice && <p className={styles.notice} role="status">{notice}</p>}
+      {loading ? <p role="status">Loading bindings…</p> : bindings.length === 0 ? <p className={styles.card}>No binding requests.</p> :
+        <ul className={styles.list}>
+          {bindings.map(binding => <li key={binding.id} className={styles.card}>
+            <h2>{binding.elderName}</h2>
+            <p className={styles.meta}>Relationship: {binding.relationship.replaceAll('_', ' ')}</p>
+            <p className={styles.meta}>Access: {binding.accessScope === 'FULL' ? 'Full access' : 'Read-only'}</p>
+            <p className={styles.meta}>Status: {binding.status.replaceAll('_', ' ')}</p>
+            {binding.status === 'PENDING_CONFIRMATION' && <div className={styles.actions}>
+              <button type="button" disabled={busy !== null} onClick={() => void decide(binding.id, true)}>Confirm binding</button>
+              <button type="button" disabled={busy !== null} onClick={() => void decide(binding.id, false)}>Reject binding</button>
+            </div>}
+          </li>)}
+        </ul>}
+    </div>
+  </div>
 }

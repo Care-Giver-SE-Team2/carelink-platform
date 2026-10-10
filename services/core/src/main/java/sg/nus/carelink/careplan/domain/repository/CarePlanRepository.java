@@ -24,4 +24,7 @@ public interface CarePlanRepository {
 	List<Long> findElderIdsWithIssuedPlans();
 
 	CarePlan save(CarePlan carePlan);
+
+	/** Removes a discarded draft. Its nodes must be deleted first. */
+	void deleteById(Long id);
 }

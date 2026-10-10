@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useFamilyElders } from '../../../features/family-account/useFamilyAccount'
 import { ApiError } from '../../../shared/api/client'
 import {
@@ -11,6 +11,8 @@ import type {
   RenewalDecision,
   ReviewableCaregiver,
 } from '../../../features/caregiver-reviews/types'
+import { singaporeToday } from '../../../features/schedule/presentation'
+import { serverFieldErrors } from '../../../shared/validation/serverErrors'
 import { useSelectedElder } from '../components/selectedElder'
 import styles from './FamilyCaregiverReviewsPage.module.css'
 
@@ -20,7 +22,23 @@ const decisions: { value: RenewalDecision; label: string }[] = [
   { value: 'CANCEL_SERVICE', label: 'Cancel service' },
 ]
 
+type ReviewErrors = { periodStart?: string; periodEnd?: string; feedbackNotes?: string }
+
+/** Why the period or feedback cannot be sent; the server checks the same in CaregiverReviewCreateRequest. */
+function validate(periodStart: string, periodEnd: string, feedbackNotes: string, today: string): ReviewErrors {
+  const errors: ReviewErrors = {}
+  if (!periodStart) errors.periodStart = 'Choose the first day of the period.'
+  else if (periodStart > today) errors.periodStart = 'Choose a period that has started.'
+  if (!periodEnd) errors.periodEnd = 'Choose the last day of the period.'
+  else if (periodEnd > today) errors.periodEnd = 'Choose a period that has ended.'
+  else if (periodStart && periodEnd < periodStart) errors.periodEnd = 'The period must end on or after its start.'
+  if ([...feedbackNotes.trim()].length > 2000) errors.feedbackNotes = 'Use 2000 characters or fewer.'
+  return errors
+}
+
 export function FamilyCaregiverReviewsPage() {
+  const id = useId()
+  const today = singaporeToday()
   const elders = useFamilyElders()
   const { elderId } = useSelectedElder()
   const selectedElderId = elderId ?? elders.data?.[0]?.id ?? null
@@ -37,6 +55,7 @@ export function FamilyCaregiverReviewsPage() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<ReviewErrors>({})
   const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
@@ -62,10 +81,13 @@ export function FamilyCaregiverReviewsPage() {
   }, [selectedElderId])
 
   async function submit() {
-    if (selectedElderId === null || caregiverId === null || !periodStart || !periodEnd) {
-      setError('Choose a caregiver and review period.')
+    if (selectedElderId === null || caregiverId === null) {
+      setError('Choose a caregiver.')
       return
     }
+    const found = validate(periodStart, periodEnd, feedbackNotes, today)
+    setFieldErrors(found)
+    if (Object.values(found).some(Boolean)) return
     setSubmitting(true)
     setError(null)
     setSuccess(null)
@@ -85,7 +107,9 @@ export function FamilyCaregiverReviewsPage() {
       setFeedbackNotes('')
       setSuccess('Review submitted successfully.')
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to submit the review.')
+      const fields = serverFieldErrors(cause, { periodInOrder: 'periodEnd' })
+      if (fields.periodStart || fields.periodEnd || fields.feedbackNotes) setFieldErrors(fields)
+      else setError(cause instanceof ApiError ? cause.message : 'Unable to submit the review.')
     } finally {
       setSubmitting(false)
     }
@@ -113,21 +137,33 @@ export function FamilyCaregiverReviewsPage() {
             </select>
           </label>
           <div className={styles.twoColumns}>
-            <label className={styles.field}>Period start
-              <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} />
-            </label>
-            <label className={styles.field}>Period end
-              <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} />
-            </label>
+            <div className={styles.field}>
+              <label htmlFor={`${id}-start`}>Period start</label>
+              <input id={`${id}-start`} type="date" max={today} value={periodStart} aria-invalid={!!fieldErrors.periodStart}
+                aria-describedby={fieldErrors.periodStart ? `${id}-start-error` : undefined}
+                onChange={(event) => { setPeriodStart(event.target.value); setFieldErrors((current) => ({ ...current, periodStart: undefined })) }} />
+              {fieldErrors.periodStart && <span id={`${id}-start-error`} className={styles.fieldError}>{fieldErrors.periodStart}</span>}
+            </div>
+            <div className={styles.field}>
+              <label htmlFor={`${id}-end`}>Period end</label>
+              <input id={`${id}-end`} type="date" min={periodStart || undefined} max={today} value={periodEnd}
+                aria-invalid={!!fieldErrors.periodEnd} aria-describedby={fieldErrors.periodEnd ? `${id}-end-error` : undefined}
+                onChange={(event) => { setPeriodEnd(event.target.value); setFieldErrors((current) => ({ ...current, periodEnd: undefined })) }} />
+              {fieldErrors.periodEnd && <span id={`${id}-end-error`} className={styles.fieldError}>{fieldErrors.periodEnd}</span>}
+            </div>
           </div>
           <div className={styles.scores}>
             <Score label="Overall rating" value={overallRating} onChange={setOverallRating} />
             <Score label="Punctuality" value={punctualityScore} onChange={setPunctualityScore} />
             <Score label="Care quality" value={careQualityScore} onChange={setCareQualityScore} />
           </div>
-          <label className={styles.field}>Feedback
-            <textarea value={feedbackNotes} onChange={(event) => setFeedbackNotes(event.target.value)} placeholder="Optional feedback" />
-          </label>
+          <div className={styles.field}>
+            <label htmlFor={`${id}-feedback`}>Feedback</label>
+            <textarea id={`${id}-feedback`} value={feedbackNotes} maxLength={2000} placeholder="Optional feedback"
+              aria-invalid={!!fieldErrors.feedbackNotes} aria-describedby={fieldErrors.feedbackNotes ? `${id}-feedback-error` : undefined}
+              onChange={(event) => { setFeedbackNotes(event.target.value); setFieldErrors((current) => ({ ...current, feedbackNotes: undefined })) }} />
+            {fieldErrors.feedbackNotes && <span id={`${id}-feedback-error`} className={styles.fieldError}>{fieldErrors.feedbackNotes}</span>}
+          </div>
           <fieldset className={styles.decisions}>
             <legend>Renewal decision</legend>
             {decisions.map((decision) => <label key={decision.value}>

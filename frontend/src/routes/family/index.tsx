@@ -3,6 +3,7 @@ import { IntakeLayout } from './intake/IntakeLayout'
 import { IntakeListPage } from './intake/IntakeListPage'
 import { IntakeDetailPage } from './intake/IntakeDetailPage'
 import { ServiceApplicationCreatePage } from './service-applications/ServiceApplicationCreatePage'
+import { FamilyCarePlanPage } from './care-plan/FamilyCarePlanPage'
 import { ServiceApplicationListPage } from './service-applications/ServiceApplicationListPage'
 import { ServiceApplicationDetailPage } from './service-applications/ServiceApplicationDetailPage'
 import { FamilyLayout } from './components/FamilyLayout'
@@ -55,6 +56,9 @@ export default function FamilyHome() {
       </Route>
       <Route element={<FamilyLayout title="Weekly schedule" />}>
         <Route path="schedule" element={<FamilySchedulePage />} />
+      </Route>
+      <Route element={<FamilyLayout title="Care plan" />}>
+        <Route path="care-plan" element={<FamilyCarePlanPage />} />
       </Route>
       <Route element={<FamilyLayout title="Visit changes" />}>
         <Route path="changes" element={<FamilyRosterChangesPage />} />

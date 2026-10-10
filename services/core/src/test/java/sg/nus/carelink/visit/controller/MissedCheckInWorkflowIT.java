@@ -29,7 +29,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         clock.at(START.plusSeconds(899)); assertThat(scan.scan().triggered()).isZero();
         clock.at(START.plusSeconds(900)); assertThat(scan.scan().triggered()).isZero();
         overdue(); assertThat(scan.scan().triggered()).isEqualTo(1); long event=incident(id);
-        assertThat(version(id)).isEqualTo(1); assertThat(count("visit_state_transition", id)).isEqualTo(1);
+        assertThat(version(id)).isEqualTo(1); assertThat(count("visit_state_transition", id)).isZero();
         assertSystemTransition(id);
         try(var mgr=browser(managerName);var cg=browser(caregiverName);var a=browser(familyName);var b=browser(secondFamilyName)) {
             var detail=mgr.read("/api/incidents/"+event).path("incident");
@@ -50,16 +50,16 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=?",Long.class,event)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id=? AND resource_id=? AND event_type='INCIDENT_RAISED'",Long.class,manager,event)).isEqualTo(1);
     }
-    @Test void alertBlocksStaleAndRefreshedCheckInEvenAfterIncidentResolution() throws Exception {
+    @Test void alertRejectsStaleVersionButAllowsRefreshedCheckInWithoutResolvingIncident() throws Exception {
         long id=plannedVisit();overdue();assertThat(scan.trigger(id)).isTrue();long event=incident(id);
         try(var mgr=browser(managerName);var cg=browser(caregiverName)) {
             var pack=cg.read("/api/visits/"+id+"/work-pack");
-            assertThat(pack.path("visit").path("status").asString()).isEqualTo("EXCEPTION");
-            assertThat(pack.path("execution").path("allowedActions").valueStream().map(JsonNode::asString).toList()).doesNotContain("CHECK_IN","TASK_RESULT");
-            assertThat(pack.path("execution").path("blockedReason").asString()).isEqualTo("VISIT_EXECUTION_NOT_ALLOWED");
+            assertThat(pack.path("visit").path("status").asString()).isEqualTo("SCHEDULED");
+            assertThat(pack.path("execution").path("allowedActions").valueStream().map(JsonNode::asString).toList()).contains("CHECK_IN").doesNotContain("TASK_RESULT");
+            assertThat(pack.path("execution").path("blockedReason").isNull()).isTrue();
             assertThat(pack.path("execution").path("checkedInAt").isNull()).isTrue();
             assertThat(cg.post("/api/visits/"+id+"/check-in",check(0)).statusCode()).isEqualTo(409);
-            assertThat(body(cg.post("/api/visits/"+id+"/check-in",check(1)),409).toString()).contains("VISIT_EXECUTION_NOT_ALLOWED");
+            body(cg.post("/api/visits/"+id+"/check-in",check(1)),200);
             assertThat(mgr.read("/api/incidents/"+event).path("incident").path("status").asString()).isEqualTo("OPEN");
             body(mgr.post("/api/incidents/"+event+"/claim",Map.of()),200);
             body(mgr.post("/api/incidents/"+event+"/resolve",Map.of("resolutionNote","Checked attendance and completed review")),200);
@@ -67,10 +67,10 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
             body(cg.post("/api/visits/"+id+"/check-in",check(1)),409);
         }
         assertThat(scan.trigger(id)).isFalse(); assertThat(count("incident",id)).isEqualTo(1);
-        assertThat(count("visit_check_in_record",id)).isZero();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_task WHERE visit_id=?",Long.class,id)).isZero();
-        assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("EXCEPTION");
-        assertThat(version(id)).isEqualTo(1);
+        assertThat(count("visit_check_in_record",id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_task WHERE visit_id=?",Long.class,id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("IN_PROGRESS");
+        assertThat(version(id)).isEqualTo(2);
         assertSystemTransition(id);
     }
     @Test void timelyCheckInAndStoppedPlanNeverTrigger() throws Exception {
@@ -82,7 +82,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         try(var mgr=browser(managerName)) { body(mgr.post("/api/care-plans/"+plan+"/stop",Map.of("effectiveDate","2026-10-08","reason","Fictional cancellation")),200); }
         overdue(); assertThat(scan.trigger(stopped)).isFalse(); assertThat(count("incident",stopped)).isZero();
     }
-    @ParameterizedTest @ValueSource(strings={"incident","incident_log","notification","visit_state_transition","visit_missed_check_in_trigger"})
+    @ParameterizedTest @ValueSource(strings={"incident","incident_log","notification","visit_missed_check_in_trigger"})
     void sourcePersistenceFailureRollsBackAllFactsAndLaterRetrySucceeds(String table) throws Exception {
         long id=plannedVisit(); overdue();
         jdbc.execute("CREATE TRIGGER sys03_source_fault BEFORE INSERT ON "+table+" FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic source failure'");
@@ -119,7 +119,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE resource_type='INCIDENT' AND recipient_user_id IN (?,?,?,?)",Long.class,manager,caregiverUser,family,secondFamilyUser)).isZero();
     }
     private void assertSystemTransition(long id) {
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_state_transition WHERE visit_id=? AND from_state='SCHEDULED' AND to_state='EXCEPTION' AND result='APPLIED' AND actor_user_id IS NULL",Long.class,id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_state_transition WHERE visit_id=? AND from_state='SCHEDULED' AND to_state='EXCEPTION' AND result='APPLIED' AND actor_user_id IS NULL",Long.class,id)).isZero();
     }
     @Test void failedFamilyConsumerDoesNotRollbackSourceOrPreventOtherFamily() throws Exception {
         long id=plannedVisit(); overdue();
@@ -131,7 +131,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
             assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)",String.class,profile,event)).isEqualTo("FAILED");
             try(var b=browser(secondFamilyName)) { assertThat(b.read("/api/notifications/me").path("items").get(0).path("resourceId").asLong()).isEqualTo(event); }
             assertThat(scan.trigger(id)).isFalse(); assertThat(count("incident",id)).isEqualTo(1);
-            assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("EXCEPTION");
+            assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("SCHEDULED");
             assertThat(version(id)).isEqualTo(1);assertSystemTransition(id);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident_log WHERE incident_id=? AND action='REPORTED'",Long.class,event)).isEqualTo(1);
         } finally { jdbc.execute("DROP TRIGGER sys03_consumer_fault"); }
@@ -178,8 +178,8 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
             body(mgr.post("/api/incidents/"+event+"/claim",Map.of()),200);
             body(mgr.post("/api/incidents/"+event+"/resolve",Map.of("resolutionNote","Reviewed")),200);
         }
-        assertThatThrownBy(()->changes.reassign(id,otherCaregiver,new VisitReassignment.Change(null,manager,null,"Fictional replacement")))
-                .isInstanceOf(sg.nus.carelink.shared.error.BusinessRuleViolation.class).hasMessageContaining("EXCEPTION");
+        changes.reassign(id,otherCaregiver,new VisitReassignment.Change(null,manager,null,"Fictional replacement"));
+        assertThat(jdbc.queryForObject("SELECT caregiver_id FROM visit WHERE id=?",Long.class,id)).isEqualTo(otherCaregiver);
         assertThat(scan.trigger(id)).isFalse(); assertThat(count("incident",id)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT triggered_caregiver_id FROM visit_missed_check_in_trigger WHERE visit_id=?",Long.class,id)).isEqualTo(caregiver);
     }

@@ -23,6 +23,7 @@ class CarePlanNodeMapperTest {
 		entity.setId(1L);
 		entity.setCarePlanId(2L);
 		entity.setGroupName("Personal care");
+		entity.setActivityCode("BATHING");
 		entity.setName("v5");
 		entity.setScheduleDays("v7");
 		entity.setDurationPerVisit(new BigDecimal("8.5"));
@@ -36,6 +37,7 @@ class CarePlanNodeMapperTest {
 		assertThat(domain.id()).isEqualTo(entity.getId());
 		assertThat(domain.carePlanId()).isEqualTo(entity.getCarePlanId());
 		assertThat(domain.groupName()).isEqualTo(entity.getGroupName());
+		assertThat(domain.activityCode()).isEqualTo(entity.getActivityCode());
 		assertThat(domain.name()).isEqualTo(entity.getName());
 		assertThat(domain.scheduleDays()).isEqualTo(entity.getScheduleDays());
 		assertThat(domain.durationPerVisit()).isEqualTo(entity.getDurationPerVisit());
@@ -50,6 +52,7 @@ class CarePlanNodeMapperTest {
 		assertThat(back.getId()).isEqualTo(entity.getId());
 		assertThat(back.getCarePlanId()).isEqualTo(entity.getCarePlanId());
 		assertThat(back.getGroupName()).isEqualTo(entity.getGroupName());
+		assertThat(back.getActivityCode()).isEqualTo(entity.getActivityCode());
 		assertThat(back.getName()).isEqualTo(entity.getName());
 		assertThat(back.getScheduleDays()).isEqualTo(entity.getScheduleDays());
 		assertThat(back.getDurationPerVisit()).isEqualTo(entity.getDurationPerVisit());

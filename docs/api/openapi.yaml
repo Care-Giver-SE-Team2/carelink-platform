@@ -346,7 +346,10 @@ paths:
         CAREGIVER only, CSRF required. Within configured early arrival (default 30 minutes) through scheduledEnd
         or Singapore day end. One transaction initializes only assigned plan-version tasks and records two APPLIED
         transitions SCHEDULED to ARRIVED to IN_PROGRESS. checkedInAt is server time. Manual location is explicitly
-        unverified; GPS is device-supplied and no geofence is applied. No check-out or SYS03 scheduler is implemented.
+        unverified; GPS is device-supplied and no geofence is applied. SYS03 preserves its once-per-Visit alert and
+        notifications without pausing service. A proven legacy SYS03-only EXCEPTION may check in through
+        EXCEPTION to ARRIVED to IN_PROGRESS; other exceptions remain blocked. Strictly more than the shared
+        default ten-minute threshold is late, not a penalty or approval requirement. Scheduled end remains the cutoff.
       requestBody:
         required: true
         content:
@@ -364,6 +367,40 @@ paths:
         '404': {description: Visit not found.}
         '409': {description: 'Window, plan, state, version or command conflict. Authorized rejected state attempts are logged.'}
         '503': {description: Storage unavailable; check results before retry.}
+  /visits/{visitId}/check-out:
+    parameters:
+      - $ref: '#/components/parameters/VisitId'
+    post:
+      tags: [Visits]
+      summary: Record caregiver departure and complete service (CG05)
+      operationId: caregiverVisitCheckOut
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        CAREGIVER only, CSRF and current assignment required. A genuinely checked-in IN_PROGRESS visit
+        becomes COMPLETED with server Singapore check-out time at second precision. Task, evidence and
+        health completeness do not block departure; their original facts remain unchanged. No manager or
+        elder pre-approval, VERIFIED/AUTO_CLOSED state, incident resolution or extra notification is implied.
+        Departure may be after scheduledEnd, but never before checkedInAt. Parent lock, expectedVersion and
+        immutable actor/key/payload receipt enforce atomicity. Identical replay returns the original timestamp
+        and version; different keys do not record departure twice. New task and health writes then stop.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaregiverCheckOutCommand'}
+      responses:
+        '200':
+          description: Saved departure or original successful response on identical replay; reload work-pack.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaregiverCheckOutResult'}
+        '400': {description: Invalid or missing command identity.}
+        '401': {description: Authentication required.}
+        '403': {description: 'Role, CSRF or current assignment rejected.'}
+        '404': {description: Visit not found.}
+        '409': {description: 'State, check-out time, version or command conflict.'}
+        '503': {description: Result could not be confirmed; inspect saved facts before retrying identical command.}
   /visits/{visitId}/tasks/{taskId}/complete:
     parameters:
       - $ref: '#/components/parameters/VisitId'
@@ -3262,6 +3299,22 @@ components:
         page: {type: integer}
         size: {type: integer}
         total: {type: integer, format: int64}
+    CaregiverCheckOutCommand:
+      type: object
+      required: [expectedVersion, clientRequestId]
+      properties:
+        expectedVersion: {type: integer, minimum: 0}
+        clientRequestId: {type: string, format: uuid}
+    CaregiverCheckOutResult:
+      type: object
+      required: [visitId, visitVersion, savedState, checkedInAt, checkedOutAt, replayed]
+      properties:
+        visitId: {type: integer, format: int64}
+        visitVersion: {type: integer, description: Original saved version; reload work-pack for current facts.}
+        savedState: {type: string, enum: [COMPLETED]}
+        checkedInAt: {type: string, description: Singapore local date-time without offset.}
+        checkedOutAt: {type: string, description: Original server Singapore local date-time without offset at second precision.}
+        replayed: {type: boolean}
     CaregiverExecutionResult:
       type: object
       required: [visitId, visitVersion, savedState, taskId, replayed]
@@ -3274,7 +3327,7 @@ components:
     CaregiverExecutionContext:
       type: object
       properties:
-        allowedActions: {type: array, items: {type: string, enum: [CHECK_IN, TASK_RESULT, HEALTH_RECORD, REPORT_INCIDENT]}}
+        allowedActions: {type: array, items: {type: string, enum: [CHECK_IN, CHECK_OUT, TASK_RESULT, HEALTH_RECORD, REPORT_INCIDENT]}}
         blockedReason: {type: string, nullable: true}
         serverNow: {type: string, description: Singapore local date-time}
         checkInOpensAt: {type: string, description: Singapore local date-time}
@@ -4018,8 +4071,9 @@ components:
           nullable: true
           description: >-
             Optional deadline for other visit states. SYS03 uses scheduledStart plus the configured
-            late-arrival threshold, not this field; its alert transitions SCHEDULED to EXCEPTION and blocks check-in,
-            including refreshed requests. Resolving the Incident does not reopen the Visit.
+            late-arrival threshold, not this field; its alert retains SCHEDULED and advances the parent version
+            without pausing service. A stale command must refresh. Other operational exceptions remain blocked;
+            resolving an Incident does not itself reopen the Visit.
         assignmentHistory:
           type: array
           description: Previous and current caregiver assignments, including replacement status, reason and assignment times.

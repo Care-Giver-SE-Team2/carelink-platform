@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import {
   createFamilyValueAddedServiceRequest,
@@ -20,9 +20,18 @@ const catalogue = [
   { id: 2, name: 'Companionship', description: 'Company at home', durationMinutes: 120, status: 'AVAILABLE' as const },
 ]
 
+// The picker's earliest time is "now" plus the notice period, and jsdom refuses to submit a value
+// below it, so pin the clock before the times the tests type in. Only Date is faked; user-event
+// still needs real timers.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 1, 9, 0))
+})
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 function renderForm(onCreated = vi.fn()) {
@@ -66,8 +75,37 @@ it('asks for a time before sending anything', async () => {
 
   await user.click(await screen.findByRole('button', { name: 'Book service' }))
 
-  expect(screen.getByRole('alert')).toHaveTextContent('Choose a service and a date and time.')
+  expect(screen.getByText('Choose a date and time.')).toBeInTheDocument()
+  expect(screen.getByLabelText('Date and time')).toHaveAttribute('aria-invalid', 'true')
   expect(createFamilyValueAddedServiceRequest).not.toHaveBeenCalled()
+})
+
+it('keeps a booking within service hours, so a 3-hour escort cannot start after 5 pm', async () => {
+  const user = userEvent.setup()
+  vi.mocked(fetchFamilyValueAddedServices).mockResolvedValue(catalogue)
+  renderForm()
+
+  expect(await screen.findByText(/Start between 8 am and 5 pm, on the hour or half hour/)).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Date and time'), { target: { value: '2026-10-12T17:30' } })
+  await user.click(screen.getByRole('button', { name: 'Book service' }))
+
+  expect(screen.getByText('Choose a start between 8 am and 5 pm, so the visit ends by 8 pm.')).toBeInTheDocument()
+  expect(createFamilyValueAddedServiceRequest).not.toHaveBeenCalled()
+})
+
+it('shows the server\'s answer about the time under the date and time', async () => {
+  const user = userEvent.setup()
+  vi.mocked(fetchFamilyValueAddedServices).mockResolvedValue(catalogue)
+  vi.mocked(createFamilyValueAddedServiceRequest).mockRejectedValue(
+    new ApiError('Choose a time within the next 90 days.', 409, { code: 'VALUE_ADDED_SERVICE_TOO_FAR' }),
+  )
+  renderForm()
+
+  fireEvent.change(await screen.findByLabelText('Date and time'), { target: { value: '2026-10-12T10:00' } })
+  await user.click(screen.getByRole('button', { name: 'Book service' }))
+
+  expect(await screen.findByText('Choose a time within the next 90 days.')).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).toBeNull()
 })
 
 it('shows why the server refused, e.g. read-only access or too little notice', async () => {

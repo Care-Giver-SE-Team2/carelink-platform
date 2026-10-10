@@ -3,9 +3,12 @@ package sg.nus.carelink.careplan.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -95,7 +98,7 @@ class CarePlanControllerTest {
 	@Test
 	void returns200WithThePlanNodes() throws Exception {
 		when(service.findNodes(1L)).thenReturn(List.of(new CarePlanNode(
-				5L, 1L, "Personal care", "Bathing", "MON,WED", null, null,
+				5L, 1L, "Personal care", "BATHING", "Bathing", "MON,WED", null, null,
 				CarePlanNode.EvidenceType.CHECKLIST, 1, null, null,
 				List.of(new ScheduledVisit(DayOfWeek.WEDNESDAY, LocalTime.of(16, 30), 45),
 						new ScheduledVisit(DayOfWeek.MONDAY, LocalTime.of(8, 0), 30)))));
@@ -121,6 +124,31 @@ class CarePlanControllerTest {
 								"visits":[{"day":"Mon","startTime":"08:00","minutes":30}],"evidenceType":"CHECKLIST"}]}
 								"""))
 				.andExpect(status().isOk());
+	}
+
+	@Test
+	void savesADraftWithAnUnscheduledCatalogTask() throws Exception {
+		when(service.saveDraft(eq(1L), any(), any())).thenReturn(new CarePlan(
+				1L, 42L, 7L, null, 1, CarePlan.Status.DRAFT, null, null, null, null));
+
+		mvc.perform(put("/api/care-plans/1/draft")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"startDate":null,"nodes":[{"groupName":"Personal care","activityCode":"BATHING",
+								"name":"Bathing assistance","visits":[],"evidenceType":"CHECKLIST"}]}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("DRAFT"));
+
+		verify(service).saveDraft(eq(1L), eq(null), eq(List.of(new sg.nus.carelink.careplan.application.PlanNodeInput(
+				"Personal care", "BATHING", "Bathing assistance", List.of(), CarePlanNode.EvidenceType.CHECKLIST))));
+	}
+
+	@Test
+	void returns204WhenADraftIsDiscarded() throws Exception {
+		mvc.perform(delete("/api/care-plans/1")).andExpect(status().isNoContent());
+
+		verify(service).discardDraft(1L);
 	}
 
 	@Test

@@ -56,4 +56,9 @@ class InMemoryCarePlanRepository implements CarePlanRepository {
 		}
 		return stored;
 	}
+
+	@Override
+	public void deleteById(Long id) {
+		rows.remove(id);
+	}
 }

@@ -43,6 +43,16 @@ public class ServiceApplicationJpaEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME)
+    @Column(name = "declined_at")
+    private LocalDateTime declinedAt;
+
+    @Column(name = "declined_by_user_id")
+    private Long declinedByUserId;
+
+    @Column(name = "decline_reason", length = 255)
+    private String declineReason;
+
     public ServiceApplicationJpaEntity() { }
 
     public Long getId() { return id; }
@@ -61,4 +71,10 @@ public class ServiceApplicationJpaEntity {
     public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getDeclinedAt() { return declinedAt; }
+    public void setDeclinedAt(LocalDateTime declinedAt) { this.declinedAt = declinedAt; }
+    public Long getDeclinedByUserId() { return declinedByUserId; }
+    public void setDeclinedByUserId(Long declinedByUserId) { this.declinedByUserId = declinedByUserId; }
+    public String getDeclineReason() { return declineReason; }
+    public void setDeclineReason(String declineReason) { this.declineReason = declineReason; }
 }

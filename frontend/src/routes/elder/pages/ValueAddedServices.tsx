@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { ApiError } from '../../../shared/api/client'
 import {
   createElderValueAddedServiceRequest,
@@ -7,6 +7,10 @@ import {
   withdrawElderValueAddedServiceRequest,
 } from '../../../features/value-added-services/api'
 import type { ValueAddedService, ValueAddedServiceRequest } from '../../../features/value-added-services/types'
+import {
+  BOOKING_TIME_CODES, MIN_NOTICE_HOURS, STEP_MINUTES, bookingHint, bookingTimeError, bookingWindow,
+} from '../../../features/value-added-services/bookingTime'
+import { problemCode, serverFieldErrors } from '../../../shared/validation/serverErrors'
 import { ElderShell } from '../components/ElderShell'
 import {
   ActionStack,
@@ -23,16 +27,6 @@ import {
 } from '../components/ElderUi'
 import { greeting } from '../lib/greeting'
 import styles from '../Elder.module.css'
-
-/** The server asks for at least this much notice; the picker starts there. */
-const MIN_NOTICE_HOURS = 2
-
-/** "2026-10-10T12:30", the datetime-local value for {@link MIN_NOTICE_HOURS} from now on this device. */
-function earliestRequestTime(now = new Date()): string {
-  const earliest = new Date(now.getTime() + MIN_NOTICE_HOURS * 60 * 60 * 1000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${earliest.getFullYear()}-${pad(earliest.getMonth() + 1)}-${pad(earliest.getDate())}T${pad(earliest.getHours())}:${pad(earliest.getMinutes())}`
-}
 
 /** "About 1 hour", "About 1.5 hours". */
 function durationText(minutes: number): string {
@@ -55,6 +49,8 @@ export default function ValueAddedServices() {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<{ schedule?: string; note?: string }>({})
+  const id = useId()
   const [confirmingId, setConfirmingId] = useState<number | null>(null)
   const [withdrawingId, setWithdrawingId] = useState<number | null>(null)
 
@@ -75,10 +71,16 @@ export default function ValueAddedServices() {
   const selected = useMemo(() => services.find((item) => item.id === serviceId) ?? null, [services, serviceId])
 
   async function submit() {
-    if (serviceId === null || !schedule) {
-      setError('Choose a service and requested date/time.')
+    if (serviceId === null || !selected) {
+      setError('Choose a service.')
       return
     }
+    const found = {
+      schedule: bookingTimeError(schedule, selected.durationMinutes),
+      note: [...note.trim()].length > 1000 ? 'Please keep this under 1000 characters.' : undefined,
+    }
+    setFieldErrors(found)
+    if (found.schedule || found.note) return
     setSubmitting(true)
     setError(null)
     setMessage(null)
@@ -93,7 +95,10 @@ export default function ValueAddedServices() {
       setSchedule('')
       setMessage('Request sent. Status: Pending approval.')
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to send the service request.')
+      const fields = serverFieldErrors(cause, { requestedSchedule: 'schedule', specialInstructions: 'note' })
+      if (BOOKING_TIME_CODES.has(problemCode(cause) ?? '') && cause instanceof ApiError) setFieldErrors({ schedule: cause.message })
+      else if (fields.schedule || fields.note) setFieldErrors(fields)
+      else setError(cause instanceof ApiError ? cause.message : 'Unable to send the service request.')
     } finally {
       setSubmitting(false)
     }
@@ -212,25 +217,45 @@ export default function ValueAddedServices() {
                   {selected?.description && <p className={styles.lead}>{selected.description}</p>}
                   {selected && <p className={styles.familyMeta}>{durationText(selected.durationMinutes)}</p>}
                   <p className={styles.familyMeta}>Ask at least {MIN_NOTICE_HOURS} hours ahead.</p>
-                  <label className={styles.fieldLabel}>
-                    <span>Requested date and time</span>
+                  <div className={styles.fieldLabel}>
+                    <label htmlFor={`${id}-schedule`}>Requested date and time</label>
                     <input
+                      id={`${id}-schedule`}
                       type="datetime-local"
-                      min={earliestRequestTime()}
+                      {...bookingWindow()}
+                      step={STEP_MINUTES * 60}
                       value={schedule}
                       disabled={submitting}
-                      onChange={(event) => setSchedule(event.target.value)}
+                      aria-invalid={!!fieldErrors.schedule}
+                      aria-describedby={[fieldErrors.schedule && `${id}-schedule-error`, selected && `${id}-schedule-hint`]
+                        .filter(Boolean).join(' ') || undefined}
+                      onChange={(event) => {
+                        setSchedule(event.target.value)
+                        setFieldErrors((current) => ({ ...current, schedule: undefined }))
+                      }}
                     />
-                  </label>
-                  <label className={styles.fieldLabel}>
-                    <span>Anything we should know?</span>
+                    {fieldErrors.schedule && <span id={`${id}-schedule-error`} className={styles.fieldError}>{fieldErrors.schedule}</span>}
+                    {selected && <span id={`${id}-schedule-hint`} className={`${styles.familyMeta} ${styles.hint}`}>
+                      {bookingHint(selected.durationMinutes)}
+                    </span>}
+                  </div>
+                  <div className={styles.fieldLabel}>
+                    <label htmlFor={`${id}-note`}>Anything we should know?</label>
                     <textarea
+                      id={`${id}-note`}
                       value={note}
+                      maxLength={1000}
                       disabled={submitting}
-                      onChange={(event) => setNote(event.target.value)}
+                      aria-invalid={!!fieldErrors.note}
+                      aria-describedby={fieldErrors.note ? `${id}-note-error` : undefined}
+                      onChange={(event) => {
+                        setNote(event.target.value)
+                        setFieldErrors((current) => ({ ...current, note: undefined }))
+                      }}
                       placeholder="Optional instructions"
                     />
-                  </label>
+                    {fieldErrors.note && <span id={`${id}-note-error`} className={styles.fieldError}>{fieldErrors.note}</span>}
+                  </div>
                   <WideButton onClick={submit} disabled={submitting}>
                     {submitting ? 'Sending…' : `Request ${selected?.name ?? 'service'}`}
                   </WideButton>

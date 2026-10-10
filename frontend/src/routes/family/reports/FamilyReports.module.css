@@ -3,6 +3,11 @@
 }
 .reportDetail { max-width: 1060px; }
 .reports.reportDetail > article { max-width: none; }
+/* Desktop: the header spans the page; the report body below it is one column at the same centred
+   640px reading width as the other single-column family pages. */
+@media (min-width: 900px) {
+  .reports.reportDetail > article > :not(header) { width: 100%; max-width: 640px; margin-inline: auto; }
+}
 .hero.detailHero { display: block; }
 .detailHero > .eyebrow { margin-top: 18px; }
 .amendmentKind {

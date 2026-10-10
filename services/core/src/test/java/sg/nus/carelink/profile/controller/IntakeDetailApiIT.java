@@ -72,20 +72,13 @@ class IntakeDetailApiIT {
 
 	@Test
 	void submittedApplicationRemainsInTheOwnersListAndDetailsAcrossLoginSessions() throws Exception {
+		seedApplication(102, 7, "SUBMITTED");
 		var login = loginAs("family-b");
-		var submitted = mvc.perform(post(PATH).session(login.session()).cookie(login.csrfCookie())
-				.header("X-XSRF-TOKEN", login.csrfCookie().getValue())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"targetElderName":"Tan Mei","targetAddress":"12 Example Road","postalCode":"123456"}
-						"""))
-				.andExpect(status().isCreated()).andReturn().getResponse();
-		var application = json.readTree(submitted.getContentAsString());
-		var response = mvc.perform(get(PATH + "/" + application.path("id").longValue()).session(login.session()))
+		var response = mvc.perform(get(PATH + "/102").session(login.session()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.applicantFamilyMemberId").value(7))
 				.andReturn().getResponse();
-		assertThat(json.readTree(response.getContentAsString())).isEqualTo(application);
+		var application = json.readTree(response.getContentAsString());
 		mvc.perform(get(PATH).session(login.session()).param("status", "SUBMITTED"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.totalElements").value(1))

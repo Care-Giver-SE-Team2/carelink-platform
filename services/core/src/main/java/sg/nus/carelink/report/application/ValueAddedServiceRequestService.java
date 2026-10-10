@@ -87,7 +87,7 @@ public class ValueAddedServiceRequestService {
             String specialInstructions) {
         Long elderId = profiles.requireElderByUserId(userId).id();
         ValueAddedService service = requireAvailable(serviceId);
-        ValueAddedServiceRequest.requireEnoughNotice(requestedSchedule, now());
+        ValueAddedServiceRequest.requireBookableTime(requestedSchedule, service.duration(), now());
         ValueAddedServiceRequest saved = requests.save(ValueAddedServiceRequest.requestedByElder(
                 elderId, serviceId, requestedSchedule, specialInstructions));
         notifier.requested(saved, service.name());
@@ -107,7 +107,7 @@ public class ValueAddedServiceRequestService {
         FamilyMember family = requireFamily(username);
         familyAccess.requireWritableElder(username, elderId);
         ValueAddedService service = requireAvailable(serviceId);
-        ValueAddedServiceRequest.requireEnoughNotice(requestedSchedule, now());
+        ValueAddedServiceRequest.requireBookableTime(requestedSchedule, service.duration(), now());
         ValueAddedServiceRequest pending = requests.save(ValueAddedServiceRequest.requestedByFamily(
                 elderId, serviceId, family.id(), requestedSchedule, specialInstructions));
         return dispatch(pending, family.id(), service);

@@ -58,4 +58,31 @@ class ServiceApplicationTest {
                     LocalDateTime.now()).notes()).isNull();
         }
     }
+
+    @Test
+    void declinesOnceWithAReasonTheFamilyCanRead() {
+        var submitted = ServiceApplication.submit(42L, elder("Tan Mei", "Road", "123456"), List.of("VITALS"), null,
+                LocalDateTime.of(2026, 10, 9, 6, 0));
+        var at = LocalDateTime.of(2026, 10, 10, 2, 0);
+
+        var declined = submitted.decline("  No nurse free in your sector  ", 3L, at);
+
+        assertThat(declined.status()).isEqualTo(ServiceApplication.Status.DECLINED);
+        assertThat(declined.decline()).isEqualTo(new ServiceApplication.Decline("No nurse free in your sector", 3L, at));
+        assertThat(declined.careNeeds()).isEqualTo(submitted.careNeeds());
+        assertThatThrownBy(() -> declined.decline("Again", 3L, at))
+                .isInstanceOfSatisfying(BusinessRuleViolation.class,
+                        error -> assertThat(error.code()).isEqualTo("SERVICE_APPLICATION_ALREADY_DECLINED"));
+    }
+
+    @Test
+    void aDeclineNeedsAShortReason() {
+        var submitted = ServiceApplication.submit(42L, elder("Tan Mei", "Road", "123456"), List.of("VITALS"), null,
+                LocalDateTime.of(2026, 10, 9, 6, 0));
+        for (String reason : java.util.Arrays.asList(null, "  ", "a".repeat(256))) {
+            assertThatThrownBy(() -> submitted.decline(reason, 3L, LocalDateTime.now()))
+                    .isInstanceOfSatisfying(BusinessRuleViolation.class,
+                            error -> assertThat(error.code()).isEqualTo("SERVICE_APPLICATION_DECLINE_REASON_REQUIRED"));
+        }
+    }
 }

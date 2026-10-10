@@ -7,8 +7,9 @@ import java.util.List;
 
 /**
  * Cross-module contract for UC-MG03: the weekly schedule each version of an elder's care plan
- * puts in force, for rostering to turn into dated visits. Rostering imports this interface
- * only, never careplan's domain or infrastructure.
+ * puts in force, for rostering to turn into dated visits, and for profile to show the family
+ * what was planned. Other modules import this interface only, never careplan's domain or
+ * infrastructure.
  */
 public interface CarePlanSchedules {
 
@@ -30,8 +31,11 @@ public interface CarePlanSchedules {
 			LocalDate effectiveUntil, List<Task> tasks) {
 	}
 
-	/** A plan task: its sub-plan label, its name and the days it recurs on. */
-	record Task(Long carePlanNodeId, String groupName, String name, List<Slot> slots) {
+	/**
+	 * A plan task: its sub-plan label, the care activity it delivers (a catalog code, or null for a
+	 * task outside the catalog), its name and the days it recurs on.
+	 */
+	record Task(Long carePlanNodeId, String groupName, String activityCode, String name, List<Slot> slots) {
 	}
 
 	/** One recurring day of a task: Monday at 08:00 for 30 minutes. */

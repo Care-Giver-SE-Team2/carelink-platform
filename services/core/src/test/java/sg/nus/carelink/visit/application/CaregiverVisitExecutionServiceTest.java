@@ -54,7 +54,7 @@ class CaregiverVisitExecutionServiceTest {
     void setUp() {
         service = new CaregiverVisitExecutionService(executor, receipts, visits, tasks,
                 mock(VisitStateTransitionRepository.class), mock(VisitCheckInRepository.class), plans,
-                new VisitExecutionPolicy(Duration.ofMinutes(30), Duration.ofMinutes(10)));
+                new VisitExecutionPolicy(Duration.ofMinutes(30), Duration.ofMinutes(10)), mock(MissedCheckInResumeService.class));
         visit = new Visit(1L, 3L, 2L, null, null, "Hospital escort", START, null, null, null,
                 Visit.Status.SCHEDULED, null, null, 0, null, null);
         when(executor.now()).thenReturn(START.plusMinutes(2));

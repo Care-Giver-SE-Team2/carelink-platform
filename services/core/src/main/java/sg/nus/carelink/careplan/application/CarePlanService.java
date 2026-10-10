@@ -14,6 +14,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import sg.nus.carelink.careplan.domain.model.CareActivity;
 import sg.nus.carelink.careplan.domain.model.CarePlan;
 import sg.nus.carelink.careplan.domain.model.CarePlanNode;
 import sg.nus.carelink.careplan.domain.model.ScheduleDays;
@@ -75,21 +76,43 @@ public class CarePlanService {
 	}
 
 	/**
+	 * Saves the manager's work in progress on a draft, so leaving the editor doesn't lose it:
+	 * the start date so far and the whole task list, replaced rather than diffed. Unlike publish,
+	 * a task may have no visits yet (the family chose the activity, the manager hasn't scheduled
+	 * it) and the start date may be empty. Nothing is scheduled from a draft — rostering and visits
+	 * only read issued versions — so no event is raised.
+	 */
+	public CarePlan saveDraft(Long planId, LocalDate startDate, List<PlanNodeInput> nodes) {
+		CarePlan plan = carePlans.findById(planId)
+				.orElseThrow(() -> new ResourceNotFound("CarePlan", planId));
+		CarePlan revised = carePlans.save(plan.reviseDraft(startDate));
+		replaceTasks(planId, nodes, false);
+		return revised;
+	}
+
+	/**
+	 * Throws a draft away with its tasks. The version it would have replaced stays in force; an
+	 * elder with no issued version is left with no plan.
+	 */
+	public void discardDraft(Long planId) {
+		CarePlan plan = carePlans.findById(planId)
+				.orElseThrow(() -> new ResourceNotFound("CarePlan", planId));
+		plan.discard();
+		carePlanNodes.deleteByCarePlanId(planId);
+		carePlans.deleteById(planId);
+	}
+
+	/**
 	 * Publishes a draft — replaces its task list with the one the manager just built in
 	 * the editor, rolls up total_hours from it, and marks the plan it supersedes (if any) as
-	 * superseded. The list is a snapshot at the moment of publishing, not incrementally saved, so
-	 * the whole thing is replaced rather than diffed.
+	 * superseded. The list sent here is the final word: whatever the draft last saved is
+	 * replaced rather than diffed.
 	 */
 	public CarePlan publish(Long planId, LocalDate startDate, List<PlanNodeInput> nodes) {
 		CarePlan plan = carePlans.findById(planId)
 				.orElseThrow(() -> new ResourceNotFound("CarePlan", planId));
 
-		carePlanNodes.deleteByCarePlanId(planId);
-		BigDecimal totalHours = BigDecimal.ZERO;
-		int order = 0;
-		for (PlanNodeInput node : nodes) {
-			totalHours = totalHours.add(saveTask(planId, node, order++));
-		}
+		BigDecimal totalHours = replaceTasks(planId, nodes, true);
 
 		CarePlan published = carePlans.save(plan.publish(startDate, totalHours));
 
@@ -100,6 +123,8 @@ public class CarePlanService {
 		}
 
 		events.publishEvent(new CarePlanScheduleChanged(published.elderId()));
+		events.publishEvent(new CarePlanPublished(
+				published.elderId(), published.id(), published.version(), published.startDate()));
 		return published;
 	}
 
@@ -112,18 +137,31 @@ public class CarePlanService {
 		return stopped;
 	}
 
-	private BigDecimal saveTask(Long planId, PlanNodeInput node, int displayOrder) {
-		if (node.visits() == null || node.visits().isEmpty()) {
+	/** Replaces a plan's tasks with {@code nodes}, in order, and returns their total weekly hours. */
+	private BigDecimal replaceTasks(Long planId, List<PlanNodeInput> nodes, boolean requireVisits) {
+		carePlanNodes.deleteByCarePlanId(planId);
+		BigDecimal totalHours = BigDecimal.ZERO;
+		int order = 0;
+		for (PlanNodeInput node : nodes) {
+			totalHours = totalHours.add(saveTask(planId, node, order++, requireVisits));
+		}
+		return totalHours;
+	}
+
+	private BigDecimal saveTask(Long planId, PlanNodeInput node, int displayOrder, boolean requireVisits) {
+		boolean unscheduled = node.visits() == null || node.visits().isEmpty();
+		if (unscheduled && requireVisits) {
 			throw new BusinessRuleViolation(
 					"CARE_PLAN_TASK_NO_VISITS", "Task [%s] has no scheduled visits".formatted(node.name()));
 		}
-		List<ScheduledVisit> visits = scheduledVisitsOf(node);
+		CareActivity.requireKnownOrAbsent(node.activityCode());
+		List<ScheduledVisit> visits = unscheduled ? List.of() : scheduledVisitsOf(node);
 		int totalMinutes = visits.stream().mapToInt(ScheduledVisit::minutes).sum();
 		// duration_per_visit is kept as the average for readers that predate the per-day rows.
-		int averageMinutes = Math.round((float) totalMinutes / visits.size());
+		BigDecimal averageHours = unscheduled ? null : minutesToHours(Math.round((float) totalMinutes / visits.size()));
 		CarePlanNode task = new CarePlanNode(
-				null, planId, node.groupName(), node.name(),
-				scheduleDaysOf(node.visits()), minutesToHours(averageMinutes), minutesToHours(totalMinutes),
+				null, planId, node.groupName(), node.activityCode(), node.name(),
+				unscheduled ? null : scheduleDaysOf(node.visits()), averageHours, minutesToHours(totalMinutes),
 				node.evidenceType() == null ? CarePlanNode.EvidenceType.NONE : node.evidenceType(),
 				displayOrder, null, null, visits);
 		return carePlanNodes.save(task).weeklyHours();

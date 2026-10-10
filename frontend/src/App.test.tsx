@@ -8,7 +8,7 @@ describe('App', () => {
 
     expect(screen.getByText('CareLink')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Sign in/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Apply for care for a family member/ })).toHaveAttribute('href', '/apply')
+    expect(screen.getByRole('link', { name: /Register as a family member/ })).toHaveAttribute('href', '/apply')
     for (const label of ['Manager', 'Caregiver', 'Family', 'Elder', 'Admin']) {
       expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument()
     }

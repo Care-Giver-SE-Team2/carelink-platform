@@ -57,7 +57,7 @@ class RecurringRosterIT {
 		LocalDate tomorrow = LocalDate.now(clock).plusDays(1);
 		CarePlan draft = carePlans.createDraft(elderId, null);
 
-		carePlans.publish(draft.id(), tomorrow, List.of(new PlanNodeInput("Personal care", "Bathing assistance",
+		carePlans.publish(draft.id(), tomorrow, List.of(new PlanNodeInput("Personal care", "BATHING", "Bathing assistance",
 				Arrays.stream(DayOfWeek.values()).map(day -> new VisitInput(day.name(), LocalTime.of(8, 0), 30)).toList(),
 				CarePlanNode.EvidenceType.CHECKLIST)));
 

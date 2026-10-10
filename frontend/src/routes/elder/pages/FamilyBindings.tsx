@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useState,
 } from 'react'
 import type {
@@ -104,6 +105,11 @@ export default function FamilyBindings() {
   const [success, setSuccess] =
     useState<string | null>(null)
 
+  const [usernameError, setUsernameError] =
+    useState<string | null>(null)
+
+  const id = useId()
+
   useEffect(() => {
     const controller =
       new AbortController()
@@ -142,10 +148,27 @@ export default function FamilyBindings() {
   ) {
     event.preventDefault()
 
+    if (submitting) {
+      return
+    }
+
+    const username =
+      familyUsername.trim().toLowerCase()
+
+    if (!username) {
+      setUsernameError(
+        'Enter the username of their family account.',
+      )
+      return
+    }
+
+    // The same rule family sign-up uses, so a typo is caught before it is looked up.
     if (
-      submitting ||
-      !familyUsername.trim()
+      !/^[a-z0-9][a-z0-9._-]{2,63}$/.test(username)
     ) {
+      setUsernameError(
+        'A username has 3 to 64 letters, digits, dots, dashes or underscores, and no spaces.',
+      )
       return
     }
 
@@ -156,8 +179,7 @@ export default function FamilyBindings() {
     try {
       const created =
         await createFamilyBinding({
-          familyUsername:
-            familyUsername.trim(),
+          familyUsername: username,
           relationship,
           primaryContact,
           accessScope,
@@ -184,7 +206,7 @@ export default function FamilyBindings() {
         failure instanceof ApiError &&
         failure.status === 404
       ) {
-        setError(
+        setUsernameError(
           'No family member account was found with that username.',
         )
       } else if (
@@ -369,24 +391,42 @@ export default function FamilyBindings() {
                   CareLink family account.
                 </p>
 
-                <label className={styles.fieldLabel}>
-                  <span>Family username</span>
+                <div className={styles.fieldLabel}>
+                  <label htmlFor={`${id}-username`}>
+                    Family username
+                  </label>
 
                   <input
+                    id={`${id}-username`}
                     type="text"
                     value={familyUsername}
                     autoCapitalize="none"
                     spellCheck={false}
                     maxLength={64}
-                    required
                     disabled={submitting}
-                    onChange={(event) =>
+                    aria-invalid={!!usernameError}
+                    aria-describedby={
+                      usernameError
+                        ? `${id}-username-error`
+                        : undefined
+                    }
+                    onChange={(event) => {
                       setFamilyUsername(
                         event.target.value,
                       )
-                    }
+                      setUsernameError(null)
+                    }}
                   />
-                </label>
+
+                  {usernameError && (
+                    <span
+                      id={`${id}-username-error`}
+                      className={styles.fieldError}
+                    >
+                      {usernameError}
+                    </span>
+                  )}
+                </div>
 
                 <label className={styles.fieldLabel}>
                   <span>Relationship</span>

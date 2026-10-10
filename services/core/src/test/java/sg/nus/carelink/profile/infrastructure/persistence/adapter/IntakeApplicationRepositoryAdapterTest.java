@@ -37,15 +37,4 @@ class IntakeApplicationRepositoryAdapterTest {
 
 		assertThat(adapter.findById(7L)).isEmpty();
 	}
-
-	@Test
-	void saveGoesThroughSpringDataAndComesBackAsDomain() {
-		IntakeApplicationJpaEntity entity = new IntakeApplicationJpaEntity();
-		entity.setId(7L);
-		when(jpa.save(any(IntakeApplicationJpaEntity.class))).thenReturn(entity);
-
-		IntakeApplication saved = adapter.save(IntakeApplicationMapper.toDomain(entity));
-
-		assertThat(saved).isNotNull();
-	}
 }

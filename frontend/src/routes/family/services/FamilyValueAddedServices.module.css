@@ -4,8 +4,13 @@
   gap: 20px;
 }
 .band { composes: band from '../components/FamilyScreen.module.css'; }
-.band h1, .band p { margin: 0; }
-.eyebrow { color: var(--fm-accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+/* The same header as the other family pages: eyebrow, title, then a muted line under it. */
+.page > .band { margin-bottom: 0; }
+.band h1 { margin: 0; }
+.band > p:last-child { margin: 6px 0 0; color: var(--fm-muted); font-size: 13.5px; text-wrap: pretty; }
+.eyebrow { margin: 0 0 8px !important; color: var(--fm-accent); font-size: 11px; font-weight: 600; letter-spacing: .12em; line-height: 1.2; text-transform: uppercase; }
+/* Phone: the long title wraps before the floating notification bell instead of running under it. */
+@media (max-width: 899px) { .band h1 { padding-right: 48px; } }
 .card { padding: 20px; border: 1px solid var(--fm-line-card); border-radius: 18px; background: var(--fm-card); display: grid; gap: 14px; }
 .card h2 { margin: 0; }
 .request { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--fm-line-row); }
@@ -25,3 +30,9 @@ dt { color: var(--fm-muted); } dd { margin: 0; font-weight: 700; text-align: rig
 .form label { display: grid; gap: 6px; font-weight: 700; }
 .form select, .form input, .form textarea { min-height: 42px; padding: 8px 12px; border: 1px solid var(--fm-line-card); border-radius: 12px; font: inherit; font-weight: 400; }
 .form textarea { min-height: 84px; resize: vertical; }
+.formField { display: grid; gap: 6px; }
+.formField > label { font-weight: 700; }
+.form [aria-invalid='true'] { border-color: var(--fm-urgent); }
+.fieldError, .fieldHint { font-size: 13px; line-height: 1.4; }
+.fieldError { color: var(--fm-urgent); }
+.fieldHint { color: var(--fm-muted); }

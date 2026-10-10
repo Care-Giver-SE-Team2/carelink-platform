@@ -1,13 +1,9 @@
 package sg.nus.carelink.profile.infrastructure.persistence.repository;
 
 import java.util.List;
-import java.util.Optional;
-
-import jakarta.persistence.LockModeType;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,18 +28,5 @@ public interface IntakeApplicationJpaRepository extends JpaRepository<IntakeAppl
 	long countForApplicant(@Param("familyMemberId") Long familyMemberId,
 			@Param("status") IntakeApplicationJpaEntity.Status status);
 
-	@Query("""
-			SELECT application FROM IntakeApplicationJpaEntity application
-			WHERE application.status IN :statuses
-			ORDER BY application.createdAt DESC, application.id DESC
-			""")
-	List<IntakeApplicationJpaEntity> findByStatusNewestFirst(
-			@Param("statuses") List<IntakeApplicationJpaEntity.Status> statuses);
-
-	List<IntakeApplicationJpaEntity> findByPostalCodeAndStatusIn(String postalCode,
-			List<IntakeApplicationJpaEntity.Status> statuses);
-
-	@Lock(LockModeType.PESSIMISTIC_WRITE)
-	@Query("SELECT application FROM IntakeApplicationJpaEntity application WHERE application.id = :id")
-	Optional<IntakeApplicationJpaEntity> findByIdForUpdate(@Param("id") Long id);
+	List<IntakeApplicationJpaEntity> findByElderIdAndStatus(Long elderId, IntakeApplicationJpaEntity.Status status);
 }

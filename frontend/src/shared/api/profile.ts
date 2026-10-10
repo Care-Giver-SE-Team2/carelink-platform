@@ -36,6 +36,34 @@ export function fetchElderFamily(id: string): Promise<ElderFamilyContact[]> {
   return api<ElderFamilyContact[]>(`/elders/${id}/family`)
 }
 
+/** Care the family applied for on the elder's behalf: the intake that created the elder, or a later service
+ * application. careNeeds are care activity codes, or free text on applications that predate the catalog.
+ * outcome is worked out from the published plan versions: PLANNED once every activity is in one (this outranks
+ * a decline), DECLINED with the reason the family was given, SUBMITTED otherwise. */
+export type ElderCareRequest = {
+  source: 'INTAKE' | 'SERVICE_APPLICATION'
+  applicationId: number
+  careNeeds: string[]
+  notes: string | null
+  submittedAt: string
+  outcome: 'SUBMITTED' | 'PLANNED' | 'DECLINED'
+  needs: { need: string; plannedVersion: number | null; plannedFrom: string | null }[]
+  declineReason: string | null
+}
+
+/** Newest first; [] when the family hasn't applied for anything (e.g. the elder registered themselves). */
+export function fetchElderCareRequests(id: string): Promise<ElderCareRequest[]> {
+  return api<ElderCareRequest[]>(`/elders/${id}/care-requests`)
+}
+
+/** The care team won't plan a family's service application; the reason is shown to the family. */
+export function declineServiceApplication(applicationId: number, reason: string): Promise<void> {
+  return api<void>(`/service-applications/${applicationId}/decline`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
 /**
  * Row shape for GET /api/elders — profile.controller.dto.ElderListItemResponse. The three
  * primaryCaregiver fields are all null while the elder has no primary caregiver.
@@ -154,68 +182,6 @@ export function publishCredential(id: number): Promise<void> {
 /** Rejects a submitted certificate; the caregiver is told `reason`. */
 export function rejectCredential(id: number, reason: string): Promise<void> {
   return api<void>(`/credentials/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) })
-}
-
-/** One screening check on a family application. `count` is the caregivers counted by `sector`
- *  (free now) and `dialect` (could take the elder); null for `contact` and when the sector is unknown.
- *  Whether the person is already on record is not a check: the server refuses that outright. */
-export type IntakeCheck = {
-  key: 'contact' | 'sector' | 'dialect'
-  pass: boolean
-  count: number | null
-}
-
-export type IntakeStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'
-export type IntakeMobilityLevel = 'INDEPENDENT' | 'ASSISTIVE_CANE' | 'WHEELCHAIR_BEDBOUND'
-
-/** A pending family application as the manager reviews it (GET /api/intake-reviews): the family's
- *  submission, with the same field names the family app reads from /api/intake-applications, plus
- *  the applicant, the caregiver sector the postcode falls in (null when unknown) and the checks. */
-export type IntakeReview = {
-  id: number
-  applicantFamilyMemberId: number
-  applicant: { fullName: string; username: string | null; phone: string | null }
-  targetElderName: string
-  targetElderAge: number | null
-  targetAddress: string
-  postalCode: string
-  mobilityLevel: IntakeMobilityLevel
-  preferredDialects: string | null
-  /** The form's checkbox codes (BATHING, VITALS) and the family's own words. */
-  careNeeds: string[]
-  medicalNotes: string | null
-  status: IntakeStatus
-  reviewRemarks: string | null
-  /** ISO with offset. */
-  createdAt: string
-  reviewedAt: string | null
-  elderId: number | null
-  sector: string | null
-  checks: IntakeCheck[]
-}
-
-/** `elderLogin` is set on approval only; its password is the one plain-text copy, shown once. */
-export type IntakeDecision = {
-  id: number
-  status: IntakeStatus
-  elderId: number | null
-  elderLogin: { username: string; temporaryPassword: string } | null
-}
-
-/** Applications waiting for an answer, newest first. */
-export function fetchIntakeReviews(signal?: AbortSignal): Promise<IntakeReview[]> {
-  return api<IntakeReview[]>('/intake-reviews', { signal })
-}
-
-/** Approves: creates the elder record and the elder's login. `message` is shown to the family with the decision.
- *  Refused (409 ELDER_ALREADY_REGISTERED) if the elder has been put on record since the family applied. */
-export function approveIntakeApplication(id: number, message: string | null): Promise<IntakeDecision> {
-  return api<IntakeDecision>(`/intake-reviews/${id}/approve`, { method: 'POST', body: JSON.stringify({ message }) })
-}
-
-/** Declines: nothing is created; `message` (required) tells the family why. */
-export function declineIntakeApplication(id: number, message: string): Promise<IntakeDecision> {
-  return api<IntakeDecision>(`/intake-reviews/${id}/decline`, { method: 'POST', body: JSON.stringify({ message }) })
 }
 
 /** Body of POST /api/family-registrations — profile.controller.dto.FamilyRegistrationRequest. */

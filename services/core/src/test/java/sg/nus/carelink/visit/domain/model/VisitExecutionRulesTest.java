@@ -63,6 +63,29 @@ class VisitExecutionRulesTest {
         assertThatThrownBy(()->task.result(VisitTask.Status.DONE,"x".repeat(256),null,now)).hasMessageContaining("long");
         assertThatThrownBy(()->task.result(VisitTask.Status.DONE,null,"x".repeat(501),now)).hasMessageContaining("long");
     }
+    @Test void departureHasNoPlannedEndOrCompletenessGateAndPreservesHealth() {
+        var started=visit(Visit.Status.SCHEDULED,1L,"Task",now.plusMinutes(5)).arrivedAt(now).started();
+        var measured=started.observedHealth(new HealthMeasurement(null,null,null,null,
+                HealthObservation.Flag.ATTENTION,"Follow up"));
+        var completed=VisitStateFactory.forVisit(measured).checkOut(measured,now.plusHours(2));
+        assertThat(completed.status()).isEqualTo(Visit.Status.COMPLETED);
+        assertThat(completed.checkedInAt()).isEqualTo(now);
+        assertThat(completed.checkedOutAt()).isEqualTo(now.plusHours(2));
+        assertThat(completed.healthFlag()).isEqualTo(HealthObservation.Flag.ATTENTION);
+        assertThat(completed.healthNote()).isEqualTo("Follow up");
+        assertThat(started.checkedOutAt(now).checkedOutAt()).isEqualTo(now);
+        assertThatThrownBy(()->started.checkedOutAt(now.minusSeconds(1))).hasMessageContaining("precede");
+        assertThatThrownBy(()->completed.checkedOutAt(now.plusHours(3))).hasMessageContaining("active");
+        assertThatThrownBy(()->visit(Visit.Status.IN_PROGRESS,1L,"Task",null).checkedOutAt(now)).hasMessageContaining("active");
+        for(var status:Visit.Status.values()) {
+            if(status==Visit.Status.IN_PROGRESS) continue;
+            var v=visit(status,1L,"Task",null);
+            assertThatThrownBy(()->VisitStateFactory.forVisit(v).checkOut(v,now)).hasMessageContaining("cannot");
+        }
+        assertThatThrownBy(()->VisitStateFactory.forVisit(completed).requireTaskResult()).hasMessageContaining("cannot");
+        assertThatThrownBy(()->completed.observedHealth(new HealthMeasurement(null,null,null,null,
+                HealthObservation.Flag.NO_CONCERN,"Not measured"))).hasMessageContaining("active");
+    }
     @Test void gpsAndManualRecordsNeverMasqueradeAsEachOther() {
         var gps=new CheckInLocation("GPS",BigDecimal.valueOf(1.2),BigDecimal.valueOf(103.2),10.0,null,Instant.now());
         assertThat(gps.note()).isNull();

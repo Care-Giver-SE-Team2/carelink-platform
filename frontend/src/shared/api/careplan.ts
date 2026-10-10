@@ -25,9 +25,11 @@ export type CarePlanResponse = {
  */
 export type VisitPayload = { day: string; startTime: string; minutes: number }
 
-/** Every published node is a task; groupName is a display-only label, not a hierarchy. */
+/** Every node is a task; groupName is a display-only label, not a hierarchy. activityCode is the
+ * catalog activity the task delivers (GET /api/care-activities), or null for a task outside it. */
 export type PlanNodePayload = {
   groupName: string | null
+  activityCode: string | null
   name: string
   visits: VisitPayload[]
   evidenceType: 'NONE' | 'CHECKLIST' | 'PHOTO' | 'READING'
@@ -36,6 +38,7 @@ export type PlanNodePayload = {
 export type CarePlanNodeResponse = {
   id: number
   groupName: string | null
+  activityCode: string | null
   name: string
   visits: VisitPayload[]
   evidenceType: 'NONE' | 'CHECKLIST' | 'PHOTO' | 'READING'
@@ -80,10 +83,38 @@ export function publishCarePlan(
   })
 }
 
+/** Saves the editor's work in progress on a draft. Unlike publish, startDate may still be null and a task may
+ * have no visits yet. Nothing is scheduled from a draft. */
+export function saveCarePlanDraft(
+  carePlanId: number,
+  startDate: string | null,
+  nodes: PlanNodePayload[],
+): Promise<CarePlanResponse> {
+  return api<CarePlanResponse>(`/care-plans/${carePlanId}/draft`, {
+    method: 'PUT',
+    body: JSON.stringify({ startDate, nodes }),
+  })
+}
+
+/** Throws a draft away; the version it would have replaced stays in force. */
+export function discardCarePlanDraft(carePlanId: number): Promise<void> {
+  return api<void>(`/care-plans/${carePlanId}`, { method: 'DELETE' })
+}
+
 /** Effective date as an ISO "yyyy-MM-dd" string, matching java.time.LocalDate's JSON form. */
 export function stopCarePlan(carePlanId: number, effectiveDate: string, reason: string): Promise<CarePlanResponse> {
   return api<CarePlanResponse>(`/care-plans/${carePlanId}/stop`, {
     method: 'POST',
     body: JSON.stringify({ effectiveDate, reason }),
   })
+}
+
+/** One entry of the care activity catalog — the same list the family applies from and the manager plans from.
+ * code is what an application's careNeeds stores; label is what both sides see and what a plan task is named;
+ * category is the sub-plan the task is filed under. */
+export type CareActivity = { code: string; label: string; category: string }
+
+/** GET /api/care-activities, in catalog order. */
+export function fetchCareActivities(signal?: AbortSignal): Promise<CareActivity[]> {
+  return api<CareActivity[]>('/care-activities', { signal })
 }

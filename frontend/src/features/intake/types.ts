@@ -1,21 +1,6 @@
 export type IntakeStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'
 export type MobilityLevel = 'INDEPENDENT' | 'ASSISTIVE_CANE' | 'WHEELCHAIR_BEDBOUND'
 
-/**
- * Family-editable fields accepted when submitting an application.
- * @author Wang Zhili
- */
-export interface IntakeApplicationCreateRequest {
-  targetElderName: string
-  targetAddress: string
-  postalCode: string
-  targetElderAge?: number
-  mobilityLevel?: MobilityLevel
-  preferredDialects?: string
-  careNeeds?: string[]
-  medicalNotes?: string
-}
-
 export interface IntakeListQuery {
   page: number
   size: number

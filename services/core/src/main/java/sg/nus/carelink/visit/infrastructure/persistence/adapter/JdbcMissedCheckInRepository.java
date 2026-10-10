@@ -3,6 +3,7 @@ package sg.nus.carelink.visit.infrastructure.persistence.adapter;
 import java.time.LocalDateTime;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import sg.nus.carelink.visit.domain.model.MissedCheckInTrigger;
@@ -41,5 +42,12 @@ class JdbcMissedCheckInRepository implements MissedCheckInRepository {
                 scheduled_start,check_in_due_at,observed_visit_version,triggered_at) VALUES (?,?,?,?,?,?,?)
                 """, t.visitId(), t.incidentId(), t.caregiverId(), Timestamp.valueOf(t.scheduledStart()),
                 Timestamp.valueOf(t.dueAt()), t.observedVersion(), Timestamp.valueOf(t.triggeredAt()));
+    }
+    @Override public Optional<MissedCheckInTrigger> find(Long visitId) {
+        return jdbc.query("SELECT * FROM visit_missed_check_in_trigger WHERE visit_id=?", (row, ignored) ->
+                new MissedCheckInTrigger(row.getLong("visit_id"), row.getLong("incident_id"),
+                        row.getLong("triggered_caregiver_id"), row.getTimestamp("scheduled_start").toLocalDateTime(),
+                        row.getTimestamp("check_in_due_at").toLocalDateTime(), row.getInt("observed_visit_version"),
+                        row.getTimestamp("triggered_at").toLocalDateTime()), visitId).stream().findFirst();
     }
 }

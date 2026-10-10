@@ -11,10 +11,12 @@ import sg.nus.carelink.careplan.domain.model.CarePlanNode;
 /**
  * One task the manager is publishing, with its weekly effort ({@code visits}). {@code groupName}
  * is a display-only label the UI uses to cluster tasks under a heading; it carries no validation
- * or roll-up rule.
+ * or roll-up rule. {@code activityCode} is the catalog activity the task delivers (GET
+ * /api/care-activities), or null for a task outside the catalog.
  */
 public record PlanNodeRequest(
 		String groupName,
+		@Size(max = 50) String activityCode,
 		@NotBlank @Size(max = 150) String name,
 		List<@Valid VisitRequest> visits,
 		CarePlanNode.EvidenceType evidenceType) {

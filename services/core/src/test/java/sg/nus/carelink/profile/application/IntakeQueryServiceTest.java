@@ -18,7 +18,6 @@ import sg.nus.carelink.identity.application.UserDirectory;
 import sg.nus.carelink.identity.domain.model.AppUser;
 import sg.nus.carelink.profile.domain.model.FamilyMember;
 import sg.nus.carelink.profile.domain.model.IntakeApplication;
-import sg.nus.carelink.profile.domain.model.IntakeSubmission;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.shared.security.Role;
 
@@ -59,9 +58,8 @@ class IntakeQueryServiceTest {
 
 	@Test
 	void resolvesApplicationOwnershipThroughTheFamilyProfileWithoutAnElderBinding() {
-		var details = new IntakeSubmission("Tan Mei", null, "12 Example Road", "123456", null, null, null, null);
-		var own = applications.save(IntakeApplication.submit(42L, details));
-		applications.save(IntakeApplication.submit(7L, details));
+		var own = applications.save(submitted(42L, "Tan Mei", "12 Example Road"));
+		applications.save(submitted(7L, "Tan Mei", "12 Example Road"));
 
 		var result = service.listMine("family-a", IntakeApplication.Status.SUBMITTED, 0, 20);
 
@@ -78,16 +76,14 @@ class IntakeQueryServiceTest {
 
 	@Test
 	void readsTheCurrentFamilysApplicationWithoutRequiringAnElderBinding() {
-		var details = new IntakeSubmission("Tan Mei", null, "12 Example Road", "123456", null, null, null, null);
-		var saved = applications.save(IntakeApplication.submit(42L, details));
+		var saved = applications.save(submitted(42L, "Tan Mei", "12 Example Road"));
 
 		assertThat(service.getMine("family-a", saved.id())).isEqualTo(saved);
 	}
 
 	@Test
 	void refusesAnApplicationOwnedByAnotherFamilyEvenWhenItsFamilyIdMatchesTheUserId() {
-		var details = new IntakeSubmission("Private elder", null, "Private address", "123456", null, null, null, null);
-		var other = applications.save(IntakeApplication.submit(7L, details));
+		var other = applications.save(submitted(7L, "Private elder", "Private address"));
 
 		assertThatThrownBy(() -> service.getMine("family-a", other.id()))
 				.isInstanceOf(AccessDeniedException.class);
@@ -101,5 +97,11 @@ class IntakeQueryServiceTest {
 				.isInstanceOf(AccessDeniedException.class);
 		assertThatThrownBy(() -> service.getMine(username, 999L))
 				.isInstanceOf(AccessDeniedException.class);
+	}
+
+	private static IntakeApplication submitted(Long familyMemberId, String elderName, String address) {
+		return new IntakeApplication(null, familyMemberId, elderName, null, address, "123456",
+				IntakeApplication.MobilityLevel.INDEPENDENT, null, null, null, IntakeApplication.Status.SUBMITTED,
+				null, null, null, null, null);
 	}
 }

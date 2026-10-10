@@ -310,8 +310,10 @@ class FamilyReportWorkflowIT {
 			assertThat(audits()).isEmpty();
 			login(family, "family-a");
 			getJson(family, "/api/reports/" + reportId(generated, "FAMILY"));
-			var application = postJson(family, "/api/intake-applications", Map.of("targetElderName", "New elder",
-					"targetAddress", "12 Example Road", "postalCode", "123456"), 201);
+			jdbc.update("INSERT INTO intake_application (id, applicant_family_member_id, target_elder_name, target_address, "
+						+ "postal_code, status, created_at) VALUES (901, 42, 'New elder', '12 Example Road', '123456', 'SUBMITTED', "
+						+ "'2026-09-20 10:00:00')");
+			var application = getJson(family, "/api/intake-applications/901");
 			assertThat(application.path("applicantFamilyMemberId").longValue()).isEqualTo(42);
 			assertThat(application.path("status").asString()).isEqualTo("SUBMITTED");
 			assertThat(getJson(family, "/api/intake-applications").path("items")).containsExactly(application);

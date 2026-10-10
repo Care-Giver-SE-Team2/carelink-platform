@@ -42,7 +42,7 @@ class CarePlanScheduleIT {
 		CarePlan draft = service.createDraft(elderId, null);
 
 		service.publish(draft.id(), LocalDate.of(2026, 10, 1), List.of(new PlanNodeInput(
-				"Personal care", "Bathing assistance",
+				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Mon", LocalTime.of(8, 0), 30), new VisitInput("Wed", LocalTime.of(16, 30), 45)),
 				CarePlanNode.EvidenceType.CHECKLIST)));
 
@@ -57,16 +57,37 @@ class CarePlanScheduleIT {
 	}
 
 	@Test
+	void savesADraftsUnscheduledCatalogTasksAndThrowsThemAwayOnDiscard() {
+		Long elderId = elder();
+		CarePlan draft = service.createDraft(elderId, null);
+
+		service.saveDraft(draft.id(), null, List.of(new PlanNodeInput(
+				"Personal care", "BATHING", "Bathing assistance", List.of(), CarePlanNode.EvidenceType.CHECKLIST)));
+
+		assertThat(jdbc.queryForObject(
+				"SELECT activity_code FROM care_plan_node WHERE care_plan_id = ?", String.class, draft.id()))
+				.isEqualTo("BATHING");
+		assertThat(service.findNodes(draft.id()).getFirst().visits()).isEmpty();
+
+		service.discardDraft(draft.id());
+
+		assertThat(jdbc.queryForObject(
+				"SELECT COUNT(*) FROM care_plan WHERE id = ?", Integer.class, draft.id())).isZero();
+		assertThat(jdbc.queryForObject(
+				"SELECT COUNT(*) FROM care_plan_node WHERE care_plan_id = ?", Integer.class, draft.id())).isZero();
+	}
+
+	@Test
 	void theNextVersionHasItsOwnScheduleAndLeavesThePreviousOneAlone() {
 		Long elderId = elder();
 		CarePlan first = service.createDraft(elderId, null);
 		service.publish(first.id(), LocalDate.of(2026, 10, 1), List.of(new PlanNodeInput(
-				null, "Vital-sign check", List.of(new VisitInput("Tue", LocalTime.of(9, 0), 15)),
+				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Tue", LocalTime.of(9, 0), 15)),
 				CarePlanNode.EvidenceType.READING)));
 
 		CarePlan second = service.createDraft(elderId, null);
 		service.publish(second.id(), LocalDate.of(2026, 10, 8), List.of(new PlanNodeInput(
-				null, "Vital-sign check", List.of(new VisitInput("Thu", LocalTime.of(10, 0), 20)),
+				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Thu", LocalTime.of(10, 0), 20)),
 				CarePlanNode.EvidenceType.READING)));
 
 		assertThat(service.findNodes(first.id()).getFirst().visits())

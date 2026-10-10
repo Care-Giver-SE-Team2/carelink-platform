@@ -291,12 +291,46 @@ describe(
       )
 
       expect(
-        await screen.findByRole(
-          'alert',
+        await screen.findByText(
+          'No family member account was found with that username.',
         ),
-      ).toHaveTextContent(
-        'No family member account was found with that username.',
+      ).toBeInTheDocument()
+      expect(
+        screen.getByLabelText(
+          'Family username',
+        ),
+      ).toHaveAttribute('aria-invalid', 'true')
+    })
+
+    it('checks the username format before looking it up', async () => {
+      mockedGet.mockResolvedValue([])
+      renderPage()
+
+      const user =
+        userEvent.setup()
+
+      await user.type(
+        await screen.findByLabelText(
+          'Family username',
+        ),
+        'lim wei ling',
       )
+      await user.click(
+        screen.getByRole(
+          'button',
+          {
+            name:
+              'Send binding request',
+          },
+        ),
+      )
+
+      expect(
+        screen.getByText(
+          /A username has 3 to 64 letters/,
+        ),
+      ).toBeInTheDocument()
+      expect(mockedCreate).not.toHaveBeenCalled()
     })
 
     it('shows 409 message for an existing binding', async () => {

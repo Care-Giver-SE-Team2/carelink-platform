@@ -6,6 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FamilyVisit } from '../../features/schedule/types'
 import FamilyHome from './index'
 
+// The navigation's waiting counts are tested with FamilyLayout and on Home; here they stay at zero so
+// only this page's own requests are made.
+vi.mock('./components/usePendingDecisions', () => ({
+  usePendingDecisions: () => ({ changes: [], spotChecks: [], requests: [], total: 0 }),
+}))
+
 const family = { id: 11, username: 'wei_ling', displayName: 'Lim Wei Ling', roles: ['FAMILY'] }
 const elders = [
   { id: 21, fullName: 'Tan Mei', dateOfBirth: '1948-03-02', address: null, sector: 'S31', planStatus: 'published', planVersion: 1, nextVisitDate: null, primaryCaregiverId: 31, primaryCaregiverName: 'Siti Rahmah', primaryCaregiverAssignedAt: null },
@@ -94,8 +100,9 @@ describe('Family desktop layout', () => {
     openFamily('/family/home')
 
     const nav = screen.getByRole('navigation', { name: 'Family pages' })
-    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Schedule', 'Visit changes', 'Spot checks', 'Reports', 'Services', 'Extra services', 'Caregiver reviews', 'My elders', 'Family bindings'])
+    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Schedule', 'Care plan', 'Reports', 'Visit changes', 'Spot checks', 'Extra services', 'Care applications', 'Caregiver review'])
     expect(within(nav).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getAllByRole('paragraph').map((heading) => heading.textContent)).toEqual(['Care', 'Needs your answer', 'Your service'])
     expect(await screen.findByRole('link', { name: /Lim Wei Ling.*Account/ })).toHaveAttribute('href', '/family/account')
     expect(screen.getByRole('link', { name: 'CareLink' })).toHaveAttribute('href', '/family/home')
     expect(screen.getByRole('combobox', { name: 'Following' })).toHaveValue('21')

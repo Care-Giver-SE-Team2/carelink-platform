@@ -116,7 +116,6 @@ const awaiting: AbsenceCase = {
 beforeEach(() => {
   vi.spyOn(incidentsApi, 'listIncidentQueue').mockImplementation(async ({ size }) => ({ items: [], page: 0, size, totalElements: 0 }))
   vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue({ id: 11, username: 'alice', displayName: 'Alice Tan', roles: ['MANAGER'] })
-  vi.spyOn(profileApi, 'fetchIntakeReviews').mockResolvedValue([])
   vi.spyOn(profileApi, 'fetchCredentialRegister').mockResolvedValue([])
   vi.spyOn(rosteringApi, 'fetchVisitsAtRisk').mockResolvedValue([])
 })

@@ -199,6 +199,22 @@ public record Visit(
         if (status != Status.ARRIVED) throw new sg.nus.carelink.shared.error.BusinessRuleViolation("VISIT_EXECUTION_NOT_ALLOWED", "Visit has not arrived.");
         return withAssignmentAndStatus(caregiverId, Status.IN_PROGRESS);
     }
+    /** Only the locked, evidence-checked legacy SYS03 command may invoke this transition. */
+    public Visit arrivedAfterMissedCheckIn(LocalDateTime now) {
+        if (status != Status.EXCEPTION || checkedInAt != null || checkedOutAt != null || absenceId != null || caregiverId == null)
+            throw new sg.nus.carelink.shared.error.BusinessRuleViolation("VISIT_EXECUTION_NOT_ALLOWED", "Visit cannot resume late check-in.");
+        return new Visit(id, elderId, caregiverId, carePlanNodeId, absenceId, serviceType, scheduledStart, scheduledEnd,
+                now, null, Status.ARRIVED, null, carePlanId, version, createdAt, updatedAt, healthFlag, healthNote);
+    }
+    /** Departure is independent of task/evidence completeness and the planned end time. */
+    public Visit checkedOutAt(LocalDateTime now) {
+        if (status != Status.IN_PROGRESS || checkedInAt == null || checkedOutAt != null)
+            throw new sg.nus.carelink.shared.error.BusinessRuleViolation("VISIT_EXECUTION_NOT_ALLOWED", "Check out requires an active, checked-in visit.");
+        if (now == null || now.isBefore(checkedInAt))
+            throw new sg.nus.carelink.shared.error.BusinessRuleViolation("VISIT_CHECK_OUT_TIME", "Check-out time cannot precede check-in time.");
+        return new Visit(id, elderId, caregiverId, carePlanNodeId, absenceId, serviceType, scheduledStart, scheduledEnd,
+                checkedInAt, now, Status.COMPLETED, null, carePlanId, version, createdAt, updatedAt, healthFlag, healthNote);
+    }
     /** CG04: operational reports pause open work, never undo a completed visit. */
     public Visit reportedException(LocalDateTime now) {
         if (status == Status.CANCELLED || (status == Status.SCHEDULED && now.isBefore(scheduledStart))) {

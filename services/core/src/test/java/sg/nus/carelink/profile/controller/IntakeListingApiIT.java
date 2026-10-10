@@ -273,25 +273,6 @@ class IntakeListingApiIT {
 		assertThat(pending.path("elderId").isNull()).isTrue();
 	}
 
-	@Test
-	void submittedApplicationImmediatelyAppearsInTheSameFamilysList() throws Exception {
-		var login = loginAs("family-b");
-		var submitted = mvc.perform(post(PATH).session(login.session()).cookie(login.csrfCookie())
-				.header("X-XSRF-TOKEN", login.csrfCookie().getValue())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"targetElderName":"Tan Mei","targetAddress":"12 Example Road","postalCode":"123456"}
-						"""))
-				.andExpect(status().isCreated()).andReturn().getResponse();
-		var listed = mvc.perform(get(PATH).session(login.session()))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.totalElements").value(1))
-				.andExpect(jsonPath("$.items.length()").value(1))
-				.andReturn().getResponse();
-		assertThat(json.readTree(listed.getContentAsString()).path("items").get(0))
-				.isEqualTo(json.readTree(submitted.getContentAsString()));
-	}
-
 	private void seedApplication(long id, long familyMemberId, String applicationStatus, String createdAt) {
 		jdbc.update("INSERT INTO intake_application (id, applicant_family_member_id, target_elder_name, "
 				+ "target_address, postal_code, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",

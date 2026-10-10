@@ -53,7 +53,7 @@ class CarePlanSchedulesService implements CarePlanSchedules {
 	}
 
 	private static Task taskOf(CarePlanNode node) {
-		return new Task(node.id(), node.groupName(), node.name(), node.visits().stream()
+		return new Task(node.id(), node.groupName(), node.activityCode(), node.name(), node.visits().stream()
 				.map(visit -> new Slot(visit.day(), visit.startTime(), visit.minutes()))
 				.toList());
 	}
