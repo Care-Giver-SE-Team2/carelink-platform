@@ -353,35 +353,38 @@ itself is tested in core.
 
 A service tells the others what happened by publishing an event, and the services that care handle it. Events
 travel through one SNS topic. Each service has its own SQS queue subscribed to the topic, with a dead-letter
-queue behind it. The event catalogue lists which events exist, who publishes each, and who handles it.
+queue behind it. [event-catalogue.md](event-catalogue.md) lists which events exist, who publishes each, what it
+carries, and who handles it.
 
 **Publishing.** Call `Events.publish` in the transaction that changes the data the event is about:
 
 ```java
 @Transactional
-public void markMissed(Long visitId) {
+public void checkOut(Long visitId, LocalDateTime at) {
 	Visit visit = visits.require(visitId);
-	visit.markMissed();
-	events.publish("VisitMissed", new VisitMissed(visit.id(), visit.elderId()));
+	visits.save(visit.checkOut(at));
+	events.publish("VisitCompleted", VisitCompleted.of(visit));
 }
 ```
 
 The event is written to the `outbox_event` table in that transaction, so it goes out only if the transaction
 commits. A relay then publishes it to SNS, normally within a second. Called outside a transaction, `publish`
-throws. The payload is written as JSON: ids and the fields the receivers need, never health details.
+throws. The payload is written as JSON: ids and the fields the receivers need, in the formats the catalogue
+sets (times with their offset, decimals as strings). Health and care details travel only in the events the
+catalogue marks as sensitive, to the services that subscribe to them, and no service logs a payload.
 
 **Handling.** Declare one bean per event type the service handles:
 
 ```java
 @Component
-class VisitMissedHandler implements EventHandler<VisitMissed> {
+class VisitCompletedHandler implements EventHandler<VisitCompleted> {
 
-	public String type() { return "VisitMissed"; }
+	public String type() { return "VisitCompleted"; }
 
-	public Class<VisitMissed> payloadType() { return VisitMissed.class; }
+	public Class<VisitCompleted> payloadType() { return VisitCompleted.class; }
 
-	public void handle(VisitMissed event, EventMetadata metadata) {
-		incidents.raiseMissedCheckIn(event.visitId(), event.elderId(), metadata.occurredAt());
+	public void handle(VisitCompleted event, EventMetadata metadata) {
+		visits.completed(event.visitId(), event.checkedInAt(), event.checkedOutAt(), event.version());
 	}
 
 }

@@ -64,7 +64,8 @@ carelink-platform/
 │  ├─ ci.yml                      works out what a commit changed and runs service.yml for those services
 │  └─ service.yml                 the pipeline every service goes through
 ├─ frontend/                      the React web application
-├─ docs/                          the API contract (docs/api/), data models, design notes
+├─ docs/                          the API contract (docs/api/), the platform guides (docs/platform/: building a
+│                                 service, service boundaries, the event catalogue), data models, design notes
 ├─ pom.xml                        parent of every service: Java version, dependency versions, test and coverage plugins
 ├─ docker-compose.yml             the local environment: the services plus MySQL, Redis and LocalStack
 └─ ARCHITECTURE.md                inside a service: modules and layers

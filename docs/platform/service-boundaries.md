@@ -113,8 +113,9 @@ controllers move with it, and a caller that has switched to the client changes n
 | SQL on `visit` in `NotificationTableAlert` (the elder's latest caregiver) | incident | `GET /internal/v1/visits/latest-caregiver?elderId=` → `{ caregiverId }`, or 404 |
 
 Times are ISO date-times on Singapore's wall clock, as visit stores them. A caller switches by keeping its port and
-replacing the adapter with one that calls `VisitApi`, as in section 3. Some of these calls can become events instead
-(`VisitScheduled`, `AbsenceReported`), as the event catalogue decides.
+replacing the adapter with one that calls `VisitApi`, as in section 3. The [event catalogue](event-catalogue.md) decides
+which facts travel as events instead: report's reads of the visit table become visit's events there, and
+`AbsenceReported` is not built.
 
 ## 5. SQL and writes that reach another service's tables
 
