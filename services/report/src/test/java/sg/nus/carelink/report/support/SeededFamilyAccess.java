@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -25,6 +26,9 @@ import sg.nus.carelink.coreapi.CoreApi;
  * a binding that is ACTIVE and not yet expired on Singapore's clock, FULL to act and FULL or
  * READ_ONLY to read. core's own tests prove that rule; here it only stands in for core, so that
  * report's tests can change a binding in the middle of a session and see report ask again.
+ *
+ * <p>The expiry is read as a {@link Timestamp}, the way JPA reads it in core, so that it lands on
+ * the same side of the connection's time-zone conversion as in core.
  */
 public final class SeededFamilyAccess {
 
@@ -84,9 +88,11 @@ public final class SeededFamilyAccess {
 		return jdbc.query("""
 				select elder_id, access_scope, status, expires_at from elder_family_binding
 				where family_member_id = ? and (? is null or elder_id = ?)
-				""", (row, n) -> new Binding(row.getLong("elder_id"), row.getString("access_scope"),
-				row.getString("status"), row.getObject("expires_at", LocalDateTime.class)),
-				familyMemberId, elderId, elderId);
+				""", (row, n) -> {
+					Timestamp expiresAt = row.getTimestamp("expires_at");
+					return new Binding(row.getLong("elder_id"), row.getString("access_scope"), row.getString("status"),
+							expiresAt == null ? null : expiresAt.toLocalDateTime());
+				}, familyMemberId, elderId, elderId);
 	}
 
 	private LocalDateTime now() {
