@@ -128,6 +128,14 @@ public interface CoreApi {
 	@PostExchange("/incidents/service-disputes")
 	IncidentRef raiseServiceDispute(@RequestBody ServiceDisputeRequest request);
 
+	/**
+	 * Whether this missed check-in incident is the only incident on the visit, which visit asks before
+	 * it lets the caregiver carry on with a visit the missed check-in paused.
+	 */
+	@GetExchange("/incidents/{incidentId}/sole-missed-check-in")
+	SoleIncident soleMissedCheckInIncident(@PathVariable Long incidentId, @RequestParam Long elderId,
+			@RequestParam Long visitId);
+
 	// ---------- Visit cover (rostering) ----------
 
 	@GetExchange("/visits/{visitId}/cover-options")
@@ -210,6 +218,9 @@ public interface CoreApi {
 	}
 
 	record IncidentRef(Long incidentId) {
+	}
+
+	record SoleIncident(boolean sole) {
 	}
 
 	/** {@code rank} is null when the caregiver cannot take the visit; {@code reason} says why. */

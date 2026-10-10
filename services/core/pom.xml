@@ -70,6 +70,12 @@
 			<artifactId>core-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<!-- The contract of visit's internal API, which core serves until visit becomes a service -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>visit-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- Events between services: the outbox and its relay. Its tables come with core's platform migrations -->
 		<dependency>
 			<groupId>sg.nus</groupId>

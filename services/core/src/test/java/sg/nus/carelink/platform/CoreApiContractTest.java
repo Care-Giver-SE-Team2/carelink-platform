@@ -37,6 +37,7 @@ import sg.nus.carelink.coreapi.CoreRuleViolation;
 import sg.nus.carelink.incident.application.CaregiverIncidentGateway;
 import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
+import sg.nus.carelink.incident.application.MissedCheckInPauseEvidence;
 import sg.nus.carelink.incident.controller.InternalIncidentController;
 import sg.nus.carelink.incident.domain.model.Incident;
 import sg.nus.carelink.profile.application.CaregiverDirectory;
@@ -103,6 +104,9 @@ class CoreApiContractTest {
 
 	@MockitoBean
 	private IncidentService incidents;
+
+	@MockitoBean
+	private MissedCheckInPauseEvidence pauseEvidence;
 
 	@MockitoBean
 	private VisitCover visitCover;
@@ -268,6 +272,14 @@ class CoreApiContractTest {
 				.isEqualTo(new CoreApi.IncidentRef(56L));
 		assertThat(core.raiseServiceDispute(new CoreApi.ServiceDisputeRequest(3L, 100L, 30L,
 				"The caregiver left early"))).isEqualTo(new CoreApi.IncidentRef(57L));
+	}
+
+	@Test
+	void whetherAMissedCheckInsIncidentIsTheVisitsOnlyOne() {
+		when(pauseEvidence.isSoleIncident(3L, 100L, 56L)).thenReturn(true);
+
+		assertThat(core.soleMissedCheckInIncident(56L, 3L, 100L).sole()).isTrue();
+		assertThat(core.soleMissedCheckInIncident(57L, 3L, 100L).sole()).isFalse();
 	}
 
 	@Test

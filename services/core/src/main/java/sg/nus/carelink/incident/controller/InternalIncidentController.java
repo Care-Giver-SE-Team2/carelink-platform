@@ -11,10 +11,12 @@ import sg.nus.carelink.coreapi.CoreApi;
 import sg.nus.carelink.incident.application.CaregiverIncidentGateway;
 import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
+import sg.nus.carelink.incident.application.MissedCheckInPauseEvidence;
 
 /**
  * incident's part of core's internal API ({@link CoreApi}): the incidents a visit raises, either
- * reported by the caregiver, found by the missed check-in scan, or disputed by the elder.
+ * reported by the caregiver, found by the missed check-in scan, or disputed by the elder, and
+ * whether a missed check-in's incident is the visit's only one.
  */
 @RestController
 @RequestMapping("/internal/v1")
@@ -26,11 +28,15 @@ public class InternalIncidentController {
 
 	private final IncidentService incidents;
 
+	private final MissedCheckInPauseEvidence pauseEvidence;
+
 	InternalIncidentController(CaregiverIncidentGateway caregiverIncidents,
-			MissedCheckInIncidentGateway missedCheckIns, IncidentService incidents) {
+			MissedCheckInIncidentGateway missedCheckIns, IncidentService incidents,
+			MissedCheckInPauseEvidence pauseEvidence) {
 		this.caregiverIncidents = caregiverIncidents;
 		this.missedCheckIns = missedCheckIns;
 		this.incidents = incidents;
+		this.pauseEvidence = pauseEvidence;
 	}
 
 	@PostMapping("/incidents/caregiver-reports")
@@ -62,6 +68,12 @@ public class InternalIncidentController {
 	public CoreApi.IncidentRef raiseServiceDispute(@RequestBody CoreApi.ServiceDisputeRequest request) {
 		return new CoreApi.IncidentRef(incidents.createElderServiceDispute(
 				request.elderId(), request.visitId(), request.reportedByUserId(), request.description()).id());
+	}
+
+	@GetMapping("/incidents/{incidentId}/sole-missed-check-in")
+	public CoreApi.SoleIncident soleMissedCheckInIncident(@PathVariable Long incidentId, @RequestParam Long elderId,
+			@RequestParam Long visitId) {
+		return new CoreApi.SoleIncident(pauseEvidence.isSoleIncident(elderId, visitId, incidentId));
 	}
 
 	private static CoreApi.IncidentReport report(CaregiverIncidentGateway.Report report) {

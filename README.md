@@ -47,6 +47,7 @@ carelink-platform/
 │  ├─ shared/                     core's shared package for every service: errors, request context, access audit, roles
 │  ├─ platform-security/          who is signed in, read from the session core wrote; the security chain of every service but core
 │  ├─ core-api/                   core's internal API (/internal/v1) as a Java interface, and its client
+│  ├─ visit-api/                  visit's internal API and its client; core serves it until visit moves out
 │  ├─ events/                     events between services: the outbox, its relay to SNS, the SQS consumer
 │  └─ test-support/               shared test helpers: MySQL and Redis containers, the exception handler
 ├─ build/
@@ -126,7 +127,8 @@ once; a service supplies only its code and one values file.
 `pom.xml`, its `src/`, and `deploy/values.yaml`; add it to `<modules>` in the root `pom.xml`
 and to `docker-compose.yml`. The pipeline finds it by its directory, and the scripts take its
 name. [docs/platform/building-a-service.md](docs/platform/building-a-service.md) walks through
-it, including the signed-in user (`libs/platform-security`) and calls to core (`libs/core-api`).
+it, including the signed-in user (`libs/platform-security`) and calls to core (`libs/core-api`)
+and to visit (`libs/visit-api`).
 
 A change to a shared part reaches every service, so it goes through review like any other
 change, and the pipeline rebuilds every service when one is touched.
