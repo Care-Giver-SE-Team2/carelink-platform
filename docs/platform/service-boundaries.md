@@ -79,7 +79,7 @@ call it through the same interface. [building-a-service.md](building-a-service.m
 | `CaregiverIncidentGateway.report`, `own`, `list` | visit (1) | `POST /internal/v1/incidents/caregiver-reports`; `GET /internal/v1/incidents/{id}?actor=`; `GET /internal/v1/incidents?visitId=&actor=&page=&size=` |
 | `MissedCheckInIncidentGateway.raise(…)` → incident id | visit (1) | `POST /internal/v1/incidents/missed-check-ins` → `{ incidentId }`. Synchronous because visit stores the id; the missed check-in scan retries on failure |
 | `IncidentService.createElderServiceDispute(…)` | visit (`VisitService`) | `POST /internal/v1/incidents/service-disputes` → `{ incidentId }` |
-| `MissedCheckInPauseEvidence.isSoleIncident(elderId, visitId, incidentId)` | visit (`MissedCheckInResumeService`) | **Not in `CoreApi` yet.** A read: is this incident the visit's only one, raised by the missed check-in scan? It becomes an endpoint under `/internal/v1/incidents/` before visit moves out |
+| `MissedCheckInPauseEvidence.isSoleIncident(elderId, visitId, incidentId)` | visit (`MissedCheckInResumeService`) | `GET /internal/v1/incidents/{incidentId}/sole-missed-check-in?elderId=&visitId=` → `{ sole }`: is this incident the visit's only one, raised by the missed check-in scan? |
 | `VisitCover.options(visitId)`, `cover(…)` | report (2) | `GET /internal/v1/visits/{visitId}/cover-options`; `POST /internal/v1/visits/{visitId}/cover`. Rostering stays in core and calls visit in turn |
 
 The caller keeps the port it has today and swaps the adapter. For example, visit keeps its own `FamilyAccess`
@@ -87,19 +87,34 @@ interface, and the implementation becomes a call through `CoreApi`, which has co
 business code that calls the port does not change. The library does not retry: a read can simply be repeated, and
 a `POST` is repeated only by a caller that knows it is safe (the missed check-in scan tries again on its next run).
 
-## 4. What core needs from visit
+## 4. What visit offers core and report
 
-This is input for the visit split. The visit owner defines visit's internal API.
+Rostering and incident stay in core, and report moves out, but all three call visit today. Their calls are written
+down the same way as core's: the Java interface `VisitApi` in `libs/visit-api`. Until visit moves out, core serves it
+(the `InternalVisit*Controller` classes in `visit/controller`, checked against the interface by
+`VisitApiContractTest`; `VisitApiIT` runs the reads incident needs against MySQL). When visit moves, those
+controllers move with it, and a caller that has switched to the client changes nothing.
 
-| Call today | Called from |
-|---|---|
-| `VisitScheduling.schedule`, `cancelUntouchedFrom`, `findUncoveredStarted`, `markUncoveredAsException` | rostering |
-| `VisitReassignment.find`, `reassign`, `moveTo`, `callOff`, `markUncovered`, `bookingsBetween`, `finishedVisitsWith`, `unstartedFor` | rostering (11 classes) |
-| `UpcomingAssignments.unstartedBetween` | rostering |
-| SQL on `visit` | incident: `JdbcSpotCheckLookups`, and the "latest caregiver of this elder" query in `NotificationTableAlert` |
+| Call today | Called from | Replacement |
+|---|---|---|
+| `VisitReassignment.find` | rostering | `GET /internal/v1/visits/{visitId}` → `{ visitId, elderId, caregiverId, carePlanId, serviceType, start, end, status, absenceId }`, or 404 |
+| `VisitReassignment.unstartedFor` | rostering | `GET /internal/v1/visits/unstarted?caregiverId=&from=&until=` |
+| `VisitReassignment.bookingsBetween` | rostering | `GET /internal/v1/visits/bookings?from=&until=` |
+| `VisitReassignment.finishedVisitsWith` | rostering | `GET /internal/v1/visits/finished-with?elderId=&since=&until=` → `{ caregiverId: count }` |
+| `VisitReassignment.reassign`, `markUncovered`, `callOff` | rostering; report (`callOff`) | `POST /internal/v1/visits/{visitId}/reassignment`, `…/uncovered`, `…/call-off` → 204 |
+| `VisitReassignment.moveTo` | rostering | `POST /internal/v1/visits/{visitId}/move` → `{ visitId }` of the new visit |
+| `VisitScheduling.schedule` | rostering | `POST /internal/v1/visits/schedule` → `{ created, covered }` |
+| `VisitScheduling.cancelUntouchedFrom` | rostering | `POST /internal/v1/visits/cancel-untouched` → `{ count }` |
+| `VisitScheduling.findUncoveredStarted`, `markUncoveredAsException` | rostering | `GET /internal/v1/visits/uncovered-started?since=&now=`; `POST /internal/v1/visits/{visitId}/uncovered-exception` → `{ marked }` |
+| `UpcomingAssignments.unstartedBetween` | rostering | `GET /internal/v1/visits/upcoming-assignments?from=&until=` |
+| `StandaloneVisits.schedule`, `find` | report | `POST /internal/v1/visits/standalone` → `{ visitId }`; `GET /internal/v1/visits/{visitId}/state`, or 404 |
+| `VisitScheduleQuery.caregiverIdsForElder`, `hasAssignedVisit` | report | `GET /internal/v1/visits/caregivers-of-elder?elderId=`; `GET /internal/v1/visits/assigned?elderIds=&caregiverId=` → `{ assigned }` |
+| SQL on `visit` in `JdbcSpotCheckLookups` | incident | `GET /internal/v1/visits/{visitId}`; `GET /internal/v1/visits/upcoming?elderId=&from=&until=` |
+| SQL on `visit` in `NotificationTableAlert` (the elder's latest caregiver) | incident | `GET /internal/v1/visits/latest-caregiver?elderId=` → `{ caregiverId }`, or 404 |
 
-Some of these calls can become events instead (`VisitScheduled`, `AbsenceReported`), as the event catalogue
-decides.
+Times are ISO date-times on Singapore's wall clock, as visit stores them. A caller switches by keeping its port and
+replacing the adapter with one that calls `VisitApi`, as in section 3. Some of these calls can become events instead
+(`VisitScheduled`, `AbsenceReported`), as the event catalogue decides.
 
 ## 5. SQL and writes that reach another service's tables
 
@@ -126,7 +141,7 @@ for careplan's `CarePlanPublished` event and changes in the same way.
 | report `NotificationTableValueAddedNotifier` | `caregiver` | Recipients go in the event |
 | notification `JdbcNotificationInbox` | `care_plan`, `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification |
 | notification `JdbcRecipientDirectory` | `app_user`, `user_role` | Recipients go in the event |
-| incident `JdbcSpotCheckLookups` | `visit`, `notification` | Calls to visit; the reminder time kept in core |
+| incident `JdbcSpotCheckLookups` | `visit`, `notification` | Calls to visit (section 4); the reminder time kept in core |
 
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
 service keeps its own `audit_log` in its own schema.

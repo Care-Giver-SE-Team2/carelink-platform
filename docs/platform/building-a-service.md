@@ -28,6 +28,7 @@ and the front end's proxy entry. Start a new service by copying it.
 | Errors, request context, audit | dependency on `libs/shared` | core's `shared` package: error types and the exception handler, request id and access log, `audit_log` writes, roles |
 | Signed-in user | dependency on `libs/platform-security` | the security chain and `SignedInUsers` |
 | Calls to core | dependency on `libs/core-api` | the `CoreApi` client |
+| Calls to visit | dependency on `libs/visit-api` | the `VisitApi` client; core serves it until visit moves out |
 | Events | dependency on `libs/events` | the outbox and its relay to SNS, the SQS consumer that handles each event once |
 
 ## 2. Step by step
@@ -328,6 +329,19 @@ For a lookup that may find nothing, use the `find…` methods (`findCaregiverPub
 
 The client does not retry. A read can simply be called again. A `POST` is repeated only where the caller knows
 it is safe. For example, the missed check-in scan tries again on its next run.
+
+### Calling visit: `visit-api`
+
+visit's internal API is built the same way: `VisitApi` in `libs/visit-api`, set up by
+`carelink.visit-api.base-url`, with the same timeouts. Its errors come back as `VisitNotFound` and
+`VisitRuleViolation`, and the lookups that may find nothing have `find…` methods (`findVisit`,
+`findVisitState`, `findLatestCaregiverId`).
+
+Until visit moves out, core serves this API (`InternalVisit*Controller`, checked by `VisitApiContractTest`).
+A service that leaves core before visit does, such as report, points `carelink.visit-api.base-url` at core;
+once visit runs on its own, the setting points at visit and nothing else changes. Rostering and incident stay in
+core: they call visit in-process until it moves, and then their adapters switch to `VisitApi`.
+[service-boundaries.md](service-boundaries.md), section 4, lists which call replaces which.
 
 **Testing.** In the service's own tests, replace the client with `@MockitoBean CoreApi core`. The contract
 itself is tested in core.
