@@ -113,6 +113,18 @@ class NotificationInboxIT {
 	}
 
 	@Test
+	void aMessageAboutACarePlanIsAboutThePlansElder() throws Exception {
+		long faye = account("it-inbox-faye", "FAMILY");
+		long elder = elder();
+		bind(elder, familyMember(faye));
+		write(faye, "Care plan v1 is ready", NINE, "CARE_PLAN", carePlan(elder));
+
+		String inbox = read("it-inbox-faye", "FAMILY", "/api/notifications/me");
+		assertThat(JsonPath.<String>read(inbox, "$.items[0].title")).isEqualTo("Care plan v1 is ready");
+		assertThat(JsonPath.<Integer>read(inbox, "$.items[0].elderId")).isEqualTo((int) elder);
+	}
+
+	@Test
 	void withoutASessionThereIsNoInbox() throws Exception {
 		mvc.perform(get("/api/notifications/me/unread-count")).andExpect(status().isUnauthorized());
 	}
@@ -156,6 +168,11 @@ class NotificationInboxIT {
 		jdbc.update("insert into spot_check (elder_id, proposed_time, reason) values (?, ?, 'Routine')", elderId,
 				Timestamp.valueOf(NINE.plusDays(3)));
 		return jdbc.queryForObject("select max(id) from spot_check where elder_id = ?", Long.class, elderId);
+	}
+
+	private long carePlan(long elderId) {
+		jdbc.update("insert into care_plan (elder_id, status) values (?, 'PUBLISHED')", elderId);
+		return jdbc.queryForObject("select max(id) from care_plan where elder_id = ?", Long.class, elderId);
 	}
 
 	private long write(long recipient, String title, LocalDateTime at, String resourceType, Long resourceId) {

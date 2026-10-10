@@ -29,7 +29,9 @@
 		<module>libs/platform-security</module>
 		<module>libs/core-api</module>
 		<module>libs/events</module>
+		<module>libs/test-support</module>
 		<module>services/core</module>
+		<module>services/notification</module>
 	</modules>
 
 	<properties>
