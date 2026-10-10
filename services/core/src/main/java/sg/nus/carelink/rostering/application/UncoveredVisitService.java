@@ -10,8 +10,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.incident.application.IncidentService;
-import sg.nus.carelink.visit.application.VisitScheduling;
-import sg.nus.carelink.visit.application.VisitScheduling.UncoveredVisit;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling.UncoveredVisit;
 
 /**
  * UC-MG03: a visit still unassigned when it is due to start has failed to be covered. It

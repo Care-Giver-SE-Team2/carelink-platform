@@ -25,8 +25,8 @@ import sg.nus.carelink.shared.security.Role;
  * honest state: the alert exists and is addressed, and whoever builds the sender will find
  * it waiting rather than having to work out the audience again.
  *
- * <p>Reads tables it does not own - {@code user_role}, {@code visit} - with plain statements
- * that take an id and nothing else. Reading is not
+ * <p>Reads {@code user_role} with a plain statement, and asks visit for the caregiver on the
+ * elder's most recent visit ({@link LatestCaregivers}). Reading is not
  * owning; no other module's code changes for this to work. Family messages are created only
  * by the after-commit FM05 observer, so this adapter never produces a second family copy.
  */
@@ -39,14 +39,8 @@ class NotificationTableAlert implements IncidentAlert {
 			where u.enabled = true and r.role = :role
 			""";
 
-	/** The caregiver on this elder's most recent visit, if there has been one. */
-	private static final String RECENT_CAREGIVER = """
-			select c.user_id from visit v
-			join caregiver c on c.id = v.caregiver_id
-			where v.elder_id = :elderId and v.caregiver_id is not null
-			order by v.scheduled_start desc
-			limit 1
-			""";
+	/** The account of a caregiver: an alert reaches a caregiver through their account. */
+	private static final String CAREGIVER_ACCOUNT = "select user_id from caregiver where id = :caregiverId";
 
 	private static final String INSERT = """
 			insert into notification
@@ -57,10 +51,12 @@ class NotificationTableAlert implements IncidentAlert {
 			""";
 
 	private final JdbcClient jdbc;
+	private final LatestCaregivers caregivers;
 	private final Clock clock;
 
-	NotificationTableAlert(JdbcClient jdbc, Clock clock) {
+	NotificationTableAlert(JdbcClient jdbc, LatestCaregivers caregivers, Clock clock) {
 		this.jdbc = jdbc;
+		this.caregivers = caregivers;
 		this.clock = clock;
 	}
 
@@ -104,8 +100,9 @@ class NotificationTableAlert implements IncidentAlert {
 		if (elderId == null) {
 			return List.of();
 		}
-		List<Long> found = new ArrayList<>(
-				jdbc.sql(RECENT_CAREGIVER).param("elderId", elderId).query(Long.class).list());
+		List<Long> found = new ArrayList<>(caregivers.latestCaregiverId(elderId)
+				.map(caregiverId -> jdbc.sql(CAREGIVER_ACCOUNT).param("caregiverId", caregiverId).query(Long.class).list())
+				.orElse(List.of()));
 		found.removeIf(java.util.Objects::isNull);
 		return found;
 	}

@@ -20,8 +20,8 @@ import sg.nus.carelink.careplan.application.CarePlanSchedules.PlanSchedule;
 import sg.nus.carelink.careplan.application.CarePlanSchedules.Slot;
 import sg.nus.carelink.careplan.application.CarePlanSchedules.Task;
 import sg.nus.carelink.rostering.application.RecurringRosterService.RosterRefresh;
-import sg.nus.carelink.visit.application.VisitScheduling;
-import sg.nus.carelink.visit.application.VisitScheduling.PlannedVisit;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling.PlannedVisit;
 
 class RecurringRosterServiceTest {
 

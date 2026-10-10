@@ -44,7 +44,7 @@ import sg.nus.carelink.rostering.domain.service.ScoringObjective;
 import sg.nus.carelink.rostering.domain.service.Shortlist;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * UC-MG04 re-roster on caregiver absence, from the manager's "re-roster now" to the family's

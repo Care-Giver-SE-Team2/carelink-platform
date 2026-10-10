@@ -15,8 +15,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import sg.nus.carelink.incident.application.IncidentService;
-import sg.nus.carelink.visit.application.VisitScheduling;
-import sg.nus.carelink.visit.application.VisitScheduling.UncoveredVisit;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling.UncoveredVisit;
 
 class UncoveredVisitServiceTest {
 

@@ -31,7 +31,7 @@ import sg.nus.carelink.rostering.domain.service.ReplacementFinder;
 import sg.nus.carelink.rostering.domain.service.RosterSnapshot;
 import sg.nus.carelink.rostering.domain.service.ScoringObjective;
 import sg.nus.carelink.rostering.domain.service.Shortlist;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * UC-MG03 while the primary caregiver is on leave: once somebody covers an elder for an

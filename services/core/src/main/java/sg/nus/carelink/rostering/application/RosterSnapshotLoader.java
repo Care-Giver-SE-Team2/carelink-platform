@@ -25,7 +25,7 @@ import sg.nus.carelink.rostering.domain.service.CandidateCard;
 import sg.nus.carelink.rostering.domain.service.ElderCard;
 import sg.nus.carelink.rostering.domain.service.RosterSnapshot;
 import sg.nus.carelink.rostering.domain.service.SpotCheckRecord;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * Gathers what the replacement search reads, from the four modules that own it: caregivers and
