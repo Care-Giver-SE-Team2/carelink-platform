@@ -161,7 +161,7 @@ final class OutboxRelay implements SmartLifecycle, DisposableBean {
 	}
 
 	private PublishRequest request(Pending event) {
-		Envelope envelope = new Envelope(event.eventId(), event.type(), service, event.occurredAt(),
+		Envelope envelope = new Envelope(event.eventId(), event.type(), service, event.occurredAt(), event.id(),
 				json.readTree(event.payload()));
 		return PublishRequest.builder()
 				.topicArn(topicArn)

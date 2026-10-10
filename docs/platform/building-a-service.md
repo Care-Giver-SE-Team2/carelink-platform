@@ -395,6 +395,23 @@ SQS may deliver a message twice; the second delivery finds the row and is skippe
 back, and SQS delivers the event again after the queue's visibility timeout. After five receives the message
 goes to the dead-letter queue. An event type the service has no handler for is ignored.
 
+**Worked example: core's events.** Core publishes the four events report needs: `IncidentRaised`,
+`IncidentUpdated`, `SpotCheckUpdated` and `RosterChangeUpdated`. Look at them before you publish or handle your own.
+
+- **The records** are in `libs/event-types`, one per event, with the event's name as `TYPE`. The publisher builds
+  the record and every handler reads the same one. Add yours there.
+- **Where to publish.** Each of core's four is published in its repository adapter's `save` (for example
+  `IncidentRepositoryAdapter`), in the same transaction. Every change to the record goes through that one
+  method, so no code path, today's or a later one, can change it without its event. An event that names one
+  step, such as `VisitCheckedIn`, is published in the service method that takes the step.
+- **Times** go through `SingaporeTime.of(...)`, which adds Singapore's offset and rounds to the second as the
+  database does. A handler turns them back with `SingaporeTime.local(...)`.
+- **Order.** A handler that keeps a copy drops an update older than the one it holds: by `version` or `logId`
+  when the event has one, otherwise by `metadata.sequence()`.
+- **Tests.** The adapters' unit tests check each record's fields. `CoreEventsIT` checks, against MySQL, that each
+  change leaves its event in `outbox_event`, in the order written, with the times the database keeps, and that a
+  rolled-back change leaves none.
+
 **Settings**, under `carelink.events`:
 
 | Setting | Environment variable | What |

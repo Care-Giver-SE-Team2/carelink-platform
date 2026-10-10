@@ -76,6 +76,12 @@
 			<artifactId>visit-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<!-- The events core publishes, as the records their handlers read (docs/platform/event-catalogue.md) -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>event-types</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- Events between services: the outbox and its relay. Its tables come with core's platform migrations -->
 		<dependency>
 			<groupId>sg.nus</groupId>

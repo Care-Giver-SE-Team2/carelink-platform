@@ -49,6 +49,7 @@ carelink-platform/
 │  ├─ core-api/                   core's internal API (/internal/v1) as a Java interface, and its client
 │  ├─ visit-api/                  visit's internal API and its client; core serves it until visit moves out
 │  ├─ events/                     events between services: the outbox, its relay to SNS, the SQS consumer
+│  ├─ event-types/                the events in docs/platform/event-catalogue.md as records, shared by publishers and handlers
 │  └─ test-support/               shared test helpers: MySQL and Redis containers, the exception handler
 ├─ build/
 │  ├─ Dockerfile                  the Dockerfile of every service: Maven build, then a JRE, non-root

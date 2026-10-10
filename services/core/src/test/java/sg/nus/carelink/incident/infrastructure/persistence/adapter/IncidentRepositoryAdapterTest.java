@@ -7,9 +7,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -21,16 +23,22 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.IncidentRaised;
 import sg.nus.carelink.incident.domain.model.Incident;
 import sg.nus.carelink.incident.domain.model.PageSlice;
 import sg.nus.carelink.incident.infrastructure.persistence.entity.IncidentJpaEntity;
 import sg.nus.carelink.incident.infrastructure.persistence.repository.IncidentJpaRepository;
 
-/** The adapter delegates to Spring Data and maps at the boundary; nothing else. */
+/**
+ * The adapter delegates to Spring Data and maps at the boundary, and publishes a new incident as
+ * {@code IncidentRaised}.
+ */
 class IncidentRepositoryAdapterTest {
 
 	private final IncidentJpaRepository jpa = mock(IncidentJpaRepository.class);
-	private final IncidentRepositoryAdapter adapter = new IncidentRepositoryAdapter(jpa);
+	private final Events events = mock(Events.class);
+	private final IncidentRepositoryAdapter adapter = new IncidentRepositoryAdapter(jpa, events);
 
 	/**
 	 * A row as the database would really hand it back. Every enum column is NOT NULL in V2,
@@ -76,6 +84,17 @@ class IncidentRepositoryAdapterTest {
 
 		assertThat(saved).isNotNull();
 		assertThat(saved.id()).isEqualTo(7L);
+		verifyNoInteractions(events);
+	}
+
+	@Test
+	void aNewIncidentIsPublishedAsRaisedByTheSaveThatCreatesIt() {
+		when(jpa.save(any(IncidentJpaEntity.class))).thenReturn(row(601L));
+
+		adapter.save(IncidentMapper.toDomain(row(null)));
+
+		verify(events).publish(IncidentRaised.TYPE, new IncidentRaised(601L, 7L, null, "ELDER_SOS", "SOS", "HIGH",
+				"OPEN", null, OffsetDateTime.parse("2026-09-16T14:30:00+08:00")));
 	}
 
 	@Test

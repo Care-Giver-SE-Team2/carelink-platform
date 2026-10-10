@@ -11,10 +11,10 @@ import tools.jackson.databind.node.ObjectNode;
  * this JSON, so a receiver needs nothing else, whether its subscription delivers the message raw
  * or wrapped in SNS's own notification JSON.
  */
-record Envelope(String id, String type, String source, Instant occurredAt, JsonNode payload) {
+record Envelope(String id, String type, String source, Instant occurredAt, Long sequence, JsonNode payload) {
 
 	EventMetadata metadata() {
-		return new EventMetadata(id, type, source, occurredAt);
+		return new EventMetadata(id, type, source, occurredAt, sequence);
 	}
 
 	String toJson(JsonMapper json) {
@@ -23,6 +23,9 @@ record Envelope(String id, String type, String source, Instant occurredAt, JsonN
 		body.put("type", type);
 		body.put("source", source);
 		body.put("occurredAt", occurredAt.toString());
+		if (sequence != null) {
+			body.put("sequence", sequence);
+		}
 		body.set("payload", payload);
 		return json.writeValueAsString(body);
 	}
@@ -42,8 +45,10 @@ record Envelope(String id, String type, String source, Instant occurredAt, JsonN
 		if (payload == null) {
 			throw new IllegalArgumentException("Not an event: no payload");
 		}
+		JsonNode sequence = node.get("sequence");
 		return new Envelope(required(node, "id"), required(node, "type"), required(node, "source"),
-				Instant.parse(required(node, "occurredAt")), payload);
+				Instant.parse(required(node, "occurredAt")),
+				sequence == null || sequence.isNull() ? null : sequence.asLong(), payload);
 	}
 
 	private static String required(JsonNode node, String field) {
