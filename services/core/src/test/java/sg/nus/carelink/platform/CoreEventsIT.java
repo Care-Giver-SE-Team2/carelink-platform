@@ -122,10 +122,12 @@ class CoreEventsIT {
 		long caregiver = caregiver();
 		LocalDateTime visitStart = LocalDateTime.now(SINGAPORE).plusDays(2).withHour(10).withMinute(0).withSecond(0)
 				.withNano(0);
-		SpotCheck check = spotChecks.save(SpotCheck.requested(elder, 812L, caregiver, visitStart, "Routine check", manager,
+		long visit = visit(caregiver, visitStart);
+		long absence = absence(caregiver, visitStart);
+		SpotCheck check = spotChecks.save(SpotCheck.requested(elder, visit, caregiver, visitStart, "Routine check", manager,
 				LocalDateTime.now(SINGAPORE)));
-		RosterChange change = rosterChanges.save(RosterChange.offered(33L,
-				new VacatedSlot(812L, elder, null, "BATHING", visitStart, visitStart.plusHours(1), caregiver), null,
+		RosterChange change = rosterChanges.save(RosterChange.offered(absence,
+				new VacatedSlot(visit, elder, null, "BATHING", visitStart, visitStart.plusHours(1), caregiver), null,
 				caregiver + 1, visitStart.minusHours(2), LocalDateTime.now(SINGAPORE)));
 
 		JsonNode spotCheck = single(eventsAbout("spotCheckId", check.id()), "SpotCheckUpdated");
@@ -137,7 +139,7 @@ class CoreEventsIT {
 
 		JsonNode rosterChange = single(eventsAbout("rosterChangeId", change.id()), "RosterChangeUpdated");
 		assertThat(rosterChange.get("status").asString()).isEqualTo("AWAITING_FAMILY");
-		assertThat(rosterChange.get("absenceId").asLong()).isEqualTo(33L);
+		assertThat(rosterChange.get("absenceId").asLong()).isEqualTo(absence);
 		assertThat(rosterChange.get("visitStart").asString()).isEqualTo(offset(visitStart));
 		assertThat(rosterChange.get("outcome").isNull()).isTrue();
 	}
@@ -178,6 +180,20 @@ class CoreEventsIT {
 
 	private static String offset(LocalDateTime wallClock) {
 		return wallClock.atZone(SINGAPORE).toOffsetDateTime().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+	}
+
+	/** Written the way JPA writes visit times, as a Timestamp. */
+	private long visit(long caregiver, LocalDateTime start) {
+		jdbc.update("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)"
+				+ " values (?, ?, 'BATHING', ?, ?, 'SCHEDULED')", elder, caregiver, Timestamp.valueOf(start),
+				Timestamp.valueOf(start.plusHours(1)));
+		return jdbc.queryForObject("select last_insert_id()", Long.class);
+	}
+
+	private long absence(long caregiver, LocalDateTime day) {
+		jdbc.update("insert into absence_report (caregiver_id, start_date, end_date, status) values (?, ?, ?, 'APPROVED')",
+				caregiver, day.toLocalDate(), day.toLocalDate());
+		return jdbc.queryForObject("select last_insert_id()", Long.class);
 	}
 
 	private long caregiver() {
