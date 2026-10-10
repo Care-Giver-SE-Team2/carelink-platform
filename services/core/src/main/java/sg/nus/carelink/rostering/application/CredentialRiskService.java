@@ -15,28 +15,29 @@ import sg.nus.carelink.careplan.application.CarePlanRequirements;
 import sg.nus.carelink.profile.application.CredentialRegister;
 import sg.nus.carelink.rostering.domain.model.VisitsAtRisk;
 import sg.nus.carelink.rostering.domain.model.VisitsAtRisk.Booking;
-import sg.nus.carelink.visit.application.UpcomingAssignments;
+import sg.nus.carelink.rostering.domain.repository.BookedVisits;
 
 /**
  * UC-MG06: for each row of the manager's certification register, the booked visits it puts at
- * risk within the roster window. The register comes from profile, the bookings from visit and
- * each plan's required certifications from careplan; the rule is VisitsAtRisk.
+ * risk within the roster window. The register comes from profile, the bookings from visit (through
+ * rostering's own port, {@link BookedVisits}) and each plan's required certifications from
+ * careplan; the rule is VisitsAtRisk.
  */
 @Service
 @Transactional(readOnly = true)
 public class CredentialRiskService {
 
 	private final CredentialRegister register;
-	private final UpcomingAssignments assignments;
+	private final BookedVisits bookedVisits;
 	private final CarePlanRequirements requirements;
 	private final Clock clock;
 	private final int horizonDays;
 
-	public CredentialRiskService(CredentialRegister register, UpcomingAssignments assignments,
+	public CredentialRiskService(CredentialRegister register, BookedVisits bookedVisits,
 			CarePlanRequirements requirements, Clock clock,
 			@Value("${carelink.roster.horizon-days:14}") int horizonDays) {
 		this.register = register;
-		this.assignments = assignments;
+		this.bookedVisits = bookedVisits;
 		this.requirements = requirements;
 		this.clock = clock;
 		this.horizonDays = horizonDays;
@@ -46,9 +47,7 @@ public class CredentialRiskService {
 	public List<CredentialRisk> risks() {
 		LocalDateTime now = LocalDateTime.now(clock);
 		LocalDateTime windowEnd = now.toLocalDate().plusDays(horizonDays).atStartOfDay();
-		List<Booking> bookings = assignments.unstartedBetween(now, windowEnd).stream()
-				.map(a -> new Booking(a.caregiverId(), a.carePlanId(), a.start()))
-				.toList();
+		List<Booking> bookings = bookedVisits.unstartedBetween(now, windowEnd);
 		Set<Long> planIds = bookings.stream().map(Booking::carePlanId).filter(Objects::nonNull)
 				.collect(Collectors.toSet());
 		VisitsAtRisk atRisk = new VisitsAtRisk(now, windowEnd, bookings, requirements.requiredCredentialTypes(planIds));
