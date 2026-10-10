@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import sg.nus.carelink.platform.security.SignedInUserSession;
 import sg.nus.carelink.testsupport.SharedMySql;
 import sg.nus.carelink.testsupport.SharedRedis;
 
@@ -70,7 +71,11 @@ class SessionStoreIT {
 		Cookie csrf = csrf();
 		Cookie session = login(csrf);
 
-		assertThat(redis.hasKey(SESSION_KEYS + sessionId(session))).isTrue();
+		String key = SESSION_KEYS + sessionId(session);
+		assertThat(redis.hasKey(key)).isTrue();
+		// The account id and display name the other services read (SignedInUsers)
+		assertThat(redis.opsForHash().hasKey(key, "sessionAttr:" + SignedInUserSession.ID)).isTrue();
+		assertThat(redis.opsForHash().hasKey(key, "sessionAttr:" + SignedInUserSession.DISPLAY_NAME)).isTrue();
 		mvc.perform(get("/api/auth/me").cookie(session))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.username").value("session-check"));

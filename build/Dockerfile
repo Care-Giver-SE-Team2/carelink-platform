@@ -5,8 +5,9 @@
 #     docker build -f build/Dockerfile --build-arg SERVICE=core --build-arg GIT_SHA=<commit> .
 #
 # scripts/build.sh runs exactly this and tags the image with the commit. The build context is
-# the repository root, because each service's pom.xml inherits from the root pom.xml, and core
-# also packages docs/api/ (see services/core/pom.xml). .dockerignore keeps everything else out.
+# the repository root: each service's pom.xml inherits from the root pom.xml, a service may use
+# the shared libraries under libs/, and core also packages docs/api/ (see
+# services/core/pom.xml). .dockerignore keeps everything else out.
 #
 # Changing this file rebuilds every service in the pipeline, so changes go through review.
 
@@ -17,15 +18,17 @@ RUN test -n "$SERVICE" || { echo "pass --build-arg SERVICE=<directory under serv
 WORKDIR /src
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-COPY services/${SERVICE}/pom.xml services/${SERVICE}/
+# Every module: Maven reads all the modules the root pom lists, then builds the service together
+# with the shared libraries it depends on (-pl services/<service> -am)
+COPY libs/ libs/
+COPY services/ services/
 COPY docs/api/ docs/api/
-COPY services/${SERVICE}/src/ services/${SERVICE}/src/
 # ~/.m2 is a build cache that stays on the machine between builds, so dependencies are
 # downloaded once, not again for every image. The tests have already run before the image
 # is built (scripts/build.sh <service> test).
 RUN --mount=type=cache,target=/root/.m2 \
     chmod +x mvnw \
- && ./mvnw -B -ntp -f services/${SERVICE}/pom.xml package -DskipTests \
+ && ./mvnw -B -ntp -pl services/${SERVICE} -am package -DskipTests \
  && cp services/${SERVICE}/target/*.jar /src/app.jar
 
 # ---------- 2. Run on a JRE, as a non-root user ----------
