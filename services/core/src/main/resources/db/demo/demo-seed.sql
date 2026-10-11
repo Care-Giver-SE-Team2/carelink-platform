@@ -66,6 +66,10 @@
 --
 -- Singapore keeps no daylight saving, so the offset is constant. Set it to 0 when
 -- loading into a database whose reader runs in the same zone as its writer.
+--
+-- VISIT'S ROWS go to visit's own database, carelink_visit, on the same server
+-- (docs/platform/service-boundaries.md, section 9): every visit table below is
+-- named with it. Load the file with an account that can write both databases.
 SET @appOffsetHours := 8;
 
 -- ---------------------------------------------------------------- accounts ---
@@ -203,7 +207,7 @@ SELECT entries.incident_id, entries.actor, entries.action, entries.detail, entri
 SET @danielCaregiver := (SELECT id FROM caregiver WHERE user_id = @daniel);
 
 -- A visit is identified by elder and start time, the only key the seed has.
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
                    checked_in_at, checked_out_at, status)
 SELECT @graceElder, @danielCaregiver, 'Personal care',
        planned.scheduled_start, planned.scheduled_start + INTERVAL 1 HOUR,
@@ -226,22 +230,22 @@ SELECT @graceElder, @danielCaregiver, 'Personal care',
        ) AS planned
  WHERE @graceElder IS NOT NULL
    AND @danielCaregiver IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit
                     WHERE elder_id = @graceElder AND scheduled_start = planned.scheduled_start);
 
-SET @visitSep08 := (SELECT id FROM visit WHERE elder_id = @graceElder
+SET @visitSep08 := (SELECT id FROM carelink_visit.visit WHERE elder_id = @graceElder
                        AND scheduled_start = '2026-09-08 09:00:00' + INTERVAL @appOffsetHours HOUR ORDER BY id LIMIT 1);
-SET @visitSep10 := (SELECT id FROM visit WHERE elder_id = @graceElder
+SET @visitSep10 := (SELECT id FROM carelink_visit.visit WHERE elder_id = @graceElder
                        AND scheduled_start = '2026-09-10 09:00:00' + INTERVAL @appOffsetHours HOUR ORDER BY id LIMIT 1);
-SET @visitSep15 := (SELECT id FROM visit WHERE elder_id = @graceElder
+SET @visitSep15 := (SELECT id FROM carelink_visit.visit WHERE elder_id = @graceElder
                        AND scheduled_start = '2026-09-15 09:00:00' + INTERVAL @appOffsetHours HOUR ORDER BY id LIMIT 1);
-SET @visitSep17 := (SELECT id FROM visit WHERE elder_id = @graceElder
+SET @visitSep17 := (SELECT id FROM carelink_visit.visit WHERE elder_id = @graceElder
                        AND scheduled_start = '2026-09-17 09:00:00' + INTERVAL @appOffsetHours HOUR ORDER BY id LIMIT 1);
 
 -- Four readings on every visit that happened, one systolic reading a week above
 -- range - Grace is hypertensive - so the family's ranges and the institution's
 -- flagged readings visibly differ. A visit that already has readings gets none.
-INSERT INTO vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at)
+INSERT INTO carelink_visit.vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at)
 SELECT readings.visit_id, readings.metric, readings.value, readings.unit, readings.out_of_range, readings.recorded_at
   FROM (
         SELECT @visitSep08 AS visit_id, 'systolic' AS metric, 132.00 AS value, 'mmHg' AS unit,
@@ -263,11 +267,11 @@ SELECT readings.visit_id, readings.metric, readings.value, readings.unit, readin
   UNION ALL SELECT @visitSep17, 'temperature', 36.80, '°C', FALSE, '2026-09-17 09:10:00' + INTERVAL @appOffsetHours HOUR
        ) AS readings
  WHERE readings.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM vital_sign WHERE visit_id = readings.visit_id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.vital_sign WHERE visit_id = readings.visit_id);
 
 -- A photo and a signature per visit. Verified on the visits that are, not yet on
 -- the one Grace has not confirmed.
-INSERT INTO visit_evidence (visit_id, kind, reference, verification_status, captured_at)
+INSERT INTO carelink_visit.visit_evidence (visit_id, kind, reference, verification_status, captured_at)
 SELECT proof.visit_id, proof.kind, proof.reference, proof.verification_status, proof.captured_at
   FROM (
         SELECT @visitSep08 AS visit_id, 'PHOTO' AS kind, 'demo/2026-09-08/arrival.jpg' AS reference,
@@ -288,12 +292,12 @@ SELECT proof.visit_id, proof.kind, proof.reference, proof.verification_status, p
                '2026-09-17 10:00:00' + INTERVAL @appOffsetHours HOUR
        ) AS proof
  WHERE proof.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit_evidence WHERE visit_id = proof.visit_id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_evidence WHERE visit_id = proof.visit_id);
 
 -- Daniel's note on each visit: the observations section of the reports. The
 -- family reads these words, the institution reads them with the visit and task,
 -- the regulator is told only how many there were.
-INSERT INTO visit_task (visit_id, name, status, caregiver_note, completed_at)
+INSERT INTO carelink_visit.visit_task (visit_id, name, status, caregiver_note, completed_at)
 SELECT notes.visit_id, notes.name, 'DONE', notes.caregiver_note, notes.completed_at
   FROM (
         SELECT @visitSep08 AS visit_id, 'Mobility check' AS name,
@@ -310,4 +314,4 @@ SELECT notes.visit_id, notes.name, 'DONE', notes.caregiver_note, notes.completed
                '2026-09-17 09:30:00' + INTERVAL @appOffsetHours HOUR
        ) AS notes
  WHERE notes.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit_task WHERE visit_id = notes.visit_id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_task WHERE visit_id = notes.visit_id);

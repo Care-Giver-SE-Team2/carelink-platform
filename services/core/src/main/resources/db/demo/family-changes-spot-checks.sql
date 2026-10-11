@@ -41,6 +41,10 @@
 
 -- See TIMESTAMPS in demo-seed.sql: 0 for a backend started with ./mvnw on a
 -- machine set to Singapore time, 8 for the compose container or staging.
+--
+-- VISIT'S ROWS go to visit's own database, carelink_visit, on the same server
+-- (docs/platform/service-boundaries.md, section 9): every visit table below is
+-- named with it. Load the file with an account that can write both databases.
 SET @appOffsetHours := 0;
 
 SET time_zone = '+08:00';
@@ -71,7 +75,7 @@ DELETE FROM rostering_candidate_check
                                    WHERE rostering_run_id IN (SELECT id FROM demo_fcs_run));
 DELETE FROM rostering_candidate WHERE rostering_run_id IN (SELECT id FROM demo_fcs_run);
 DELETE FROM rostering_run       WHERE id IN (SELECT id FROM demo_fcs_run);
-UPDATE visit SET absence_id = NULL WHERE absence_id IN (SELECT id FROM demo_fcs_absence);
+UPDATE carelink_visit.visit SET absence_id = NULL WHERE absence_id IN (SELECT id FROM demo_fcs_absence);
 DELETE FROM absence_report      WHERE id IN (SELECT id FROM demo_fcs_absence);
 DELETE FROM spot_check          WHERE elder_id IN (@eBoon, @eSiew);
 
@@ -80,28 +84,28 @@ DROP TEMPORARY TABLE demo_fcs_absence;
 
 -- ------------------------------------------------------------ pick the visits ---
 -- Waiting for the family: Chen Ming's next two visits to Lim Boon Huat, two or more days out.
-SET @vAsk1 := (SELECT id FROM visit WHERE elder_id = @eBoon AND caregiver_id = @cMing
+SET @vAsk1 := (SELECT id FROM carelink_visit.visit WHERE elder_id = @eBoon AND caregiver_id = @cMing
                   AND status = 'SCHEDULED' AND scheduled_start >= @soon
                 ORDER BY scheduled_start LIMIT 1);
-SET @vAsk2 := (SELECT id FROM visit WHERE elder_id = @eBoon AND caregiver_id = @cMing
+SET @vAsk2 := (SELECT id FROM carelink_visit.visit WHERE elder_id = @eBoon AND caregiver_id = @cMing
                   AND status = 'SCHEDULED'
-                  AND scheduled_start > (SELECT scheduled_start FROM visit WHERE id = @vAsk1)
+                  AND scheduled_start > (SELECT scheduled_start FROM carelink_visit.visit WHERE id = @vAsk1)
                 ORDER BY scheduled_start LIMIT 1);
 -- Nobody free: the upcoming visit that has no caregiver.
-SET @vOpen := (SELECT id FROM visit WHERE elder_id = @eBoon AND caregiver_id IS NULL
+SET @vOpen := (SELECT id FROM carelink_visit.visit WHERE elder_id = @eBoon AND caregiver_id IS NULL
                   AND status = 'SCHEDULED' AND scheduled_start >= @now
                 ORDER BY scheduled_start LIMIT 1);
 -- Settled: a past visit the default plan gave to Chen Ming, and the cancelled one the family skipped.
-SET @vSwap := (SELECT id FROM visit WHERE elder_id = @eSiew AND status = 'VERIFIED' AND scheduled_start < @now
+SET @vSwap := (SELECT id FROM carelink_visit.visit WHERE elder_id = @eSiew AND status = 'VERIFIED' AND scheduled_start < @now
                 ORDER BY scheduled_start DESC LIMIT 1);
-SET @vSkip := (SELECT id FROM visit WHERE elder_id = @eBoon AND status = 'CANCELLED' AND scheduled_start < @now
+SET @vSkip := (SELECT id FROM carelink_visit.visit WHERE elder_id = @eBoon AND status = 'CANCELLED' AND scheduled_start < @now
                 ORDER BY scheduled_start DESC LIMIT 1);
 
 -- ------------------------------------------------------------------ absences ---
 INSERT INTO absence_report (caregiver_id, reviewed_by_user_id, type, start_date, end_date, reason, status)
 SELECT @cMing, @uMgr, 'SICK',
        DATE(MIN(scheduled_start)), DATE(MAX(scheduled_start)), 'Medical leave', 'APPROVED'
-  FROM visit WHERE id IN (@vAsk1, @vAsk2, @vOpen)
+  FROM carelink_visit.visit WHERE id IN (@vAsk1, @vAsk2, @vOpen)
 HAVING COUNT(*) > 0;
 SET @aMing := IF(ROW_COUNT() > 0, LAST_INSERT_ID(), NULL);
 
@@ -110,7 +114,7 @@ INSERT INTO absence_report (caregiver_id, reviewed_by_user_id, type, start_date,
 SELECT @cSiti, @uMgr, 'EMERGENCY',
        DATE(MIN(scheduled_start)), DATE(MAX(scheduled_start)), 'Family emergency', 'APPROVED',
        MAX(scheduled_start), @uMgr
-  FROM visit WHERE id IN (@vSwap, @vSkip)
+  FROM carelink_visit.visit WHERE id IN (@vSwap, @vSkip)
 HAVING COUNT(*) > 0;
 SET @aSiti := IF(ROW_COUNT() > 0, LAST_INSERT_ID(), NULL);
 
@@ -141,7 +145,7 @@ SELECT id, 3, 64.00, 'Free at that time'
 INSERT INTO rostering_candidate (rostering_run_id, visit_id, caregiver_id, option_rank, score, outcome, match_reason)
 SELECT @runMing, v.id, o.caregiver_id, o.option_rank, o.score, 'SUGGESTED', o.reason
   FROM demo_fcs_option o
-  JOIN visit v ON v.id IN (@vAsk1, @vAsk2)
+  JOIN carelink_visit.visit v ON v.id IN (@vAsk1, @vAsk2)
  WHERE @runMing IS NOT NULL AND o.caregiver_id IS NOT NULL;
 
 DROP TEMPORARY TABLE demo_fcs_option;
@@ -153,14 +157,14 @@ INSERT INTO roster_change (absence_id, visit_id, elder_id, original_caregiver_id
 SELECT @aMing, v.id, v.elder_id, @cMing, v.scheduled_start, v.scheduled_end,
        @runMing, @cSiti, 'AWAITING_FAMILY', v.scheduled_start - INTERVAL 15 HOUR, @now - INTERVAL 2 HOUR,
        @now - INTERVAL 2 HOUR
-  FROM visit v WHERE v.id IN (@vAsk1, @vAsk2) AND @aMing IS NOT NULL;
+  FROM carelink_visit.visit v WHERE v.id IN (@vAsk1, @vAsk2) AND @aMing IS NOT NULL;
 
 -- Uncovered: nobody was free, so a manager has it.
 INSERT INTO roster_change (absence_id, visit_id, elder_id, original_caregiver_id, visit_start, visit_end,
                            rostering_run_id, status, note, created_at, updated_at)
 SELECT @aMing, v.id, v.elder_id, @cMing, v.scheduled_start, v.scheduled_end,
        @runMing, 'UNCOVERED', 'Nobody was free to cover this visit', @now - INTERVAL 2 HOUR, @now - INTERVAL 2 HOUR
-  FROM visit v WHERE v.id = @vOpen AND @aMing IS NOT NULL;
+  FROM carelink_visit.visit v WHERE v.id = @vOpen AND @aMing IS NOT NULL;
 
 -- Settled by the default plan: the family did not answer in time.
 INSERT INTO roster_change (absence_id, visit_id, elder_id, original_caregiver_id, visit_start, visit_end,
@@ -171,7 +175,7 @@ SELECT @aSiti, v.id, v.elder_id, @cSiti, v.scheduled_start, v.scheduled_end,
        @cMing, v.scheduled_start - INTERVAL 15 HOUR, v.scheduled_start - INTERVAL 15 HOUR,
        'The family did not answer in time; the suggested caregiver went',
        v.scheduled_start - INTERVAL 1 DAY, v.scheduled_start - INTERVAL 15 HOUR
-  FROM visit v WHERE v.id = @vSwap AND @aSiti IS NOT NULL;
+  FROM carelink_visit.visit v WHERE v.id = @vSwap AND @aSiti IS NOT NULL;
 
 -- Skipped at the family's request.
 INSERT INTO roster_change (absence_id, visit_id, elder_id, original_caregiver_id, visit_start, visit_end,
@@ -182,7 +186,7 @@ SELECT @aSiti, v.id, v.elder_id, @cSiti, v.scheduled_start, v.scheduled_end,
        @uWei, v.scheduled_start - INTERVAL 15 HOUR, v.scheduled_start - INTERVAL 20 HOUR,
        'Skipped at the family''s request',
        v.scheduled_start - INTERVAL 1 DAY, v.scheduled_start - INTERVAL 20 HOUR
-  FROM visit v WHERE v.id = @vSkip AND @aSiti IS NOT NULL;
+  FROM carelink_visit.visit v WHERE v.id = @vSkip AND @aSiti IS NOT NULL;
 
 -- --------------------------------------------------------------- spot checks ---
 -- Waiting for consent: Tan Siew Lan's next visit.
@@ -190,7 +194,7 @@ INSERT INTO spot_check (elder_id, caregiver_id, visit_id, raised_by_user_id, pro
                         approval_status, created_at)
 SELECT v.elder_id, v.caregiver_id, v.id, @uMgr, v.scheduled_start,
        'Routine quality check of her morning routine and memory activities', 'PENDING_APPROVAL', @now - INTERVAL 3 HOUR
-  FROM visit v
+  FROM carelink_visit.visit v
  WHERE v.elder_id = @eSiew AND v.status = 'SCHEDULED' AND v.caregiver_id IS NOT NULL AND v.scheduled_start >= @now
  ORDER BY v.scheduled_start LIMIT 1;
 
@@ -200,7 +204,7 @@ INSERT INTO spot_check (elder_id, caregiver_id, visit_id, raised_by_user_id, app
 SELECT v.elder_id, v.caregiver_id, v.id, @uMgr, @fWei, v.scheduled_start,
        'New vitals checklist: confirming it is followed at home', 'APPROVED',
        @now - INTERVAL 1 DAY, @now - INTERVAL 2 DAY
-  FROM visit v
+  FROM carelink_visit.visit v
  WHERE v.elder_id = @eBoon AND v.caregiver_id = @cSiti AND v.status = 'SCHEDULED' AND v.scheduled_start >= @now
  ORDER BY v.scheduled_start LIMIT 1;
 
@@ -212,7 +216,7 @@ SELECT v.elder_id, v.caregiver_id, v.id, @uMgr, @fWei, v.scheduled_start,
        'Routine quality check', 'APPROVED', v.scheduled_start - INTERVAL 2 DAY,
        'Warm and patient; followed every step of the care plan and explained each one', 'MEETS_STANDARD', 'COMPLETED',
        v.scheduled_start + INTERVAL 1 HOUR, v.scheduled_start - INTERVAL 3 DAY
-  FROM visit v
+  FROM carelink_visit.visit v
  WHERE v.elder_id = @eBoon AND v.caregiver_id = @cSiti AND v.status = 'VERIFIED' AND v.scheduled_start < @now
  ORDER BY v.scheduled_start LIMIT 1;
 
@@ -224,7 +228,7 @@ SELECT v.elder_id, v.caregiver_id, v.id, @uMgr, @fWei, v.scheduled_start,
        'Follow-up after a late arrival was reported', 'APPROVED', v.scheduled_start - INTERVAL 2 DAY,
        'Care itself was good, but vitals were only written down after leaving the home', 'NEEDS_IMPROVEMENT', 'COMPLETED',
        v.scheduled_start + INTERVAL 1 HOUR, v.scheduled_start - INTERVAL 3 DAY
-  FROM visit v
+  FROM carelink_visit.visit v
  WHERE v.elder_id = @eBoon AND v.caregiver_id = @cMing AND v.status = 'VERIFIED' AND v.scheduled_start < @now
  ORDER BY v.scheduled_start LIMIT 1;
 
@@ -234,7 +238,7 @@ INSERT INTO spot_check (elder_id, caregiver_id, visit_id, raised_by_user_id, app
 SELECT v.elder_id, v.caregiver_id, v.id, @uMgr, @fWei, v.scheduled_start,
        'Routine quality check', 'REJECTED', v.scheduled_start - INTERVAL 1 DAY,
        'My mother was unwell that week and would rather not have visitors', v.scheduled_start - INTERVAL 2 DAY
-  FROM visit v
+  FROM carelink_visit.visit v
  WHERE v.elder_id = @eSiew AND v.caregiver_id IS NOT NULL AND v.scheduled_start < @now
    AND v.status <> 'CANCELLED'
  ORDER BY v.scheduled_start DESC LIMIT 1;

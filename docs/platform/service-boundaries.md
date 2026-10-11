@@ -178,8 +178,8 @@ outbox, `requested_notification` (`src/test/resources/db/platform`).
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
 service keeps its own `audit_log` in its own schema.
 
-No service reads or writes another's tables now, so the schema split can follow (section 9). notification
-already has a database of its own; visit and report still share core's.
+No service reads or writes another's tables now, so the schema split can follow (section 9). notification and
+visit already have databases of their own; report still shares core's.
 
 ## 6. Tables the platform adds
 
@@ -204,8 +204,9 @@ platform migration takes the next free version, listed here.
 | V9 | `report_visit`, `report_visit_task`, `report_vital_sign`, `report_elder_confirmation`, `report_incident`, `report_incident_log`, `report_spot_check`, `report_roster_change` | report | core | The facts a report is made from, kept from visit's and core's events (event catalogue, section 5) |
 | V10 | none: fills V9's tables once from the shared tables | report | core | The first deployment's copy. It is safe to run again, and is run again after loading demonstration data into the shared tables |
 | V11 | none: drops `notification` and `notification_subscription` | core | core | notification has a database of its own (section 9) |
+| V12 | none: drops visit's eleven tables | core | core | visit has a database of its own (section 9) |
 
-The next platform migration is V12. Until the schema split, the services share one schema, so the two events
+The next platform migration is V13. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
 
 ## 7. What the move changes: commands visit and core share
@@ -264,8 +265,8 @@ account that can reach its own database only, so a statement on another service'
 |---|---|---|
 | core | `carelink` | Keeps core's tables. Each service's tables leave it in a platform migration once that service has its own |
 | notification | `carelink_notification` | Done: its own migrations build it; core dropped its tables (V11) |
-| visit | `carelink_visit` | Next |
-| report | `carelink_report` | After visit |
+| visit | `carelink_visit` | Done: its own migrations build it, with its own `audit_log` and `shedlock`; core dropped its tables (V12) |
+| report | `carelink_report` | Next |
 
 **What a service with its own database has.**
 - **Its own migrations** in `src/main/resources/db/migration`, starting at V1 with its tables as they stood in the
@@ -289,9 +290,18 @@ account that can reach its own database only, so a statement on another service'
 creates each service's database and account if they are missing, on a volume from before the split too.
 
 **Data.** The split starts each service's database empty. Rows a service kept in the shared schema are not carried
-over, and core drops the moved tables. Demonstration data goes to the service it belongs to: the one family message
-the demonstration data laid out is now an event in core's outbox (`db/demo/manager-absences-and-spot-checks.sql`),
-which notification keeps when core's relay publishes it.
+over, and core drops the moved tables.
+
+**Demonstration data** (core's `db/demo`) still lays out whole scenarios, each in one file, but every row goes to the
+database of the service it belongs to:
+- visit's tables are named with visit's database (`carelink_visit.visit`), so load a file with an account that can
+  write every database on the server.
+- The one family message is an event in core's outbox (`manager-absences-and-spot-checks.sql`), which notification
+  keeps when core's relay publishes it.
+- Rows loaded straight into the databases send no events, so report would not hear of them. Load `report-facts.sql`
+  last: it copies the facts into report's tables the way the first deployment did (V10).
+
+core's tests that load demonstration data build visit's database beside their own (`VisitDatabaseForDemoData`).
 
 **What the cloud environment needs** for each service with a database: the database on the RDS instance, an account
 whose privileges cover that database only, and the service's `DB_URL`, `DB_USER` and `DB_PASSWORD` in the Secret

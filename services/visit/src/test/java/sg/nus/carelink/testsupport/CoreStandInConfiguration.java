@@ -12,12 +12,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * What every visit test that starts the application has in place of core: the core stand-in instead
  * of the core-api client, which only steps in when no CoreApi is defined; core's sign-in
- * ({@link SignInAsCore}), in front of the service's security chain; and the platform's tables after
- * core's migrations, as in a real run. Component scanning finds this class; slice tests leave it
- * out, as they leave out every configuration class of the application's own.
+ * ({@link SignInAsCore}), in front of the service's security chain; and visit's own database, built by
+ * its own migrations beside core's tables (OwnDatabaseForTests), as in a real run. Component scanning
+ * finds this class; slice tests leave it out, as they leave out every configuration class of the
+ * application's own.
  */
 @Configuration(proxyBeanMethods = false)
-@Import(PlatformTablesForTests.class)
+@Import(OwnDatabaseForTests.class)
 class CoreStandInConfiguration {
 
 	@Bean

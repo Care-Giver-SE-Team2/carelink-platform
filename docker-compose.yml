@@ -106,7 +106,9 @@ services:
   visit:
     image: ${IMAGE_PREFIX:-carelink}/visit:${IMAGE_TAG:-local}
     depends_on:
-      # core migrates the schema this service validates, and serves the internal API it calls
+      # visit migrates its own database, which mysql-setup creates; core serves the internal API it calls
+      mysql-setup:
+        condition: service_completed_successfully
       core:
         condition: service_healthy
       redis:
@@ -114,8 +116,8 @@ services:
       localstack:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
-      DB_USER: carelink
+      DB_URL: jdbc:mysql://mysql:3306/carelink_visit?connectionTimeZone=Asia/Singapore
+      DB_USER: visit
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
       # The login made through core, read from the same Redis
       SPRING_DATA_REDIS_HOST: redis

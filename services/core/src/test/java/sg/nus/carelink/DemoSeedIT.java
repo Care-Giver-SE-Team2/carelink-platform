@@ -19,6 +19,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitDatabaseForDemoData;
 
 /**
  * Checks that the demonstration seed still loads, that loading it twice is harmless, and
@@ -70,6 +71,8 @@ class DemoSeedIT {
 	@BeforeEach
 	void letSomebodyElseHaveTheLowIdsFirst() {
 		if (!databaseAlreadyInUse) {
+			// The visits go to visit's own database on the same server, as on a real one
+			VisitDatabaseForDemoData.build(jdbc);
 			jdbc.update("insert into app_user (username, password_hash, display_name) "
 					+ "values ('someone-else', '{noop}unused-test-password', 'Someone Else')");
 			jdbc.update("insert into elder (full_name) values ('Somebody Else''s Elder')");
@@ -100,10 +103,10 @@ class DemoSeedIT {
 		long bindingsBefore = count("elder_family_binding");
 		long incidentsBefore = count("incident");
 		long entriesBefore = count("incident_log");
-		long visitsBefore = count("visit");
-		long readingsBefore = count("vital_sign");
-		long evidenceBefore = count("visit_evidence");
-		long tasksBefore = count("visit_task");
+		long visitsBefore = count(VisitDatabaseForDemoData.NAME + ".visit");
+		long readingsBefore = count(VisitDatabaseForDemoData.NAME + ".vital_sign");
+		long evidenceBefore = count(VisitDatabaseForDemoData.NAME + ".visit_evidence");
+		long tasksBefore = count(VisitDatabaseForDemoData.NAME + ".visit_task");
 
 		loadSeed();
 
@@ -112,10 +115,10 @@ class DemoSeedIT {
 		assertThat(count("elder_family_binding")).isEqualTo(bindingsBefore);
 		assertThat(count("incident")).isEqualTo(incidentsBefore);
 		assertThat(count("incident_log")).isEqualTo(entriesBefore);
-		assertThat(count("visit")).isEqualTo(visitsBefore);
-		assertThat(count("vital_sign")).isEqualTo(readingsBefore);
-		assertThat(count("visit_evidence")).isEqualTo(evidenceBefore);
-		assertThat(count("visit_task")).isEqualTo(tasksBefore);
+		assertThat(count(VisitDatabaseForDemoData.NAME + ".visit")).isEqualTo(visitsBefore);
+		assertThat(count(VisitDatabaseForDemoData.NAME + ".vital_sign")).isEqualTo(readingsBefore);
+		assertThat(count(VisitDatabaseForDemoData.NAME + ".visit_evidence")).isEqualTo(evidenceBefore);
+		assertThat(count(VisitDatabaseForDemoData.NAME + ".visit_task")).isEqualTo(tasksBefore);
 	}
 
 	/**
@@ -128,8 +131,8 @@ class DemoSeedIT {
 		loadSeed();
 
 		Long verifiedWithReadings = jdbc.queryForObject(
-				"select count(distinct v.id) from visit v join vital_sign s on s.visit_id = v.id "
-						+ "where v.status = 'VERIFIED'",
+				"select count(distinct v.id) from carelink_visit.visit v join carelink_visit.vital_sign s"
+						+ " on s.visit_id = v.id where v.status = 'VERIFIED'",
 				Long.class);
 
 		assertThat(verifiedWithReadings).isPositive();

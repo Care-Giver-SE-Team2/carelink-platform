@@ -30,6 +30,7 @@ import sg.nus.carelink.incident.application.SpotCheckHistory;
 import sg.nus.carelink.rostering.application.AbsenceReRosteringService;
 import sg.nus.carelink.rostering.domain.model.RosteringRun;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitDatabaseForDemoData;
 import sg.nus.carelink.testsupport.VisitStandIn;
 
 /**
@@ -40,8 +41,9 @@ import sg.nus.carelink.testsupport.VisitStandIn;
  * only looks right in the tables proves nothing about the screen.
  *
  * <p>Loaded as a script on one connection, as DemoSeedIT does, through the JDBC time-zone setting
- * the application runs with. The script still writes visit's tables in core's database, and the
- * visit stand-in takes the visits over from there.
+ * the application runs with. The script writes visit's rows into visit's own database on the same
+ * server (VisitDatabaseForDemoData), as it does on a real one, and the visit stand-in takes the visits
+ * over from there.
  *
  * @author Wang Ziyu
  */
@@ -57,7 +59,8 @@ class AbsencesAndSpotChecksDemoIT {
 	private static final String SEED = "db/demo/manager-absences-and-spot-checks.sql";
 
 	private static final List<String> TABLES = List.of("app_user", "user_role", "caregiver", "credential",
-			"family_member", "elder_family_binding", "absence_report", "visit", "visit_task", "visit_assignment",
+			"family_member", "elder_family_binding", "absence_report", VisitDatabaseForDemoData.NAME + ".visit",
+			VisitDatabaseForDemoData.NAME + ".visit_task", VisitDatabaseForDemoData.NAME + ".visit_assignment",
 			"spot_check", "outbox_event");
 
 	@Autowired
@@ -75,6 +78,7 @@ class AbsencesAndSpotChecksDemoIT {
 
 	@Test
 	void laysOutTheScenarioOnceAndAgainOnlyAfterItHasBeenUsed() throws Exception {
+		VisitDatabaseForDemoData.build(jdbc);
 		load("db/demo/demo-seed.sql");
 		load(SEED);
 		Map<String, Long> before = counts();
