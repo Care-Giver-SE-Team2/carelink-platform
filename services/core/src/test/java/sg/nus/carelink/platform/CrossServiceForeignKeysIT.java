@@ -41,6 +41,7 @@ class CrossServiceForeignKeysIT {
 		services.addAll(ServiceTables.NOTIFICATION);
 
 		assertThat(tables()).as("tables of visit, report and notification in core's database")
+				.contains("elder", "incident")
 				.doesNotContainAnyElementsOf(services);
 	}
 
