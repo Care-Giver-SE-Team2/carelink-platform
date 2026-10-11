@@ -9,7 +9,7 @@
 #
 # A queue subscribes to the topic only for the events its service handles, with a filter policy on
 # the message's "type" attribute (docs/platform/event-catalogue.md lists who handles what). A
-# service that handles nothing yet, core and visit today, has a queue but no subscription. When a
+# service that handles nothing, core and visit today, has a queue but no subscription. When a
 # service gets its first handler, add its subscription here and in the Terraform.
 set -eu
 

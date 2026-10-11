@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,13 +43,16 @@ import sg.nus.carelink.report.domain.repository.ReportFactsSource;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
- * UC-MG07 against a real MySQL, with the real Flyway migrations (V8's report_amendment
- * included), the real Spring wiring and the real JSON column.
+ * UC-MG07 against a real MySQL, with the real Flyway migrations (V8's report_amendment and the
+ * platform's V9, report's own record of the facts, included), the real Spring wiring and the real
+ * JSON column. core is the core stand-in, which answers the elder's profile and the caregivers'
+ * names from the rows laid out here in core's tables, as core would.
  *
  * <p>The unit tests prove what the three reports say; this proves the parts that only a
- * database can: the SQL that reads other modules' tables, the derived queries and their
+ * database can: the SQL that reads the facts report keeps, the derived queries and their
  * ordering, the content column taking and giving back the JSON the adapter writes, and -
- * the reason this test exists - where a week begins and ends.
+ * the reason this test exists - where a week begins and ends. How the facts get into those
+ * tables from visit's and core's events is {@code ReportFactsFromEventsIT}'s.
  *
  * <p><strong>The connection is configured as production's is.</strong> Staging's JDBC URL
  * declares {@code connectionTimeZone=Asia/Singapore} while the application's JVM runs in UTC,
@@ -60,8 +64,8 @@ import sg.nus.carelink.testsupport.SharedMySql;
  *
  * <p>Every row it needs, it creates, for an elder of its own; nothing is cleared and nothing
  * depends on what another test left behind. Rows are written with their times as
- * {@link Timestamp} parameters - the path Hibernate takes when the visit and incident modules
- * write them - never as SQL literals, which the driver would store without the shift.
+ * {@link Timestamp} parameters - the path report takes when it keeps a fact from an event -
+ * never as SQL literals, which the driver would store without the shift.
  *
  * <p>Named *IT: runs under the integration-tests job of the pipeline; needs Docker.
  */
@@ -90,6 +94,9 @@ class ReportFlowIT {
 	private static Long caregiver;
 	/** The caregiver who covers an absence in the roster change rows. */
 	private static Long replacement;
+
+	/** Ids for the facts this test keeps, as visit and core would have numbered them. */
+	private static final AtomicLong IDS = new AtomicLong(1_000);
 
 	private Long elder;
 
@@ -192,9 +199,9 @@ class ReportFlowIT {
 	// ---------------------------------------------------- what else a report reads ---
 
 	/**
-	 * The profile, the plan, the elder's answers, the family's reviews, the spot checks, the
-	 * roster changes and the value-added requests come from their own tables - each written the
-	 * way its module writes it - and only the rows that belong to the week are read.
+	 * The profile, the plan and the names come from core; the elder's answers, the spot checks and
+	 * the roster changes from what report keeps of them; the family's reviews and the value-added
+	 * requests from report's own tables - and only the rows that belong to the week are read.
 	 */
 	@Test
 	void theRestOfTheWeeksRecordIsReadFromItsOwnTables() {
@@ -263,7 +270,7 @@ class ReportFlowIT {
 	void aRunFilesItsReportsAgainstOneBasis() {
 		givenTheElderHadAVerifiedWeek();
 		visit(LocalDateTime.of(2026, 9, 18, 9, 0), "SCHEDULED");
-		Long monday = jdbc.sql("select id from visit where elder_id = :elder order by scheduled_start limit 1")
+		Long monday = jdbc.sql("select visit_id from report_visit where elder_id = :elder order by scheduled_start limit 1")
 				.param("elder", elder).query(Long.class).single();
 		answer(monday, "CONFIRMED", 5, null, LocalDateTime.of(2026, 9, 14, 11, 0));
 
@@ -442,13 +449,14 @@ class ReportFlowIT {
 		note(monday, "Mobility", "Walked to the void deck with the cane, steady on her feet.");
 		note(wednesday, "Meals", "Ate half of lunch; said she was not hungry.");
 
-		Long fall = insert("insert into incident (elder_id, reported_by_user_id, responder_user_id, source, category,"
-						+ " severity, status, description, reported_at, resolved_at)"
-						+ " values (:elder, :reporter, :manager, 'CAREGIVER', 'FALL', 'MEDIUM', 'RESOLVED',"
-						+ " 'Slipped getting out of the shower, no injury.', :reported, :resolved)",
-				Map.of("elder", elder, "reporter", caregiverUser, "manager", manager,
-						"reported", at(LocalDateTime.of(2026, 9, 15, 10, 15)),
-						"resolved", at(LocalDateTime.of(2026, 9, 15, 11, 2))));
+		Long fall = IDS.incrementAndGet();
+		jdbc.sql("insert into report_incident (incident_id, elder_id, category, severity, status, description,"
+						+ " reported_at, resolved_at) values (:id, :elder, 'FALL', 'MEDIUM', 'RESOLVED',"
+						+ " 'Slipped getting out of the shower, no injury.', :reported, :resolved)")
+				.param("id", fall).param("elder", elder)
+				.param("reported", at(LocalDateTime.of(2026, 9, 15, 10, 15)))
+				.param("resolved", at(LocalDateTime.of(2026, 9, 15, 11, 2)))
+				.update();
 		log(fall, "caregiver:" + caregiverUser, "REPORTED", "reported by caregiver", LocalDateTime.of(2026, 9, 15, 10, 15));
 		log(fall, "Ben Lim (it-ben)", "CLAIMED", "taken over; countdown stopped", LocalDateTime.of(2026, 9, 15, 10, 21));
 		log(fall, "Ben Lim (it-ben)", "RESOLVED",
@@ -469,18 +477,14 @@ class ReportFlowIT {
 	}
 
 	private Long timedVisit(LocalDateTime start, LocalDateTime end, LocalDateTime checkedIn, LocalDateTime checkedOut) {
-		return insert("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,"
-						+ " checked_in_at, checked_out_at, status)"
-						+ " values (:elder, :caregiver, 'Personal care', :start, :end, :in, :out, 'VERIFIED')",
-				Map.of("elder", elder, "caregiver", caregiver, "start", at(start), "end", at(end),
-						"in", at(checkedIn), "out", at(checkedOut)));
+		return keptVisit(start, end, checkedIn, checkedOut, "VERIFIED");
 	}
 
 	private void answer(Long visit, String status, Integer rating, String comment, LocalDateTime when) {
-		jdbc.sql("insert into elder_confirmation (visit_id, elder_id, confirmation_status, rating, comment, confirmed_at)"
-						+ " values (:visit, :elder, :status, :rating, :comment, :when)")
-				.param("visit", visit).param("elder", elder).param("status", status).param("rating", rating)
-				.param("comment", comment).param("when", at(when))
+		jdbc.sql("insert into report_elder_confirmation (visit_id, elder_id, visit_scheduled_start, confirmation_status,"
+						+ " rating, comment, confirmed_at) values (:visit, :elder, :start, :status, :rating, :comment, :when)")
+				.param("visit", visit).param("elder", elder).param("start", startOf(visit)).param("status", status)
+				.param("rating", rating).param("comment", comment).param("when", at(when))
 				.update();
 	}
 
@@ -494,24 +498,20 @@ class ReportFlowIT {
 	}
 
 	private void spotCheck(LocalDateTime proposed, String finding) {
-		jdbc.sql("insert into spot_check (elder_id, caregiver_id, proposed_time, approval_status, finding, result, outcome,"
-						+ " checked_at) values (:elder, :caregiver, :proposed, 'APPROVED', :finding, 'NEEDS_IMPROVEMENT',"
-						+ " 'COMPLETED', :checked)")
-				.param("elder", elder).param("caregiver", caregiver).param("proposed", at(proposed))
-				.param("finding", finding).param("checked", at(proposed.plusMinutes(40)))
+		jdbc.sql("insert into report_spot_check (spot_check_id, elder_id, caregiver_id, proposed_time, approval_status,"
+						+ " finding, result, outcome, checked_at, sequence) values (:id, :elder, :caregiver, :proposed,"
+						+ " 'APPROVED', :finding, 'NEEDS_IMPROVEMENT', 'COMPLETED', :checked, 1)")
+				.param("id", IDS.incrementAndGet()).param("elder", elder).param("caregiver", caregiver)
+				.param("proposed", at(proposed)).param("finding", finding).param("checked", at(proposed.plusMinutes(40)))
 				.update();
 	}
 
 	private void rosterChange(Long visit, LocalDateTime visitStart) {
-		Long absence = insert("insert into absence_report (caregiver_id, start_date, end_date, status)"
-						+ " values (:caregiver, :start, :end, 'APPROVED')",
-				Map.of("caregiver", caregiver, "start", visitStart.toLocalDate(), "end", visitStart.toLocalDate()));
-		jdbc.sql("insert into roster_change (absence_id, visit_id, elder_id, original_caregiver_id, visit_start, status,"
-						+ " outcome, decided_by, assigned_caregiver_id, created_at, updated_at)"
-						+ " values (:absence, :visit, :elder, :caregiver, :start, 'RESOLVED', 'REPLACED', 'FAMILY',"
-						+ " :replacement, :start, :start)")
-				.param("absence", absence).param("visit", visit).param("elder", elder).param("caregiver", caregiver)
-				.param("start", at(visitStart)).param("replacement", replacement)
+		jdbc.sql("insert into report_roster_change (roster_change_id, visit_id, elder_id, original_caregiver_id,"
+						+ " visit_start, status, outcome, decided_by, assigned_caregiver_id, sequence)"
+						+ " values (:id, :visit, :elder, :caregiver, :start, 'RESOLVED', 'REPLACED', 'FAMILY', :replacement, 1)")
+				.param("id", IDS.incrementAndGet()).param("visit", visit).param("elder", elder)
+				.param("caregiver", caregiver).param("start", at(visitStart)).param("replacement", replacement)
 				.update();
 	}
 
@@ -528,9 +528,26 @@ class ReportFlowIT {
 	}
 
 	private Long visit(LocalDateTime start, String status) {
-		return insert("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, status)"
-						+ " values (:elder, :caregiver, 'Personal care', :start, :status)",
-				Map.of("elder", elder, "caregiver", caregiver, "start", at(start), "status", status));
+		return keptVisit(start, null, null, null, status);
+	}
+
+	/** A visit as report keeps it from visit's events, with the class's caregiver on it. */
+	private Long keptVisit(LocalDateTime start, LocalDateTime end, LocalDateTime checkedIn, LocalDateTime checkedOut,
+			String status) {
+		Long id = IDS.incrementAndGet();
+		jdbc.sql("insert into report_visit (visit_id, elder_id, caregiver_id, service_type, scheduled_start,"
+						+ " scheduled_end, checked_in_at, checked_out_at, status, version)"
+						+ " values (:id, :elder, :caregiver, 'Personal care', :start, :end, :in, :out, :status, 4)")
+				.param("id", id).param("elder", elder).param("caregiver", caregiver).param("start", at(start))
+				.param("end", at(end)).param("in", at(checkedIn)).param("out", at(checkedOut)).param("status", status)
+				.update();
+		return id;
+	}
+
+	/** The visit's start as kept, for the facts filed under it. */
+	private Timestamp startOf(Long visit) {
+		return jdbc.sql("select scheduled_start from report_visit where visit_id = :visit").param("visit", visit)
+				.query(Timestamp.class).single();
 	}
 
 	private void readings(Long visit, LocalDateTime at, String systolic, String diastolic, String pulse,
@@ -542,31 +559,35 @@ class ReportFlowIT {
 	}
 
 	private void reading(Long visit, String metric, String value, String unit, boolean outOfRange, LocalDateTime at) {
-		jdbc.sql("insert into vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at)"
-						+ " values (:visit, :metric, :value, :unit, :outOfRange, :at)")
-				.param("visit", visit).param("metric", metric).param("value", new BigDecimal(value))
-				.param("unit", unit).param("outOfRange", outOfRange).param("at", at(at))
+		jdbc.sql("insert into report_vital_sign (visit_id, elder_id, visit_scheduled_start, metric, value, unit,"
+						+ " out_of_range, recorded_at) values (:visit, :elder, :start, :metric, :value, :unit, :outOfRange, :at)")
+				.param("visit", visit).param("elder", elder).param("start", startOf(visit)).param("metric", metric)
+				.param("value", new BigDecimal(value)).param("unit", unit).param("outOfRange", outOfRange)
+				.param("at", at(at))
 				.update();
 	}
 
+	/** Verified evidence, counted on the visit as it was copied at the first deployment. */
 	private void evidence(Long visit, String kind) {
-		jdbc.sql("insert into visit_evidence (visit_id, kind, reference, verification_status)"
-						+ " values (:visit, :kind, :reference, 'VERIFIED')")
-				.param("visit", visit).param("kind", kind).param("reference", "it/" + visit + "/" + kind)
+		jdbc.sql("update report_visit set evidence_count = evidence_count + 1,"
+						+ " verified_evidence_count = verified_evidence_count + 1 where visit_id = :visit")
+				.param("visit", visit)
 				.update();
 	}
 
 	private void note(Long visit, String task, String note) {
-		jdbc.sql("insert into visit_task (visit_id, name, status, caregiver_note) values (:visit, :task, 'DONE', :note)")
-				.param("visit", visit).param("task", task).param("note", note)
+		jdbc.sql("insert into report_visit_task (task_id, visit_id, elder_id, visit_scheduled_start, name, status,"
+						+ " caregiver_note, sequence) values (:id, :visit, :elder, :start, :task, 'DONE', :note, 1)")
+				.param("id", IDS.incrementAndGet()).param("visit", visit).param("elder", elder)
+				.param("start", startOf(visit)).param("task", task).param("note", note)
 				.update();
 	}
 
 	private void log(Long incident, String actor, String action, String detail, LocalDateTime at) {
-		jdbc.sql("insert into incident_log (incident_id, actor, action, detail, occurred_at)"
-						+ " values (:incident, :actor, :action, :detail, :at)")
-				.param("incident", incident).param("actor", actor).param("action", action)
-				.param("detail", detail).param("at", at(at))
+		jdbc.sql("insert into report_incident_log (log_id, incident_id, actor, action, detail, occurred_at)"
+						+ " values (:id, :incident, :actor, :action, :detail, :at)")
+				.param("id", IDS.incrementAndGet()).param("incident", incident).param("actor", actor)
+				.param("action", action).param("detail", detail).param("at", at(at))
 				.update();
 	}
 
@@ -582,9 +603,9 @@ class ReportFlowIT {
 				.query(String.class).list();
 	}
 
-	/** How Hibernate hands a LocalDateTime to the driver. See the class comment. */
+	/** How report hands a time it keeps to the driver. See the class comment. */
 	private static Timestamp at(LocalDateTime moment) {
-		return Timestamp.valueOf(moment);
+		return moment == null ? null : Timestamp.valueOf(moment);
 	}
 
 	private static String section(Report report, String title) {

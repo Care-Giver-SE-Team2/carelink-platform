@@ -275,9 +275,32 @@ public class CoreStandIn implements CoreApi {
 		throw notAnswered();
 	}
 
+	/** The statement core runs (JdbcElderReportProfiles): the latest published plan is the one in force. */
 	@Override
 	public ElderReportProfile elderReportProfile(Long elderId) {
-		throw notAnswered();
+		List<ElderReportProfile> found = jdbc.query("""
+				select e.id, e.full_name, e.gender, e.date_of_birth, e.mobility_level, e.lives_alone, e.medical_notes,
+				       pc.caregiver_id as primary_caregiver_id, c.full_name as primary_caregiver_name,
+				       p.version as plan_version, p.total_hours as plan_hours
+				from elder e
+				left join elder_primary_caregiver pc on pc.elder_id = e.id
+				left join caregiver c on c.id = pc.caregiver_id
+				left join care_plan p on p.id = (
+				    select cp.id from care_plan cp
+				    where cp.elder_id = e.id and cp.status = 'PUBLISHED'
+				    order by cp.version desc, cp.id desc
+				    limit 1)
+				where e.id = ?
+				""", (row, n) -> new ElderReportProfile(row.getLong("id"), row.getString("full_name"),
+						row.getString("gender"), date(row, "date_of_birth"), row.getString("mobility_level"),
+						row.getObject("lives_alone", Boolean.class), row.getString("medical_notes"),
+						row.getObject("primary_caregiver_id", Long.class), row.getString("primary_caregiver_name"),
+						row.getObject("plan_version", Integer.class), row.getBigDecimal("plan_hours")),
+				elderId);
+		if (found.isEmpty()) {
+			throw new CoreNotFound("Elder [%s] does not exist".formatted(elderId));
+		}
+		return found.getFirst();
 	}
 
 	// ---------- Care plans ----------
@@ -365,9 +388,14 @@ public class CoreStandIn implements CoreApi {
 		throw notAnswered();
 	}
 
+	/** Approved leave covering the day, as core's rostering reads it. */
 	@Override
 	public OnLeave onLeave(Long caregiverId, LocalDate day) {
-		throw notAnswered();
+		Long approved = jdbc.queryForObject("""
+				select count(*) from absence_report
+				where caregiver_id = ? and status = 'APPROVED' and start_date <= ? and end_date >= ?
+				""", Long.class, caregiverId, Date.valueOf(day), Date.valueOf(day));
+		return new OnLeave(approved != null && approved > 0);
 	}
 
 	// ---------- How core answers ----------

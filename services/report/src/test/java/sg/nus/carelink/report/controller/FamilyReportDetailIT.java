@@ -31,14 +31,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import sg.nus.carelink.coreapi.CoreApi;
-import sg.nus.carelink.report.support.SeededFamilyAccess;
 import sg.nus.carelink.report.support.SignedInSessions;
 import sg.nus.carelink.testsupport.SharedMySql;
 
@@ -67,11 +64,6 @@ class FamilyReportDetailIT {
 	private MockMvc mvc;
 	@Autowired
 	private JdbcTemplate jdbc;
-	@Autowired
-	private Clock clock;
-	/** core, which answers report's questions about family access; see SeededFamilyAccess */
-	@MockitoBean
-	private CoreApi core;
 	private final JsonMapper json = JsonMapper.builder().build();
 
 	@TestConfiguration(proxyBeanMethods = false)
@@ -85,13 +77,12 @@ class FamilyReportDetailIT {
 
 	@BeforeEach
 	void prepareIsolatedReports() {
-		SeededFamilyAccess.answer(core, jdbc, clock);
 		jdbc.update("DELETE FROM audit_log");
 		jdbc.update("DELETE FROM report_amendment");
 		jdbc.update("DELETE FROM report");
-		jdbc.update("DELETE FROM vital_sign");
-		jdbc.update("DELETE FROM visit_task");
-		jdbc.update("DELETE FROM visit");
+		jdbc.update("DELETE FROM report_vital_sign");
+		jdbc.update("DELETE FROM report_visit_task");
+		jdbc.update("DELETE FROM report_visit");
 		jdbc.update("DELETE FROM caregiver");
 		jdbc.update("DELETE FROM elder_family_binding");
 		jdbc.update("DELETE FROM elder");
@@ -274,20 +265,23 @@ class FamilyReportDetailIT {
 	@Test
 	void managerGeneratedFamilyReportAndItsNewCorrectionAreReadableInTheSameSession() throws Exception {
 		jdbc.update("INSERT INTO caregiver (id, user_id, full_name) VALUES (201, 14, 'Mei')");
+		// The week's facts as report keeps them from visit's events
 		jdbc.update("""
-				INSERT INTO visit (id, elder_id, caregiver_id, service_type, scheduled_start, status) VALUES
-				(701, 101, 201, 'Personal care', '2026-09-14 09:00:00', 'VERIFIED'),
-				(702, 101, 201, 'Personal care', '2026-09-16 09:00:00', 'VERIFIED')
+				INSERT INTO report_visit (visit_id, elder_id, caregiver_id, service_type, scheduled_start, status, version) VALUES
+				(701, 101, 201, 'Personal care', '2026-09-14 09:00:00', 'VERIFIED', 4),
+				(702, 101, 201, 'Personal care', '2026-09-16 09:00:00', 'VERIFIED', 4)
 				""");
 		jdbc.update("""
-				INSERT INTO vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at) VALUES
-				(701, 'systolic', 128, 'mmHg', false, '2026-09-14 09:10:00'),
-				(701, 'systolic', 136, 'mmHg', false, '2026-09-14 10:10:00'),
-				(702, 'systolic', 142, 'mmHg', true, '2026-09-16 09:10:00')
+				INSERT INTO report_vital_sign (visit_id, elder_id, visit_scheduled_start, metric, value, unit, out_of_range,
+				recorded_at) VALUES
+				(701, 101, '2026-09-14 09:00:00', 'systolic', 128, 'mmHg', false, '2026-09-14 09:10:00'),
+				(701, 101, '2026-09-14 09:00:00', 'systolic', 136, 'mmHg', false, '2026-09-14 10:10:00'),
+				(702, 101, '2026-09-16 09:00:00', 'systolic', 142, 'mmHg', true, '2026-09-16 09:10:00')
 				""");
 		jdbc.update("""
-				INSERT INTO visit_task (visit_id, name, status, caregiver_note)
-				VALUES (701, 'Mobility', 'DONE', 'Walked two laps with a cane.')
+				INSERT INTO report_visit_task (task_id, visit_id, elder_id, visit_scheduled_start, name, status,
+				caregiver_note, sequence)
+				VALUES (7011, 701, 101, '2026-09-14 09:00:00', 'Mobility', 'DONE', 'Walked two laps with a cane.', 1)
 				""");
 		var manager = loginAs("manager");
 		var generated = managerPost(manager, "/api/reports/generate",

@@ -140,8 +140,10 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       CARELINK_COREAPI_BASEURL: http://core:8080
       CARELINK_VISITAPI_BASEURL: http://visit:8080
-      # report's messages go out as events to the topic; it handles none yet, so it has no queue setting
+      # report's messages go out as events to the topic, and it keeps the facts its reports are made
+      # from off its queue (visit's and core's events, docs/platform/event-catalogue.md)
       CARELINK_EVENTS_TOPICARN: arn:aws:sns:ap-southeast-1:000000000000:carelink-events
+      CARELINK_EVENTS_QUEUEURL: http://localstack:4566/000000000000/carelink-report
       CARELINK_EVENTS_ENDPOINT: http://localstack:4566
       AWS_ACCESS_KEY_ID: test             # LocalStack takes any key
       AWS_SECRET_ACCESS_KEY: test
