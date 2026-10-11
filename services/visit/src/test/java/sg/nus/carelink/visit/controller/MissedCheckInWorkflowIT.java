@@ -71,6 +71,8 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         clock.at(START); long stopped=plannedVisit();
         long plan=jdbc.queryForObject("SELECT care_plan_id FROM visit WHERE id=?",Long.class,stopped);
         stopPlan(plan, LocalDate.of(2026, 10, 8));
+        assertThat(eventsOf(stopped)).containsExactly("VisitScheduled v0","VisitCancelled v1");
+        assertThat(lastEvent(stopped,"VisitCancelled").path("reason").asString()).isEqualTo("PLAN_CHANGED");
         overdue(); assertThat(scan.trigger(stopped)).isFalse(); assertThat(count("incident",stopped)).isZero();
     }
     /** The visit's own update fails before visit asks core for anything: nothing anywhere, and the next scan tries again. */
@@ -121,6 +123,10 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         assertThat(event).isNotEqualTo(old);
         core.resolve(event);
         changes.reassign(id,otherCaregiver,new VisitReassignment.Change(null,manager,null,"Fictional replacement"));
+        var handedOver=lastEvent(id,"VisitCaregiverChanged");
+        assertThat(handedOver.path("caregiverId").asLong()).isEqualTo(otherCaregiver);
+        assertThat(handedOver.path("previousCaregiverId").asLong()).isEqualTo(caregiver);
+        assertThat(handedOver.path("version").asInt()).isEqualTo(version(id));
         assertThat(jdbc.queryForObject("SELECT caregiver_id FROM visit WHERE id=?",Long.class,id)).isEqualTo(otherCaregiver);
         assertThat(scan.trigger(id)).isFalse(); assertThat(count("incident",id)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT triggered_caregiver_id FROM visit_missed_check_in_trigger WHERE visit_id=?",Long.class,id)).isEqualTo(caregiver);

@@ -1,6 +1,7 @@
 package sg.nus.carelink.visit.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,7 +18,8 @@ class VisitSchedulingServiceTest {
 	private static final LocalDateTime WED_8 = LocalDateTime.of(2026, 10, 7, 8, 0);
 
 	private final InMemoryVisitRepository visits = new InMemoryVisitRepository();
-	private final VisitSchedulingService scheduling = new VisitSchedulingService(visits, visits);
+	private final RecordingVisitEvents events = new RecordingVisitEvents();
+	private final VisitSchedulingService scheduling = new VisitSchedulingService(visits, visits, events);
 
 	@Test
 	void createsScheduledVisitsLinkedToTheirPlanTask() {
@@ -32,6 +34,10 @@ class VisitSchedulingServiceTest {
 					assertThat(visit.serviceType()).isEqualTo("Bathing assistance");
 				})
 				.extracting(Visit::scheduledStart).containsExactlyInAnyOrder(MON_8, WED_8);
+		assertThat(events.published()).extracting(RecordingVisitEvents.Published::event,
+				RecordingVisitEvents.Published::version, RecordingVisitEvents.Published::why)
+				.containsOnly(tuple("VisitScheduled", 0, "PLAN"));
+		assertThat(events.published()).hasSize(2);
 	}
 
 	@Test
@@ -40,6 +46,7 @@ class VisitSchedulingServiceTest {
 
 		assertThat(scheduling.schedule(List.of(planned(MON_8, 5L)))).isEqualTo(new Outcome(0, 0));
 		assertThat(visits.findByCarePlanIdStartingFrom(9L, MON_8)).hasSize(1);
+		assertThat(events.published()).hasSize(1);
 	}
 
 	@Test
@@ -49,6 +56,9 @@ class VisitSchedulingServiceTest {
 		assertThat(scheduling.schedule(List.of(planned(MON_8, 5L)))).isEqualTo(new Outcome(0, 1));
 		assertThat(visits.findByCarePlanIdStartingFrom(9L, MON_8)).singleElement()
 				.extracting(Visit::caregiverId).isEqualTo(5L);
+		assertThat(events.published()).extracting(RecordingVisitEvents.Published::event,
+				RecordingVisitEvents.Published::version, RecordingVisitEvents.Published::caregiverId)
+				.containsExactly(tuple("VisitScheduled", 0, null), tuple("VisitCaregiverChanged", 1, 5L));
 	}
 
 	@Test
@@ -76,6 +86,11 @@ class VisitSchedulingServiceTest {
 						org.assertj.core.groups.Tuple.tuple(MON_8, Visit.Status.SCHEDULED),
 						org.assertj.core.groups.Tuple.tuple(WED_8, Visit.Status.IN_PROGRESS),
 						org.assertj.core.groups.Tuple.tuple(WED_8.plusDays(1), Visit.Status.CANCELLED));
+		assertThat(events.published()).filteredOn(published -> published.event().equals("VisitCancelled"))
+				.singleElement().satisfies(published -> {
+					assertThat(published.why()).isEqualTo("PLAN_CHANGED");
+					assertThat(published.version()).isEqualTo(1);
+				});
 	}
 
 	@Test
@@ -91,6 +106,9 @@ class VisitSchedulingServiceTest {
 		assertThat(scheduling.markUncoveredAsException(uncovered.getFirst().visitId())).isTrue();
 		assertThat(visits.findById(uncovered.getFirst().visitId())).get()
 				.extracting(Visit::status).isEqualTo(Visit.Status.EXCEPTION);
+		assertThat(events.published().getLast()).extracting(RecordingVisitEvents.Published::event,
+				RecordingVisitEvents.Published::visitId, RecordingVisitEvents.Published::why)
+				.containsExactly("VisitExceptionRaised", uncovered.getFirst().visitId(), "UNCOVERED_AT_START");
 		assertThat(scheduling.findUncoveredStarted(MON_8.minusDays(1), MON_8.plusHours(2))).isEmpty();
 	}
 

@@ -114,6 +114,31 @@ public abstract class CaregiverHttpITSupport {
     protected record PublishedPlan(long id, List<Long> visits) {
     }
 
+    /**
+     * What visit published about a visit, oldest first: each event's type, with the visit's version
+     * where the event names one ({@code "VisitCheckedIn v1"}). Events go to the outbox in the
+     * transaction of the change, so a change that rolled back left none.
+     */
+    protected List<String> eventsOf(long visitId) {
+        return jdbc.query("""
+                select type, json_value(payload, '$.version' returning signed) as version from outbox_event
+                where source = 'visit' and json_value(payload, '$.visitId' returning signed) = ?
+                order by id
+                """, (row, n) -> {
+                    long version = row.getLong("version");
+                    return row.wasNull() ? row.getString("type") : row.getString("type") + " v" + version;
+                }, visitId);
+    }
+
+    /** The payload of the latest event of this type visit published about the visit. */
+    protected JsonNode lastEvent(long visitId, String type) {
+        return json.readTree(jdbc.queryForObject("""
+                select payload from outbox_event
+                where source = 'visit' and type = ? and json_value(payload, '$.visitId' returning signed) = ?
+                order by id desc limit 1
+                """, String.class, type, visitId));
+    }
+
     protected long insert(String sql, Object... args) {
         var key = new GeneratedKeyHolder();
         jdbc.update(connection -> {

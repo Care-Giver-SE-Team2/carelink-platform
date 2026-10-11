@@ -69,10 +69,14 @@ class VisitRepositoryAdapter
                 VisitJpaEntity.Status.SCHEDULED, from, until).stream().map(VisitMapper::toDomain).toList();
     }
 
+    /**
+     * Flushed, so the visit returned carries its new version: visit's events name the version the
+     * change produced (VisitEvents).
+     */
     @Override
     public Visit save(Visit visit) {
         return VisitMapper.toDomain(
-                jpa.save(
+                jpa.saveAndFlush(
                         VisitMapper.toEntity(visit)
                 )
         );

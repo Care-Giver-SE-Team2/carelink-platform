@@ -123,8 +123,9 @@ class VisitRepositoryAdapterTest {
 
         entity.setId(7L);
 
+        // Flushed, so the visit comes back with the version the change gave it
         when(
-                jpa.save(
+                jpa.saveAndFlush(
                         any(
                                 VisitJpaEntity.class
                         )

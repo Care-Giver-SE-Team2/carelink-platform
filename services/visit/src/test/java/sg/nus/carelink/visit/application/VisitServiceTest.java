@@ -33,6 +33,7 @@ class VisitServiceTest {
     private InMemoryVisitRepository visits;
     private InMemoryElderConfirmationRepository confirmations;
     private ElderServiceDisputes incidents;
+    private RecordingVisitEvents events;
     private VisitService service;
 
     @BeforeEach
@@ -46,11 +47,20 @@ class VisitServiceTest {
         incidents =
                 mock(ElderServiceDisputes.class);
 
+        // The dispute's incident, as core answers it
+        org.mockito.Mockito.when(incidents.createElderServiceDispute(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(601L);
+
+        events =
+                new RecordingVisitEvents();
+
         service =
                 new VisitService(
                         visits,
                         confirmations,
                         incidents,
+                        events,
                         Clock.fixed(
                                 NOW,
                                 ZONE
@@ -249,6 +259,11 @@ class VisitServiceTest {
         verifyNoInteractions(
                 incidents
         );
+
+        assertThat(events.published())
+                .singleElement()
+                .extracting(RecordingVisitEvents.Published::event, RecordingVisitEvents.Published::why)
+                .containsExactly("ElderConfirmationSubmitted", "CONFIRMED");
     }
 
     @Test
@@ -272,6 +287,11 @@ class VisitServiceTest {
                         (byte) 2,
                         "Caregiver left early."
                 );
+
+        assertThat(events.published())
+                .singleElement()
+                .extracting(RecordingVisitEvents.Published::why)
+                .isEqualTo("DISPUTED #" + 601L);
 
         assertThat(saved.confirmationStatus())
                 .isEqualTo(

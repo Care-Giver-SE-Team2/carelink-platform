@@ -54,6 +54,16 @@ class CaregiverHealthWorkflowIT extends CaregiverHealthITSupport {
             assertThat(a.read(path(id)).toString()).doesNotContain("recordedByUserId", "payloadHash");
             assertThat(familyBrowser.read("/api/visits/" + id).toString()).doesNotContain("healthNote", "Synthetic caregiver observation");
             assertThat(familyBrowser.read("/api/visits/" + id + "/timeline").size()).isEqualTo(2);
+            // Two sets of readings, two events; the replay and the refused change sent none
+            assertThat(eventsOf(id)).containsExactly("VisitScheduled v0", "VisitCheckedIn v1", "VitalsRecorded", "VitalsRecorded");
+            var vitals = json.readTree(jdbc.queryForObject("""
+                    select payload from outbox_event where source = 'visit' and type = 'VitalsRecorded'
+                    and json_value(payload, '$.healthRecordId' returning signed) = ?
+                    """, String.class, recordId));
+            assertThat(vitals.path("healthFlag").asString()).isEqualTo("ATTENTION");
+            assertThat(vitals.path("readings").size()).isEqualTo(4);
+            assertThat(vitals.path("readings").findValuesAsString("value")).allMatch(value -> value.matches("\\d+\\.\\d{2}"));
+            assertThat(vitals.path("readings").findValues("outOfRange")).allMatch(flag -> !flag.asBoolean());
         }
     }
 

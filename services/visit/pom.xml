@@ -67,6 +67,17 @@
 			<artifactId>visit-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<!-- Events between services: visit publishes what happens to a visit (docs/platform/event-catalogue.md) -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>event-types</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>events</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- Each scheduled job runs on one replica at a time (visit/infrastructure/config/SchedulerLocks) -->
 		<dependency>
 			<groupId>net.javacrumbs.shedlock</groupId>

@@ -21,11 +21,13 @@ public class CaregiverHealthService {
     private final VisitRepository visits;
     private final HealthRecordRepository records;
     private final CaregiverWorkDirectory directory;
+    private final VisitEvents events;
 
     public CaregiverHealthService(CaregiverCommandExecutor executor, CaregiverCommandStore receipts,
-            VisitCommandRepository commands, VisitRepository visits, HealthRecordRepository records, CaregiverWorkDirectory directory) {
+            VisitCommandRepository commands, VisitRepository visits, HealthRecordRepository records, CaregiverWorkDirectory directory,
+            VisitEvents events) {
         this.executor = executor; this.receipts = receipts; this.commands = commands;
-        this.visits = visits; this.records = records; this.directory = directory;
+        this.visits = visits; this.records = records; this.directory = directory; this.events = events;
     }
 
     public Saved record(String username, Long visitId, Integer version, UUID key, HealthMeasurement input) {
@@ -45,6 +47,7 @@ public class CaregiverHealthService {
             var now = executor.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
             var saved = records.save(new HealthRecord(null, visitId, input.healthFlag(), input.healthNote(), now, input.readings()), actor.userId());
             var changed = commands.save(observed);
+            events.vitalsRecorded(saved, changed);
             receipts.audit(actor.userId(), visitId, ACTION, "OK", "SAVED");
             receipts.save(new CaregiverCommandReceipt(actor.userId(), key, ACTION, visitId, hash, saved.id(), changed.version(), now));
             return new Saved(saved, changed.version(), false);

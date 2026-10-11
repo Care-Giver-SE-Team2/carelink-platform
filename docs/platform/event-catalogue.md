@@ -61,22 +61,40 @@ Each event is listed with its publisher, its trigger, its handler, and when it g
 | **draft** | Fields still to be agreed. |
 | **reserved** | No code produces this fact yet. |
 
-**Visit's events.** visit publishes these. visit runs on its own now; its events are the next step, before the
-schema split.
+**Visit's events.** visit publishes these, each in the transaction of the change (`VisitEvents`, adapter
+`OutboxVisitEvents` in `visit/infrastructure/events`). One change to a visit is one event, carrying the visit's
+version after the change; the version also moves on changes that publish nothing, such as a task result or a
+missed check-in, so a consumer sees gaps, never a repeat.
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
-| `VisitScheduled` | `VisitSchedulingService.schedule`, `StandaloneVisitsService.schedule`, `VisitReassignmentService.moveTo` | A visit is created | report | with the move |
-| `VisitCaregiverChanged` | `VisitSchedulingService.schedule` (when it covers an existing visit), `VisitReassignmentService.reassign`, `markUncovered` | The visit's caregiver changes | report | with the move |
-| `VisitCancelled` | `VisitSchedulingService.cancelUntouchedFrom`, `VisitReassignmentService.callOff` | The visit becomes CANCELLED | report | with the move |
-| `VisitCheckedIn` | `CaregiverVisitExecutionService.checkIn` | A caregiver checks in, including a check-in that resumes after a missed one | report | with the move |
-| `VisitCompleted` | `CaregiverVisitExecutionService.checkOut` | The visit becomes COMPLETED | report: the weekly report and value-added settlement | with the move |
-| `VisitExceptionRaised` | `CaregiverIncidentReportingService.report`, `VisitSchedulingService.markUncoveredAsException`, `VisitReassignmentService.markUncovered` | The visit becomes EXCEPTION | report | with the move |
-| `VisitTaskRecorded` | `CaregiverVisitExecutionService.taskResult` | A task's result is recorded | report | with the move |
-| `VitalsRecorded` | `CaregiverHealthService.record` | A set of readings is recorded | report | with the move |
-| `ElderConfirmationSubmitted` | `VisitService.submitElderConfirmation` | The elder confirms or disputes a visit | report | with the move |
+| `VisitScheduled` | `VisitSchedulingService.schedule`, `StandaloneVisitsService.schedule`, `VisitReassignmentService.moveTo` | A visit is created | report | published |
+| `VisitCaregiverChanged` | `VisitSchedulingService.schedule` (when it covers an existing visit), `VisitReassignmentService.reassign` | A caregiver takes the visit over | report | published |
+| `VisitCancelled` | `VisitSchedulingService.cancelUntouchedFrom`, `VisitReassignmentService.callOff`, `moveTo` (the visit it replaces) | The visit becomes CANCELLED | report | published |
+| `VisitCheckedIn` | `CaregiverVisitExecutionService.checkIn` | A caregiver checks in, including a check-in that resumes after a missed one | report | published |
+| `VisitCompleted` | `CaregiverVisitExecutionService.checkOut` | The visit becomes COMPLETED | report: the weekly report and value-added settlement | published |
+| `VisitExceptionRaised` | `CaregiverIncidentReportingService.report`, `VisitSchedulingService.markUncoveredAsException`, `VisitReassignmentService.markUncovered` | The visit becomes EXCEPTION | report | published |
+| `VisitTaskRecorded` | `CaregiverVisitExecutionService.taskResult` | A task's result is recorded | report | published |
+| `VitalsRecorded` | `CaregiverHealthService.record` | A set of readings is recorded | report | published |
+| `ElderConfirmationSubmitted` | `VisitService.submitElderConfirmation` | The elder confirms or disputes a visit | report | published |
 | `VisitClosed` | No code sets VERIFIED or AUTO_CLOSED yet | The visit becomes VERIFIED or AUTO_CLOSED | report | reserved |
 | `VisitEvidenceUpdated` | No code writes visit evidence yet | Evidence is added or verified | report | reserved |
+
+**The state a visit event leaves.** Each event says what the visit is after it, so a consumer that keeps visits
+applies an event only when its `version` is higher than the one it holds, and needs nothing else:
+
+| Event | Status after it | Caregiver after it |
+|---|---|---|
+| `VisitScheduled` | SCHEDULED | `caregiverId` (may be null) |
+| `VisitCaregiverChanged` | SCHEDULED | `caregiverId` |
+| `VisitCancelled` | CANCELLED | `caregiverId` (unchanged by the cancellation) |
+| `VisitCheckedIn` | IN_PROGRESS | `caregiverId` |
+| `VisitCompleted` | COMPLETED | `caregiverId` |
+| `VisitExceptionRaised` | EXCEPTION | `caregiverId` (null when nobody covers it) |
+
+What never changes after `VisitScheduled` - the service, the plan and its task, the end time - comes only with
+it. When an update arrives first, keep its state and fill those fields in when `VisitScheduled` arrives, whatever
+its version.
 
 **Core's events.**
 
@@ -128,21 +146,26 @@ transaction, so every method listed publishes it.
   "previousCaregiverId": 7, "absenceId": 33, "version": 1, "changedAt": "2026-10-11T15:20:00+08:00" }
 ```
 
-`caregiverId` is null when nobody takes the visit over. `absenceId` is set when an absence caused the change.
+- After this event the visit is SCHEDULED with `caregiverId`. A visit an absence leaves with nobody is
+  `VisitExceptionRaised`, cause `ABSENCE_UNCOVERED`.
+- `previousCaregiverId` is null when the visit had nobody. `absenceId` is set when an absence caused the change.
+- `changedAt` is when visit published the change.
 
 **`VisitCancelled`**
 
 ```json
-{ "visitId": 812, "elderId": 101, "scheduledStart": "2026-10-12T09:00:00+08:00", "reason": "ABSENCE",
-  "absenceId": 33, "note": "Family skipped the visit", "version": 2, "cancelledAt": "2026-10-11T18:02:00+08:00" }
+{ "visitId": 812, "elderId": 101, "scheduledStart": "2026-10-12T09:00:00+08:00", "caregiverId": 9,
+  "reason": "ABSENCE", "absenceId": 33, "note": "Family skipped the visit", "version": 2,
+  "cancelledAt": "2026-10-11T18:02:00+08:00" }
 ```
 
 `reason` is one of:
 - `PLAN_CHANGED`: `cancelUntouchedFrom`.
-- `ABSENCE`: `callOff` with an absence.
-- `CALLED_OFF`: `callOff` without an absence, for example when an extra service is withdrawn.
+- `ABSENCE`: `callOff` or `moveTo` with an absence.
+- `CALLED_OFF`: `callOff` or `moveTo` without an absence, for example when an extra service is withdrawn.
 
-`note` is the reason text given to `callOff`.
+`note` is the reason text given to `callOff` or `moveTo`. A moved visit's new time is a new visit:
+`VisitScheduled` with `origin` `MOVED` and `movedFromVisitId`.
 
 **`VisitCheckedIn`**
 
@@ -163,12 +186,16 @@ After this event the visit is IN_PROGRESS.
 **`VisitExceptionRaised`**
 
 ```json
-{ "visitId": 812, "elderId": 101, "scheduledStart": "2026-10-12T09:00:00+08:00", "cause": "CAREGIVER_REPORT",
-  "incidentId": 601, "checkedIn": true, "version": 5 }
+{ "visitId": 812, "elderId": 101, "scheduledStart": "2026-10-12T09:00:00+08:00", "caregiverId": 9,
+  "cause": "CAREGIVER_REPORT", "absenceId": null, "incidentId": 601, "checkedIn": true, "version": 5 }
 ```
 
 - `cause` is `CAREGIVER_REPORT`, `UNCOVERED_AT_START` or `ABSENCE_UNCOVERED`.
-- `incidentId` is null when the change raised no incident in the same transaction.
+- `caregiverId` is null for `UNCOVERED_AT_START` and `ABSENCE_UNCOVERED`: nobody covers the visit.
+- `absenceId` is set for `ABSENCE_UNCOVERED`.
+- `incidentId` is the caregiver's report for `CAREGIVER_REPORT`, and null otherwise: core raises its own alert
+  for an uncovered visit.
+- A report on a visit already in EXCEPTION, or already completed, changes nothing and publishes nothing.
 
 **`VisitTaskRecorded`**
 
@@ -189,6 +216,7 @@ After this event the visit is IN_PROGRESS.
 ```
 
 - `metric` is `systolic`, `diastolic`, `pulse` or `temperature`.
+- `value` has two decimals, as `vital_sign` keeps it.
 - `outOfRange` is the stored flag. See section 6.
 - `healthFlag` is the caregiver's own judgement: `NO_CONCERN`, `ATTENTION` or `MEDICAL_REVIEW`.
 

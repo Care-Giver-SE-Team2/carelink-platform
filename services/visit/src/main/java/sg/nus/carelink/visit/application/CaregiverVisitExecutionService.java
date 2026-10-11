@@ -23,10 +23,12 @@ public class CaregiverVisitExecutionService {
     private final VisitCheckInRepository checkIns;
     private final VisitPlanReader plans;
     private final VisitExecutionPolicy policy;
+    private final VisitEvents events;
     public CaregiverVisitExecutionService(CaregiverCommandExecutor executor, CaregiverCommandStore receipts, VisitCommandRepository visits,
-            VisitTaskRepository tasks, VisitStateTransitionRepository transitions, VisitCheckInRepository checkIns, VisitPlanReader plans, VisitExecutionPolicy policy, MissedCheckInResumeService resume) {
+            VisitTaskRepository tasks, VisitStateTransitionRepository transitions, VisitCheckInRepository checkIns, VisitPlanReader plans, VisitExecutionPolicy policy, MissedCheckInResumeService resume,
+            VisitEvents events) {
         this.executor=executor;this.receipts=receipts;this.visits=visits;this.tasks=tasks;this.transitions=transitions;this.checkIns=checkIns;this.plans=plans;this.policy=policy;
-        this.resume=resume;
+        this.resume=resume;this.events=events;
     }
     public ExecutionResult checkIn(String username, Long id, Integer version, UUID key, CheckInLocation loc) {
         String hash=CommandFingerprint.of(id,version,loc.source(),loc.latitude(),loc.longitude(),loc.accuracy(),loc.note(),loc.clientCapturedAt());
@@ -44,6 +46,7 @@ public class CaregiverVisitExecutionService {
             var started=VisitStateFactory.forVisit(arrived).start(arrived);
             checkIns.save(id,actor.userId(),key,loc,now);
             var saved=visits.save(started);
+            events.checkedIn(saved,visit.status()==Visit.Status.EXCEPTION);
             transitions.save(new VisitStateTransition(null,id,visit.status().name(),Visit.Status.ARRIVED.name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));
             transitions.save(new VisitStateTransition(null,id,Visit.Status.ARRIVED.name(),Visit.Status.IN_PROGRESS.name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));
             receipts.audit(actor.userId(),id,CHECK_IN,"OK","SAVED");
@@ -82,8 +85,9 @@ public class CaregiverVisitExecutionService {
             VisitStateFactory.forVisit(visit).requireTaskResult();
             var task=tasks.findById(taskId).filter(t->Objects.equals(id,t.visitId())).orElseThrow(()->new ResourceNotFound("Task",taskId));
             var now=executor.now();
-            tasks.save(task.result(VisitTask.Status.valueOf(status),cleanOutcome,cleanNote,now));
+            var recorded=tasks.save(task.result(VisitTask.Status.valueOf(status),cleanOutcome,cleanNote,now));
             var saved=visits.save(visit);
+            events.taskRecorded(recorded,saved);
             receipts.audit(actor.userId(),id,TASK_RESULT,"OK","SAVED");
             receipts.save(new CaregiverCommandReceipt(actor.userId(),key,TASK_RESULT,id,hash,taskId,saved.version(),now));
             return new ExecutionResult(id,saved.version(),saved.status().name(),taskId,false);
@@ -102,6 +106,7 @@ public class CaregiverVisitExecutionService {
             var now=executor.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
             var completed=VisitStateFactory.forVisit(visit).checkOut(visit,now);
             var saved=visits.save(completed);
+            events.completed(saved);
             transitions.save(new VisitStateTransition(null,id,visit.status().name(),saved.status().name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));
             receipts.audit(actor.userId(),id,CHECK_OUT,"OK","SAVED");
             receipts.save(new CaregiverCommandReceipt(actor.userId(),key,CHECK_OUT,id,hash,id,saved.version(),now));
