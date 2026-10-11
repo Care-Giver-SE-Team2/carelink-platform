@@ -499,7 +499,10 @@ Until the schema split, the services share core's database and its one schema:
 - A schema change goes into core's migrations. Tell the owner of core before it is merged, so that two changes
   never take the same version number.
 
-At the split, each service gets its own schema and its own Flyway migrations.
+At the split, each service gets its own database and its own Flyway migrations
+([service-boundaries.md](service-boundaries.md), section 9). notification has: its migrations start at
+`db/migration/V1`, `OwnDatabaseForTests` builds its tests' database, and `OwnTablesTest` keeps its code to its own
+tables. visit and report follow the same way.
 
 ## 7. Scheduled jobs
 

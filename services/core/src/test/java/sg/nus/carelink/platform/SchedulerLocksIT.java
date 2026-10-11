@@ -19,6 +19,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import sg.nus.carelink.shared.config.PlatformMigrationsAutoConfiguration;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
@@ -65,7 +66,7 @@ class SchedulerLocksIT {
 	@Test
 	void theLockTableComesFromThePlatformsOwnMigrationHistory() {
 		assertThat(jdbc.queryForObject(
-				"SELECT COUNT(*) FROM " + PlatformMigrations.HISTORY_TABLE + " WHERE version = '1' AND success = 1",
+				"SELECT COUNT(*) FROM " + PlatformMigrationsAutoConfiguration.HISTORY_TABLE + " WHERE version = '1' AND success = 1",
 				Integer.class)).isEqualTo(1);
 		assertThat(jdbc.queryForObject(
 				"SELECT COUNT(*) FROM flyway_schema_history WHERE script LIKE '%shedlock%'", Integer.class)).isZero();

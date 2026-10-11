@@ -85,16 +85,14 @@
 			<artifactId>spring-boot-starter-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!-- The integration tests build core's schema from core's migrations (see src/test/resources/config) -->
+		<!-- notification migrates its own database (src/main/resources/db/migration), then the platform's tables -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-flyway</artifactId>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-mysql</artifactId>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>sg.nus</groupId>
