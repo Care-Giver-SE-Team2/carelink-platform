@@ -2,8 +2,8 @@ package sg.nus.carelink.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -12,27 +12,19 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+
+import sg.nus.carelink.testsupport.ServiceTables;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
- * No foreign key joins two services' tables. The services share one database until the schema
- * split, but each owns its tables (docs/platform/service-boundaries.md, section 1), and platform
- * migration V3 dropped the keys between them, so each service is built as it will run after the
- * split. A migration that adds such a key again, for example one an upstream sync brings in, fails
- * here: drop the key in the next platform migration. A new table counts as core's until it is added
- * to its service's list below.
+ * core's database holds core's tables only, now that each service has a database of its own
+ * (docs/platform/service-boundaries.md, section 9): platform migration V3 dropped the foreign keys
+ * between the services' tables, and V11 to V13 dropped the services' tables. A migration that brings a
+ * service's table back into core's database, or a key to a table core does not own - for example one an
+ * upstream sync brings in - fails here: put the table in its service's own migrations instead.
  */
 @SpringBootTest
 class CrossServiceForeignKeysIT {
-
-	/** The tables each service other than core owns; every other table is core's or the platform's. */
-	private static final Map<String, Set<String>> SERVICE_TABLES = Map.of(
-			"visit", Set.of("caregiver_command_receipt", "elder_confirmation", "visit", "visit_assignment",
-					"visit_check_in_record", "visit_evidence", "visit_health_record", "visit_missed_check_in_trigger",
-					"visit_state_transition", "visit_task", "vital_sign"),
-			"report", Set.of("caregiver_review", "report", "report_amendment", "report_basis", "value_added_service",
-					"value_added_service_request"),
-			"notification", Set.of("notification", "notification_subscription"));
 
 	@DynamicPropertySource
 	static void database(DynamicPropertyRegistry registry) {
@@ -43,21 +35,34 @@ class CrossServiceForeignKeysIT {
 	private JdbcTemplate jdbc;
 
 	@Test
-	void noForeignKeyJoinsTwoServicesTables() {
-		List<String> crossing = foreignKeys().stream()
-				.filter(key -> !owner(key.table()).equals(owner(key.referencedTable())))
+	void coresDatabaseHoldsNoServicesTables() {
+		Set<String> services = new HashSet<>(ServiceTables.VISIT);
+		services.addAll(ServiceTables.REPORT);
+		services.addAll(ServiceTables.NOTIFICATION);
+
+		assertThat(tables()).as("tables of visit, report and notification in core's database")
+				.doesNotContainAnyElementsOf(services);
+	}
+
+	@Test
+	void noForeignKeyLeavesCoresTables() {
+		List<String> leaving = foreignKeys().stream()
+				.filter(key -> !ServiceTables.CORE.contains(key.referencedTable()))
 				.map(key -> "%s (%s) -> %s".formatted(key.table(), key.name(), key.referencedTable()))
 				.toList();
 
-		assertThat(crossing).as("foreign keys between two services' tables").isEmpty();
+		assertThat(leaving).as("foreign keys to a table core does not own").isEmpty();
 	}
 
-	/** visit's own keys, such as a task's to its visit, went with its tables to its own database (V12). */
 	@Test
-	void theKeysWithinAServiceStay() {
+	void theKeysWithinCoreStay() {
 		assertThat(foreignKeys()).extracting(ForeignKey::name)
-				.contains("fk_incident_log_incident", "fk_roster_change_absence", "fk_report_amendment_report")
-				.doesNotContain("fk_visit_task_visit", "fk_vital_visit");
+				.contains("fk_incident_log_incident", "fk_roster_change_absence");
+	}
+
+	private List<String> tables() {
+		return jdbc.queryForList(
+				"select table_name from information_schema.tables where table_schema = database()", String.class);
 	}
 
 	private List<ForeignKey> foreignKeys() {
@@ -66,14 +71,6 @@ class CrossServiceForeignKeysIT {
 				from information_schema.referential_constraints
 				where constraint_schema = database()
 				""", (row, number) -> new ForeignKey(row.getString(1), row.getString(2), row.getString(3)));
-	}
-
-	private static String owner(String table) {
-		return SERVICE_TABLES.entrySet().stream()
-				.filter(service -> service.getValue().contains(table))
-				.map(Map.Entry::getKey)
-				.findFirst()
-				.orElse("core");
 	}
 
 	private record ForeignKey(String name, String table, String referencedTable) {
