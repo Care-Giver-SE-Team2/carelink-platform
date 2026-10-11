@@ -33,7 +33,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.JsonNode;
@@ -41,8 +40,6 @@ import tools.jackson.databind.json.JsonMapper;
 
 import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.domain.model.Report;
-import sg.nus.carelink.coreapi.CoreApi;
-import sg.nus.carelink.report.support.SeededFamilyAccess;
 import sg.nus.carelink.report.support.SignedInSessions;
 import sg.nus.carelink.testsupport.SharedMySql;
 
@@ -74,11 +71,6 @@ class FamilyReportListIT {
 	@Autowired
 	private JdbcTemplate jdbc;
 	@Autowired
-	private Clock clock;
-	/** core, which answers report's questions about family access; see SeededFamilyAccess */
-	@MockitoBean
-	private CoreApi core;
-	@Autowired
 	private ReportService reports;
 	private final JsonMapper json = JsonMapper.builder().build();
 
@@ -93,7 +85,6 @@ class FamilyReportListIT {
 
 	@BeforeEach
 	void prepareIsolatedReports() {
-		SeededFamilyAccess.answer(core, jdbc, clock);
 		jdbc.update("DELETE FROM audit_log");
 		jdbc.update("DELETE FROM report_amendment");
 		jdbc.update("DELETE FROM report");

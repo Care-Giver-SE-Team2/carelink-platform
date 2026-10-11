@@ -32,14 +32,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import sg.nus.carelink.coreapi.CoreApi;
-import sg.nus.carelink.report.support.SeededFamilyAccess;
 import sg.nus.carelink.report.support.SignedInSessions;
 import sg.nus.carelink.testsupport.SharedMySql;
 
@@ -68,11 +65,6 @@ class FamilyWeeklySummaryIT {
 	private MockMvc mvc;
 	@Autowired
 	private JdbcTemplate jdbc;
-	@Autowired
-	private Clock clock;
-	/** core, which answers report's questions about family access; see SeededFamilyAccess */
-	@MockitoBean
-	private CoreApi core;
 	private final JsonMapper json = JsonMapper.builder().build();
 
 	@TestConfiguration(proxyBeanMethods = false)
@@ -86,13 +78,12 @@ class FamilyWeeklySummaryIT {
 
 	@BeforeEach
 	void prepareIsolatedReports() {
-		SeededFamilyAccess.answer(core, jdbc, clock);
 		jdbc.update("DELETE FROM audit_log");
 		jdbc.update("DELETE FROM report_amendment");
 		jdbc.update("DELETE FROM report");
-		jdbc.update("DELETE FROM vital_sign");
-		jdbc.update("DELETE FROM visit_task");
-		jdbc.update("DELETE FROM visit");
+		jdbc.update("DELETE FROM report_vital_sign");
+		jdbc.update("DELETE FROM report_visit_task");
+		jdbc.update("DELETE FROM report_visit");
 		jdbc.update("DELETE FROM caregiver");
 		jdbc.update("DELETE FROM elder_family_binding");
 		jdbc.update("DELETE FROM elder");

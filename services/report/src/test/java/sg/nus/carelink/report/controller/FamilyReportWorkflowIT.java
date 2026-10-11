@@ -30,22 +30,19 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import sg.nus.carelink.coreapi.CoreApi;
-import sg.nus.carelink.report.support.SeededFamilyAccess;
 import sg.nus.carelink.report.support.SignedInSessions;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
  * MG07 generation to FM04 reading through report's API and isolated MySQL. Care facts and active
  * bindings are fixtures; report content is generated through the API. Each browser holds the
- * session core leaves after sign-in, and a {@code CoreApi} double answers family access from the
- * seeded bindings ({@link SeededFamilyAccess}).
+ * session core leaves after sign-in, and the core stand-in answers family access from the seeded
+ * bindings.
  *
  * <p>Signing in and out, the elder list, intake applications and the visit schedule belong to core
  * and visit, and are tested there.
@@ -70,11 +67,6 @@ class FamilyReportWorkflowIT {
 	private MockMvc mvc;
 	@Autowired
 	private JdbcTemplate jdbc;
-	@Autowired
-	private Clock clock;
-	/** core, which answers report's questions about family access */
-	@MockitoBean
-	private CoreApi core;
 	private final JsonMapper json = JsonMapper.builder().build();
 
 	@TestConfiguration(proxyBeanMethods = false)
@@ -88,10 +80,9 @@ class FamilyReportWorkflowIT {
 
 	@BeforeEach
 	void prepareIsolatedCareFacts() {
-		SeededFamilyAccess.answer(core, jdbc, clock);
-		for (String table : List.of("audit_log", "intake_application", "report_amendment", "report", "incident_log",
-				"incident", "vital_sign", "visit_task", "visit_evidence", "visit", "elder_family_binding", "elder",
-				"family_member", "caregiver", "user_role", "app_user")) {
+		for (String table : List.of("audit_log", "intake_application", "report_amendment", "report",
+				"report_incident_log", "report_incident", "report_vital_sign", "report_visit_task", "report_visit",
+				"elder_family_binding", "elder", "family_member", "caregiver", "user_role", "app_user")) {
 			jdbc.update("DELETE FROM " + table);
 		}
 		jdbc.update("""
@@ -116,19 +107,18 @@ class FamilyReportWorkflowIT {
 		visit(203, 101, "2026-09-25T09:00:00", "SCHEDULED");
 		visit(204, 102, "2026-09-22T09:00:00", "VERIFIED");
 		visit(210, 110, "2026-09-21T09:00:00", "VERIFIED");
-		jdbc.update("INSERT INTO visit_task (visit_id, name, status, caregiver_note) VALUES (201, 'Mobility', 'DONE', ?)", OBSERVATION);
-		jdbc.update("INSERT INTO visit_task (visit_id, name, status, caregiver_note) VALUES (210, 'Mobility', 'DONE', 'OTHER-FAMILY-OBSERVATION')");
-		jdbc.update("INSERT INTO vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at) VALUES (201, 'systolic', 128, 'mmHg', false, ?)", at("2026-09-21T09:10:00"));
-		jdbc.update("INSERT INTO vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at) VALUES (202, 'systolic', 142, 'mmHg', true, ?)", at("2026-09-23T09:10:00"));
+		jdbc.update("INSERT INTO report_visit_task (task_id, visit_id, elder_id, visit_scheduled_start, name, status, caregiver_note, sequence) VALUES (2011, 201, 101, ?, 'Mobility', 'DONE', ?, 1)", at("2026-09-21T09:00:00"), OBSERVATION);
+		jdbc.update("INSERT INTO report_visit_task (task_id, visit_id, elder_id, visit_scheduled_start, name, status, caregiver_note, sequence) VALUES (2101, 210, 110, ?, 'Mobility', 'DONE', 'OTHER-FAMILY-OBSERVATION', 1)", at("2026-09-21T09:00:00"));
+		jdbc.update("INSERT INTO report_vital_sign (visit_id, elder_id, visit_scheduled_start, metric, value, unit, out_of_range, recorded_at) VALUES (201, 101, ?, 'systolic', 128, 'mmHg', false, ?)", at("2026-09-21T09:00:00"), at("2026-09-21T09:10:00"));
+		jdbc.update("INSERT INTO report_vital_sign (visit_id, elder_id, visit_scheduled_start, metric, value, unit, out_of_range, recorded_at) VALUES (202, 101, ?, 'systolic', 142, 'mmHg', true, ?)", at("2026-09-23T09:00:00"), at("2026-09-23T09:10:00"));
 		jdbc.update("""
-				INSERT INTO incident (id, elder_id, reported_by_user_id, responder_user_id, source, category,
-				severity, status, description, reported_at, resolved_at)
-				VALUES (301, 101, 12, 10, 'CAREGIVER', 'FALL', 'MEDIUM', 'RESOLVED',
-				'Slipped in the bathroom, no injury.', ?, ?)
+				INSERT INTO report_incident (incident_id, elder_id, category, severity, status, description, reported_at,
+				resolved_at)
+				VALUES (301, 101, 'FALL', 'MEDIUM', 'RESOLVED', 'Slipped in the bathroom, no injury.', ?, ?)
 				""", at("2026-09-22T10:00:00"), at("2026-09-22T10:30:00"));
 		jdbc.update("""
-				INSERT INTO incident_log (incident_id, actor, action, detail, occurred_at)
-				VALUES (301, 'Manager Private (manager)', 'RESOLVED', 'INTERNAL-ONLY review', ?)
+				INSERT INTO report_incident_log (log_id, incident_id, actor, action, detail, occurred_at)
+				VALUES (3011, 301, 'Manager Private (manager)', 'RESOLVED', 'INTERNAL-ONLY review', ?)
 				""", at("2026-09-22T10:30:00"));
 	}
 
@@ -291,8 +281,9 @@ class FamilyReportWorkflowIT {
 		assertThat(response.getContentAsString()).doesNotContain("Walked two laps", "OTHER-FAMILY", "Systolic", "Slipped", "Caregiver Mei", "New elder");
 	}
 
+	/** A visit as report keeps it from visit's events. */
 	private void visit(long id, long elderId, String start, String status) {
-		jdbc.update("INSERT INTO visit (id, elder_id, caregiver_id, service_type, scheduled_start, status) VALUES (?, ?, 501, 'Personal care', ?, ?)", id, elderId, at(start), status);
+		jdbc.update("INSERT INTO report_visit (visit_id, elder_id, caregiver_id, service_type, scheduled_start, status, version) VALUES (?, ?, 501, 'Personal care', ?, ?, 4)", id, elderId, at(start), status);
 	}
 
 	private static Timestamp at(String value) {

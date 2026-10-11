@@ -93,8 +93,8 @@ call it through the same interface. [building-a-service.md](building-a-service.m
 | SQL on `app_user`, `user_role` in `JdbcRecipientDirectory` (is the account behind a session still allowed, and with which roles) | notification | `GET /internal/v1/accounts/{username}` → `{ userId, username, displayName, enabled, roles }`, or 404 |
 | SQL on `app_user`, `user_role` in `NotificationTableValueAddedManagerAlert` (every enabled manager) | report | `GET /internal/v1/accounts/with-role/{role}` → `{ userIds }` |
 | SQL on `caregiver` in `NotificationTableValueAddedNotifier` (the caregiver's account, which a message is addressed to) | report | `GET /internal/v1/caregivers/{caregiverId}/account` → `{ userId }`, or 404 |
-| SQL on `elder`, `elder_primary_caregiver`, `caregiver`, `care_plan` in `ReportFactsJdbcSource` (the elder a report describes) | report | `GET /internal/v1/elders/{elderId}/report-profile` → the profile, the primary caregiver and the latest published plan, or 404 |
-| SQL on `absence_report` in `JdbcValueAddedVisitAssignment` (is the caregiver away that day) | report | `GET /internal/v1/caregivers/{caregiverId}/on-leave?day=` → `{ onLeave }` |
+| SQL on `elder`, `elder_primary_caregiver`, `caregiver`, `care_plan` in report's facts source (the elder a report describes) | report | `GET /internal/v1/elders/{elderId}/report-profile` → the profile, the primary caregiver and the latest published plan, or 404 |
+| SQL on `absence_report` in report's value-added assignment (is the caregiver away that day) | report | `GET /internal/v1/caregivers/{caregiverId}/on-leave?day=` → `{ onLeave }` |
 | `VisitCover.options(visitId)`, `cover(…)` | report (2) | `GET /internal/v1/visits/{visitId}/cover-options`; `POST /internal/v1/visits/{visitId}/cover`. Rostering stays in core and calls visit in turn |
 
 The caller keeps the port it has today and swaps the adapter. For example, visit keeps its own `FamilyAccess`
@@ -124,7 +124,7 @@ needs against MySQL).
 | `StandaloneVisits.schedule`, `find` | report | `POST /internal/v1/visits/standalone` → `{ visitId }`; `GET /internal/v1/visits/{visitId}/state`, or 404 |
 | `VisitScheduleQuery.caregiverIdsForElder`, `hasAssignedVisit` | report | `GET /internal/v1/visits/caregivers-of-elder?elderId=`; `GET /internal/v1/visits/assigned?elderIds=&caregiverId=` → `{ assigned }` |
 | SQL on `visit` in `JdbcSpotCheckLookups` | incident | `GET /internal/v1/visits/{visitId}`; `GET /internal/v1/visits/upcoming?elderId=&from=&until=` |
-| SQL on `visit` in `JdbcValueAddedVisitAssignment` (does the caregiver have a visit at that time) | report | `GET /internal/v1/visits/caregiver-busy?caregiverId=&from=&until=` → `{ busy }`. Its times are bound the way JPA writes them, which the SQL it replaces did not do |
+| SQL on `visit` in report's value-added assignment (does the caregiver have a visit at that time) | report | `GET /internal/v1/visits/caregiver-busy?caregiverId=&from=&until=` → `{ busy }`. Its times are bound the way JPA writes them, which the SQL it replaces did not do |
 | SQL on `visit` in `NotificationTableAlert` (the elder's latest caregiver) | incident | `GET /internal/v1/visits/latest-caregiver?elderId=` → `{ caregiverId }`, or 404 |
 
 Times are ISO date-times on Singapore's wall clock, as visit stores them. Each caller keeps a port of its own and
@@ -167,8 +167,8 @@ outbox, `requested_notification` (`src/test/resources/db/platform`).
 
 | Class | Reads from other schemas | Direction of the fix |
 |---|---|---|
-| report `ReportFactsJdbcSource` | `care_plan`, `caregiver`, `elder`, `elder_confirmation`, `elder_primary_caregiver`, `incident`, `incident_log`, `roster_change`, `spot_check`, `visit`, `visit_evidence`, `visit_task`, `vital_sign` | A read model in report's schema, filled from events; the elder through `CoreApi.elderReportProfile` |
-| report `JdbcValueAddedVisitAssignment` | `absence_report`, `visit` | `CoreApi.onLeave` and `VisitApi.caregiverBusy` |
+| report `KeptFactsSource` (was `ReportFactsJdbcSource`) | none now; it read `care_plan`, `caregiver`, `elder`, `elder_confirmation`, `elder_primary_caregiver`, `incident`, `incident_log`, `roster_change`, `spot_check`, `visit`, `visit_evidence`, `visit_task`, `vital_sign` | Done: report keeps the facts in its own tables from visit's and core's events (`ReportFactHandlers`, `JdbcKeptFacts`), and asks core for the elder (`CoreApi.elderReportProfile`) and the caregivers' names |
+| report `ApiValueAddedVisitAssignment` (was `JdbcValueAddedVisitAssignment`) | none now; it read `absence_report`, `visit` | Done: `CoreApi.onLeave` and `VisitApi.caregiverBusy` |
 | report `NotificationRequestedValueAddedManagerAlert` | none now; it reads `app_user`, `user_role`, `elder` and `caregiver` through `CoreApi` | Done |
 | report `NotificationRequestedValueAddedNotifier` | none now; the caregiver's account through `CoreApi.caregiverAccount`, the names through `CoreApi` | Done |
 | notification `JdbcNotificationInbox` | none now | Done: each message keeps the elder its event names (`notification.elder_id`), and the family rule takes the elders `CoreApi.readableElders` answers |
@@ -178,7 +178,8 @@ outbox, `requested_notification` (`src/test/resources/db/platform`).
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
 service keeps its own `audit_log` in its own schema.
 
-The schema split comes after these reads are gone. Until then the four parts share one schema.
+No service reads or writes another's tables now, so the schema split can follow. Until then the four parts
+share one schema.
 
 ## 6. Tables the platform adds
 
@@ -200,8 +201,10 @@ platform migration takes the next free version, listed here.
 | V6 | `value_added_service_request.family_reminded_at` | report | core | A request's one reminder, noted on the request; it was read from `notification` |
 | V7 | `notification.elder_id` | notification | core | The elder a message is about, as its event names it, for the family rule; filled once for the messages kept before |
 | V8 | `incident_request` | core | core | Which incident each keyed request from visit raised, so a retry gets the same one (section 7) |
+| V9 | `report_visit`, `report_visit_task`, `report_vital_sign`, `report_elder_confirmation`, `report_incident`, `report_incident_log`, `report_spot_check`, `report_roster_change` | report | core | The facts a report is made from, kept from visit's and core's events (event catalogue, section 5) |
+| V10 | none: fills V9's tables once from the shared tables | report | core | The first deployment's copy. It is safe to run again, and is run again after loading demonstration data into the shared tables |
 
-The next platform migration is V9. Until the schema split, the services share one schema, so the two events
+The next platform migration is V11. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
 
 ## 7. What the move changes: commands visit and core share

@@ -2,7 +2,7 @@
 
 This catalogue lists the events the services publish to each other: what each event carries and who handles it.
 
-Version 1 was worked out from what report reads from other modules' tables today (`ReportFactsJdbcSource` and
+Version 1 was worked out from what report read from other modules' tables (`ReportFactsJdbcSource` and
 three smaller classes, see [service-boundaries.md](service-boundaries.md), section 5.2). It also covers the two
 events that notification and the report worker need.
 
@@ -310,11 +310,12 @@ EventBridge Scheduler puts the envelope on report's queue directly.
 
 ## 5. What report keeps
 
-- **Tables.** report keeps one table per kind of fact.
+- **Tables.** report keeps one table per kind of fact (platform migration V9: `report_visit`, `report_visit_task`, `report_vital_sign`, `report_elder_confirmation`, `report_incident`, `report_incident_log`, `report_spot_check`, `report_roster_change`). `ReportFactHandlers` hands each event to `JdbcKeptFacts`; `KeptFactsSource` reads the week back.
   - It inserts or updates each row by the id it came with.
   - It ignores an update that is older than the row, by the event's ordering field.
+  - An update that arrives before the event that creates the record is kept; what only the creating event carries (a visit's service and end, an incident's category, description and report time) is filled in when that event arrives. An incident is in no week until `IncidentRaised` has said when it was reported.
 - **Filed reports never change.** Facts that arrive later reach readers through amendments, as today.
-- **First deployment.** Fill the tables once from the current data. While the schema is still shared, this is a one-off copy from the tables report reads today.
+- **First deployment.** Fill the tables once from the current data. While the schema is still shared, this is a one-off copy from the tables report read until then (platform migration V10). Each copied row takes the ordering field an event is compared with, so an event still on its way that is older than the copy changes nothing. Loading demonstration data straight into the shared tables needs the copy again: run V10's file after it.
 - **When to generate.** Generate after the week has ended, leaving room for late check-outs and late events: Monday 02:00 Singapore time.
 
 **Which week a fact belongs to.** A week runs from Monday 00:00 to the next Monday 00:00, Singapore time. The start
@@ -335,5 +336,5 @@ catalogue already reserves the events they will need.
 
 - **Nothing sets a visit to VERIFIED or AUTO_CLOSED.** So every week with a completed visit is marked incomplete (`data_complete`). `VisitClosed` is reserved for this.
 - **Readings are stored with `out_of_range = false`.** The caregiver's own judgement is the health record's flag. `VitalsRecorded` carries both, so report can follow whichever rule the owners decide.
-- **Nothing writes visit evidence.** So evidence counts are 0. `VisitEvidenceUpdated` is reserved for this.
-- **The value-added availability check is 8 hours off.** It binds `LocalDateTime` straight into SQL, while visit times are written through JPA, so the overlap check is 8 hours off in a JVM running on UTC. This goes away when the check becomes the calls in section 4.
+- **Nothing writes visit evidence.** So evidence counts are 0, except what the first deployment copied. `VisitEvidenceUpdated` is reserved for this.
+- **The value-added availability check was 8 hours off.** It bound `LocalDateTime` straight into SQL, while visit times are written through JPA, so the overlap check was 8 hours off in a JVM running on UTC. It is the calls in section 4 now, and visit binds the times the way it writes them.
