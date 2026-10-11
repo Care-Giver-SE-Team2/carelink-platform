@@ -14,7 +14,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionOperations;
 
+import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.profile.application.FamilyAccessQuery;
 import sg.nus.carelink.profile.application.RosteringProfiles;
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
@@ -22,6 +24,8 @@ import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidate;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidateCheck;
 import sg.nus.carelink.rostering.domain.model.RosteringConstraint;
+import sg.nus.carelink.rostering.domain.model.VisitChangeRetries;
+import sg.nus.carelink.rostering.domain.model.VisitChangeStep;
 import sg.nus.carelink.rostering.domain.repository.AbsenceAlert;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
 import sg.nus.carelink.rostering.domain.repository.RosterAudit;
@@ -30,6 +34,7 @@ import sg.nus.carelink.rostering.domain.repository.RosterChangeRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringCandidateCheckRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringCandidateRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringConstraintRepository;
+import sg.nus.carelink.rostering.domain.repository.VisitChangeStepRepository;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
@@ -41,6 +46,16 @@ import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 final class ReRosteringFakes {
 
 	private ReRosteringFakes() {
+	}
+
+	/**
+	 * The re-rostering saga on the in-memory ports, with no transactions: every step is made as soon as
+	 * the decision that records it returns.
+	 */
+	static VisitChangeSaga saga(Steps steps, VisitReassignment visits, IncidentService incidents, Alerts alerts,
+			Profiles profiles, java.time.Clock clock) {
+		return new VisitChangeSaga(steps, visits, incidents, alerts, profiles, TransactionOperations.withoutTransaction(),
+				VisitChangeRetries.DEFAULT, clock);
 	}
 
 	static final class Absences implements AbsenceReportRepository {
@@ -157,6 +172,14 @@ final class ReRosteringFakes {
 							.thenComparing(c -> c.optionRank() == null ? Integer.MAX_VALUE : c.optionRank()))
 					.toList();
 		}
+
+		@Override
+		public void moveToVisit(Long runId, Long fromVisitId, Long toVisitId) {
+			rows.replaceAll((id, c) -> c.rosteringRunId().equals(runId) && c.visitId().equals(fromVisitId)
+					? new RosteringCandidate(c.id(), c.rosteringRunId(), toVisitId, c.caregiverId(), c.optionRank(),
+							c.score(), c.outcome(), c.excludedByCode(), c.matchReason())
+					: c);
+		}
 	}
 
 	static final class Checks implements RosteringCandidateCheckRepository {
@@ -267,7 +290,7 @@ final class ReRosteringFakes {
 		}
 
 		@Override
-		public void reassign(Long visitId, Long toCaregiverId, Change why) {
+		public void reassign(Long visitId, Long toCaregiverId, Change why, String requestKey) {
 			VisitSlot v = requireOpen(visitId);
 			rows.put(visitId, new VisitSlot(visitId, v.elderId(), toCaregiverId, v.carePlanId(), v.serviceType(),
 					v.start(), v.end(), "SCHEDULED", why.absenceId()));
@@ -275,7 +298,7 @@ final class ReRosteringFakes {
 		}
 
 		@Override
-		public void markUncovered(Long visitId, Change why) {
+		public void markUncovered(Long visitId, Change why, String requestKey) {
 			VisitSlot v = rows.get(visitId);
 			if (!"SCHEDULED".equals(v.status())) {
 				throw new BusinessRuleViolation("VISIT_NOT_OPEN", "not open");
@@ -286,7 +309,7 @@ final class ReRosteringFakes {
 		}
 
 		@Override
-		public void callOff(Long visitId, Change why) {
+		public void callOff(Long visitId, Change why, String requestKey) {
 			VisitSlot v = requireOpen(visitId);
 			rows.put(visitId, new VisitSlot(visitId, v.elderId(), v.caregiverId(), v.carePlanId(), v.serviceType(),
 					v.start(), v.end(), "CANCELLED", why.absenceId()));
@@ -294,9 +317,9 @@ final class ReRosteringFakes {
 		}
 
 		@Override
-		public Long moveTo(Long visitId, LocalDateTime newStart, Long toCaregiverId, Change why) {
+		public Long moveTo(Long visitId, LocalDateTime newStart, Long toCaregiverId, Change why, String requestKey) {
 			VisitSlot v = requireOpen(visitId);
-			callOff(visitId, why);
+			callOff(visitId, why, requestKey);
 			Long id = nextId++;
 			rows.put(id, new VisitSlot(id, v.elderId(), toCaregiverId, v.carePlanId(), v.serviceType(), newStart,
 					newStart.plus(java.time.Duration.between(v.start().atZone(SINGAPORE), v.end().atZone(SINGAPORE))),
@@ -389,9 +412,62 @@ final class ReRosteringFakes {
 			record("settled " + change.outcome(), change, notice);
 		}
 
+		@Override
+		public void notMade(VisitChangeStep step, Notice notice) {
+			sent.add("not made visit " + step.visit().visitId() + " for user " + step.decision().decidedByUserId());
+			notices.add(notice);
+		}
+
 		private void record(String what, RosterChange change, Notice notice) {
 			sent.add(what + " visit " + change.visitId());
 			notices.add(notice);
+		}
+	}
+
+	/** visit_change_step in a map: a step moves on only from the state it was read in, as the table's update has it. */
+	static final class Steps implements VisitChangeStepRepository {
+
+		final Map<Long, VisitChangeStep> rows = new LinkedHashMap<>();
+		private long nextId = 1;
+
+		@Override
+		public VisitChangeStep add(VisitChangeStep step) {
+			VisitChangeStep stored = new VisitChangeStep(nextId++, step.absenceId(), step.rosterChangeId(), step.visit(),
+					step.request(), step.decision(), step.requestKey(), step.status(), step.attempts(), step.nextTryAt(),
+					step.lastError(), step.resultVisitId(), step.incidentId(), step.createdAt(), step.updatedAt());
+			rows.put(stored.id(), stored);
+			return stored;
+		}
+
+		@Override
+		public Optional<VisitChangeStep> findById(Long id) {
+			return Optional.ofNullable(rows.get(id));
+		}
+
+		@Override
+		public boolean advance(VisitChangeStep from, VisitChangeStep to) {
+			VisitChangeStep now = rows.get(from.id());
+			if (now == null || now.status() != from.status() || now.attempts() != from.attempts()) {
+				return false;
+			}
+			rows.put(from.id(), to);
+			return true;
+		}
+
+		@Override
+		public List<VisitChangeStep> findHoldingByAbsenceId(Long absenceId) {
+			return rows.values().stream().filter(s -> s.absenceId().equals(absenceId) && s.holdsVisit()).toList();
+		}
+
+		@Override
+		public List<VisitChangeStep> findDue(LocalDateTime now, int limit) {
+			return rows.values().stream().filter(s -> s.isPending() && !s.nextTryAt().isAfter(now)).limit(limit)
+					.toList();
+		}
+
+		@Override
+		public List<VisitChangeStep> findGivenUpWithoutIncident(int limit) {
+			return rows.values().stream().filter(s -> s.isAbandoned() && s.incidentId() == null).limit(limit).toList();
 		}
 	}
 

@@ -18,4 +18,10 @@ public interface RosteringCandidateRepository {
 
 	/** Everybody one run considered for one visit: suggestions by rank, then the excluded. */
 	List<RosteringCandidate> findByRunAndVisit(Long rosteringRunId, Long visitId);
+
+	/**
+	 * Files a run's candidates for one visit under another: a move's search is made for the visit before
+	 * it moves, and belongs to the visit that replaces it once visit has made that one.
+	 */
+	void moveToVisit(Long rosteringRunId, Long fromVisitId, Long toVisitId);
 }

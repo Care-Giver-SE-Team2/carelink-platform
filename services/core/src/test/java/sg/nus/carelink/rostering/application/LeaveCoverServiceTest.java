@@ -1,6 +1,7 @@
 package sg.nus.carelink.rostering.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -13,7 +14,10 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import sg.nus.carelink.identity.application.UserDirectory;
+import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.profile.application.CredentialRegister;
+import sg.nus.carelink.rostering.domain.model.FamilyResponseWindow;
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
 import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidate;
@@ -45,6 +49,8 @@ class LeaveCoverServiceTest {
 	private final ReRosteringFakes.Profiles profiles = new ReRosteringFakes.Profiles();
 	private final ReRosteringFakes.Alerts alerts = new ReRosteringFakes.Alerts();
 	private final ReRosteringFakes.Audit audit = new ReRosteringFakes.Audit();
+	private final ReRosteringFakes.Steps steps = new ReRosteringFakes.Steps();
+	private final IncidentService incidents = mock(IncidentService.class);
 	private final List<CredentialRegister.Cover> covers = new ArrayList<>();
 
 	private LeaveCoverService service;
@@ -64,8 +70,12 @@ class LeaveCoverServiceTest {
 
 		RosterSnapshotLoader loader = new RosterSnapshotLoader(profiles, () -> covers,
 				planIds -> Map.of(4L, Set.of(2L)), absences, visits, since -> Map.of(), RosterLookbacks.DEFAULT, clock);
-		service = new LeaveCoverService(absences, changes, runs, candidates, checks, constraints, loader, visits,
-				profiles, alerts, audit, clock);
+		VisitChangeSaga saga = ReRosteringFakes.saga(steps, visits, incidents, alerts, profiles, clock);
+		AbsenceReRosteringService settling = new AbsenceReRosteringService(absences, changes, runs, candidates, checks,
+				constraints, loader, visits, profiles, incidents, new ReRosteringFakes.Family(), mock(UserDirectory.class),
+				alerts, audit, FamilyResponseWindow.DEFAULT, saga, clock);
+		service = new LeaveCoverService(absences, changes, runs, candidates, checks, constraints, loader, visits, saga,
+				settling, clock);
 		absenceId = absences.save(AbsenceReport.recordedByManager(5L, AbsenceReport.Type.SICK, FIRST_DAY,
 				FIRST_DAY.plusDays(1), "flu", 11L, NOW.toLocalDate())).id();
 	}

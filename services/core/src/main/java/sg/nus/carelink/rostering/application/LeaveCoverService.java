@@ -3,6 +3,7 @@ package sg.nus.carelink.rostering.application;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -10,17 +11,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
-import sg.nus.carelink.profile.application.RosteringProfiles;
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
 import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.RosteringRun;
 import sg.nus.carelink.rostering.domain.model.VacatedSlot;
+import sg.nus.carelink.rostering.domain.model.VisitChangeStep;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
-import sg.nus.carelink.rostering.domain.repository.RosterAudit;
-import sg.nus.carelink.rostering.domain.repository.RosterChangeAlert;
 import sg.nus.carelink.rostering.domain.repository.RosterChangeRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringCandidateCheckRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringCandidateRepository;
@@ -49,9 +46,13 @@ import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
  * and its own repositories, so the absence still accounts for every visit it vacated: a run
  * with its candidates and rule results, and a change settled by the default plan. The family
  * is told who is coming.
+ *
+ * <p>It is a step of the re-rostering saga ({@link VisitChangeSaga}), like every UC-MG04 change: the
+ * move is decided and written down, visit is asked once that has committed, and the change is recorded
+ * and the family told only once visit has made it, the way {@link AbsenceReRosteringService} settles a
+ * replacement by the default plan.
  */
 @Service
-@Transactional
 public class LeaveCoverService {
 
 	private final AbsenceReportRepository absences;
@@ -60,26 +61,24 @@ public class LeaveCoverService {
 	private final ReplacementSearchRecord search;
 	private final RosterSnapshotLoader snapshots;
 	private final VisitReassignment visits;
-	private final RosteringProfiles profiles;
-	private final RosterChangeAlert alert;
-	private final RosterAudit audit;
+	private final VisitChangeSaga saga;
+	private final AbsenceReRosteringService reRostering;
 	private final Clock clock;
 
 	@SuppressWarnings("java:S107") // one collaborator per table a UC-MG04 record touches, as in AbsenceReRosteringService
 	public LeaveCoverService(AbsenceReportRepository absences, RosterChangeRepository changes,
 			RosteringRunRepository runs, RosteringCandidateRepository candidates,
 			RosteringCandidateCheckRepository checks, RosteringConstraintRepository constraints,
-			RosterSnapshotLoader snapshots, VisitReassignment visits, RosteringProfiles profiles,
-			RosterChangeAlert alert, RosterAudit audit, Clock clock) {
+			RosterSnapshotLoader snapshots, VisitReassignment visits, VisitChangeSaga saga,
+			AbsenceReRosteringService reRostering, Clock clock) {
 		this.absences = absences;
 		this.changes = changes;
 		this.runs = runs;
 		this.search = new ReplacementSearchRecord(constraints, candidates, checks);
 		this.snapshots = snapshots;
 		this.visits = visits;
-		this.profiles = profiles;
-		this.alert = alert;
-		this.audit = audit;
+		this.saga = saga;
+		this.reRostering = reRostering;
 		this.clock = clock;
 	}
 
@@ -88,10 +87,14 @@ public class LeaveCoverService {
 	 * elder for that absence. Its own transaction, run after the elder's refresh has committed,
 	 * so a failure here never undoes the visits the refresh made.
 	 *
-	 * @return how many visits went to a cover
+	 * @return how many visits are going to a cover: given to them, or to be once visit answers
 	 */
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public int continueCover(Long elderId) {
+		Integer moved = saga.decideThenChange(() -> coverDecision(elderId), reRostering::settle);
+		return moved == null ? 0 : moved;
+	}
+
+	private int coverDecision(Long elderId) {
 		LocalDateTime now = LocalDateTime.now(clock);
 		int moved = 0;
 		List<AbsenceReport> stillAhead = absences.findAll(AbsenceReport.Status.APPROVED).stream()
@@ -103,7 +106,8 @@ public class LeaveCoverService {
 			if (cover.isEmpty()) {
 				continue;
 			}
-			Set<Long> handled = recorded.stream().map(RosterChange::visitId).collect(Collectors.toSet());
+			Set<Long> handled = recorded.stream().map(RosterChange::visitId).collect(Collectors.toCollection(HashSet::new));
+			handled.addAll(saga.heldVisits(absence.id()));
 			List<VacatedSlot> slots = Vacancies.notYetRerostered(visits, absence, handled, now).stream()
 					.filter(visit -> visit.elderId().equals(elderId))
 					.map(visit -> new VacatedSlot(visit.visitId(), visit.elderId(), visit.carePlanId(),
@@ -148,22 +152,14 @@ public class LeaveCoverService {
 			Long candidateId = candidateIds.get(coverId);
 			String why = "%s already covers this elder during the leave, so the new visit went to them too"
 					.formatted(verdict.get().name());
-			visits.reassign(slot.visitId(), coverId, new VisitReassignment.Change(absence.id(), null, candidateId,
-					"Default plan (absence %d): %s".formatted(absence.id(), why)));
-			search.select(candidateId);
-			RosterChange settled = changes.save(RosterChange.offered(absence.id(), slot, run.id(), coverId, now, now)
-					.replacedBy(coverId, run.id(), RosterChange.DecidedBy.DEFAULT_PLAN, null, why, now));
-			alert.settled(settled, new RosterChangeAlert.Notice(elderName(slot.elderId()), verdict.get().name(), coverId,
-					null, why));
-			audit.defaultPlanApplied(settled, "%s; caregiver %d assigned to visit %d".formatted(why, coverId,
-					slot.visitId()));
+			// The change is recorded, and the family told, once visit has given them the visit
+			saga.recordStep(absence.id(), null, slot, VisitChangeStep.Request.reassign(coverId, null, candidateId,
+					"Default plan (absence %d): %s".formatted(absence.id(), why)),
+					new VisitChangeStep.Decision(run.id(), RosterChange.DecidedBy.DEFAULT_PLAN, null,
+							verdict.get().name(), why));
 			moved++;
 		}
 		runs.save(run.committed(slots.size(), moved, continuity, now));
 		return moved;
-	}
-
-	private String elderName(Long elderId) {
-		return profiles.elder(elderId).map(RosteringProfiles.ElderFacts::fullName).orElse(null);
 	}
 }

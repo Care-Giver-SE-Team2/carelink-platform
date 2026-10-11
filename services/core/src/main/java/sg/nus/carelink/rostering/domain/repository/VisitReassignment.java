@@ -13,6 +13,13 @@ import java.util.Optional;
  *
  * <p>Every change also writes visit_assignment, so a visit's caregivers stay on record after it
  * changes hands (DECISION 17: "accepting a candidate creates a visit_assignment").
+ *
+ * <p>The changes take a request key: visit makes a change once per key and answers the same key again
+ * with the first answer, so a change that got no answer is sent again with its key, never a new one.
+ * visit's refusal comes back as {@link sg.nus.carelink.shared.error.BusinessRuleViolation} (409, with
+ * visit's code) and a visit that does not exist as {@link sg.nus.carelink.shared.error.ResourceNotFound}
+ * (404); anything else - no connection, no answer in time, a server error - means the change may or may
+ * not have been made.
  */
 public interface VisitReassignment {
 
@@ -27,22 +34,31 @@ public interface VisitReassignment {
 	/** Caregiver id to how many visits they finished for this elder in [since, until). */
 	Map<Long, Integer> finishedVisitsWith(Long elderId, LocalDateTime since, LocalDateTime until);
 
-	/** Gives the visit to another caregiver because of an absence. */
-	void reassign(Long visitId, Long toCaregiverId, Change why);
+	/**
+	 * Gives the visit to another caregiver because of an absence.
+	 *
+	 * @param requestKey makes the change once however often it is sent; null to make it every time
+	 */
+	void reassign(Long visitId, Long toCaregiverId, Change why, String requestKey);
+
+	/** {@link #reassign(Long, Long, Change, String)} without a key, for a caller that never sends it again. */
+	default void reassign(Long visitId, Long toCaregiverId, Change why) {
+		reassign(visitId, toCaregiverId, why, null);
+	}
 
 	/** Nobody can take the visit: it becomes an exception with nobody on it. */
-	void markUncovered(Long visitId, Change why);
+	void markUncovered(Long visitId, Change why, String requestKey);
 
 	/** Calls the visit off - the family skipped it. */
-	void callOff(Long visitId, Change why);
+	void callOff(Long visitId, Change why, String requestKey);
 
 	/**
 	 * Moves the visit: this one is called off and a new one is created at {@code newStart}, same
 	 * length, with {@code toCaregiverId} on it.
 	 *
-	 * @return the new visit's id
+	 * @return the new visit's id; the same one every time the move is sent with the same key
 	 */
-	Long moveTo(Long visitId, LocalDateTime newStart, Long toCaregiverId, Change why);
+	Long moveTo(Long visitId, LocalDateTime newStart, Long toCaregiverId, Change why, String requestKey);
 
 	/**
 	 * A visit as re-rostering sees it.

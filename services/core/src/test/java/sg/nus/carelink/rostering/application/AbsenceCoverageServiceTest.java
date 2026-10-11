@@ -67,6 +67,18 @@ class AbsenceCoverageServiceTest {
 	}
 
 	@Test
+	void visitsHeldByAChangeVisitHasNotMadeYetDoNotReopenTheAbsence() {
+		AbsenceReport leave = confirmedLeave(TODAY.plusDays(3), TODAY.plusDays(20));
+		visits.add(2L, 7L, 5L, TODAY.plusDays(16).atTime(9, 0), 60);
+		when(reRostering.reroster(leave.id(), null, null))
+				.thenReturn(new AbsenceReRosteringService.ReRosterOutcome(leave.id(), null, 0, 0, 0, 0));
+
+		assertThat(service.rerosterAddedVisits(leave.id())).isFalse();
+		assertThat(absences.findById(leave.id()).orElseThrow().isCoverageConfirmed()).isTrue();
+		assertThat(told).isEmpty();
+	}
+
+	@Test
 	void onlyConfirmedApprovedAbsencesNotYetOverAreRechecked() {
 		AbsenceReport confirmed = confirmedLeave(TODAY.plusDays(3), TODAY.plusDays(20));
 		absences.save(AbsenceReport.recordedByManager(5L, null, TODAY.plusDays(30), TODAY.plusDays(31), null, 11L,

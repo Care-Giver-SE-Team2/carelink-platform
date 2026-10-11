@@ -62,18 +62,20 @@ class VisitApiRosteringAdaptersTest {
 	}
 
 	@Test
-	void rosteringsChangesReachVisitAsAsked() {
+	void rosteringsChangesReachVisitAsAskedWithTheirRequestKeys() {
 		when(visit.moveTo(eq(812L), any(), any())).thenReturn(new VisitApi.VisitRef(900L));
 
-		reassignment.reassign(812L, 9L, WHY);
-		reassignment.markUncovered(813L, WHY);
-		reassignment.callOff(814L, WHY);
-		Long moved = reassignment.moveTo(812L, NINE, 9L, WHY);
+		reassignment.reassign(812L, 9L, WHY, "step-1");
+		reassignment.markUncovered(813L, WHY, "step-2");
+		reassignment.callOff(814L, WHY, "step-3");
+		Long moved = reassignment.moveTo(812L, NINE, 9L, WHY, "step-4");
+		reassignment.reassign(815L, 9L, WHY);
 
-		verify(visit).reassign(812L, new VisitApi.Reassignment(9L, VISITS_WHY), null);
-		verify(visit).markUncovered(813L, VISITS_WHY, null);
-		verify(visit).callOff(814L, VISITS_WHY, null);
-		verify(visit).moveTo(812L, new VisitApi.Move(NINE, 9L, VISITS_WHY), null);
+		verify(visit).reassign(812L, new VisitApi.Reassignment(9L, VISITS_WHY), "step-1");
+		verify(visit).markUncovered(813L, VISITS_WHY, "step-2");
+		verify(visit).callOff(814L, VISITS_WHY, "step-3");
+		verify(visit).moveTo(812L, new VisitApi.Move(NINE, 9L, VISITS_WHY), "step-4");
+		verify(visit).reassign(815L, new VisitApi.Reassignment(9L, VISITS_WHY), null);
 		assertThat(moved).isEqualTo(900L);
 	}
 
@@ -87,10 +89,10 @@ class VisitApiRosteringAdaptersTest {
 				.isInstanceOf(BusinessRuleViolation.class)
 				.hasMessage("The visit has started.")
 				.extracting(error -> ((BusinessRuleViolation) error).code()).isEqualTo("VISIT_NOT_OPEN");
-		assertThatThrownBy(() -> reassignment.callOff(999L, WHY))
+		assertThatThrownBy(() -> reassignment.callOff(999L, WHY, "step-5"))
 				.isInstanceOf(ResourceNotFound.class)
 				.hasMessage("Visit [999] does not exist");
-		assertThatThrownBy(() -> reassignment.moveTo(998L, NINE, 9L, WHY)).isInstanceOf(ResourceNotFound.class);
+		assertThatThrownBy(() -> reassignment.moveTo(998L, NINE, 9L, WHY, "step-6")).isInstanceOf(ResourceNotFound.class);
 	}
 
 	@Test
