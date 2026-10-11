@@ -215,9 +215,12 @@ class FamilyIncidentObserverIT {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = {"notification", "family_alert_window", "family_alert_delivery"})
+	@ValueSource(strings = {"outbox_event", "family_alert_window", "family_alert_delivery"})
 	void oneRecipientFailureRollsBackItsWholeDeliveryAndCanRetryWithoutDuplicatingOthers(String table) {
-		String condition = table.equals("notification") ? "NEW.recipient_user_id = 9" : "NEW.family_member_id = 7";
+		// The message is an event: Family B's fails as its outbox write
+		String condition = table.equals("outbox_event")
+				? "NEW.type = 'NotificationRequested' AND JSON_VALUE(NEW.payload, '$.recipientUserId' RETURNING SIGNED) = 9"
+				: "NEW.family_member_id = 7";
 		String operation = table.equals("family_alert_delivery") ? "UPDATE" : "INSERT";
 		if (table.equals("family_alert_delivery")) { condition += " AND NEW.status = 'CREATED'"; }
 		jdbc.execute("CREATE TRIGGER fm05_reject BEFORE " + operation + " ON " + table + " FOR EACH ROW BEGIN IF " + condition

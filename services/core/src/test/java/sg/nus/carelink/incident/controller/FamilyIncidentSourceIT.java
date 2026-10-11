@@ -100,9 +100,12 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
         assertThat(count("family_alert_event")).isEqualTo(2);
     }
 
-    @ParameterizedTest @ValueSource(strings = {"notification", "family_alert_event"})
+    @ParameterizedTest @ValueSource(strings = {"outbox_event", "family_alert_event"})
     void observerStorageFailureDoesNotTurnCommittedReportIntoFailedResponse(String table) {
-        String condition = table.equals("notification") ? "NEW.recipient_user_id=" + family : "NEW.elder_id=" + elder;
+        // The family's message is an event: it fails as its outbox write
+        String condition = table.equals("outbox_event")
+                ? "NEW.type='NotificationRequested' AND JSON_VALUE(NEW.payload, '$.recipientUserId' RETURNING SIGNED)=" + family
+                : "NEW.elder_id=" + elder;
         jdbc.execute("CREATE TRIGGER fm05_source_fault BEFORE INSERT ON " + table + " FOR EACH ROW BEGIN IF "
                 + condition + " THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Forced family storage failure'; END IF; END");
         try {
@@ -111,7 +114,7 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE resource_id=? AND recipient_user_id=?", Long.class, id, manager)).isGreaterThan(0);
             assertThat(familyMessages()).isZero();
             assertThat(count("family_alert_window")).isZero();
-            if (table.equals("notification")) {
+            if (table.equals("outbox_event")) {
                 assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event WHERE incident_id=?", String.class, id)).isEqualTo("FAILED");
                 assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, id)).isEqualTo("FAILED");
             }
