@@ -55,9 +55,9 @@ class NotificationInboxIT {
 	void staffReadOnlyTheirOwnMessagesDeliveredOnAskingAndOpeningThemIsRemembered() throws Exception {
 		long alice = account("it-inbox-alice", "MANAGER");
 		long ben = account("it-inbox-ben", "MANAGER");
-		long older = write(alice, "Older", NINE, null, null);
-		long newer = write(alice, "Newer", NINE.plusHours(1), null, null);
-		long bens = write(ben, "Not Alice's", NINE.plusHours(2), null, null);
+		long older = write(alice, "Older", NINE, null, null, null);
+		long newer = write(alice, "Newer", NINE.plusHours(1), null, null, null);
+		long bens = write(ben, "Not Alice's", NINE.plusHours(2), null, null, null);
 
 		String inbox = read("it-inbox-alice", "MANAGER", "/api/notifications/me");
 		assertThat(JsonPath.<List<String>>read(inbox, "$.items[*].title")).containsExactly("Newer", "Older");
@@ -90,8 +90,8 @@ class NotificationInboxIT {
 		long fiona = account("it-inbox-fiona", "FAMILY");
 		long elder = elder();
 		long binding = bind(elder, familyMember(fiona));
-		long aboutElder = write(fiona, "About the elder", NINE, "SPOT_CHECK", spotCheck(elder));
-		write(fiona, "About the account", NINE.plusHours(1), null, null);
+		long aboutElder = write(fiona, "About the elder", NINE, "SPOT_CHECK", 44L, elder);
+		write(fiona, "About the account", NINE.plusHours(1), null, null, null);
 
 		String bound = read("it-inbox-fiona", "FAMILY", "/api/notifications/me");
 		assertThat(JsonPath.<List<String>>read(bound, "$.items[*].title"))
@@ -113,14 +113,15 @@ class NotificationInboxIT {
 	}
 
 	@Test
-	void aMessageAboutACarePlanIsAboutThePlansElder() throws Exception {
+	void aMessageAboutCareThatNamesNoElderIsShownToNoFamily() throws Exception {
 		long faye = account("it-inbox-faye", "FAMILY");
 		long elder = elder();
 		bind(elder, familyMember(faye));
-		write(faye, "Care plan v1 is ready", NINE, "CARE_PLAN", carePlan(elder));
+		write(faye, "Care plan v1 is ready", NINE, "CARE_PLAN", 45L, elder);
+		write(faye, "About an elder nobody named", NINE.plusHours(1), "CARE_PLAN", 46L, null);
 
 		String inbox = read("it-inbox-faye", "FAMILY", "/api/notifications/me");
-		assertThat(JsonPath.<String>read(inbox, "$.items[0].title")).isEqualTo("Care plan v1 is ready");
+		assertThat(JsonPath.<List<String>>read(inbox, "$.items[*].title")).containsExactly("Care plan v1 is ready");
 		assertThat(JsonPath.<Integer>read(inbox, "$.items[0].elderId")).isEqualTo((int) elder);
 	}
 
@@ -164,21 +165,12 @@ class NotificationInboxIT {
 				Long.class, elderId, familyMemberId);
 	}
 
-	private long spotCheck(long elderId) {
-		jdbc.update("insert into spot_check (elder_id, proposed_time, reason) values (?, ?, 'Routine')", elderId,
-				Timestamp.valueOf(NINE.plusDays(3)));
-		return jdbc.queryForObject("select max(id) from spot_check where elder_id = ?", Long.class, elderId);
-	}
-
-	private long carePlan(long elderId) {
-		jdbc.update("insert into care_plan (elder_id, status) values (?, 'PUBLISHED')", elderId);
-		return jdbc.queryForObject("select max(id) from care_plan where elder_id = ?", Long.class, elderId);
-	}
-
-	private long write(long recipient, String title, LocalDateTime at, String resourceType, Long resourceId) {
+	/** A message as the event that asked for it describes it: what it links to, and the elder it is about. */
+	private long write(long recipient, String title, LocalDateTime at, String resourceType, Long resourceId,
+			Long elderId) {
 		jdbc.update("insert into notification (recipient_user_id, event_type, channel, title, body, resource_type, "
-				+ "resource_id, status, created_at) values (?, 'TEST_EVENT', 'IN_APP', ?, 'body', ?, ?, 'PENDING', ?)",
-				recipient, title, resourceType, resourceId, Timestamp.valueOf(at));
+				+ "resource_id, elder_id, status, created_at) values (?, 'TEST_EVENT', 'IN_APP', ?, 'body', ?, ?, ?, 'PENDING', ?)",
+				recipient, title, resourceType, resourceId, elderId, Timestamp.valueOf(at));
 		return jdbc.queryForObject("select max(id) from notification where recipient_user_id = ?", Long.class,
 				recipient);
 	}

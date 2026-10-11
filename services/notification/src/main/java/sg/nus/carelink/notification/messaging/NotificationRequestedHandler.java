@@ -39,7 +39,7 @@ class NotificationRequestedHandler implements EventHandler<NotificationRequested
 	@Override
 	public void handle(NotificationRequested event, EventMetadata metadata) {
 		requests.keep(event.recipientUserId(), event.kind(), Notification.Channel.valueOf(event.channel()),
-				event.title(), event.body(), event.resourceType(), event.resourceId(),
+				event.title(), event.body(), event.resourceType(), event.resourceId(), event.elderId(),
 				SingaporeTime.local(event.requestedAt()));
 	}
 

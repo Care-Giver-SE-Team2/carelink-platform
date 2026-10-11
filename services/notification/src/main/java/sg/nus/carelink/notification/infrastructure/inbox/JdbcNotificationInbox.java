@@ -6,6 +6,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
@@ -16,51 +17,39 @@ import sg.nus.carelink.notification.domain.model.Notification;
 import sg.nus.carelink.notification.domain.repository.NotificationInbox;
 
 /**
- * The inbox in SQL. It reads tables other modules own - incident, roster_change, spot_check,
- * value_added_service_request and care_plan for the elder a message is about, elder_family_binding and
- * family_member for the family rule - with plain statements, the way every notifier finds its
- * recipients, so this module needs none of their code.
+ * The inbox in SQL, on notification's own table only. A message about care carries the elder it is
+ * about, as the event that asked for it named the elder, and the family rule takes the elders core
+ * says the reader may read now ({@link InboxReader#readableElders()}).
  *
- * <p>Times are bound and read as {@link Timestamp}, the way the notifiers write them and JPA
- * writes the bindings, so the connection's time-zone conversion is the same on both sides.
+ * <p>Times are bound and read as {@link Timestamp}, the way the messages were written, so the
+ * connection's time-zone conversion is the same on both sides.
  */
 @Component
 class JdbcNotificationInbox implements NotificationInbox {
 
 	private static final String COLUMNS = """
 			select n.id, n.recipient_user_id, n.event_type, n.channel, n.title, n.body, n.resource_type,
-			       n.resource_id, n.status, n.created_at, n.sent_at, n.read_at,
-			       coalesce(i.elder_id, rc.elder_id, sc.elder_id, vasr.elder_id, cp.elder_id) as elder_id
+			       n.resource_id, n.elder_id, n.status, n.created_at, n.sent_at, n.read_at
 			""";
 
-	/** The reader's own in-app messages in the asked statuses, with what each links to. */
+	/** The reader's own in-app messages in the asked statuses. */
 	private static final String FROM = """
 			from notification n
-			left join incident i on n.resource_type = 'INCIDENT' and i.id = n.resource_id
-			left join roster_change rc on n.resource_type = 'ROSTER_CHANGE' and rc.id = n.resource_id
-			left join spot_check sc on n.resource_type = 'SPOT_CHECK' and sc.id = n.resource_id
-			left join value_added_service_request vasr on n.resource_type = 'VALUE_ADDED_REQUEST' and vasr.id = n.resource_id
-			left join care_plan cp on n.resource_type = 'CARE_PLAN' and cp.id = n.resource_id
 			where n.recipient_user_id = :userId
 			  and n.channel = 'IN_APP'
 			  and n.status in (:statuses)
 			""";
 
 	/**
-	 * The family rule. A message about a care record is shown while the reader is bound to its
-	 * elder - ACTIVE and not expired - and not otherwise; one whose elder cannot be found is not
-	 * shown at all. Only a message with neither resource type nor resource ID is account-only;
-	 * unknown resource types must not bypass the care-content authorization rule.
+	 * The family rule. A message about a care record is shown while the reader may read its elder,
+	 * and not otherwise; one that names no elder is not shown at all. Only a message with neither
+	 * resource type nor resource ID is account-only; unknown resource types must not bypass the
+	 * care-content authorization rule.
 	 */
 	private static final String FAMILY_SCOPE = """
 			  and ((n.resource_type is null and n.resource_id is null)
 			       or (n.resource_type in ('INCIDENT', 'ROSTER_CHANGE', 'SPOT_CHECK', 'VALUE_ADDED_REQUEST', 'CARE_PLAN')
-			           and exists (select 1 from elder_family_binding b
-			                  join family_member f on f.id = b.family_member_id
-			                  where f.user_id = :userId
-			                    and b.elder_id = coalesce(i.elder_id, rc.elder_id, sc.elder_id, vasr.elder_id, cp.elder_id)
-			                    and b.status = 'ACTIVE'
-			                    and (b.expires_at is null or b.expires_at > :now))))
+			           and n.elder_id in (:elders)))
 			""";
 
 	private static final String NEWEST_FIRST = " order by n.created_at desc, n.id desc limit :size offset :offset";
@@ -74,19 +63,10 @@ class JdbcNotificationInbox implements NotificationInbox {
 	private static final String FIND_FAMILY = COLUMNS + FROM + FAMILY_SCOPE + ONE;
 
 	private static final String DELIVER = """
-			update notification set status = 'SENT', sent_at = :now
-			where recipient_user_id = :userId and channel = 'IN_APP' and status = 'PENDING'
-			""";
-	private static final String DELIVER_FAMILY = """
-			update notification n
-			left join incident i on n.resource_type = 'INCIDENT' and i.id = n.resource_id
-			left join roster_change rc on n.resource_type = 'ROSTER_CHANGE' and rc.id = n.resource_id
-			left join spot_check sc on n.resource_type = 'SPOT_CHECK' and sc.id = n.resource_id
-			left join value_added_service_request vasr on n.resource_type = 'VALUE_ADDED_REQUEST' and vasr.id = n.resource_id
-			left join care_plan cp on n.resource_type = 'CARE_PLAN' and cp.id = n.resource_id
-			set n.status = 'SENT', n.sent_at = :now
+			update notification n set n.status = 'SENT', n.sent_at = :now
 			where n.recipient_user_id = :userId and n.channel = 'IN_APP' and n.status = 'PENDING'
-			""" + FAMILY_SCOPE;
+			""";
+	private static final String DELIVER_FAMILY = DELIVER + FAMILY_SCOPE;
 
 	private static final String MARK_READ = """
 			update notification set status = 'READ', read_at = :now where id = :id and status = 'SENT'
@@ -96,17 +76,10 @@ class JdbcNotificationInbox implements NotificationInbox {
 			update notification n set n.status = 'READ', n.read_at = :now
 			where n.recipient_user_id = :userId and n.channel = 'IN_APP' and n.status = 'SENT'
 			""";
+	private static final String MARK_ALL_FAMILY = MARK_ALL_OWN + FAMILY_SCOPE;
 
-	private static final String MARK_ALL_FAMILY = """
-			update notification n
-			left join incident i on n.resource_type = 'INCIDENT' and i.id = n.resource_id
-			left join roster_change rc on n.resource_type = 'ROSTER_CHANGE' and rc.id = n.resource_id
-			left join spot_check sc on n.resource_type = 'SPOT_CHECK' and sc.id = n.resource_id
-			left join value_added_service_request vasr on n.resource_type = 'VALUE_ADDED_REQUEST' and vasr.id = n.resource_id
-			left join care_plan cp on n.resource_type = 'CARE_PLAN' and cp.id = n.resource_id
-			set n.status = 'READ', n.read_at = :now
-			where n.recipient_user_id = :userId and n.channel = 'IN_APP' and n.status = 'SENT'
-			""" + FAMILY_SCOPE;
+	/** No elder has this id: an IN list must not be empty, and a reader who may read no elder sees none. */
+	private static final List<Long> NO_ELDER = List.of(-1L);
 
 	private static final List<String> DISPLAYABLE = Notification.DISPLAYABLE.stream().map(Enum::name).sorted().toList();
 
@@ -118,16 +91,14 @@ class JdbcNotificationInbox implements NotificationInbox {
 
 	@Override
 	public int deliverPending(InboxReader reader, LocalDateTime now) {
-		return jdbc.sql(reader.family() ? DELIVER_FAMILY : DELIVER)
-				.param("userId", reader.userId()).param("now", Timestamp.valueOf(now)).update();
+		return scoped(reader, DELIVER_FAMILY, DELIVER)
+				.param("now", Timestamp.valueOf(now)).update();
 	}
 
 	@Override
 	public List<InboxItem> page(InboxReader reader, Notification.Status status, int page, int size, LocalDateTime now) {
-		return jdbc.sql(reader.family() ? PAGE_FAMILY : PAGE_OWN)
-				.param("userId", reader.userId())
+		return scoped(reader, PAGE_FAMILY, PAGE_OWN)
 				.param("statuses", statuses(status))
-				.param("now", Timestamp.valueOf(now))
 				.param("size", size)
 				.param("offset", (long) page * size)
 				.query(JdbcNotificationInbox::item)
@@ -136,10 +107,8 @@ class JdbcNotificationInbox implements NotificationInbox {
 
 	@Override
 	public long count(InboxReader reader, Notification.Status status, LocalDateTime now) {
-		Long count = jdbc.sql(reader.family() ? COUNT_FAMILY : COUNT_OWN)
-				.param("userId", reader.userId())
+		Long count = scoped(reader, COUNT_FAMILY, COUNT_OWN)
 				.param("statuses", statuses(status))
-				.param("now", Timestamp.valueOf(now))
 				.query(Long.class)
 				.single();
 		return count == null ? 0 : count;
@@ -147,10 +116,8 @@ class JdbcNotificationInbox implements NotificationInbox {
 
 	@Override
 	public Optional<InboxItem> find(InboxReader reader, Long id, LocalDateTime now) {
-		return jdbc.sql(reader.family() ? FIND_FAMILY : FIND_OWN)
-				.param("userId", reader.userId())
+		return scoped(reader, FIND_FAMILY, FIND_OWN)
 				.param("statuses", DISPLAYABLE)
-				.param("now", Timestamp.valueOf(now))
 				.param("id", id)
 				.query(JdbcNotificationInbox::item)
 				.optional();
@@ -163,10 +130,19 @@ class JdbcNotificationInbox implements NotificationInbox {
 
 	@Override
 	public int markAllRead(InboxReader reader, LocalDateTime now) {
-		return jdbc.sql(reader.family() ? MARK_ALL_FAMILY : MARK_ALL_OWN)
-				.param("userId", reader.userId())
+		return scoped(reader, MARK_ALL_FAMILY, MARK_ALL_OWN)
 				.param("now", Timestamp.valueOf(now))
 				.update();
+	}
+
+	/** The family statement with the elders the reader may read, or the reader's own. */
+	private JdbcClient.StatementSpec scoped(InboxReader reader, String family, String own) {
+		if (!reader.family()) {
+			return jdbc.sql(own).param("userId", reader.userId());
+		}
+		Set<Long> elders = reader.readableElders();
+		return jdbc.sql(family).param("userId", reader.userId())
+				.param("elders", elders.isEmpty() ? NO_ELDER : List.copyOf(elders));
 	}
 
 	private static List<String> statuses(Notification.Status status) {
@@ -174,12 +150,13 @@ class JdbcNotificationInbox implements NotificationInbox {
 	}
 
 	private static InboxItem item(ResultSet rs, int row) throws SQLException {
+		Long elderId = nullableLong(rs, "elder_id");
 		Notification notification = new Notification(rs.getLong("id"), rs.getLong("recipient_user_id"),
 				rs.getString("event_type"), Notification.Channel.valueOf(rs.getString("channel")), rs.getString("title"),
-				rs.getString("body"), rs.getString("resource_type"), nullableLong(rs, "resource_id"),
+				rs.getString("body"), rs.getString("resource_type"), nullableLong(rs, "resource_id"), elderId,
 				Notification.Status.valueOf(rs.getString("status")), time(rs, "created_at"), time(rs, "sent_at"),
 				time(rs, "read_at"));
-		return new InboxItem(notification, nullableLong(rs, "elder_id"));
+		return new InboxItem(notification, elderId);
 	}
 
 	private static Long nullableLong(ResultSet rs, String column) throws SQLException {

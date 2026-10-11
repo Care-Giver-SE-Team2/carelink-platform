@@ -20,7 +20,7 @@ class NotificationRequestsTest {
 	@Test
 	void aRequestedMessageWaitsPendingForItsRecipient() {
 		Notification kept = requests.keep(7L, "CREDENTIAL_EXPIRED", Notification.Channel.IN_APP,
-				"Your First aid certificate expired", "Upload the renewed certificate.", "CREDENTIAL", 8732L, NINE);
+				"Your First aid certificate expired", "Upload the renewed certificate.", "CREDENTIAL", 8732L, null, NINE);
 
 		assertThat(kept.id()).isNotNull();
 		assertThat(notifications.findById(kept.id())).contains(kept);
@@ -32,20 +32,30 @@ class NotificationRequestsTest {
 
 	@Test
 	void anAccountOnlyMessageLinksToNothing() {
-		Notification kept = requests.keep(7L, "WELCOME", Notification.Channel.IN_APP, "Welcome", null, null, null, NINE);
+		Notification kept = requests.keep(7L, "WELCOME", Notification.Channel.IN_APP, "Welcome", null, null, null, null,
+				NINE);
 
 		assertThat(kept.resourceType()).isNull();
 		assertThat(kept.resourceId()).isNull();
+		assertThat(kept.elderId()).isNull();
+	}
+
+	@Test
+	void aMessageAboutCareKeepsItsElder() {
+		Notification kept = requests.keep(9L, "SPOT_CHECK_REQUESTED", Notification.Channel.IN_APP, "May a manager watch?",
+				null, "SPOT_CHECK", 44L, 101L, NINE);
+
+		assertThat(notifications.findById(kept.id()).orElseThrow().elderId()).isEqualTo(101L);
 	}
 
 	@Test
 	void aMessageNeedsARecipientAKindAndATitle() {
 		assertThatThrownBy(() -> Notification.requested(null, "WELCOME", Notification.Channel.IN_APP, "Welcome", null,
-				null, null, NINE)).isInstanceOf(NullPointerException.class).hasMessageContaining("recipientUserId");
+				null, null, null, NINE)).isInstanceOf(NullPointerException.class).hasMessageContaining("recipientUserId");
 		assertThatThrownBy(() -> Notification.requested(7L, null, Notification.Channel.IN_APP, "Welcome", null, null,
-				null, NINE)).isInstanceOf(NullPointerException.class).hasMessageContaining("eventType");
+				null, null, NINE)).isInstanceOf(NullPointerException.class).hasMessageContaining("eventType");
 		assertThatThrownBy(() -> Notification.requested(7L, "WELCOME", Notification.Channel.IN_APP, null, null, null,
-				null, NINE)).isInstanceOf(NullPointerException.class).hasMessageContaining("title");
+				null, null, NINE)).isInstanceOf(NullPointerException.class).hasMessageContaining("title");
 	}
 
 }

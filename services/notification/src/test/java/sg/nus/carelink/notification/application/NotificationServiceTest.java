@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -33,7 +34,7 @@ class NotificationServiceTest {
 	private static final Long FIONA = 2L;
 	private static final Long ALICE = 11L;
 	private static final Long GRACE = 7L;
-	private static final Map<String, InboxReader> ACCOUNTS = Map.of("fiona", new InboxReader(FIONA, true), "alice", new InboxReader(ALICE, false));
+	private static final Map<String, InboxReader> ACCOUNTS = Map.of("fiona", InboxReader.family(FIONA, Set.of()), "alice", InboxReader.own(ALICE));
 
 	private final InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
 	private final InMemoryNotificationInbox inbox = new InMemoryNotificationInbox();
@@ -45,7 +46,7 @@ class NotificationServiceTest {
 	@Test
 	void findsWhatWasSaved() {
 		Notification saved = repository.save(new Notification(null, FIONA, "X", Notification.Channel.IN_APP, "title",
-				null, null, null, Notification.Status.PENDING, NOW, null, null));
+				null, null, null, null, Notification.Status.PENDING, NOW, null, null));
 
 		assertThat(service.findNotification(saved.id())).contains(saved);
 		assertThat(service.findNotification(999L)).isEmpty();

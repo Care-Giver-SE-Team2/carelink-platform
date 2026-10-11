@@ -65,6 +65,10 @@ public class NotificationJpaEntity {
 	@Column(name = "resource_id")
 	private Long resourceId;
 
+	/** the elder a message about care is about; the family rule checks it */
+	@Column(name = "elder_id")
+	private Long elderId;
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false)
 	private Status status = Status.PENDING;
@@ -144,6 +148,14 @@ public class NotificationJpaEntity {
 
 	public void setResourceId(Long resourceId) {
 		this.resourceId = resourceId;
+	}
+
+	public Long getElderId() {
+		return elderId;
+	}
+
+	public void setElderId(Long elderId) {
+		this.elderId = elderId;
 	}
 
 	public Status getStatus() {

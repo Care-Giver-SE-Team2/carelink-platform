@@ -370,11 +370,11 @@ at risk, and the bookings belong to visit. Rostering asks for them through a por
 
 **Testing.** In the service's own tests, the client gives way to a double. For a few answers, a mock with stubs:
 report's tests use `@MockitoBean CoreApi core`. For many, a stand-in that answers the way the other service does:
-core's tests meet `VisitStandIn`, and visit's tests meet `CoreStandIn`, which reads the people and plans the tests
-lay out in core's tables and keeps the incidents visit raises. A stand-in is a bean in a configuration class under
-`testsupport`, which component scanning finds, so it replaces the client in every test that starts the
-application; a `TestExecutionListener` registered in `src/test/resources/META-INF/spring.factories` empties it
-before each test. The contract itself is tested where the API is served (`CoreApiContractTest`,
+core's tests meet `VisitStandIn`, and visit's and notification's tests meet `CoreStandIn` (`libs/test-support`),
+which reads the accounts, families and plans the tests lay out in core's tables and keeps the incidents a service
+raises. A stand-in is a bean in a configuration class under `testsupport`, which component scanning finds, so it
+replaces the client in every test that starts the application; where a stand-in keeps state, a
+`TestExecutionListener` registered in `src/test/resources/META-INF/spring.factories` empties it before each test. The contract itself is tested where the API is served (`CoreApiContractTest`,
 `VisitApiContractTest`).
 
 **A new endpoint** is one change in core: the method in `CoreApi`, the controller method in core, and a case in

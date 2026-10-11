@@ -24,9 +24,9 @@ import sg.nus.carelink.coreapi.CoreNotFound;
 import sg.nus.carelink.coreapi.CoreRuleViolation;
 
 /**
- * core, as visit's tests meet it: the internal API core serves, answered the way core answers it. The
- * tests lay out people, families and plans in core's tables, which their database has because it is
- * built from core's migrations, and the stand-in reads them there with the rules of core's services
+ * core, as a service's tests meet it: the internal API core serves, answered the way core answers it.
+ * The tests lay out people, families and plans in core's tables, which their database has because it
+ * is built from core's migrations, and the stand-in reads them there with the rules of core's services
  * (FamilyAccessQueryService, CaregiverDirectoryService, CaregiverWorkDirectoryService,
  * VisitPlanReaderService). Its refusals are the client's exceptions (AccessDeniedException,
  * CoreNotFound, CoreRuleViolation), so visit's adapters translate them as they do in a real run.
@@ -34,11 +34,13 @@ import sg.nus.carelink.coreapi.CoreRuleViolation;
  * <p>What visit asks core to raise - a caregiver's report, a missed check-in, a service dispute -
  * the stand-in keeps in memory, as core's incident record would; a test reads it with
  * {@link #incidentsOf} and moves it on with {@link #resolve}. Credential alerts are core's policy, so
- * the stand-in answers none unless a test gives it some ({@link #alerts}). Every visit test that
- * starts the application has it in place of the HTTP client (CoreStandInConfiguration), and every
- * test starts with no incidents and no alerts (CoreStandInReset).
+ * the stand-in answers none unless a test gives it some ({@link #alerts}). A service puts it in place
+ * of the HTTP client in its tests with a configuration class of its own, which component scanning
+ * finds (visit's and notification's {@code testsupport.CoreStandInConfiguration}); {@link #clear}
+ * empties it between tests.
  *
- * <p>What visit never asks of core (the report service's and rostering's questions) is not here.
+ * <p>The calls only report makes (cover options, leave, the report profile, primary caregivers,
+ * alert recipients) are not answered here: report's tests stub {@code CoreApi} themselves.
  */
 public class CoreStandIn implements CoreApi {
 
@@ -212,7 +214,7 @@ public class CoreStandIn implements CoreApi {
 
 	@Override
 	public AccountRef caregiverAccount(Long caregiverId) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	@Override
@@ -256,22 +258,22 @@ public class CoreStandIn implements CoreApi {
 
 	@Override
 	public List<Long> familyMemberIds(Long elderId) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	@Override
 	public AlertRecipient alertRecipient(Long elderId, Long familyMemberId) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	@Override
 	public CaregiverRef primaryCaregiver(Long elderId) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	@Override
 	public ElderReportProfile elderReportProfile(Long elderId) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	// ---------- Care plans ----------
@@ -347,21 +349,21 @@ public class CoreStandIn implements CoreApi {
 				&& related.getFirst().reportedByUserId() == null);
 	}
 
-	// ---------- Rostering (asked by the report service, never by visit) ----------
+	// ---------- Rostering (asked by the report service) ----------
 
 	@Override
 	public List<CoverOption> coverOptions(Long visitId) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	@Override
 	public void cover(Long visitId, CoverRequest request) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	@Override
 	public OnLeave onLeave(Long caregiverId, LocalDate day) {
-		throw notAskedByVisit();
+		throw notAnswered();
 	}
 
 	// ---------- How core answers ----------
@@ -430,8 +432,8 @@ public class CoreStandIn implements CoreApi {
 		return LocalDateTime.now(clock.withZone(SINGAPORE));
 	}
 
-	private static UnsupportedOperationException notAskedByVisit() {
-		return new UnsupportedOperationException("visit never asks core this");
+	private static UnsupportedOperationException notAnswered() {
+		return new UnsupportedOperationException("The core stand-in does not answer this; stub CoreApi in the test");
 	}
 
 	private record Binding(long elderId, String scope, String status, LocalDateTime expiresAt) {

@@ -55,6 +55,12 @@
 			<artifactId>platform-security</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<!-- Who reads the inbox, and which elders a family member may read: core's internal API -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>core-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- The events notification handles, as the records their publishers write -->
 		<dependency>
 			<groupId>sg.nus</groupId>

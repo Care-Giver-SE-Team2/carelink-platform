@@ -171,8 +171,8 @@ outbox, `requested_notification` (`src/test/resources/db/platform`).
 | report `JdbcValueAddedVisitAssignment` | `absence_report`, `visit` | `CoreApi.onLeave` and `VisitApi.caregiverBusy` |
 | report `NotificationRequestedValueAddedManagerAlert` | none now; it reads `app_user`, `user_role`, `elder` and `caregiver` through `CoreApi` | Done |
 | report `NotificationRequestedValueAddedNotifier` | none now; the caregiver's account through `CoreApi.caregiverAccount`, the names through `CoreApi` | Done |
-| notification `JdbcNotificationInbox` | `care_plan`, `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification; the family rule asks `CoreApi.readableElders` |
-| notification `JdbcRecipientDirectory` | `app_user`, `user_role` | `CoreApi.account` |
+| notification `JdbcNotificationInbox` | none now | Done: each message keeps the elder its event names (`notification.elder_id`), and the family rule takes the elders `CoreApi.readableElders` answers |
+| notification `JdbcRecipientDirectory` | none now | Done: `CoreRecipientDirectory` asks `CoreApi.findAccount` |
 | incident `JdbcSpotCheckLookups` | none now | Done: the time of the last ask is on the spot check, and the visits are calls to visit (section 4) |
 
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
@@ -198,8 +198,9 @@ platform migration takes the next free version, listed here.
 | V4 | `family_alert_window.first_notification_id` may be empty | core | core | A family member's FM05 message is an event, so core has no row id to keep |
 | V5 | `spot_check.family_asked_at` | core | core | When the family was last asked, for the reminders; it was read from `notification` |
 | V6 | `value_added_service_request.family_reminded_at` | report | core | A request's one reminder, noted on the request; it was read from `notification` |
+| V7 | `notification.elder_id` | notification | core | The elder a message is about, as its event names it, for the family rule; filled once for the messages kept before |
 
-The next platform migration is V7. Until the schema split, the services share one schema, so the two events
+The next platform migration is V8. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
 
 ## 7. What the move changes: commands visit and core share
