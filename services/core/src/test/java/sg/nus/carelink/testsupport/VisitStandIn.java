@@ -1,5 +1,6 @@
 package sg.nus.carelink.testsupport;
 
+import java.net.SocketTimeoutException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -8,16 +9,21 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 import sg.nus.carelink.visitapi.VisitApi;
 import sg.nus.carelink.visitapi.VisitNotFound;
 import sg.nus.carelink.visitapi.VisitRuleViolation;
@@ -32,6 +38,10 @@ import sg.nus.carelink.visitapi.VisitRuleViolation;
  * <p>A test lays out the visits it needs with {@link #add}, and sees what core made of them through
  * {@link #current}, {@link #ofElder} and {@link #askedOf}. Calls come from the test, from the server's
  * threads and from the schedulers, so every method holds the stand-in's lock.
+ *
+ * <p>Like visit, it makes a change sent with a request key once, and answers the key again with the first
+ * answer. A test of the re-rostering saga can have visit fail the changes core asks for
+ * ({@link #failChanges}); otherwise it never fails one, and core's tests see visit as it always was.
  */
 public class VisitStandIn implements VisitApi {
 
@@ -53,6 +63,19 @@ public class VisitStandIn implements VisitApi {
 	private final Map<Long, Held> visits = new LinkedHashMap<>();
 
 	private final List<Asked> asked = new ArrayList<>();
+
+	/** Each keyed change visit has made, by key: what it answered (a move's new visit, or nothing). */
+	private final Map<String, Long> answered = new HashMap<>();
+
+	private final List<Sent> sent = new ArrayList<>();
+
+	private final List<PlannedFault> faults = new ArrayList<>();
+
+	/** How many changes core has asked for since the last {@link #clear}, each try counted. */
+	private int changesAsked;
+
+	/** Down altogether: every call fails, reads as well as changes. */
+	private boolean unreachable;
 
 	/** Ids well clear of the ones MySQL hands out, so a visit id that core took from its own tables stands out. */
 	private long lastId = 900_000;
@@ -125,6 +148,31 @@ public class VisitStandIn implements VisitApi {
 	public record Asked(String what, Long visitId, Long toCaregiverId, VisitApi.Change why) {
 	}
 
+	/** How visit can fail a change core asks it for. */
+	public enum Fault {
+
+		/** visit cannot be reached: the connection is refused, and nothing changes. */
+		UNAVAILABLE,
+
+		/** visit answers 503: nothing changes. */
+		SERVER_ERROR,
+
+		/** visit makes the change, and its answer is lost: core's read times out. */
+		TIMED_OUT_AFTER_CHANGE,
+
+		/** visit refuses the change (409), as it does a visit that has started or been called off. */
+		REFUSED,
+
+		/** visit answers 404, as it does a visit that does not exist. */
+		MISSING
+	}
+
+	private record PlannedFault(Fault fault, int from, int until) {
+	}
+
+	private record Sent(Long visitId, String requestKey) {
+	}
+
 	// ---------- What a test does ----------
 
 	/** Lays out a visit and answers its id: the one it carries, or a new one. */
@@ -151,6 +199,24 @@ public class VisitStandIn implements VisitApi {
 	}
 
 	/**
+	 * The {@code times} changes core asks for, starting with the {@code from}-th from now (1 is the next
+	 * one), fail with {@code fault}. Every try counts, retries included.
+	 */
+	public synchronized void failChanges(Fault fault, int from, int times) {
+		faults.add(new PlannedFault(fault, changesAsked + from, changesAsked + from + times));
+	}
+
+	/** visit goes down altogether ({@code true}), or comes back: while down every call fails, reads too. */
+	public synchronized void unreachable(boolean down) {
+		unreachable = down;
+	}
+
+	/** The request key each change core asked for the visit came with, each try, in order. */
+	public synchronized List<String> requestKeysOf(Long visitId) {
+		return sent.stream().filter(each -> each.visitId().equals(visitId)).map(Sent::requestKey).toList();
+	}
+
+	/**
 	 * Takes over the visits that demonstration data laid out in visit's database on the same server
 	 * (VisitDatabaseForDemoData), which the stand-in does not hold yet, so a test that loads a demo
 	 * script sees its visits the way core sees visit's.
@@ -170,27 +236,35 @@ public class VisitStandIn implements VisitApi {
 				});
 	}
 
-	/** Forgets every visit and every request: each test starts with none. */
+	/** Forgets every visit, every request and every fault: each test starts with none. */
 	public synchronized void clear() {
 		visits.clear();
 		asked.clear();
+		answered.clear();
+		sent.clear();
+		faults.clear();
+		changesAsked = 0;
+		unreachable = false;
 	}
 
 	// ---------- Reassignment ----------
 
 	@Override
 	public synchronized VisitSlot visit(Long visitId) {
+		reach();
 		return slot(require(visitId));
 	}
 
 	@Override
 	public synchronized List<VisitSlot> unstartedFor(Long caregiverId, LocalDateTime from, LocalDateTime until) {
+		reach();
 		return select(visit -> caregiverId.equals(visit.caregiverId()) && visit.startsIn(from, until)
 				&& visit.notStarted()).map(VisitStandIn::slot).toList();
 	}
 
 	@Override
 	public synchronized List<Booking> bookingsBetween(LocalDateTime from, LocalDateTime until) {
+		reach();
 		return select(visit -> visit.startsIn(from, until) && visit.caregiverId() != null
 				&& BOOKED.contains(visit.status()))
 				.map(visit -> new Booking(visit.id(), visit.elderId(), visit.caregiverId(), visit.start(), visit.end()))
@@ -199,6 +273,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized Map<Long, Integer> finishedVisitsWith(Long elderId, LocalDateTime since, LocalDateTime until) {
+		reach();
 		return select(visit -> visit.startsIn(since, until) && elderId.equals(visit.elderId())
 				&& visit.caregiverId() != null && FINISHED.contains(visit.status()))
 				.collect(Collectors.groupingBy(Held::caregiverId, Collectors.summingInt(visit -> 1)));
@@ -206,48 +281,114 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized void reassign(Long visitId, Reassignment reassignment, String requestKey) {
-		Held visit = requireOpen(visitId, "change hands");
-		Objects.requireNonNull(reassignment.toCaregiverId(), "toCaregiverId");
-		keep(visit.forAbsence(reassignment.toCaregiverId(), "SCHEDULED", reassignment.why().absenceId()));
-		asked.add(new Asked("REASSIGN", visitId, reassignment.toCaregiverId(), reassignment.why()));
+		change(visitId, requestKey, () -> {
+			Held visit = requireOpen(visitId, "change hands");
+			Objects.requireNonNull(reassignment.toCaregiverId(), "toCaregiverId");
+			keep(visit.forAbsence(reassignment.toCaregiverId(), "SCHEDULED", reassignment.why().absenceId()));
+			asked.add(new Asked("REASSIGN", visitId, reassignment.toCaregiverId(), reassignment.why()));
+			return null;
+		});
 	}
 
 	@Override
 	public synchronized void markUncovered(Long visitId, Change why, String requestKey) {
-		Held visit = require(visitId);
-		if (!visit.notStarted()) {
-			throw notOpen(visit, "be left uncovered");
-		}
-		keep(visit.forAbsence(null, "EXCEPTION", why.absenceId()));
-		asked.add(new Asked("UNCOVERED", visitId, null, why));
+		change(visitId, requestKey, () -> {
+			Held visit = require(visitId);
+			if (!visit.notStarted()) {
+				throw notOpen(visit, "be left uncovered");
+			}
+			keep(visit.forAbsence(null, "EXCEPTION", why.absenceId()));
+			asked.add(new Asked("UNCOVERED", visitId, null, why));
+			return null;
+		});
 	}
 
 	@Override
 	public synchronized void callOff(Long visitId, Change why, String requestKey) {
-		Held visit = requireOpen(visitId, "be called off");
-		keep(visit.forAbsence(visit.caregiverId(), "CANCELLED", why.absenceId()));
-		asked.add(new Asked("CALL_OFF", visitId, null, why));
+		change(visitId, requestKey, () -> {
+			Held visit = requireOpen(visitId, "be called off");
+			keep(visit.forAbsence(visit.caregiverId(), "CANCELLED", why.absenceId()));
+			asked.add(new Asked("CALL_OFF", visitId, null, why));
+			return null;
+		});
 	}
 
 	@Override
 	public synchronized VisitRef moveTo(Long visitId, Move move, String requestKey) {
-		Held visit = requireOpen(visitId, "be moved");
-		keep(visit.forAbsence(visit.caregiverId(), "CANCELLED", move.why().absenceId()));
-		// The same length as a Singapore clock shows it, as Visit.movedTo keeps it
-		LocalDateTime newEnd = visit.end() == null
-				? null
-				: move.newStart().plus(Duration.between(visit.start().atZone(SINGAPORE), visit.end().atZone(SINGAPORE)));
-		Long moved = add(new Held(null, visit.elderId(), move.toCaregiverId(), visit.carePlanId(),
-				visit.carePlanNodeId(), visit.serviceType(), move.newStart(), newEnd, "SCHEDULED",
-				move.why().absenceId(), false));
-		asked.add(new Asked("MOVE", visitId, move.toCaregiverId(), move.why()));
-		return new VisitRef(moved);
+		return new VisitRef(change(visitId, requestKey, () -> {
+			Held visit = requireOpen(visitId, "be moved");
+			keep(visit.forAbsence(visit.caregiverId(), "CANCELLED", move.why().absenceId()));
+			// The same length as a Singapore clock shows it, as Visit.movedTo keeps it
+			LocalDateTime newEnd = visit.end() == null
+					? null
+					: move.newStart().plus(Duration.between(visit.start().atZone(SINGAPORE), visit.end().atZone(SINGAPORE)));
+			Long moved = add(new Held(null, visit.elderId(), move.toCaregiverId(), visit.carePlanId(),
+					visit.carePlanNodeId(), visit.serviceType(), move.newStart(), newEnd, "SCHEDULED",
+					move.why().absenceId(), false));
+			asked.add(new Asked("MOVE", visitId, move.toCaregiverId(), move.why()));
+			return moved;
+		}));
+	}
+
+	/**
+	 * A change as visit takes it (VisitRequests): unreachable or failing if a fault is planned for this
+	 * try; the first answer again for a key it has made a change for; otherwise the change, remembered
+	 * with its key. A refusal is not remembered.
+	 *
+	 * @return the visit a move created, or null
+	 */
+	private Long change(Long visitId, String requestKey, Supplier<Long> make) {
+		sent.add(new Sent(visitId, requestKey));
+		Fault fault = faultFor(++changesAsked);
+		if (unreachable || fault == Fault.UNAVAILABLE) {
+			throw refused("POST", visitId);
+		}
+		if (fault == Fault.SERVER_ERROR) {
+			throw new RestClientResponseException("visit answered 503 to POST /internal/v1/visits/" + visitId,
+					HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", null, null, null);
+		}
+		if (requestKey != null && answered.containsKey(requestKey)) {
+			return answered.get(requestKey);
+		}
+		if (fault == Fault.REFUSED) {
+			throw new VisitRuleViolation("VISIT_NOT_OPEN", "Visit %d can no longer change".formatted(visitId));
+		}
+		if (fault == Fault.MISSING) {
+			throw new VisitNotFound("Visit [%s] does not exist".formatted(visitId));
+		}
+		Long made = make.get();
+		if (requestKey != null) {
+			answered.put(requestKey, made);
+		}
+		if (fault == Fault.TIMED_OUT_AFTER_CHANGE) {
+			throw new ResourceAccessException("I/O error on POST request for \"http://visit/internal/v1/visits/"
+					+ visitId + "\": Read timed out", new SocketTimeoutException("Read timed out"));
+		}
+		return made;
+	}
+
+	/** A read fails while visit is down. */
+	private void reach() {
+		if (unreachable) {
+			throw refused("GET", null);
+		}
+	}
+
+	private static ResourceAccessException refused(String method, Long visitId) {
+		return new ResourceAccessException("I/O error on %s request for \"http://visit/internal/v1/visits%s\": Connection refused"
+				.formatted(method, visitId == null ? "" : "/" + visitId));
+	}
+
+	private Fault faultFor(int change) {
+		return faults.stream().filter(planned -> change >= planned.from() && change < planned.until())
+				.map(PlannedFault::fault).findFirst().orElse(null);
 	}
 
 	// ---------- Scheduling ----------
 
 	@Override
 	public synchronized Outcome schedule(List<PlannedVisit> planned) {
+		reach();
 		int created = 0;
 		int covered = 0;
 		Map<Long, List<PlannedVisit>> byPlan = planned.stream().collect(Collectors.groupingBy(PlannedVisit::carePlanId));
@@ -277,6 +418,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized Cancelled cancelUntouchedFrom(CancelUntouched request) {
+		reach();
 		List<Held> untouched = select(visit -> request.carePlanId().equals(visit.carePlanId())
 				&& !visit.start().isBefore(request.from()) && visit.notStarted()).toList();
 		untouched.forEach(visit -> keep(visit.with(visit.caregiverId(), "CANCELLED")));
@@ -285,6 +427,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized List<UncoveredVisit> findUncoveredStarted(LocalDateTime since, LocalDateTime now) {
+		reach();
 		return visits.values().stream()
 				.filter(visit -> visit.caregiverId() == null && visit.notStarted() && visit.startsIn(since, now))
 				.map(visit -> new UncoveredVisit(visit.id(), visit.elderId(), visit.start(), visit.serviceType()))
@@ -293,6 +436,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized Marked markUncoveredAsException(Long visitId) {
+		reach();
 		Held visit = visits.get(visitId);
 		if (visit == null || visit.caregiverId() != null || !visit.notStarted()) {
 			return new Marked(false);
@@ -303,6 +447,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized List<Assignment> unstartedBetween(LocalDateTime from, LocalDateTime until) {
+		reach();
 		return select(visit -> visit.startsIn(from, until) && visit.caregiverId() != null && visit.notStarted())
 				.map(visit -> new Assignment(visit.id(), visit.caregiverId(), visit.carePlanId(), visit.start()))
 				.toList();
@@ -312,18 +457,21 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized VisitRef scheduleStandalone(NewVisit visit) {
+		reach();
 		return new VisitRef(add(Held.scheduled(visit.elderId(), visit.caregiverId(), visit.start(), visit.end())
 				.withService(visit.serviceType())));
 	}
 
 	@Override
 	public synchronized State visitState(Long visitId) {
+		reach();
 		Held visit = require(visitId);
 		return new State(visit.id(), visit.caregiverId(), visit.status(), visit.checkedIn());
 	}
 
 	@Override
 	public synchronized List<Long> caregiverIdsForElder(Long elderId) {
+		reach();
 		return visits.values().stream()
 				.filter(visit -> elderId.equals(visit.elderId()) && visit.caregiverId() != null)
 				.map(Held::caregiverId).distinct().sorted().toList();
@@ -331,6 +479,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized Assigned hasAssignedVisit(Set<Long> elderIds, Long caregiverId) {
+		reach();
 		return new Assigned(elderIds != null && visits.values().stream()
 				.anyMatch(visit -> elderIds.contains(visit.elderId()) && caregiverId.equals(visit.caregiverId())));
 	}
@@ -339,6 +488,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized List<ElderVisit> upcomingVisits(Long elderId, LocalDateTime from, LocalDateTime until) {
+		reach();
 		return select(visit -> elderId.equals(visit.elderId()) && visit.notStarted() && visit.caregiverId() != null
 				&& visit.startsIn(from, until))
 				.map(visit -> new ElderVisit(visit.id(), visit.elderId(), visit.caregiverId(), visit.start(),
@@ -348,6 +498,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized CaregiverRef latestCaregiver(Long elderId) {
+		reach();
 		return visits.values().stream()
 				.filter(visit -> elderId.equals(visit.elderId()) && visit.caregiverId() != null)
 				.max(EARLIEST_FIRST)
@@ -358,6 +509,7 @@ public class VisitStandIn implements VisitApi {
 
 	@Override
 	public synchronized Busy caregiverBusy(Long caregiverId, LocalDateTime from, LocalDateTime until) {
+		reach();
 		return new Busy(visits.values().stream()
 				.anyMatch(visit -> caregiverId.equals(visit.caregiverId()) && UNDER_WAY.contains(visit.status())
 						&& visit.start().isBefore(until)
