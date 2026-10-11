@@ -10,7 +10,8 @@ import sg.nus.carelink.visitapi.VisitRuleViolation;
 
 /**
  * {@link VisitReassignment} from visit's internal API. visit's 404 and 409 become the errors visit
- * threw in process before, with the same code.
+ * threw in process before, with the same code. report does not send a call-off again, so it sends no
+ * request key and the call behaves as before.
  */
 @Component
 class VisitApiVisitReassignment implements VisitReassignment {
@@ -25,7 +26,7 @@ class VisitApiVisitReassignment implements VisitReassignment {
 	public void callOff(Long visitId, Change why) {
 		try {
 			visit.callOff(visitId, new VisitApi.Change(why.absenceId(), why.byUserId(), why.rosteringCandidateId(),
-					why.reason()));
+					why.reason()), null);
 		}
 		catch (VisitNotFound missing) {
 			throw new ResourceNotFound("Visit", visitId);

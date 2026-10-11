@@ -63,25 +63,25 @@ class VisitApiRosteringAdaptersTest {
 
 	@Test
 	void rosteringsChangesReachVisitAsAsked() {
-		when(visit.moveTo(eq(812L), any())).thenReturn(new VisitApi.VisitRef(900L));
+		when(visit.moveTo(eq(812L), any(), any())).thenReturn(new VisitApi.VisitRef(900L));
 
 		reassignment.reassign(812L, 9L, WHY);
 		reassignment.markUncovered(813L, WHY);
 		reassignment.callOff(814L, WHY);
 		Long moved = reassignment.moveTo(812L, NINE, 9L, WHY);
 
-		verify(visit).reassign(812L, new VisitApi.Reassignment(9L, VISITS_WHY));
-		verify(visit).markUncovered(813L, VISITS_WHY);
-		verify(visit).callOff(814L, VISITS_WHY);
-		verify(visit).moveTo(812L, new VisitApi.Move(NINE, 9L, VISITS_WHY));
+		verify(visit).reassign(812L, new VisitApi.Reassignment(9L, VISITS_WHY), null);
+		verify(visit).markUncovered(813L, VISITS_WHY, null);
+		verify(visit).callOff(814L, VISITS_WHY, null);
+		verify(visit).moveTo(812L, new VisitApi.Move(NINE, 9L, VISITS_WHY), null);
 		assertThat(moved).isEqualTo(900L);
 	}
 
 	@Test
 	void visitsRefusalKeepsItsCodeAndAMissingVisitIsNotFound() {
-		doThrow(new VisitRuleViolation("VISIT_NOT_OPEN", "The visit has started.")).when(visit).reassign(eq(812L), any());
-		doThrow(new VisitNotFound("Visit [999] does not exist")).when(visit).callOff(eq(999L), any());
-		when(visit.moveTo(eq(998L), any())).thenThrow(new VisitNotFound("Visit [998] does not exist"));
+		doThrow(new VisitRuleViolation("VISIT_NOT_OPEN", "The visit has started.")).when(visit).reassign(eq(812L), any(), any());
+		doThrow(new VisitNotFound("Visit [999] does not exist")).when(visit).callOff(eq(999L), any(), any());
+		when(visit.moveTo(eq(998L), any(), any())).thenThrow(new VisitNotFound("Visit [998] does not exist"));
 
 		assertThatThrownBy(() -> reassignment.reassign(812L, 9L, WHY))
 				.isInstanceOf(BusinessRuleViolation.class)

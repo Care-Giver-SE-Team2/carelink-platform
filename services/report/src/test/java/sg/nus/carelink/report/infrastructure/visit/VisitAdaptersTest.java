@@ -71,14 +71,14 @@ class VisitAdaptersTest {
 	void callingOffAVisitPassesWhoAndWhy() {
 		new VisitApiVisitReassignment(visit).callOff(812L, new VisitReassignment.Change(null, 10L, null, "Cancelled"));
 
-		verify(visit).callOff(812L, new VisitApi.Change(null, 10L, null, "Cancelled"));
+		verify(visit).callOff(812L, new VisitApi.Change(null, 10L, null, "Cancelled"), null);
 	}
 
 	@Test
 	void callingOffKeepsVisitsRefusalAndAMissingVisitIsNotFound() {
 		VisitApiVisitReassignment reassignment = new VisitApiVisitReassignment(visit);
-		doThrow(new VisitRuleViolation("VISIT_NOT_OPEN", "The visit has started.")).when(visit).callOff(eq(812L), any());
-		doThrow(new VisitNotFound("Visit [999] does not exist")).when(visit).callOff(eq(999L), any());
+		doThrow(new VisitRuleViolation("VISIT_NOT_OPEN", "The visit has started.")).when(visit).callOff(eq(812L), any(), any());
+		doThrow(new VisitNotFound("Visit [999] does not exist")).when(visit).callOff(eq(999L), any(), any());
 		VisitReassignment.Change why = new VisitReassignment.Change(null, 10L, null, "Cancelled");
 
 		assertThatThrownBy(() -> reassignment.callOff(812L, why))

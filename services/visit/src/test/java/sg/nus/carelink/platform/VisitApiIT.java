@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -21,11 +22,14 @@ import sg.nus.carelink.testsupport.SharedMySql;
 import sg.nus.carelink.visitapi.VisitApi;
 import sg.nus.carelink.visitapi.VisitApiClients;
 import sg.nus.carelink.visitapi.VisitNotFound;
+import sg.nus.carelink.visitapi.VisitRuleViolation;
 
 /**
  * visit's internal API in the running application, over real HTTP, for the reads of the visit table
  * incident and report make today: the same visits their own statements find, at the wall-clock
- * times they were booked for, with a database whose clock is not Singapore's.
+ * times they were booked for, with a database whose clock is not Singapore's. And re-rostering's
+ * changes sent again with their request key: made once, with one assignment and one event, and the
+ * first answer given again.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"carelink.report.schedule-cron=-",
@@ -114,6 +118,94 @@ class VisitApiIT {
 		assertThat(visit.caregiverBusy(siti, NINE.plusHours(6).plusMinutes(30), NINE.plusHours(7)).busy())
 				.as("a visit with no end lasts an hour").isTrue();
 		assertThat(visit.caregiverBusy(siti, NINE.plusHours(7), NINE.plusHours(8)).busy()).isFalse();
+	}
+
+	@Test
+	void aHandOverSentAgainWithItsKeyIsMadeOnce() {
+		long elder = elder();
+		long siti = caregiver("Siti Rahman");
+		long ahmad = caregiver("Ahmad Ismail");
+		long booked = visit(elder, siti, NINE, "SCHEDULED");
+		VisitApi.Reassignment toAhmad = new VisitApi.Reassignment(ahmad, new VisitApi.Change(4L, 10L, null,
+				"Annual leave"));
+
+		visit.reassign(booked, toAhmad, "it-hand-over-" + booked);
+		visit.reassign(booked, toAhmad, "it-hand-over-" + booked);
+
+		assertThat(visit.visit(booked).caregiverId()).isEqualTo(ahmad);
+		assertThat(assignments(booked)).as("Siti's, ended, and Ahmad's").containsExactly("REPLACED " + siti,
+				"ACTIVE " + ahmad);
+		assertThat(events(booked, "VisitCaregiverChanged")).isEqualTo(1);
+	}
+
+	@Test
+	void aMoveSentAgainWithItsKeyAnswersTheVisitItMade() {
+		long elder = elder();
+		long siti = caregiver("Siti Rahman");
+		long booked = visit(elder, siti, NINE, "SCHEDULED");
+		VisitApi.Move move = new VisitApi.Move(NINE.plusDays(1), siti, new VisitApi.Change(4L, 10L, null,
+				"Moved at the family's request"));
+
+		Long moved = visit.moveTo(booked, move, "it-move-" + booked).visitId();
+
+		assertThat(visit.moveTo(booked, move, "it-move-" + booked).visitId()).isEqualTo(moved);
+		assertThat(visit.visit(booked).status()).isEqualTo("CANCELLED");
+		assertThat(visit.visit(moved).start()).isEqualTo(NINE.plusDays(1));
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE elder_id = ?", Long.class, elder)).isEqualTo(2);
+		assertThat(events(booked, "VisitCancelled")).isEqualTo(1);
+		assertThat(events(moved, "VisitScheduled")).isEqualTo(1);
+	}
+
+	@Test
+	void withoutAKeyAChangeIsMadeEachTimeItIsSentAsBefore() {
+		long elder = elder();
+		long siti = caregiver("Siti Rahman");
+		long ahmad = caregiver("Ahmad Ismail");
+		long booked = visit(elder, siti, NINE, "SCHEDULED");
+		VisitApi.Change why = new VisitApi.Change(4L, 10L, null, "Annual leave");
+
+		visit.reassign(booked, new VisitApi.Reassignment(ahmad, why), null);
+		visit.reassign(booked, new VisitApi.Reassignment(ahmad, why), null);
+		visit.callOff(booked, why, null);
+
+		assertThat(assignments(booked)).containsExactly("REPLACED " + siti, "REPLACED " + ahmad, "CANCELLED " + ahmad);
+		assertThat(events(booked, "VisitCaregiverChanged")).isEqualTo(2);
+		assertThatThrownBy(() -> visit.callOff(booked, why, null)).isInstanceOfSatisfying(VisitRuleViolation.class,
+				refused -> assertThat(refused.code()).isEqualTo("VISIT_NOT_OPEN"));
+	}
+
+	@Test
+	void aRefusalIsNotRememberedAndAKeyChangesOnlyItsOwnVisit() {
+		long elder = elder();
+		long siti = caregiver("Siti Rahman");
+		long started = visit(elder, siti, NINE, "IN_PROGRESS");
+		long booked = visit(elder, siti, NINE.plusDays(1), "SCHEDULED");
+		long other = visit(elder, siti, NINE.plusDays(2), "SCHEDULED");
+		VisitApi.Change why = new VisitApi.Change(4L, null, null, "Nobody was free to cover this visit");
+
+		assertThatThrownBy(() -> visit.markUncovered(started, why, "it-uncover-" + started))
+				.isInstanceOfSatisfying(VisitRuleViolation.class,
+						refused -> assertThat(refused.code()).isEqualTo("VISIT_NOT_OPEN"));
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_request WHERE request_key = ?", Long.class,
+				"it-uncover-" + started)).isZero();
+
+		visit.markUncovered(booked, why, "it-uncover-" + booked);
+		assertThatThrownBy(() -> visit.markUncovered(other, why, "it-uncover-" + booked))
+				.isInstanceOfSatisfying(VisitRuleViolation.class,
+						refused -> assertThat(refused.code()).isEqualTo("REQUEST_KEY_REUSED"));
+		assertThat(visit.visit(booked).status()).isEqualTo("EXCEPTION");
+		assertThat(visit.visit(other).status()).isEqualTo("SCHEDULED");
+	}
+
+	private List<String> assignments(long visitId) {
+		return jdbc.queryForList("SELECT CONCAT(status, ' ', caregiver_id) FROM visit_assignment WHERE visit_id = ?"
+				+ " ORDER BY id", String.class, visitId);
+	}
+
+	private long events(long visitId, String type) {
+		Long events = jdbc.queryForObject("SELECT COUNT(*) FROM outbox_event WHERE source = 'visit' AND type = ?"
+				+ " AND json_value(payload, '$.visitId' RETURNING SIGNED) = ?", Long.class, type, visitId);
+		return events == null ? 0 : events;
 	}
 
 	private long elder() {

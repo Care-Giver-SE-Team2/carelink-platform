@@ -205,7 +205,7 @@ public class VisitStandIn implements VisitApi {
 	}
 
 	@Override
-	public synchronized void reassign(Long visitId, Reassignment reassignment) {
+	public synchronized void reassign(Long visitId, Reassignment reassignment, String requestKey) {
 		Held visit = requireOpen(visitId, "change hands");
 		Objects.requireNonNull(reassignment.toCaregiverId(), "toCaregiverId");
 		keep(visit.forAbsence(reassignment.toCaregiverId(), "SCHEDULED", reassignment.why().absenceId()));
@@ -213,7 +213,7 @@ public class VisitStandIn implements VisitApi {
 	}
 
 	@Override
-	public synchronized void markUncovered(Long visitId, Change why) {
+	public synchronized void markUncovered(Long visitId, Change why, String requestKey) {
 		Held visit = require(visitId);
 		if (!visit.notStarted()) {
 			throw notOpen(visit, "be left uncovered");
@@ -223,14 +223,14 @@ public class VisitStandIn implements VisitApi {
 	}
 
 	@Override
-	public synchronized void callOff(Long visitId, Change why) {
+	public synchronized void callOff(Long visitId, Change why, String requestKey) {
 		Held visit = requireOpen(visitId, "be called off");
 		keep(visit.forAbsence(visit.caregiverId(), "CANCELLED", why.absenceId()));
 		asked.add(new Asked("CALL_OFF", visitId, null, why));
 	}
 
 	@Override
-	public synchronized VisitRef moveTo(Long visitId, Move move) {
+	public synchronized VisitRef moveTo(Long visitId, Move move, String requestKey) {
 		Held visit = requireOpen(visitId, "be moved");
 		keep(visit.forAbsence(visit.caregiverId(), "CANCELLED", move.why().absenceId()));
 		// The same length as a Singapore clock shows it, as Visit.movedTo keeps it

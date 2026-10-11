@@ -3,6 +3,8 @@ package sg.nus.carelink.visitapi;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -85,10 +87,28 @@ class VisitApiClientTest {
 				.andRespond(withSuccess("{\"created\":1,\"covered\":0}", MediaType.APPLICATION_JSON));
 
 		VisitApi.Change why = new VisitApi.Change(4L, 10L, null, "Annual leave");
-		api.reassign(5L, new VisitApi.Reassignment(8L, why));
-		assertThat(api.moveTo(5L, new VisitApi.Move(NINE, 8L, why)).visitId()).isEqualTo(6L);
+		api.reassign(5L, new VisitApi.Reassignment(8L, why), null);
+		assertThat(api.moveTo(5L, new VisitApi.Move(NINE, 8L, why), null).visitId()).isEqualTo(6L);
 		assertThat(api.schedule(List.of(new VisitApi.PlannedVisit(1L, null, 3L, 11L, "BATHING", NINE,
 				NINE.plusHours(1))))).isEqualTo(new VisitApi.Outcome(1, 0));
+	}
+
+	@Test
+	void aChangesRequestKeyTravelsInItsHeaderAndNoKeyMeansNoHeader() {
+		visit.expect(requestTo(VISIT + "/visits/5/call-off")).andExpect(header("Idempotency-Key", "step-12"))
+				.andRespond(withSuccess());
+		visit.expect(requestTo(VISIT + "/visits/5/uncovered")).andExpect(header("Idempotency-Key", "step-13"))
+				.andRespond(withSuccess());
+		visit.expect(requestTo(VISIT + "/visits/5/move")).andExpect(header("Idempotency-Key", "step-14"))
+				.andRespond(withSuccess("{\"visitId\":6}", MediaType.APPLICATION_JSON));
+		visit.expect(requestTo(VISIT + "/visits/5/reassignment")).andExpect(headerDoesNotExist("Idempotency-Key"))
+				.andRespond(withSuccess());
+
+		VisitApi.Change why = new VisitApi.Change(4L, null, null, "Annual leave");
+		api.callOff(5L, why, "step-12");
+		api.markUncovered(5L, why, "step-13");
+		assertThat(api.moveTo(5L, new VisitApi.Move(NINE, 8L, why), "step-14").visitId()).isEqualTo(6L);
+		api.reassign(5L, new VisitApi.Reassignment(8L, why), null);
 	}
 
 	@Test
@@ -140,9 +160,9 @@ class VisitApiClientTest {
 				.andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.TEXT_PLAIN).body("not json"));
 
 		VisitApi.Change why = new VisitApi.Change(null, 10L, null, "Family skipped it");
-		assertThatThrownBy(() -> api.callOff(5L, why)).isInstanceOfSatisfying(VisitRuleViolation.class,
+		assertThatThrownBy(() -> api.callOff(5L, why, null)).isInstanceOfSatisfying(VisitRuleViolation.class,
 				violation -> assertThat(violation.code()).isEqualTo("VISIT_ALREADY_STARTED"));
-		assertThatThrownBy(() -> api.markUncovered(5L, why)).isInstanceOfSatisfying(VisitRuleViolation.class,
+		assertThatThrownBy(() -> api.markUncovered(5L, why, null)).isInstanceOfSatisfying(VisitRuleViolation.class,
 				violation -> assertThat(violation).hasMessage("POST /internal/v1/visits/5/uncovered")
 						.extracting(VisitRuleViolation::code).isEqualTo("UNKNOWN"));
 	}

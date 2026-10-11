@@ -57,7 +57,7 @@ class VisitApiVisitReassignment implements VisitReassignment {
 	@Override
 	public void reassign(Long visitId, Long toCaregiverId, Change why) {
 		translated(visitId, () -> {
-			visit.reassign(visitId, new VisitApi.Reassignment(toCaregiverId, change(why)));
+			visit.reassign(visitId, new VisitApi.Reassignment(toCaregiverId, change(why)), null);
 			return null;
 		});
 	}
@@ -65,7 +65,7 @@ class VisitApiVisitReassignment implements VisitReassignment {
 	@Override
 	public void markUncovered(Long visitId, Change why) {
 		translated(visitId, () -> {
-			visit.markUncovered(visitId, change(why));
+			visit.markUncovered(visitId, change(why), null);
 			return null;
 		});
 	}
@@ -73,7 +73,7 @@ class VisitApiVisitReassignment implements VisitReassignment {
 	@Override
 	public void callOff(Long visitId, Change why) {
 		translated(visitId, () -> {
-			visit.callOff(visitId, change(why));
+			visit.callOff(visitId, change(why), null);
 			return null;
 		});
 	}
@@ -81,7 +81,7 @@ class VisitApiVisitReassignment implements VisitReassignment {
 	@Override
 	public Long moveTo(Long visitId, LocalDateTime newStart, Long toCaregiverId, Change why) {
 		return translated(visitId,
-				() -> visit.moveTo(visitId, new VisitApi.Move(newStart, toCaregiverId, change(why))).visitId());
+				() -> visit.moveTo(visitId, new VisitApi.Move(newStart, toCaregiverId, change(why)), null).visitId());
 	}
 
 	/** visit's answer, or its 404 and 409 as the errors visit throws in process. */
