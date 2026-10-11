@@ -140,7 +140,9 @@ services:
   report:
     image: ${IMAGE_PREFIX:-carelink}/report:${IMAGE_TAG:-local}
     depends_on:
-      # core migrates the schema this service validates; core and visit serve the APIs it calls
+      # report migrates its own database, which mysql-setup creates; core and visit serve the APIs it calls
+      mysql-setup:
+        condition: service_completed_successfully
       core:
         condition: service_healthy
       visit:
@@ -150,8 +152,8 @@ services:
       localstack:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
-      DB_USER: carelink
+      DB_URL: jdbc:mysql://mysql:3306/carelink_report?connectionTimeZone=Asia/Singapore
+      DB_USER: report
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
       # The login made through core, read from the same Redis
       SPRING_DATA_REDIS_HOST: redis

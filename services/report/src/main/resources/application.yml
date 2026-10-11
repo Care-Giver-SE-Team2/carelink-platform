@@ -2,17 +2,18 @@ spring:
   application:
     name: report
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/carelink?connectionTimeZone=Asia/Singapore}
-    username: ${DB_USER:carelink}
-    password: ${DB_PASSWORD:carelink}
+    # report's own database; core's and the other services' are not reachable from here
+    url: ${DB_URL:jdbc:mysql://localhost:3306/carelink_report?connectionTimeZone=Asia/Singapore}
+    username: ${DB_USER:report}
+    password: ${DB_PASSWORD:report}
   jpa:
     hibernate:
-      # The schema is core's until the schema split; this service validates what it finds
+      # The schema is the migrations'; Hibernate checks that the entities match it
       ddl-auto: validate
     open-in-view: false
   flyway:
-    # Until the schema split, core migrates the one shared schema
-    enabled: false
+    # db/migration here, then the platform's tables (shared.config.PlatformMigrationsAutoConfiguration)
+    enabled: true
 
 management:
   endpoints:

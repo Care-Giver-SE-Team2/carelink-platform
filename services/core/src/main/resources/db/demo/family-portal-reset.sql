@@ -26,6 +26,10 @@
 -- VISIT'S ROWS go to visit's own database, carelink_visit, on the same server
 -- (docs/platform/service-boundaries.md, section 9): every visit table below is
 -- named with it. Load the file with an account that can write both databases.
+--
+-- REPORT'S ROWS go to report's own database, carelink_report, on the same server
+-- (docs/platform/service-boundaries.md, section 9): every report table below is
+-- named with it.
 
 START TRANSACTION;
 
@@ -57,9 +61,9 @@ DELETE FROM carelink_visit.visit_assignment       WHERE visit_id IN (SELECT id F
 DELETE FROM carelink_visit.elder_confirmation     WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
 DELETE FROM carelink_visit.visit                  WHERE id       IN (SELECT id FROM demo_fam_visit_id);
 
-DELETE FROM report_amendment
- WHERE report_id IN (SELECT r.id FROM report r WHERE r.elder_id IN (SELECT id FROM demo_fam_elder));
-DELETE FROM report WHERE elder_id IN (SELECT id FROM demo_fam_elder);
+DELETE FROM carelink_report.report_amendment
+ WHERE report_id IN (SELECT r.id FROM carelink_report.report r WHERE r.elder_id IN (SELECT id FROM demo_fam_elder));
+DELETE FROM carelink_report.report WHERE elder_id IN (SELECT id FROM demo_fam_elder);
 
 -- Credentials are dated too (expiring in 20 days, expired 10 days ago...).
 DELETE FROM credential

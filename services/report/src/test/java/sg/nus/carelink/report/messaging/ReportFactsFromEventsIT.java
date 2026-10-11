@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,10 +19,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -51,6 +47,7 @@ import sg.nus.carelink.report.domain.model.ReportPeriod;
 import sg.nus.carelink.report.domain.model.VisitFact;
 import sg.nus.carelink.report.domain.model.VitalFact;
 import sg.nus.carelink.report.domain.repository.ReportFactsSource;
+import sg.nus.carelink.testsupport.DemoData;
 import sg.nus.carelink.testsupport.SharedMySql;
 import sg.nus.carelink.testsupport.VisitDatabaseForDemoData;
 
@@ -274,7 +271,7 @@ class ReportFactsFromEventsIT {
 	 * than the copy changes nothing.
 	 */
 	@Test
-	void demonstrationDataReachesReportThroughItsCopyStep() throws SQLException {
+	void demonstrationDataReachesReportThroughItsCopyStep() {
 		VisitDatabaseForDemoData.build(new JdbcTemplate(dataSource));
 		long visit = insert("insert into " + VISIT_DATABASE + ".visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,"
 				+ " checked_in_at, checked_out_at, status, version) values (" + elder + ", " + caregiver
@@ -337,12 +334,12 @@ class ReportFactsFromEventsIT {
 				new EventMetadata(UUID.randomUUID().toString(), handler.type(), "visit", Instant.now(), sequenceNumber)));
 	}
 
-	private void copyTheDemonstrationFacts() throws SQLException {
-		try (Connection connection = dataSource.getConnection()) {
-			// Run from the service's module directory, as the migrations are in the tests
-			ScriptUtils.executeSqlScript(connection,
-					new FileSystemResource("../core/src/main/resources/db/demo/report-facts.sql"));
-		}
+	/**
+	 * The demonstration step as it runs on a real server, except that report's tables are this test's
+	 * database rather than one called carelink_report, and core's are the copy beside them.
+	 */
+	private void copyTheDemonstrationFacts() {
+		DemoData.load(new JdbcTemplate(dataSource), "report-facts.sql", "carelink_report");
 	}
 
 	private Long caregiver(String name) {

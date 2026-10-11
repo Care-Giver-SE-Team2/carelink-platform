@@ -13,10 +13,15 @@ CREATE USER IF NOT EXISTS 'visit'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
 ALTER USER 'visit'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
 GRANT ALL PRIVILEGES ON carelink_visit.* TO 'visit'@'%';
 
+CREATE DATABASE IF NOT EXISTS carelink_report CHARACTER SET utf8mb4;
+CREATE USER IF NOT EXISTS 'report'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
+ALTER USER 'report'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
+GRANT ALL PRIVILEGES ON carelink_report.* TO 'report'@'%';
+
 CREATE DATABASE IF NOT EXISTS carelink_notification CHARACTER SET utf8mb4;
 CREATE USER IF NOT EXISTS 'notification'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
 ALTER USER 'notification'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
 GRANT ALL PRIVILEGES ON carelink_notification.* TO 'notification'@'%';
 SQL
 
-echo "service databases ready: carelink_visit, carelink_notification"
+echo "service databases ready: carelink_visit, carelink_report, carelink_notification"
