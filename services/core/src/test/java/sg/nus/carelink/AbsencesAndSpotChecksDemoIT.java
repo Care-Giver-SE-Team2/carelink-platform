@@ -58,7 +58,7 @@ class AbsencesAndSpotChecksDemoIT {
 
 	private static final List<String> TABLES = List.of("app_user", "user_role", "caregiver", "credential",
 			"family_member", "elder_family_binding", "absence_report", "visit", "visit_task", "visit_assignment",
-			"spot_check", "notification");
+			"spot_check", "outbox_event");
 
 	@Autowired
 	private MockMvc mvc;

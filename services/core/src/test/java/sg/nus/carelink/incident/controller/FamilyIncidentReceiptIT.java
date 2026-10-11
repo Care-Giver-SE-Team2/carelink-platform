@@ -76,7 +76,7 @@ class FamilyIncidentReceiptIT {
 	@BeforeEach
 	void prepare() {
 		clock.now = START;
-		for (String table : List.of("audit_log", "notification", "requested_notification", "incident_acknowledgement", "incident_log",
+		for (String table : List.of("audit_log", "requested_notification", "incident_acknowledgement", "incident_log",
 				"incident", "elder_family_binding", "elder", "family_member", "user_role", "app_user")) {
 			jdbc.update("DELETE FROM " + table);
 		}
@@ -100,10 +100,6 @@ class FamilyIncidentReceiptIT {
 					""", id, id - 500, id == 602 ? "RESOLVED" : "OPEN",
 					Timestamp.valueOf(LocalDateTime.of(2026, 10, 7, 15, 0)), Timestamp.valueOf(LocalDateTime.of(2026, 10, 7, 15, 5)));
 		}
-		jdbc.update("""
-				INSERT INTO notification (id, recipient_user_id, event_type, title, resource_type, resource_id, status)
-				VALUES (801, 7, 'INCIDENT_RAISED', 'Care alert', 'INCIDENT', 601, 'SENT')
-				""");
 	}
 
 	@Test
@@ -156,7 +152,6 @@ class FamilyIncidentReceiptIT {
 	@ParameterizedTest
 	@ValueSource(strings = {"view", "acknowledge"})
 	void independentFamiliesReadOnlyBindingAndResolvedIncidentNeedNoNotification(String action) throws Exception {
-		jdbc.update("DELETE FROM notification");
 		jdbc.update("DELETE FROM requested_notification");
 		JsonNode a = command(loginAs("family-a"), 601, action, null);
 		JsonNode b = command(loginAs("family-b"), 601, action, null);

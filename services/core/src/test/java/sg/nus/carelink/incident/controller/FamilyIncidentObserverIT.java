@@ -59,7 +59,7 @@ class FamilyIncidentObserverIT {
 	@BeforeEach
 	void prepare() {
 		clock.now = START;
-		for (String table : List.of("family_alert_window", "family_alert_delivery", "family_alert_event", "audit_log", "notification_subscription", "notification", "requested_notification", "incident_acknowledgement", "incident_log",
+		for (String table : List.of("family_alert_window", "family_alert_delivery", "family_alert_event", "audit_log", "requested_notification", "incident_acknowledgement", "incident_log",
 				"incident", "elder_family_binding", "elder", "family_member", "user_role", "app_user")) {
 			jdbc.update("DELETE FROM " + table);
 		}
@@ -83,11 +83,6 @@ class FamilyIncidentObserverIT {
 					""", id, id - 500, id == 602 ? "RESOLVED" : "OPEN",
 					Timestamp.valueOf(LocalDateTime.of(2026, 10, 7, 15, 0)), Timestamp.valueOf(LocalDateTime.of(2026, 10, 7, 15, 5)));
 		}
-		jdbc.update("""
-				INSERT INTO notification (id, recipient_user_id, event_type, title, resource_type, resource_id, status)
-				VALUES (801, 7, 'INCIDENT_RAISED', 'Care alert', 'INCIDENT', 601, 'SENT')
-				""");
-		jdbc.update("DELETE FROM notification");
 	}
 
 
@@ -199,7 +194,6 @@ class FamilyIncidentObserverIT {
 
 	@Test void readOnlyBindingReceivesUrgentAlertsRegardlessOfOptionalSubscription() throws Exception {
 		jdbc.update("UPDATE elder_family_binding SET access_scope='READ_ONLY' WHERE elder_id=101");
-		jdbc.update("INSERT INTO notification_subscription (user_id, elder_id, event_type, channel, enabled) VALUES (7, 101, 'INCIDENT_RAISED', 'IN_APP', false)");
 		publish(UUID.randomUUID());
 		assertThat(count("requested_notification")).isEqualTo(2);
 		assertThat(read(loginAs("family-a"), 601).path("acknowledgeBy").asString()).isEqualTo("2026-10-07T18:00:00+08:00");
@@ -290,12 +284,10 @@ class FamilyIncidentObserverIT {
 		}
 	}
 
-	@Test void legacyMessagesAreUntouchedAndDoNotInventPersonalWindows() throws Exception {
-		jdbc.update("INSERT INTO notification (id, recipient_user_id, event_type, title, resource_type, resource_id, status) VALUES (801,7,'INCIDENT_RAISED','Legacy notice','INCIDENT',601,'SENT')");
-		var original = jdbc.queryForList("SELECT * FROM notification WHERE id=801");
+	/** Without an FM05 alert there is no personal window: a message from before, in notification, gives none. */
+	@Test void noPersonalWindowIsInventedBeforeTheAlert() throws Exception {
 		assertThat(read(loginAs("family-a"), 601).path("acknowledgeBy").isNull()).isTrue();
 		publish(UUID.randomUUID());
-		assertThat(jdbc.queryForList("SELECT * FROM notification WHERE id=801")).isEqualTo(original);
 		assertThat(count("requested_notification")).isEqualTo(2);
 	}
 

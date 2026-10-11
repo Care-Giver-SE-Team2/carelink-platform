@@ -1,1 +1,2 @@
 sg.nus.carelink.shared.config.SharedAutoConfiguration
+sg.nus.carelink.shared.config.PlatformMigrationsAutoConfiguration

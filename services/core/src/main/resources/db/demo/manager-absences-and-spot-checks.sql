@@ -368,17 +368,25 @@ SET @consentCheck := (SELECT id FROM spot_check WHERE visit_id = @consentVisit
                          AND approval_status = 'PENDING_APPROVAL' ORDER BY id DESC LIMIT 1);
 SET @consentWhen := DATE_FORMAT(@consentVisitStart - INTERVAL @appOffsetHours HOUR, '%a %e %b, %H:%i');
 
-INSERT INTO notification (recipient_user_id, event_type, channel, title, body, resource_type, resource_id,
-                          status, created_at)
-SELECT @fiona, 'SPOT_CHECK_REQUESTED', 'IN_APP',
-       CONCAT('May a manager watch the visit on ', @consentWhen, '?'),
-       CONCAT('To check the quality of care, a manager would like to be present at Grace Wee''s visit on ',
-              @consentWhen, ': ', @consentReason, '. Nobody comes to watch unless you agree.'),
-       'SPOT_CHECK', @consentCheck, 'PENDING', @nowStored - INTERVAL 2 HOUR
+-- The message asking Fiona, sent the way the application sends every message: a NotificationRequested
+-- event in core's outbox (docs/platform/event-catalogue.md). core's relay publishes it, and notification,
+-- which has a database of its own, keeps it in her inbox. Its occurred_at is the moment as core writes it.
+INSERT INTO outbox_event (event_id, source, type, payload, occurred_at)
+SELECT UUID(), 'core', 'NotificationRequested',
+       JSON_OBJECT('recipientUserId', @fiona, 'kind', 'SPOT_CHECK_REQUESTED', 'channel', 'IN_APP',
+                   'title', CONCAT('May a manager watch the visit on ', @consentWhen, '?'),
+                   'body', CONCAT('To check the quality of care, a manager would like to be present at Grace Wee''s visit on ',
+                                  @consentWhen, ': ', @consentReason, '. Nobody comes to watch unless you agree.'),
+                   'resourceType', 'SPOT_CHECK', 'resourceId', @consentCheck, 'elderId', @graceElder,
+                   'requestedAt', DATE_FORMAT(NOW() - INTERVAL 2 HOUR, '%Y-%m-%dT%H:%i:%s+08:00')),
+       NOW(6) - INTERVAL 2 HOUR
   FROM DUAL
  WHERE @consentCheck IS NOT NULL
    AND @fiona IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM notification n WHERE n.resource_type = 'SPOT_CHECK' AND n.resource_id = @consentCheck);
+   AND NOT EXISTS (SELECT 1 FROM outbox_event o
+                    WHERE o.type = 'NotificationRequested'
+                      AND JSON_VALUE(o.payload, '$.resourceType') = 'SPOT_CHECK'
+                      AND JSON_VALUE(o.payload, '$.resourceId' RETURNING SIGNED) = @consentCheck);
 
 -- One check Fiona agreed to yesterday, on a visit of Farah's, for the manager to
 -- record a conclusion on. A new one only when none is waiting to be recorded.

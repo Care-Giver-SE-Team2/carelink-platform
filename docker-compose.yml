@@ -30,6 +30,21 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
 
+  # Each service's own database and account on the same server (scripts/mysql/service-databases.sh),
+  # made again on every start so that a volume from before a service had its database gets it too
+  mysql-setup:
+    image: mysql:8.4
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?run scripts/run.sh, which writes .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
+    volumes:
+      - ./scripts/mysql/service-databases.sh:/service-databases.sh:ro
+    entrypoint: ["sh", "/service-databases.sh"]
+    restart: "no"
+
   redis:
     image: redis:7.4-alpine
     healthcheck:
@@ -159,16 +174,16 @@ services:
   notification:
     image: ${IMAGE_PREFIX:-carelink}/notification:${IMAGE_TAG:-local}
     depends_on:
-      # core migrates the schema this service validates
-      core:
-        condition: service_healthy
+      # notification migrates its own database, which mysql-setup creates
+      mysql-setup:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       localstack:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:mysql://mysql:3306/carelink?connectionTimeZone=Asia/Singapore
-      DB_USER: carelink
+      DB_URL: jdbc:mysql://mysql:3306/carelink_notification?connectionTimeZone=Asia/Singapore
+      DB_USER: notification
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
       # The login made through core, read from the same Redis
       SPRING_DATA_REDIS_HOST: redis

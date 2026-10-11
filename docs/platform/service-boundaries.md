@@ -178,8 +178,8 @@ outbox, `requested_notification` (`src/test/resources/db/platform`).
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
 service keeps its own `audit_log` in its own schema.
 
-No service reads or writes another's tables now, so the schema split can follow. Until then the four parts
-share one schema.
+No service reads or writes another's tables now, so the schema split can follow (section 9). notification
+already has a database of its own; visit and report still share core's.
 
 ## 6. Tables the platform adds
 
@@ -203,8 +203,9 @@ platform migration takes the next free version, listed here.
 | V8 | `incident_request` | core | core | Which incident each keyed request from visit raised, so a retry gets the same one (section 7) |
 | V9 | `report_visit`, `report_visit_task`, `report_vital_sign`, `report_elder_confirmation`, `report_incident`, `report_incident_log`, `report_spot_check`, `report_roster_change` | report | core | The facts a report is made from, kept from visit's and core's events (event catalogue, section 5) |
 | V10 | none: fills V9's tables once from the shared tables | report | core | The first deployment's copy. It is safe to run again, and is run again after loading demonstration data into the shared tables |
+| V11 | none: drops `notification` and `notification_subscription` | core | core | notification has a database of its own (section 9) |
 
-The next platform migration is V11. Until the schema split, the services share one schema, so the two events
+The next platform migration is V12. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
 
 ## 7. What the move changes: commands visit and core share
@@ -252,3 +253,47 @@ first that matches wins. The front end's development server routes the same way 
 A caregiver's own incident reports moved with visit to `/api/caregivers/me/incidents` (they were `POST /api/incidents`
 and `GET /api/caregivers/me/incidents`), so that `/api/incidents`, the managers' and families' incidents, stays
 core's whole.
+
+## 9. The schema split: a database per service
+
+The services keep one MySQL server, as the cloud keeps one RDS instance, and each has a database of its own on it:
+`carelink` (core), `carelink_visit`, `carelink_report` and `carelink_notification`. Each service connects with an
+account that can reach its own database only, so a statement on another service's table fails.
+
+| Service | Database | Status |
+|---|---|---|
+| core | `carelink` | Keeps core's tables. Each service's tables leave it in a platform migration once that service has its own |
+| notification | `carelink_notification` | Done: its own migrations build it; core dropped its tables (V11) |
+| visit | `carelink_visit` | Next |
+| report | `carelink_report` | After visit |
+
+**What a service with its own database has.**
+- **Its own migrations** in `src/main/resources/db/migration`, starting at V1 with its tables as they stood in the
+  shared schema when they moved. It enables Flyway; libs/shared's `PlatformMigrationsAutoConfiguration` runs its
+  migrations and then the platform's (`db/platform` in every jar on the classpath, for example the events tables
+  libs/events ships), as core does.
+- **Its own `audit_log`**, since the shared access audit writes it in every service, and its own `shedlock` when it
+  has scheduled jobs. Both go in its own migrations, not in a platform migration of its own.
+- **Its connection settings**, `DB_URL`, `DB_USER` and `DB_PASSWORD`, pointing at its own database.
+- **A check that its code names only its own tables** (`architecture/OwnTablesTest`, with `OwnTables` from
+  libs/test-support): SQL in its strings and text blocks, and JPA's `@Table`.
+
+**Its tests.** `OwnDatabaseForTests` (libs/test-support) builds the tests' database in three steps:
+1. core's migrations, with history tables of their own, as core's database stands. The core stand-in answers from
+   these tables, and the tests lay out accounts, elders and bindings in them as before.
+2. Every table that belongs to a service (`ServiceTables`) is dropped from that copy, so a statement on another
+   service's table fails in the tests as it would in a real run.
+3. The service's own migrations and then the platform's, exactly as they build its database in a real run.
+
+**Locally**, `mysql-setup` in `docker-compose.yml` runs `scripts/mysql/service-databases.sh` on every start: it
+creates each service's database and account if they are missing, on a volume from before the split too.
+
+**Data.** The split starts each service's database empty. Rows a service kept in the shared schema are not carried
+over, and core drops the moved tables. Demonstration data goes to the service it belongs to: the one family message
+the demonstration data laid out is now an event in core's outbox (`db/demo/manager-absences-and-spot-checks.sql`),
+which notification keeps when core's relay publishes it.
+
+**What the cloud environment needs** for each service with a database: the database on the RDS instance, an account
+whose privileges cover that database only, and the service's `DB_URL`, `DB_USER` and `DB_PASSWORD` in the Secret
+its chart reads (`envFromSecret`).
+
