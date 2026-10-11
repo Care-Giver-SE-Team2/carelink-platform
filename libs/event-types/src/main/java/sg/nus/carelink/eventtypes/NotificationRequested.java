@@ -1,5 +1,6 @@
 package sg.nus.carelink.eventtypes;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 /**
@@ -17,5 +18,27 @@ public record NotificationRequested(Long recipientUserId, String kind, String ch
 
 	/** The event's name in the catalogue. */
 	public static final String TYPE = "NotificationRequested";
+
+	/** The longest title the inbox keeps. */
+	public static final int TITLE_LENGTH = 150;
+
+	/** The longest body the inbox keeps. */
+	public static final int BODY_LENGTH = 1000;
+
+	/**
+	 * An in-app message, its title and body cut to what the inbox keeps, as the inbox showed them
+	 * when the modules wrote it themselves.
+	 *
+	 * @param requestedAt the sender's wall clock in Singapore
+	 */
+	public static NotificationRequested inApp(Long recipientUserId, String kind, String title, String body,
+			String resourceType, Long resourceId, Long elderId, LocalDateTime requestedAt) {
+		return new NotificationRequested(recipientUserId, kind, "IN_APP", cut(title, TITLE_LENGTH),
+				cut(body, BODY_LENGTH), resourceType, resourceId, elderId, SingaporeTime.of(requestedAt));
+	}
+
+	private static String cut(String text, int max) {
+		return text == null || text.length() <= max ? text : text.substring(0, max - 3) + "...";
+	}
 
 }

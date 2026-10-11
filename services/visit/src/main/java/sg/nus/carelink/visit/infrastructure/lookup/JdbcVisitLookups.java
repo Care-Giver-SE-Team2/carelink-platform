@@ -12,9 +12,9 @@ import org.springframework.stereotype.Component;
 import sg.nus.carelink.visit.application.VisitLookups;
 
 /**
- * {@link VisitLookups} with the statements incident and report run today (JdbcSpotCheckLookups,
- * NotificationTableAlert, JdbcValueAddedVisitAssignment), so the answers do not change when they
- * start asking visit.
+ * {@link VisitLookups} with the statements incident and report ran on visit's table before they
+ * asked visit (spot checks, the elder's latest caregiver, the value-added clash check), so the
+ * answers did not change when they started asking.
  *
  * <p>Times go in and come out as {@link Timestamp}, the way JPA writes visit times, so they land on
  * the same side of the connection's time-zone conversion.

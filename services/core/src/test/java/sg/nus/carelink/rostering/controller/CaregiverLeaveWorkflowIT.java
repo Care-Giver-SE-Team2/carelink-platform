@@ -27,7 +27,7 @@ class CaregiverLeaveWorkflowIT extends CaregiverHttpITSupport {
             assertThat(b.read("/api/caregivers/me/absences").toString()).doesNotContain("Demo leave");
             assertThat(jdbc.queryForObject("select caregiver_id from absence_report where id=?", Long.class, id)).isEqualTo(caregiver);
             assertThat(visits.current(visit).caregiverId()).isEqualTo(caregiver);
-            assertThat(jdbc.queryForObject("select count(*) from notification where recipient_user_id=? and event_type='ABSENCE_REQUESTED' and resource_id=?", Long.class, manager, id)).isEqualTo(1L);
+            assertThat(jdbc.queryForObject("select count(*) from requested_notification where recipient_user_id=? and event_type='ABSENCE_REQUESTED' and resource_id=?", Long.class, manager, id)).isEqualTo(1L);
             assertThat(a.post("/api/caregivers/me/absences", payload).statusCode()).isEqualTo(409);
             body(mgr.post("/api/absences/" + id + "/approve", Map.of()), 200);
             assertThat(a.read("/api/caregivers/me/absences").toString()).contains("APPROVED");

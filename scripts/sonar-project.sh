@@ -7,6 +7,10 @@
 # a new service's first pull request would then fail at the quality gate with "Organization is not
 # allowed to access data from non main branches". The repository is public, so its analyses are too.
 #
+# The first analysis of a new project's main branch has nothing to compare with, so SonarCloud gives it
+# no quality gate (NONE), and the scanner's wait for the gate fails once. Re-run the job: the second
+# analysis has a gate.
+#
 #   SONAR_TOKEN   a token of an organization admin (the pipeline's secret)
 #   SONAR_ORG     the organization key
 #   PROJECT       the project key, <prefix>_<service>

@@ -10,17 +10,20 @@ import java.util.Locale;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.NotificationRequested;
 import sg.nus.carelink.incident.domain.model.SpotCheck;
 import sg.nus.carelink.incident.domain.repository.SpotCheckAlert;
 
 /**
- * Writes UC-MG08's messages as rows in {@code notification}, PENDING like every other alert in
- * this module until somebody builds the sender (SUP-02). The family is found through their
- * active bindings, the caregiver through their account, with the same plain statements
- * {@link NotificationTableAlert} uses.
+ * Sends UC-MG08's messages as {@code NotificationRequested} events, one per recipient, in the
+ * transaction of the step that sent them. The family is found through their active bindings, the
+ * caregiver through their account, with the same plain statements
+ * {@link NotificationRequestedIncidentAlert} uses. When it asks the family, it notes the time on
+ * the check, for the reminders.
  */
 @Component
-class NotificationTableSpotCheckAlert implements SpotCheckAlert {
+class NotificationRequestedSpotCheckAlert implements SpotCheckAlert {
 
 	private static final String BOUND_FAMILY = """
 			select f.user_id from elder_family_binding b
@@ -33,30 +36,31 @@ class NotificationTableSpotCheckAlert implements SpotCheckAlert {
 
 	private static final String CAREGIVER_ACCOUNT = "select user_id from caregiver where id = :caregiverId";
 
-	private static final String INSERT = """
-			insert into notification
-			    (recipient_user_id, event_type, channel, title, body, resource_type, resource_id, status, created_at)
-			values (:userId, :eventType, 'IN_APP', :title, :body, 'SPOT_CHECK', :checkId, 'PENDING', :createdAt)
-			""";
+	/** When the family was last asked about the check; {@code SpotCheckLookups.lastAskedAt} reads it. */
+	private static final String ASKED = "update spot_check set family_asked_at = :now where id = :checkId";
 
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.ENGLISH);
 
 	private final JdbcClient jdbc;
+	private final Events events;
 	private final Clock clock;
 
-	NotificationTableSpotCheckAlert(JdbcClient jdbc, Clock clock) {
+	NotificationRequestedSpotCheckAlert(JdbcClient jdbc, Events events, Clock clock) {
 		this.jdbc = jdbc;
+		this.events = events;
 		this.clock = clock;
 	}
 
 	@Override
 	public void approvalRequested(SpotCheck check, Names names) {
 		String when = check.proposedTime().format(WHEN);
-		for (Long family : boundFamily(check.elderId())) {
+		List<Long> asked = boundFamily(check.elderId());
+		asked(check, asked);
+		for (Long family : asked) {
 			write(family, "SPOT_CHECK_REQUESTED", "May a manager watch the visit on %s?".formatted(when),
 					("To check the quality of care, a manager would like to be present at %s's visit on %s: %s. "
 							+ "Nobody comes to watch unless you agree.").formatted(elder(names), when, check.reason()),
-					check.id());
+					check);
 		}
 	}
 
@@ -71,7 +75,7 @@ class NotificationTableSpotCheckAlert implements SpotCheckAlert {
 				approved
 						? "%s's family agreed. Record the conclusion on the day.".formatted(elder(names))
 						: "%s's family declined: %s".formatted(elder(names), check.closingReason()),
-				check.id());
+				check);
 	}
 
 	@Override
@@ -80,24 +84,26 @@ class NotificationTableSpotCheckAlert implements SpotCheckAlert {
 		String result = check.result() == SpotCheck.Result.MEETS_STANDARD ? "met the standard" : "needs improvement";
 		for (Long family : boundFamily(check.elderId())) {
 			write(family, "SPOT_CHECK_CONCLUDED", "Spot check on %s: %s".formatted(when, result),
-					check.finding() == null ? "The conclusion is on the spot checks page." : check.finding(), check.id());
+					check.finding() == null ? "The conclusion is on the spot checks page." : check.finding(), check);
 		}
 		jdbc.sql(CAREGIVER_ACCOUNT).param("caregiverId", check.caregiverId()).query(Long.class).optional()
 				.ifPresent(user -> write(user, "SPOT_CHECK_CONCLUDED",
 						"Your visit on %s was spot-checked: %s".formatted(when, result),
-						"You can read the notes and respond to them.", check.id()));
+						"You can read the notes and respond to them.", check));
 	}
 
 	@Override
 	public void reminded(SpotCheck check, Names names) {
 		String when = check.proposedTime().format(WHEN);
-		for (Long family : boundFamily(check.elderId())) {
+		List<Long> asked = boundFamily(check.elderId());
+		asked(check, asked);
+		for (Long family : asked) {
 			write(family, "SPOT_CHECK_REMINDER", "Still waiting for your answer: may a manager watch the visit on %s?"
 					.formatted(when),
 					("A manager would like to be present at %s's visit on %s: %s. Nobody comes to watch unless you agree;"
 							+ " the request stays open until you answer or the visit starts.")
 							.formatted(elder(names), when, check.reason()),
-					check.id());
+					check);
 		}
 	}
 
@@ -106,7 +112,7 @@ class NotificationTableSpotCheckAlert implements SpotCheckAlert {
 		for (Long family : boundFamily(check.elderId())) {
 			write(family, "SPOT_CHECK_WITHDRAWN",
 					"The spot check on %s is not going ahead".formatted(check.proposedTime().format(WHEN)),
-					check.closingReason(), check.id());
+					check.closingReason(), check);
 		}
 	}
 
@@ -118,22 +124,20 @@ class NotificationTableSpotCheckAlert implements SpotCheckAlert {
 				.list();
 	}
 
-	private void write(Long userId, String eventType, String title, String body, Long checkId) {
-		jdbc.sql(INSERT)
-				.param("userId", userId)
-				.param("eventType", eventType)
-				.param("title", trim(title, 150))
-				.param("body", trim(body, 1000))
-				.param("checkId", checkId)
-				.param("createdAt", Timestamp.valueOf(LocalDateTime.now(clock)))
-				.update();
+	/** Asking nobody is not asking: the reminders then count from when the check was raised. */
+	private void asked(SpotCheck check, List<Long> family) {
+		if (!family.isEmpty()) {
+			jdbc.sql(ASKED).param("now", Timestamp.valueOf(LocalDateTime.now(clock))).param("checkId", check.id())
+					.update();
+		}
+	}
+
+	private void write(Long userId, String eventType, String title, String body, SpotCheck check) {
+		events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(userId, eventType, title, body,
+				"SPOT_CHECK", check.id(), check.elderId(), LocalDateTime.now(clock)));
 	}
 
 	private static String elder(Names names) {
 		return names.elderName() == null ? "The elder" : names.elderName();
-	}
-
-	private static String trim(String text, int max) {
-		return text == null || text.length() <= max ? text : text.substring(0, max - 3) + "...";
 	}
 }

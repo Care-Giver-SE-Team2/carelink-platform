@@ -123,8 +123,7 @@ class SpotCheckIT {
 		Long id = spotChecks.request(laterVisit, "Routine quality check", manager).id();
 
 		assertThat(spotChecks.dueForReminder(Duration.ofDays(1))).doesNotContain(id);
-		jdbc.update("update notification set created_at = created_at - interval 25 hour"
-				+ " where resource_type = 'SPOT_CHECK' and resource_id = ?", id);
+		jdbc.update("update spot_check set family_asked_at = family_asked_at - interval 25 hour where id = ?", id);
 		assertThat(spotChecks.dueForReminder(Duration.ofDays(1))).as("asked 25 hours ago").contains(id);
 
 		assertThat(spotChecks.remind(id)).isTrue();
@@ -180,7 +179,7 @@ class SpotCheckIT {
 	}
 
 	private long notifications(Long userId, String eventType) {
-		Long rows = jdbc.queryForObject("select count(*) from notification where recipient_user_id = ? and event_type = ?"
+		Long rows = jdbc.queryForObject("select count(*) from requested_notification where recipient_user_id = ? and event_type = ?"
 				+ " and resource_type = 'SPOT_CHECK'", Long.class, userId, eventType);
 		return rows == null ? 0L : rows;
 	}

@@ -76,7 +76,7 @@ class FamilyIncidentReceiptIT {
 	@BeforeEach
 	void prepare() {
 		clock.now = START;
-		for (String table : List.of("audit_log", "notification", "incident_acknowledgement", "incident_log",
+		for (String table : List.of("audit_log", "notification", "requested_notification", "incident_acknowledgement", "incident_log",
 				"incident", "elder_family_binding", "elder", "family_member", "user_role", "app_user")) {
 			jdbc.update("DELETE FROM " + table);
 		}
@@ -126,7 +126,7 @@ class FamilyIncidentReceiptIT {
 	@Test
 	void viewThenAcknowledgePreservesFirstTimesAndNoteWithoutChangingHandlingOrRead() throws Exception {
 		var incidents = jdbc.queryForList("SELECT * FROM incident ORDER BY id");
-		var notices = jdbc.queryForList("SELECT * FROM notification ORDER BY id");
+		var notices = jdbc.queryForList("SELECT * FROM requested_notification ORDER BY id");
 		Browser family = loginAs("family-a");
 		JsonNode viewed = command(family, 601, "view", null);
 		assertReceipt(viewed, 601, 42, "2026-10-07T16:00:00+08:00", null, null);
@@ -137,7 +137,7 @@ class FamilyIncidentReceiptIT {
 		assertThat(command(family, 601, "acknowledge", "{\"responseNote\":\"Replace it\"}")).isEqualTo(acknowledged);
 		assertThat(command(family, 601, "view", null)).isEqualTo(acknowledged);
 		assertThat(jdbc.queryForList("SELECT * FROM incident ORDER BY id")).isEqualTo(incidents);
-		assertThat(jdbc.queryForList("SELECT * FROM notification ORDER BY id")).isEqualTo(notices);
+		assertThat(jdbc.queryForList("SELECT * FROM requested_notification ORDER BY id")).isEqualTo(notices);
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident_log", Long.class)).isZero();
 		assertThat(read(family, 601).path("acknowledgement")).isEqualTo(acknowledged);
 	}
@@ -157,6 +157,7 @@ class FamilyIncidentReceiptIT {
 	@ValueSource(strings = {"view", "acknowledge"})
 	void independentFamiliesReadOnlyBindingAndResolvedIncidentNeedNoNotification(String action) throws Exception {
 		jdbc.update("DELETE FROM notification");
+		jdbc.update("DELETE FROM requested_notification");
 		JsonNode a = command(loginAs("family-a"), 601, action, null);
 		JsonNode b = command(loginAs("family-b"), 601, action, null);
 		assertThat(a.path("familyMemberId").longValue()).isEqualTo(42);

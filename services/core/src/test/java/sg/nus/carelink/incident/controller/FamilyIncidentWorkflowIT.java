@@ -115,7 +115,7 @@ class FamilyIncidentWorkflowIT {
             assertThat(detailB.path("acknowledgement").path("familyMemberId").asLong()).isEqualTo(familyB);
             assertEmptyReceipt(detailA); assertEmptyReceipt(detailB);
             clock.at(START.plusSeconds(360));
-            var read = open(noticeA); assertEmptyReceipt(detail(a, reported.id()));
+            var read = noticeA; assertEmptyReceipt(detail(a, reported.id()));
             clock.at(START.plusSeconds(420));
             var viewed = body(a.command("POST", "/api/incidents/" + reported.id() + "/view", null), 200);
             assertThat(viewed.path("viewedAt").asString()).isEqualTo("2026-10-08T10:07:00+08:00");
@@ -211,8 +211,10 @@ class FamilyIncidentWorkflowIT {
     }
 
     @Test void oneFamilyStorageFailureDoesNotUndoCommittedReportOrBlockTheOtherFamily() throws Exception {
-        jdbc.execute("CREATE TRIGGER fm05_workflow_notice_fault BEFORE INSERT ON notification FOR EACH ROW BEGIN IF NEW.recipient_user_id="
-                + familyAUser + " AND NEW.resource_type='INCIDENT' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic recipient persistence failure'; END IF; END");
+        // Family A's message cannot be written: its event fails in the outbox
+        jdbc.execute("CREATE TRIGGER fm05_workflow_notice_fault BEFORE INSERT ON outbox_event FOR EACH ROW BEGIN IF NEW.type='NotificationRequested'"
+                + " AND JSON_VALUE(NEW.payload, '$.recipientUserId' RETURNING SIGNED)=" + familyAUser
+                + " AND JSON_VALUE(NEW.payload, '$.resourceType')='INCIDENT' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic recipient persistence failure'; END IF; END");
         try {
             var report = report();
             try (var a = browser(familyAName); var b = browser(familyBName)) {
@@ -258,14 +260,13 @@ class FamilyIncidentWorkflowIT {
         var report = report();
         try (var family = browser(familyAName); var other = browser(familyBName); var manager = browser(managerName)) {
             var raised = notice(familyAUser, report.id()); var deadline = detail(family, report.id()).path("acknowledgeBy");
-            var read = open(raised);
+            var read = raised;
             var awareness = body(family.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Already informed")), 200);
             clock.at(START.plusSeconds(360));
             assertThat(body(manager.command("POST", "/api/incidents/" + report.id() + "/escalate", Map.of("reason", "Synthetic chain exhausted")), 200).path("status").asString()).isEqualTo("UNRESOLVED_ESCALATED");
             var messages = notices(familyAUser, report.id());
             assertThat(messages).hasSize(2).contains(read);
             assertThat(messages).extracting(row -> row.get("event_type")).containsExactlyInAnyOrder("INCIDENT_RAISED", "INCIDENT_UNRESOLVED");
-            assertThat(messages).extracting(row -> row.get("status")).containsExactlyInAnyOrder("READ", "PENDING");
             assertThat(notices(familyBUser, report.id())).hasSize(2);
             assertThat(detail(family, report.id()).path("acknowledgement")).isEqualTo(awareness);
             assertThat(detail(family, report.id()).path("acknowledgeBy")).isEqualTo(deadline);
@@ -285,7 +286,7 @@ class FamilyIncidentWorkflowIT {
             body(manager.command("POST", "/api/care-plans/" + plan + "/publish", Map.of("startDate", start.toLocalDate().toString(), "nodes", List.of(Map.of(
                     "groupName", "Personal care", "name", "FM05 workflow care", "evidenceType", "CHECKLIST", "visits", List.of(Map.of("day", "THURSDAY", "startTime", "10:05", "minutes", 60)))))), 200);
             // Publishing also tells the family the plan is ready; these tests count incident messages only.
-            jdbc.update("DELETE FROM notification WHERE resource_type = 'CARE_PLAN'");
+            jdbc.update("DELETE FROM requested_notification WHERE resource_type = 'CARE_PLAN'");
             var planned = visits.ofElder(elder).stream().filter(visit -> Long.valueOf(plan).equals(visit.carePlanId()))
                     .findFirst().orElseThrow(() -> new AssertionError("Published/assigned plan must produce its visit in visit"));
             assertThat(planned.caregiverId()).isEqualTo(caregiver);
@@ -315,13 +316,7 @@ class FamilyIncidentWorkflowIT {
         return messages.getFirst();
     }
     private List<Map<String, Object>> notices(long user, long id) {
-        return jdbc.queryForList("SELECT * FROM notification WHERE recipient_user_id=? AND resource_type='INCIDENT' AND resource_id=? ORDER BY id", user, id);
-    }
-    /** Opens the message the way the inbox does, so incident's own facts can be shown not to follow it. */
-    private Map<String, Object> open(Map<String, Object> notice) {
-        var now = java.sql.Timestamp.valueOf(LocalDateTime.ofInstant(clock.instant(), SINGAPORE));
-        jdbc.update("UPDATE notification SET status='READ', sent_at=?, read_at=? WHERE id=?", now, now, notice.get("id"));
-        return jdbc.queryForMap("SELECT * FROM notification WHERE id=?", notice.get("id"));
+        return jdbc.queryForList("SELECT * FROM requested_notification WHERE recipient_user_id=? AND resource_type='INCIDENT' AND resource_id=? ORDER BY id", user, id);
     }
     private void assertEmptyReceipt(JsonNode detail) {
         var receipt = detail.path("acknowledgement");

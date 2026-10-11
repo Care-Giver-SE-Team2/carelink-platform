@@ -11,25 +11,20 @@ import org.springframework.stereotype.Component;
 import sg.nus.carelink.incident.domain.repository.SpotCheckLookups;
 
 /**
- * What UC-MG08 looks up outside the spot check: the visits it is about, from visit's internal API
- * ({@link SpotCheckVisits}), and family_member and the family's asks with plain statements that
- * take an id.
+ * What UC-MG08 looks up beside the spot check: the visits it is about, from visit's internal API
+ * ({@link SpotCheckVisits}), and family_member and when the family was last asked (which the alert
+ * notes on the check) with plain statements that take an id.
  *
  * <p>Times come out as {@link Timestamp}, never as {@link LocalDateTime}: only a Timestamp lands on
- * the same side of the connection's time-zone conversion as what JPA writes (see
- * NotificationTableAlert for how that was found).
+ * the same side of the connection's time-zone conversion as what JPA writes.
  */
 @Component
 class JdbcSpotCheckLookups implements SpotCheckLookups {
 
 	private static final String FAMILY_MEMBER = "select id from family_member where user_id = :userId";
 
-	/** The family's asks are the notifications the alert wrote: the request, and any reminders. */
-	private static final String LAST_ASKED = """
-			select max(created_at) from notification
-			where resource_type = 'SPOT_CHECK' and resource_id = :checkId
-			  and event_type in ('SPOT_CHECK_REQUESTED', 'SPOT_CHECK_REMINDER')
-			""";
+	/** The alert records when it asked the family: the request, and any reminder since. */
+	private static final String LAST_ASKED = "select family_asked_at from spot_check where id = :checkId";
 
 	private final JdbcClient jdbc;
 	private final SpotCheckVisits visits;
@@ -56,7 +51,7 @@ class JdbcSpotCheckLookups implements SpotCheckLookups {
 
 	@Override
 	public Optional<LocalDateTime> lastAskedAt(Long checkId) {
-		return Optional.ofNullable(jdbc.sql(LAST_ASKED).param("checkId", checkId).query(Timestamp.class).single())
+		return jdbc.sql(LAST_ASKED).param("checkId", checkId).query(Timestamp.class).optional()
 				.map(Timestamp::toLocalDateTime);
 	}
 }

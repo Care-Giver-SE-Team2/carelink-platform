@@ -1,5 +1,11 @@
 # FM05 incident event / family observer integration
 
+> **Since notification became a service of its own:** the observer no longer inserts the family's
+> message into `notification`. Each family member's message is a `NotificationRequested` event, written
+> to core's outbox in the same transaction as that member's delivery outcome and window, and the
+> notification service keeps it. A delivery is `CREATED` once its event is written; the window no longer
+> points at a notification row (`first_notification_id` is left empty). Everything else below stands.
+
 Implemented: the event contract, Observer subject and interface, after-commit bridge, family observer, safe IN_APP message creation, persistent deduplication/outcomes, and personal response windows. Shared `EscalationService` routing now registers raised and chain-exhausted facts in the source write transaction. Its old direct family sender has been replaced in the same integration; manager/caregiver broadcasts and responder handovers remain. Inbox operations now recheck current authorization, filter unresolved resources and use Singapore business time. Family INCIDENT bell links now open the authorized detail and record notification read/view independently after rendering. Real CG04 HTTP source tests establish producer activation, and the full HTTP/database/browser workflow is now covered below.
 
 ## Production source integration
@@ -25,11 +31,11 @@ flowchart LR
   C --> D[IncidentEventSubject]
   D --> E[IncidentEventObserver]
   E --> F[FamilyIncidentAlertObserver]
-  F --> G[Existing notification table]
+  F --> G[NotificationRequested event]
   F --> H[FM05 outcomes and personal window]
 ```
 
-The production handoff is implemented: `IncidentAlert`/`NotificationTableAlert` now handle staff broadcast and handover only. The old bound-family broadcast and chain-exhausted sender are removed; existing family message rows are untouched. BROADCAST timeline counts describe synchronous staff recipients, and CHAIN_EXHAUSTED records event registration without claiming successful family delivery. Routing, claim/resolve rules and CG04 version/command/receipt logic are unchanged. Existing sources sharing this route (including elder SOS and system-raised service incidents) naturally use the same publication point; this is not implementation of additional source endpoints. The inbox authorization and bell navigation integrations below preserve this publication contract.
+The production handoff is implemented: `IncidentAlert`/`NotificationRequestedIncidentAlert` now handle staff broadcast and handover only. The old bound-family broadcast and chain-exhausted sender are removed; existing family message rows are untouched. BROADCAST timeline counts describe synchronous staff recipients, and CHAIN_EXHAUSTED records event registration without claiming successful family delivery. Routing, claim/resolve rules and CG04 version/command/receipt logic are unchanged. Existing sources sharing this route (including elder SOS and system-raised service incidents) naturally use the same publication point; this is not implementation of additional source endpoints. The inbox authorization and bell navigation integrations below preserve this publication contract.
 
 ## Persistence and failure semantics
 

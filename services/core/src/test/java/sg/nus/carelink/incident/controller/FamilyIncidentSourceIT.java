@@ -34,7 +34,7 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
 
     @BeforeEach void clearPreviousScenarios() {
         // SharedMySql isolates the class; clear only its previous incident scenarios.
-        for (String table : List.of("family_alert_window", "family_alert_delivery", "family_alert_event", "notification",
+        for (String table : List.of("family_alert_window", "family_alert_delivery", "family_alert_event", "requested_notification",
                 "incident_acknowledgement", "incident_log", "incident")) {
             jdbc.update("DELETE FROM " + table);
         }
@@ -52,7 +52,7 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
                 assertThat(event.get("state")).isEqualTo("PROCESSED");
                 assertThat(UUID.fromString(event.get("event_id").toString())).isNotNull();
             });
-            var messages = jdbc.queryForList("SELECT * FROM notification WHERE recipient_user_id=? AND resource_id=?", family, id);
+            var messages = jdbc.queryForList("SELECT * FROM requested_notification WHERE recipient_user_id=? AND resource_id=?", family, id);
             assertThat(messages).singleElement().satisfies(message -> {
                 assertThat(message.get("status")).isEqualTo("PENDING");
                 assertThat(message.get("body").toString()).doesNotContain("Private source narrative");
@@ -62,10 +62,10 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
             assertThat(count("family_alert_window")).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT responder_user_id FROM incident WHERE id=?", Long.class, id)).isNotNull();
             for (long staff : List.of(manager, caregiverUser)) {
-                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE resource_id=? AND recipient_user_id=? AND event_type='INCIDENT_RAISED'",
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE resource_id=? AND recipient_user_id=? AND event_type='INCIDENT_RAISED'",
                         Long.class, id, staff)).isEqualTo(1);
             }
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE resource_id=? AND event_type='INCIDENT_ASSIGNED'", Long.class, id)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE resource_id=? AND event_type='INCIDENT_ASSIGNED'", Long.class, id)).isEqualTo(1);
             var detail = familyBrowser.read("/api/family/incidents/" + id);
             assertThat(detail.path("acknowledgeBy").isNull()).isFalse();
             assertThat(count("incident_acknowledgement")).isZero();
@@ -108,7 +108,7 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
         try {
             long id = report().id();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident WHERE visit_id=?", Long.class, visit)).isEqualTo(1);
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE resource_id=? AND recipient_user_id=?", Long.class, id, manager)).isGreaterThan(0);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE resource_id=? AND recipient_user_id=?", Long.class, id, manager)).isGreaterThan(0);
             assertThat(familyMessages()).isZero();
             assertThat(count("family_alert_window")).isZero();
             if (table.equals("notification")) {
@@ -134,6 +134,6 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
     }
     private void removeManagers() { jdbc.update("DELETE FROM user_role WHERE role='MANAGER'"); }
     private List<String> eventTypes() { return jdbc.queryForList("SELECT event_type FROM family_alert_event WHERE elder_id=?", String.class, elder); }
-    private long familyMessages() { return jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id=?", Long.class, family); }
+    private long familyMessages() { return jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE recipient_user_id=?", Long.class, family); }
     private long count(String table) { return jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class); }
 }

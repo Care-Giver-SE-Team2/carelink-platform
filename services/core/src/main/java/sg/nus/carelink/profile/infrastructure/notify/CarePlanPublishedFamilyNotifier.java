@@ -1,6 +1,5 @@
 package sg.nus.carelink.profile.infrastructure.notify;
 
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -13,9 +12,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import sg.nus.carelink.careplan.application.CarePlanPublished;
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.NotificationRequested;
 import sg.nus.carelink.profile.application.FamilyAlertRecipients;
 
 /**
@@ -24,8 +28,9 @@ import sg.nus.carelink.profile.application.FamilyAlertRecipients;
  * which the inbox resolves to its elder for the family access rule; recipients are the family
  * members whose binding to the elder is active right now.
  *
- * <p>Runs after the publish commits and writes on its own, so a failed notification never undoes
- * the manager's publish; it is logged instead.
+ * <p>Runs after the publish commits and sends the messages as {@code NotificationRequested} events
+ * in a transaction of its own, so a failed notification never undoes the manager's publish; it is
+ * logged instead.
  */
 @Component
 class CarePlanPublishedFamilyNotifier {
@@ -40,11 +45,17 @@ class CarePlanPublishedFamilyNotifier {
 
 	private final JdbcClient jdbc;
 	private final FamilyAlertRecipients families;
+	private final Events events;
+	private final TransactionTemplate ownTransaction;
 	private final Clock clock;
 
-	CarePlanPublishedFamilyNotifier(JdbcClient jdbc, FamilyAlertRecipients families, Clock clock) {
+	CarePlanPublishedFamilyNotifier(JdbcClient jdbc, FamilyAlertRecipients families, Events events,
+			PlatformTransactionManager transactions, Clock clock) {
 		this.jdbc = jdbc;
 		this.families = families;
+		this.events = events;
+		this.ownTransaction = new TransactionTemplate(transactions);
+		this.ownTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 		this.clock = clock;
 	}
 
@@ -70,22 +81,12 @@ class CarePlanPublishedFamilyNotifier {
 				.filter(Objects::nonNull)
 				.distinct()
 				.toList();
-		users.forEach(user -> jdbc.sql("""
-				insert into notification
-				(recipient_user_id,event_type,channel,title,body,resource_type,resource_id,status,created_at)
-				values (:recipient,:event,'IN_APP',:title,:body,:type,:resource,'PENDING',:createdAt)
-				""").param("recipient", user).param("event", EVENT)
-				// Stamped from the application clock, as the other notifiers do, so the inbox orders it with them.
-				.param("createdAt", Timestamp.valueOf(LocalDateTime.now(clock)))
-				.param("title", clip(title, 150)).param("body", clip(body, 1000))
-				.param("type", RESOURCE).param("resource", event.carePlanId()).update());
+		LocalDateTime now = LocalDateTime.now(clock);
+		ownTransaction.executeWithoutResult(status -> users.forEach(user -> events.publish(NotificationRequested.TYPE,
+				NotificationRequested.inApp(user, EVENT, title, body, RESOURCE, event.carePlanId(), event.elderId(), now))));
 	}
 
 	private static String day(LocalDate date) {
 		return date == null ? "a date to be confirmed" : date.format(DAY);
-	}
-
-	private static String clip(String text, int max) {
-		return text.length() > max ? text.substring(0, max) : text;
 	}
 }

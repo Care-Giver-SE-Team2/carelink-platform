@@ -25,7 +25,7 @@ class CaregiverSpotCheckWorkflowIT extends CaregiverHttpITSupport {
             body(mgr.post("/api/spot-checks/" + id + "/conclusion", Map.of("result", "NEEDS_IMPROVEMENT", "notes", "Explain the routine")), 200);
             assertThat(a.read("/api/spot-checks").toString()).contains("Demo quality check", "NEEDS_IMPROVEMENT");
             assertThat(b.read("/api/spot-checks")).isEmpty();
-            assertThat(jdbc.queryForObject("select count(*) from notification where recipient_user_id=? and event_type='SPOT_CHECK_CONCLUDED' and resource_id=?", Long.class, caregiverUser, id)).isEqualTo(1L);
+            assertThat(jdbc.queryForObject("select count(*) from requested_notification where recipient_user_id=? and event_type='SPOT_CHECK_CONCLUDED' and resource_id=?", Long.class, caregiverUser, id)).isEqualTo(1L);
             assertThat(b.post("/api/spot-checks/" + id + "/response", Map.of("response", "Not mine")).statusCode()).isEqualTo(409);
             assertThat(a.withoutCsrf("/api/spot-checks/" + id + "/response", Map.of("response", "No token")).statusCode()).isEqualTo(403);
             assertThat(a.post("/api/spot-checks/" + id + "/response", Map.of("response", "   ")).statusCode()).isEqualTo(400);

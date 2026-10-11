@@ -211,7 +211,7 @@ class AbsenceReRosteringIT {
 		AbsenceReport asked = absences.requestForSelf(username, AbsenceReport.Type.ANNUAL, TOMORROW.plusDays(3),
 				TOMORROW.plusDays(3), "family trip");
 
-		assertThat(count("select count(*) from notification where recipient_user_id = ? and event_type = 'ABSENCE_REQUESTED'"
+		assertThat(count("select count(*) from requested_notification where recipient_user_id = ? and event_type = 'ABSENCE_REQUESTED'"
 				+ " and resource_type = 'ABSENCE' and resource_id = ?", manager, asked.id())).isEqualTo(1);
 	}
 
@@ -245,7 +245,7 @@ class AbsenceReRosteringIT {
 	}
 
 	private long notifications(Long userId, String eventType) {
-		return count("select count(*) from notification where recipient_user_id = ? and event_type = ?", userId, eventType);
+		return count("select count(*) from requested_notification where recipient_user_id = ? and event_type = ?", userId, eventType);
 	}
 
 	private long count(String sql, Object... args) {

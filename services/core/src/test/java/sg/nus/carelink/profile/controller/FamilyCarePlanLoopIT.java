@@ -70,10 +70,10 @@ class FamilyCarePlanLoopIT {
 		LocalDate starts = LocalDate.now(ZoneId.of("Asia/Singapore")).plusDays(7);
 		long planId = publishBathing(starts);
 
-		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id = 7 "
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE recipient_user_id = 7 "
 				+ "AND event_type = 'CARE_PLAN_PUBLISHED' AND resource_type = 'CARE_PLAN' AND resource_id = ?",
 				Integer.class, planId)).isEqualTo(1);
-		assertThat(jdbc.queryForObject("SELECT title FROM notification WHERE recipient_user_id = 7 "
+		assertThat(jdbc.queryForObject("SELECT title FROM requested_notification WHERE recipient_user_id = 7 "
 				+ "AND resource_type = 'CARE_PLAN' AND resource_id = ?", String.class, planId))
 				.isEqualTo("Care plan v1 for Tan Mei is ready");
 

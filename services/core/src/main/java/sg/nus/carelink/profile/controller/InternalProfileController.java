@@ -17,6 +17,7 @@ import sg.nus.carelink.profile.application.FamilyAccessQuery;
 import sg.nus.carelink.profile.application.FamilyAlertRecipients;
 import sg.nus.carelink.profile.application.PrimaryCaregiverLookup;
 import sg.nus.carelink.profile.application.ProfileService;
+import sg.nus.carelink.profile.domain.repository.CaregiverRepository;
 import sg.nus.carelink.profile.domain.repository.FamilyMemberRepository;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 
@@ -42,9 +43,12 @@ public class InternalProfileController {
 
 	private final PrimaryCaregiverLookup primaryCaregivers;
 
+	private final CaregiverRepository caregiverRecords;
+
 	InternalProfileController(FamilyAccessQuery familyAccess, CaregiverDirectory caregivers,
 			CaregiverWorkDirectory caregiverWork, ProfileService profiles, FamilyMemberRepository familyMembers,
-			FamilyAlertRecipients alertRecipients, PrimaryCaregiverLookup primaryCaregivers) {
+			FamilyAlertRecipients alertRecipients, PrimaryCaregiverLookup primaryCaregivers,
+			CaregiverRepository caregiverRecords) {
 		this.familyAccess = familyAccess;
 		this.caregivers = caregivers;
 		this.caregiverWork = caregiverWork;
@@ -52,6 +56,7 @@ public class InternalProfileController {
 		this.familyMembers = familyMembers;
 		this.alertRecipients = alertRecipients;
 		this.primaryCaregivers = primaryCaregivers;
+		this.caregiverRecords = caregiverRecords;
 	}
 
 	@GetMapping("/family-access/{username}/elders")
@@ -106,6 +111,13 @@ public class InternalProfileController {
 								alert.renewalState(), alert.renewalValidFrom()))
 						.toList(),
 				new CoreApi.CredentialAlertContext(context.asOfDate(), context.warningDays(), context.reviewRequired()));
+	}
+
+	@GetMapping("/caregivers/{caregiverId}/account")
+	public CoreApi.AccountRef caregiverAccount(@PathVariable Long caregiverId) {
+		return caregiverRecords.findById(caregiverId)
+				.map(caregiver -> new CoreApi.AccountRef(caregiver.userId()))
+				.orElseThrow(() -> new ResourceNotFound("Caregiver", caregiverId));
 	}
 
 	@GetMapping("/elders/{elderId}/caregiver-view")

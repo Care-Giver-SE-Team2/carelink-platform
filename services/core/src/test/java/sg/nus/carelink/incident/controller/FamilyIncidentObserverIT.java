@@ -59,7 +59,7 @@ class FamilyIncidentObserverIT {
 	@BeforeEach
 	void prepare() {
 		clock.now = START;
-		for (String table : List.of("family_alert_window", "family_alert_delivery", "family_alert_event", "audit_log", "notification_subscription", "notification", "incident_acknowledgement", "incident_log",
+		for (String table : List.of("family_alert_window", "family_alert_delivery", "family_alert_event", "audit_log", "notification_subscription", "notification", "requested_notification", "incident_acknowledgement", "incident_log",
 				"incident", "elder_family_binding", "elder", "family_member", "user_role", "app_user")) {
 			jdbc.update("DELETE FROM " + table);
 		}
@@ -96,14 +96,14 @@ class FamilyIncidentObserverIT {
 		transaction().executeWithoutResult(status -> {
 			jdbc.update("UPDATE incident SET description = 'Committed private detail' WHERE id = 601");
 			events.raised(id, 601L, 101L, OCCURRED);
-			assertThat(count("notification")).isZero();
+			assertThat(count("requested_notification")).isZero();
 			assertThat(count("family_alert_event")).isZero();
 		});
-		assertThat(count("notification")).isEqualTo(2);
+		assertThat(count("requested_notification")).isEqualTo(2);
 		assertThat(count("family_alert_window")).isEqualTo(2);
 		assertThat(count("incident_acknowledgement")).isZero();
 		assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event", String.class)).isEqualTo("PROCESSED");
-		assertThat(jdbc.queryForList("SELECT * FROM notification")).allSatisfy(row -> {
+		assertThat(jdbc.queryForList("SELECT * FROM requested_notification")).allSatisfy(row -> {
 			assertThat(row.get("recipient_user_id")).isIn(7L, 9L);
 			assertThat(row.get("resource_type")).isEqualTo("INCIDENT");
 			assertThat(row.get("status")).isEqualTo("PENDING");
@@ -124,7 +124,7 @@ class FamilyIncidentObserverIT {
 		var readOnly = transaction(); readOnly.setReadOnly(true);
 		assertThatThrownBy(() -> readOnly.executeWithoutResult(status -> events.raised(UUID.randomUUID(), 601L, 101L, OCCURRED)))
 				.isInstanceOf(IllegalStateException.class);
-		assertThat(count("notification")).isZero();
+		assertThat(count("requested_notification")).isZero();
 		assertThat(count("family_alert_event")).isZero();
 	}
 
@@ -139,13 +139,13 @@ class FamilyIncidentObserverIT {
 			start.countDown();
 			for (var future : futures) { future.get(20, TimeUnit.SECONDS); }
 		}
-		assertThat(count("notification")).isEqualTo(2);
+		assertThat(count("requested_notification")).isEqualTo(2);
 		assertThat(count("family_alert_delivery")).isEqualTo(2);
 		assertThat(count("family_alert_event")).isEqualTo(1);
-		var messages = jdbc.queryForList("SELECT * FROM notification ORDER BY id");
+		var messages = jdbc.queryForList("SELECT * FROM requested_notification ORDER BY id");
 		clock.now = START.plusSeconds(3600);
 		publish(id);
-		assertThat(jdbc.queryForList("SELECT * FROM notification ORDER BY id")).isEqualTo(messages);
+		assertThat(jdbc.queryForList("SELECT * FROM requested_notification ORDER BY id")).isEqualTo(messages);
 		// A failed attempt's follow-up may race a successful retry; it cannot undo CREATED.
 		transaction().executeWithoutResult(status -> store.failed(id, 42L, LocalDateTime.of(2026, 10, 7, 17, 0)));
 		assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=42", String.class)).isEqualTo("CREATED");
@@ -159,12 +159,9 @@ class FamilyIncidentObserverIT {
 			jdbc.update("UPDATE incident SET status = 'UNRESOLVED_ESCALATED' WHERE id = 601");
 			events.unresolved(UUID.randomUUID(), 601L, 101L, OCCURRED.plusMinutes(30));
 		});
-		assertThat(count("notification")).isEqualTo(4);
+		assertThat(count("requested_notification")).isEqualTo(4);
 		assertThat(jdbc.queryForList("SELECT * FROM family_alert_window ORDER BY family_member_id")).isEqualTo(windows);
 		Browser family = loginAs("family-a");
-		// The family opens their inbox (the notification service), which delivers the waiting messages.
-		jdbc.update("UPDATE notification SET status = 'SENT', sent_at = ? WHERE recipient_user_id = 7 AND status = 'PENDING'",
-				Timestamp.valueOf(LocalDateTime.of(2026, 10, 7, 17, 0)));
 		assertThat(read(family, 601).path("acknowledgeBy").asString()).isEqualTo("2026-10-07T18:00:00+08:00");
 		clock.now = START.plusSeconds(3 * 3600);
 		command(family, 601, "acknowledge", null);
@@ -193,18 +190,18 @@ class FamilyIncidentObserverIT {
 			default -> jdbc.update("UPDATE elder_family_binding SET status=? WHERE family_member_id=7", change);
 		}
 		publish(UUID.randomUUID());
-		assertThat(count("notification")).isEqualTo(1);
+		assertThat(count("requested_notification")).isEqualTo(1);
 		assertThat(count("family_alert_window")).isEqualTo(1);
 		assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=7", String.class)).isEqualTo("SKIPPED");
 		assertThat(jdbc.queryForObject("SELECT reason FROM family_alert_delivery WHERE family_member_id=7", String.class)).isNotBlank();
-		assertThat(jdbc.queryForObject("SELECT recipient_user_id FROM notification", Long.class)).isEqualTo(7L);
+		assertThat(jdbc.queryForObject("SELECT recipient_user_id FROM requested_notification", Long.class)).isEqualTo(7L);
 	}
 
 	@Test void readOnlyBindingReceivesUrgentAlertsRegardlessOfOptionalSubscription() throws Exception {
 		jdbc.update("UPDATE elder_family_binding SET access_scope='READ_ONLY' WHERE elder_id=101");
 		jdbc.update("INSERT INTO notification_subscription (user_id, elder_id, event_type, channel, enabled) VALUES (7, 101, 'INCIDENT_RAISED', 'IN_APP', false)");
 		publish(UUID.randomUUID());
-		assertThat(count("notification")).isEqualTo(2);
+		assertThat(count("requested_notification")).isEqualTo(2);
 		assertThat(read(loginAs("family-a"), 601).path("acknowledgeBy").asString()).isEqualTo("2026-10-07T18:00:00+08:00");
 	}
 
@@ -214,7 +211,7 @@ class FamilyIncidentObserverIT {
 		jdbc.update("UPDATE elder_family_binding SET status='REVOKED' WHERE elder_id=101");
 		publish(UUID.randomUUID());
 		assertThat(jdbc.queryForList("SELECT state FROM family_alert_event")).extracting(row -> row.get("state")).containsOnly("NO_RECIPIENTS");
-		assertThat(count("notification")).isZero();
+		assertThat(count("requested_notification")).isZero();
 	}
 
 	@ParameterizedTest
@@ -232,14 +229,14 @@ class FamilyIncidentObserverIT {
 				events.raised(id, 601L, 101L, OCCURRED);
 			});
 			assertThat(jdbc.queryForObject("SELECT description FROM incident WHERE id=601", String.class)).isEqualTo("Source committed");
-			assertThat(count("notification")).isEqualTo(1);
+			assertThat(count("requested_notification")).isEqualTo(1);
 			assertThat(count("family_alert_window")).isEqualTo(1);
 			assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=7", String.class)).isEqualTo("FAILED");
 			assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event", String.class)).isEqualTo("FAILED");
 		} finally { jdbc.execute("DROP TRIGGER fm05_reject"); }
 		clock.now = START.plusSeconds(3600);
 		publish(id);
-		assertThat(count("notification")).isEqualTo(2);
+		assertThat(count("requested_notification")).isEqualTo(2);
 		assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event", String.class)).isEqualTo("PROCESSED");
 		var a = transaction().execute(status -> store.acknowledgeBy(601L, 42L));
 		var b = transaction().execute(status -> store.acknowledgeBy(601L, 7L));
@@ -252,13 +249,13 @@ class FamilyIncidentObserverIT {
 		transaction().executeWithoutResult(status -> events.raised(UUID.randomUUID(), 601L, 103L, OCCURRED));
 		transaction().executeWithoutResult(status -> events.unresolved(UUID.randomUUID(), 601L, 101L, OCCURRED));
 		assertThat(jdbc.queryForList("SELECT state FROM family_alert_event")).extracting(row -> row.get("state")).containsOnly("FAILED");
-		assertThat(count("notification")).isZero();
+		assertThat(count("requested_notification")).isZero();
 	}
 
 	@Test void reusedEventIdCannotChangeTheOriginalFacts() {
 		UUID id = UUID.randomUUID(); publish(id);
 		transaction().executeWithoutResult(status -> events.raised(id, 601L, 103L, OCCURRED));
-		assertThat(count("notification")).isEqualTo(2);
+		assertThat(count("requested_notification")).isEqualTo(2);
 		assertThat(jdbc.queryForObject("SELECT elder_id FROM family_alert_event", Long.class)).isEqualTo(101L);
 		assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event", String.class)).isEqualTo("FAILED");
 	}
@@ -271,17 +268,18 @@ class FamilyIncidentObserverIT {
 				events.raised(UUID.randomUUID(), 601L, 101L, OCCURRED);
 			});
 			assertThat(jdbc.queryForObject("SELECT description FROM incident WHERE id=601", String.class)).isEqualTo("Still committed");
-			assertThat(count("notification")).isZero();
+			assertThat(count("requested_notification")).isZero();
 		} finally { jdbc.execute("RENAME TABLE fm05_unavailable_event TO family_alert_event"); }
 	}
 
 	@Test void unavailableRecipientFailureRecordingStillAllowsOtherFamilies() {
-		jdbc.execute("CREATE TRIGGER fm05_message_fail BEFORE INSERT ON notification FOR EACH ROW BEGIN IF NEW.recipient_user_id=9 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Forced message failure'; END IF; END");
+		// Family B's message cannot be written: its event fails in the outbox
+		jdbc.execute("CREATE TRIGGER fm05_message_fail BEFORE INSERT ON outbox_event FOR EACH ROW BEGIN IF NEW.type='NotificationRequested' AND JSON_VALUE(NEW.payload, '$.recipientUserId' RETURNING SIGNED)=9 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Forced message failure'; END IF; END");
 		jdbc.execute("CREATE TRIGGER fm05_outcome_fail BEFORE INSERT ON family_alert_delivery FOR EACH ROW BEGIN IF NEW.status='FAILED' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Forced outcome failure'; END IF; END");
 		try {
 			publish(UUID.randomUUID());
-			assertThat(count("notification")).isEqualTo(1);
-			assertThat(jdbc.queryForObject("SELECT recipient_user_id FROM notification", Long.class)).isEqualTo(7L);
+			assertThat(count("requested_notification")).isEqualTo(1);
+			assertThat(jdbc.queryForObject("SELECT recipient_user_id FROM requested_notification", Long.class)).isEqualTo(7L);
 			assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event", String.class)).isEqualTo("FAILED");
 		} finally {
 			jdbc.execute("DROP TRIGGER fm05_message_fail");
@@ -295,6 +293,7 @@ class FamilyIncidentObserverIT {
 		assertThat(read(loginAs("family-a"), 601).path("acknowledgeBy").isNull()).isTrue();
 		publish(UUID.randomUUID());
 		assertThat(jdbc.queryForList("SELECT * FROM notification WHERE id=801")).isEqualTo(original);
+		assertThat(count("requested_notification")).isEqualTo(2);
 	}
 
 	private record Browser(MockHttpSession session, Cookie csrf) { }
