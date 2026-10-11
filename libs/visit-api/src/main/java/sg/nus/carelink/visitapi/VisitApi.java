@@ -10,6 +10,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
@@ -24,9 +25,17 @@ import org.springframework.web.service.annotation.PostExchange;
  * <p>Errors come back as they did in-process: 403 as {@link AccessDeniedException}, 404 as
  * {@link VisitNotFound}, and a broken business rule (409) as {@link VisitRuleViolation} with visit's
  * rule code. See {@link VisitApiClients}.
+ *
+ * <p>The four changes re-rostering makes take a request key ({@value #IDEMPOTENCY_KEY}). visit makes a
+ * keyed change at most once and answers the same key again with the first answer, so a caller that
+ * did not hear back - a read timeout after visit had already made the change - sends the change again
+ * with the same key, never a new one. Without a key a change is made every time it is sent.
  */
 @HttpExchange(url = "/internal/v1", accept = "application/json")
 public interface VisitApi {
+
+	/** The header that carries a change's request key. */
+	String IDEMPOTENCY_KEY = "Idempotency-Key";
 
 	// ---------- Reassignment (rostering, report) ----------
 
@@ -58,18 +67,30 @@ public interface VisitApi {
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime since,
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime until);
 
+	/** @param requestKey makes the change once however often it is sent; null to make it every time */
 	@PostExchange("/visits/{visitId}/reassignment")
-	void reassign(@PathVariable Long visitId, @RequestBody Reassignment reassignment);
+	void reassign(@PathVariable Long visitId, @RequestBody Reassignment reassignment,
+			@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String requestKey);
 
+	/** @param requestKey makes the change once however often it is sent; null to make it every time */
 	@PostExchange("/visits/{visitId}/uncovered")
-	void markUncovered(@PathVariable Long visitId, @RequestBody Change why);
+	void markUncovered(@PathVariable Long visitId, @RequestBody Change why,
+			@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String requestKey);
 
+	/** @param requestKey makes the change once however often it is sent; null to make it every time */
 	@PostExchange("/visits/{visitId}/call-off")
-	void callOff(@PathVariable Long visitId, @RequestBody Change why);
+	void callOff(@PathVariable Long visitId, @RequestBody Change why,
+			@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String requestKey);
 
-	/** Moves the visit to a new start and caregiver, and answers the id of the visit that replaces it. */
+	/**
+	 * Moves the visit to a new start and caregiver, and answers the id of the visit that replaces it. Sent
+	 * again with the same key, it answers the same visit.
+	 *
+	 * @param requestKey makes the move once however often it is sent; null to make it every time
+	 */
 	@PostExchange("/visits/{visitId}/move")
-	VisitRef moveTo(@PathVariable Long visitId, @RequestBody Move move);
+	VisitRef moveTo(@PathVariable Long visitId, @RequestBody Move move,
+			@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String requestKey);
 
 	// ---------- Scheduling (rostering) ----------
 

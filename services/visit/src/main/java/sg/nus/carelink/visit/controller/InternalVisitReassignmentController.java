@@ -10,17 +10,20 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.visit.application.VisitRequests;
 import sg.nus.carelink.visitapi.VisitApi;
 
 /**
  * The re-rostering part of visit's internal API ({@link VisitApi}): which visits an absence
  * vacates, who is booked when, who has been to an elder before, and the four changes re-rostering
- * makes to a visit. Each call is one call to {@link VisitReassignment}.
+ * makes to a visit. Each call is one call to {@link VisitReassignment}; a change sent with a request key
+ * is made once for that key ({@link VisitRequests}), and sent again it gets the first answer.
  */
 @RestController
 @RequestMapping("/internal/v1")
@@ -28,8 +31,11 @@ public class InternalVisitReassignmentController {
 
 	private final VisitReassignment visits;
 
-	InternalVisitReassignmentController(VisitReassignment visits) {
+	private final VisitRequests once;
+
+	InternalVisitReassignmentController(VisitReassignment visits, VisitRequests once) {
 		this.visits = visits;
+		this.once = once;
 	}
 
 	@GetMapping("/visits/{visitId}")
@@ -64,26 +70,41 @@ public class InternalVisitReassignmentController {
 	}
 
 	@PostMapping("/visits/{visitId}/reassignment")
-	public ResponseEntity<Void> reassign(@PathVariable Long visitId, @RequestBody VisitApi.Reassignment reassignment) {
-		visits.reassign(visitId, reassignment.toCaregiverId(), change(reassignment.why()));
+	public ResponseEntity<Void> reassign(@PathVariable Long visitId, @RequestBody VisitApi.Reassignment reassignment,
+			@RequestHeader(name = VisitApi.IDEMPOTENCY_KEY, required = false) String requestKey) {
+		once.once(requestKey, visitId, () -> {
+			visits.reassign(visitId, reassignment.toCaregiverId(), change(reassignment.why()));
+			return null;
+		});
 		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/visits/{visitId}/uncovered")
-	public ResponseEntity<Void> markUncovered(@PathVariable Long visitId, @RequestBody VisitApi.Change why) {
-		visits.markUncovered(visitId, change(why));
+	public ResponseEntity<Void> markUncovered(@PathVariable Long visitId, @RequestBody VisitApi.Change why,
+			@RequestHeader(name = VisitApi.IDEMPOTENCY_KEY, required = false) String requestKey) {
+		once.once(requestKey, visitId, () -> {
+			visits.markUncovered(visitId, change(why));
+			return null;
+		});
 		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/visits/{visitId}/call-off")
-	public ResponseEntity<Void> callOff(@PathVariable Long visitId, @RequestBody VisitApi.Change why) {
-		visits.callOff(visitId, change(why));
+	public ResponseEntity<Void> callOff(@PathVariable Long visitId, @RequestBody VisitApi.Change why,
+			@RequestHeader(name = VisitApi.IDEMPOTENCY_KEY, required = false) String requestKey) {
+		once.once(requestKey, visitId, () -> {
+			visits.callOff(visitId, change(why));
+			return null;
+		});
 		return ResponseEntity.noContent().build();
 	}
 
+	/** Sent again with the same key, the move answers the visit it created the first time. */
 	@PostMapping("/visits/{visitId}/move")
-	public VisitApi.VisitRef moveTo(@PathVariable Long visitId, @RequestBody VisitApi.Move move) {
-		return new VisitApi.VisitRef(visits.moveTo(visitId, move.newStart(), move.toCaregiverId(), change(move.why())));
+	public VisitApi.VisitRef moveTo(@PathVariable Long visitId, @RequestBody VisitApi.Move move,
+			@RequestHeader(name = VisitApi.IDEMPOTENCY_KEY, required = false) String requestKey) {
+		return new VisitApi.VisitRef(once.once(requestKey, visitId,
+				() -> visits.moveTo(visitId, move.newStart(), move.toCaregiverId(), change(move.why()))));
 	}
 
 	private static VisitReassignment.Change change(VisitApi.Change why) {

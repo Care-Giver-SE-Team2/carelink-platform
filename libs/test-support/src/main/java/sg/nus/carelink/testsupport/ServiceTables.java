@@ -11,7 +11,7 @@ public final class ServiceTables {
 
 	public static final Set<String> VISIT = Set.of("caregiver_command_receipt", "elder_confirmation", "visit",
 			"visit_assignment", "visit_check_in_record", "visit_evidence", "visit_health_record",
-			"visit_missed_check_in_trigger", "visit_state_transition", "visit_task", "vital_sign");
+			"visit_missed_check_in_trigger", "visit_request", "visit_state_transition", "visit_task", "vital_sign");
 
 	public static final Set<String> REPORT = Set.of("caregiver_review", "report", "report_amendment", "report_basis",
 			"value_added_service", "value_added_service_request", "report_visit", "report_visit_task",

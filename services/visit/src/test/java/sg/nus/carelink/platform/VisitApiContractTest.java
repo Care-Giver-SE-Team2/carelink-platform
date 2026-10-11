@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Supplier;
 
 import jakarta.servlet.http.Cookie;
 
@@ -36,6 +37,7 @@ import sg.nus.carelink.visit.application.StandaloneVisits;
 import sg.nus.carelink.visit.application.UpcomingAssignments;
 import sg.nus.carelink.visit.application.VisitLookups;
 import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.visit.application.VisitRequests;
 import sg.nus.carelink.visit.application.VisitScheduling;
 import sg.nus.carelink.visit.controller.InternalVisitPlanningController;
 import sg.nus.carelink.visit.controller.InternalVisitQueryController;
@@ -81,6 +83,9 @@ class VisitApiContractTest {
 	@MockitoBean
 	private VisitLookups lookups;
 
+	@MockitoBean
+	private VisitRequests once;
+
 	private VisitApi visit;
 
 	@BeforeEach
@@ -88,6 +93,8 @@ class VisitApiContractTest {
 		visit = VisitApiClients.create(RestClient.builder()
 				.requestFactory(new MockMvcClientHttpRequestFactory(mvc))
 				.baseUrl("http://visit"));
+		// Making a change once per key is VisitRequests' business, checked in VisitApiIT
+		when(once.once(any(), any(), any())).thenAnswer(call -> call.<Supplier<Long>>getArgument(2).get());
 	}
 
 	@Test
@@ -119,10 +126,10 @@ class VisitApiContractTest {
 		when(reassignment.moveTo(100L, NINE.plusDays(1), 9L, change)).thenReturn(101L);
 
 		var why = new VisitApi.Change(5L, 1L, 12L, "Annual leave");
-		visit.reassign(100L, new VisitApi.Reassignment(9L, why));
-		visit.markUncovered(100L, why);
-		visit.callOff(100L, why);
-		assertThat(visit.moveTo(100L, new VisitApi.Move(NINE.plusDays(1), 9L, why)).visitId()).isEqualTo(101L);
+		visit.reassign(100L, new VisitApi.Reassignment(9L, why), null);
+		visit.markUncovered(100L, why, null);
+		visit.callOff(100L, why, null);
+		assertThat(visit.moveTo(100L, new VisitApi.Move(NINE.plusDays(1), 9L, why), null).visitId()).isEqualTo(101L);
 
 		verify(reassignment).reassign(100L, 9L, change);
 		verify(reassignment).markUncovered(100L, change);
@@ -135,9 +142,28 @@ class VisitApiContractTest {
 				.when(reassignment).reassign(eq(100L), eq(9L), any());
 
 		var why = new VisitApi.Change(5L, 1L, null, "Annual leave");
-		assertThatThrownBy(() -> visit.reassign(100L, new VisitApi.Reassignment(9L, why)))
+		assertThatThrownBy(() -> visit.reassign(100L, new VisitApi.Reassignment(9L, why), null))
 				.isInstanceOfSatisfying(VisitRuleViolation.class,
 						violation -> assertThat(violation.code()).isEqualTo("VISIT_NOT_OPEN"));
+	}
+
+	@Test
+	void eachChangesRequestKeyReachesVisitRequestsWithItsVisit() {
+		var change = new VisitReassignment.Change(5L, 1L, 12L, "Annual leave");
+		when(reassignment.moveTo(100L, NINE.plusDays(1), 9L, change)).thenReturn(101L);
+
+		var why = new VisitApi.Change(5L, 1L, 12L, "Annual leave");
+		visit.reassign(100L, new VisitApi.Reassignment(9L, why), "step-1");
+		visit.markUncovered(100L, why, "step-2");
+		visit.callOff(100L, why, "step-3");
+		assertThat(visit.moveTo(100L, new VisitApi.Move(NINE.plusDays(1), 9L, why), "step-4").visitId())
+				.isEqualTo(101L);
+
+		verify(once).once(eq("step-1"), eq(100L), any());
+		verify(once).once(eq("step-2"), eq(100L), any());
+		verify(once).once(eq("step-3"), eq(100L), any());
+		verify(once).once(eq("step-4"), eq(100L), any());
+		verify(reassignment).reassign(100L, 9L, change);
 	}
 
 	@Test
