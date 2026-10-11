@@ -130,10 +130,24 @@ class FamilyIncidentSourceIT extends CaregiverHttpITSupport {
         assertThat(count("family_alert_window")).isZero();
     }
 
+    /** A retry of the same report (visit's transaction failed after core answered) gets the same incident. */
+    @Test void aRetryOfTheSameReportGetsTheSameIncidentAndTellsTheFamilyOnce() {
+        String key = "caregiver-report:" + caregiverUser + ":" + UUID.randomUUID();
+        long first = report(key).id();
+        long again = report(key).id();
+        assertThat(again).isEqualTo(first);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident WHERE visit_id=?", Long.class, visit)).isEqualTo(1);
+        assertThat(familyMessages()).isEqualTo(1);
+        assertThat(report("caregiver-report:" + caregiverUser + ":" + UUID.randomUUID()).id()).isNotEqualTo(first);
+    }
+
     /** What visit sends core once the caregiver's report is in: the elder, the visit and who reported it. */
     private CoreApi.IncidentReport report() {
+        return report("caregiver-report:" + caregiverUser + ":" + UUID.randomUUID());
+    }
+    private CoreApi.IncidentReport report(String requestKey) {
         return core.reportIncident(new CoreApi.CaregiverIncidentRequest(elder, visit, caregiverUser, "SERVICE", "MEDIUM",
-                "Private source narrative"));
+                "Private source narrative", requestKey));
     }
     private void removeManagers() { jdbc.update("DELETE FROM user_role WHERE role='MANAGER'"); }
     private List<String> eventTypes() { return jdbc.queryForList("SELECT event_type FROM family_alert_event WHERE elder_id=?", String.class, elder); }

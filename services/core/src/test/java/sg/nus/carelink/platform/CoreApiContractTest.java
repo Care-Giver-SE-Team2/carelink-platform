@@ -3,6 +3,8 @@ package sg.nus.carelink.platform;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +43,7 @@ import sg.nus.carelink.coreapi.CoreApiClients;
 import sg.nus.carelink.coreapi.CoreNotFound;
 import sg.nus.carelink.coreapi.CoreRuleViolation;
 import sg.nus.carelink.incident.application.CaregiverIncidentGateway;
+import sg.nus.carelink.incident.application.IncidentRequests;
 import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
 import sg.nus.carelink.incident.application.MissedCheckInPauseEvidence;
@@ -125,6 +129,9 @@ class CoreApiContractTest {
 	private MissedCheckInPauseEvidence pauseEvidence;
 
 	@MockitoBean
+	private IncidentRequests once;
+
+	@MockitoBean
 	private VisitCover visitCover;
 
 	@MockitoBean
@@ -146,6 +153,8 @@ class CoreApiContractTest {
 		core = CoreApiClients.create(RestClient.builder()
 				.requestFactory(new MockMvcClientHttpRequestFactory(mvc))
 				.baseUrl("http://core"));
+		// Raising once per key is IncidentRequests' business, checked in core's integration tests
+		when(once.once(any(), any())).thenAnswer(call -> call.<Supplier<Long>>getArgument(1).get());
 	}
 
 	@Test
@@ -294,7 +303,8 @@ class CoreApiContractTest {
 		CoreApi.IncidentReport expected = new CoreApi.IncidentReport(55L, 100L, "FALL", "HIGH",
 				"Slipped in the bathroom", "OPEN", reportedAt, reportedAt.plusMinutes(30), null);
 		assertThat(core.reportIncident(new CoreApi.CaregiverIncidentRequest(3L, 100L, 70L, "FALL", "HIGH",
-				"Slipped in the bathroom"))).isEqualTo(expected);
+				"Slipped in the bathroom", "caregiver-report:70:1"))).isEqualTo(expected);
+		verify(once).once(eq("caregiver-report:70:1"), any());
 		assertThat(core.incident(55L, 70L)).isEqualTo(expected);
 		assertThat(core.incidents(70L, 100L, 0, 20))
 				.isEqualTo(new CoreApi.IncidentReports(List.of(expected), 0, 20, 1));
@@ -308,10 +318,12 @@ class CoreApiContractTest {
 		when(dispute.id()).thenReturn(57L);
 		when(incidents.createElderServiceDispute(3L, 100L, 30L, "The caregiver left early")).thenReturn(dispute);
 
-		assertThat(core.raiseMissedCheckIn(new CoreApi.MissedCheckInRequest(3L, 100L, dueAt, dueAt.plusMinutes(20))))
-				.isEqualTo(new CoreApi.IncidentRef(56L));
+		assertThat(core.raiseMissedCheckIn(new CoreApi.MissedCheckInRequest(3L, 100L, dueAt, dueAt.plusMinutes(20),
+				"missed-check-in:100:2026-10-10T09:00"))).isEqualTo(new CoreApi.IncidentRef(56L));
 		assertThat(core.raiseServiceDispute(new CoreApi.ServiceDisputeRequest(3L, 100L, 30L,
-				"The caregiver left early"))).isEqualTo(new CoreApi.IncidentRef(57L));
+				"The caregiver left early", "service-dispute:100"))).isEqualTo(new CoreApi.IncidentRef(57L));
+		verify(once).once(eq("missed-check-in:100:2026-10-10T09:00"), any());
+		verify(once).once(eq("service-dispute:100"), any());
 	}
 
 	@Test

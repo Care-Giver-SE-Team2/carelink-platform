@@ -298,7 +298,7 @@ class FamilyIncidentWorkflowIT {
     private Report report() throws Exception {
         long visit = plannedVisit();
         long id = core.reportIncident(new CoreApi.CaregiverIncidentRequest(elder, visit, caregiverUser, "FALL", "HIGH",
-                DESCRIPTION)).id();
+                DESCRIPTION, "caregiver-report:" + caregiverUser + ":" + UUID.randomUUID())).id();
         return new Report(id, visit);
     }
     private CompletableFuture<HttpResponse<String>> commandAsync(Browser browser, String path, Map<String, ?> payload) {

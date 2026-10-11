@@ -1,6 +1,7 @@
 package sg.nus.carelink.visit.infrastructure.core;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 import sg.nus.carelink.coreapi.CoreApi;
@@ -32,11 +33,13 @@ class CoreIncidents implements CaregiverIncidentGateway, MissedCheckInIncidentGa
 		this.core = core;
 	}
 
+	/** The caregiver's own request id keys the report, so their retry is the same report. */
 	@Override
-	public Report report(Long elderId, Long visitId, Long actor, String category, String severity, String description) {
+	public Report report(Long elderId, Long visitId, Long actor, String category, String severity, String description,
+			UUID clientRequestId) {
 		try {
-			return report(core.reportIncident(
-					new CoreApi.CaregiverIncidentRequest(elderId, visitId, actor, category, severity, description)));
+			return report(core.reportIncident(new CoreApi.CaregiverIncidentRequest(elderId, visitId, actor, category,
+					severity, description, "caregiver-report:" + actor + ":" + clientRequestId)));
 		}
 		catch (CoreRuleViolation refused) {
 			throw new BusinessRuleViolation(refused.code(), refused.getMessage());
@@ -60,9 +63,11 @@ class CoreIncidents implements CaregiverIncidentGateway, MissedCheckInIncidentGa
 				reports.totalElements());
 	}
 
+	/** One missed check-in per visit and due time: a scan that tries again gets the incident already raised. */
 	@Override
 	public Long raise(Long elderId, Long visitId, LocalDateTime dueAt, LocalDateTime observedAt) {
-		return core.raiseMissedCheckIn(new CoreApi.MissedCheckInRequest(elderId, visitId, dueAt, observedAt)).incidentId();
+		return core.raiseMissedCheckIn(new CoreApi.MissedCheckInRequest(elderId, visitId, dueAt, observedAt,
+				"missed-check-in:" + visitId + ":" + dueAt)).incidentId();
 	}
 
 	@Override
@@ -75,10 +80,11 @@ class CoreIncidents implements CaregiverIncidentGateway, MissedCheckInIncidentGa
 		}
 	}
 
+	/** An elder answers for a visit once, so one dispute per visit. */
 	@Override
 	public Long createElderServiceDispute(Long elderId, Long visitId, Long reportedByUserId, String description) {
-		return core.raiseServiceDispute(new CoreApi.ServiceDisputeRequest(elderId, visitId, reportedByUserId, description))
-				.incidentId();
+		return core.raiseServiceDispute(new CoreApi.ServiceDisputeRequest(elderId, visitId, reportedByUserId, description,
+				"service-dispute:" + visitId)).incidentId();
 	}
 
 	private static Report report(CoreApi.IncidentReport report) {

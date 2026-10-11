@@ -186,7 +186,7 @@ class CaregiverCheckOutWorkflowIT extends MissedCheckInITSupport {
         long id=plannedVisit();legacyPause(id);
         switch(reason) {
             case "OTHER_INCIDENT" -> core.resolve(core.reportIncident(new CoreApi.CaregiverIncidentRequest(elder,id,caregiverUser,
-                    "SERVICE","LOW","Synthetic independent pause")).id());
+                    "SERVICE","LOW","Synthetic independent pause",null)).id());
             case "VERSION" -> jdbc.update("UPDATE visit SET version=version+1 WHERE id=?",id);
             case "ASSIGNMENT" -> jdbc.update("UPDATE visit_missed_check_in_trigger SET triggered_caregiver_id=? WHERE visit_id=?",otherCaregiver,id);
             case "ABSENCE" -> {
