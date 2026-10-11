@@ -5,24 +5,21 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.support.EncodedResource;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import sg.nus.carelink.testsupport.DemoData;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitDatabaseForDemoData;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -45,12 +42,9 @@ class CaregiverWorkIT {
         bVisit = jdbc.queryForObject("select id from visit where service_type='DEMO_REASSIGNED_CARE'",Long.class);
         day = jdbc.queryForObject("select date(scheduled_start) from visit where id=?",LocalDate.class,aVisit);
     }
+    /** core's demonstration script, with visit's tables in this test's database. */
     void loadSeed() {
-        jdbc.execute((ConnectionCallback<Void>) connection -> {
-            ScriptUtils.executeSqlScript(connection,new EncodedResource(
-                new FileSystemResource("../core/src/main/resources/db/demo/caregiver-slice1.sql"),StandardCharsets.UTF_8));
-            return null;
-        });
+        DemoData.load(jdbc, "caregiver-slice1.sql", VisitDatabaseForDemoData.NAME);
     }
     @Test void seedIsRepeatableAndDoesNotNeedFixedIds() {
         long before = jdbc.queryForObject("select count(*) from visit",Long.class);

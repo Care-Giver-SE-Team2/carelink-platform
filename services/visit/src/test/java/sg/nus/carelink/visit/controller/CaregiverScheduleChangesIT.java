@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDate;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,17 +15,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.ConnectionCallback;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.support.EncodedResource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import sg.nus.carelink.testsupport.DemoData;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitDatabaseForDemoData;
 
 /** Each change commits before the next request; no test-wide transaction or shared JPA cache. */
 @SpringBootTest
@@ -153,10 +150,8 @@ class CaregiverScheduleChangesIT {
                 .andExpect(jsonPath("$.tasks.length()").value(1));
     }
 
+    /** core's demonstration script, with visit's tables in this test's database. */
     private void loadDemo() {
-        jdbc.execute((ConnectionCallback<Void>) connection -> {
-            ScriptUtils.executeSqlScript(connection,new EncodedResource(new FileSystemResource("../core/src/main/resources/db/demo/caregiver-slice3.sql"),StandardCharsets.UTF_8));
-            return null;
-        });
+        DemoData.load(jdbc, "caregiver-slice3.sql", VisitDatabaseForDemoData.NAME);
     }
 }

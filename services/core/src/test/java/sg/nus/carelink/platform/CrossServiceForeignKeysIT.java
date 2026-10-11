@@ -52,10 +52,12 @@ class CrossServiceForeignKeysIT {
 		assertThat(crossing).as("foreign keys between two services' tables").isEmpty();
 	}
 
+	/** visit's own keys, such as a task's to its visit, went with its tables to its own database (V12). */
 	@Test
 	void theKeysWithinAServiceStay() {
 		assertThat(foreignKeys()).extracting(ForeignKey::name)
-				.contains("fk_visit_task_visit", "fk_vital_visit", "fk_incident_log_incident", "fk_roster_change_absence");
+				.contains("fk_incident_log_incident", "fk_roster_change_absence", "fk_report_amendment_report")
+				.doesNotContain("fk_visit_task_visit", "fk_vital_visit");
 	}
 
 	private List<ForeignKey> foreignKeys() {

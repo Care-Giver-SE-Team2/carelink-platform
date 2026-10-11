@@ -49,6 +49,10 @@
 -- TIMESTAMPS are written the way the application stores them: the Singapore
 -- wall-clock plus @appOffsetHours, for the reason given in demo-seed.sql.
 -- Dates (leave days, certificate expiry) are stored as they are.
+--
+-- VISIT'S ROWS go to visit's own database, carelink_visit, on the same server
+-- (docs/platform/service-boundaries.md, section 9): every visit table below is
+-- named with it. Load the file with an account that can write both databases.
 SET time_zone = '+08:00';
 SET @appOffsetHours := 8;
 
@@ -153,11 +157,11 @@ SELECT @chuaElder, @lilyFamily, 'DAUGHTER', TRUE, 'FULL', 'ACTIVE',
 -- back for months afterwards.
 SET @meilingHistory := (SELECT CASE
         WHEN @meilingCg IS NULL OR @graceElder IS NULL THEN 0
-        WHEN EXISTS (SELECT 1 FROM visit WHERE elder_id = @graceElder AND caregiver_id = @meilingCg
+        WHEN EXISTS (SELECT 1 FROM carelink_visit.visit WHERE elder_id = @graceElder AND caregiver_id = @meilingCg
                                          AND status = 'VERIFIED') THEN 0
         ELSE 1 END);
 
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
                    checked_in_at, checked_out_at, status)
 SELECT @graceElder, @meilingCg, 'Personal care', h.starts, h.starts + INTERVAL 1 HOUR,
        h.starts + INTERVAL 2 MINUTE, h.starts + INTERVAL 58 MINUTE, 'VERIFIED'
@@ -169,11 +173,11 @@ SELECT @graceElder, @meilingCg, 'Personal care', h.starts, h.starts + INTERVAL 1
   UNION ALL SELECT TIMESTAMP(@today - INTERVAL 7 DAY, '15:00:00') + INTERVAL @appOffsetHours HOUR
        ) AS h
  WHERE @meilingHistory = 1
-   AND NOT EXISTS (SELECT 1 FROM visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = h.starts);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = h.starts);
 
 -- Her note on each, for the periodic reports. The visits are a week apart, so
 -- the day of the year picks a different note for each of the five.
-INSERT INTO visit_task (visit_id, name, status, caregiver_note, completed_at)
+INSERT INTO carelink_visit.visit_task (visit_id, name, status, caregiver_note, completed_at)
 SELECT v.id, 'Afternoon care', 'DONE',
        ELT(1 + MOD(DAYOFYEAR(v.scheduled_start), 5),
            'Walked to the market and back with her cane. Steady, stopped once to rest.',
@@ -182,11 +186,11 @@ SELECT v.id, 'Afternoon care', 'DONE',
            'Put the evening blood pressure tablets out in her pill box and watched her take them.',
            'Folded the laundry together and talked about her grandson''s visit at the weekend.'),
        v.scheduled_start + INTERVAL 45 MINUTE
-  FROM visit v
+  FROM carelink_visit.visit v
  WHERE v.elder_id = @graceElder
    AND v.caregiver_id = @meilingCg
    AND v.status = 'VERIFIED'
-   AND NOT EXISTS (SELECT 1 FROM visit_task t WHERE t.visit_id = v.id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_task t WHERE t.visit_id = v.id);
 
 -- Two spot checks concluded at Chua's visits a fortnight ago: Hui Min's needed
 -- improvement, Farah's met the standard. The re-rostering search reads both
@@ -199,7 +203,7 @@ SET @chuaHistory := (SELECT CASE
 SET @huiminVisitStart := TIMESTAMP(@today - INTERVAL 14 DAY, '14:00:00') + INTERVAL @appOffsetHours HOUR;
 SET @farahVisitStart  := TIMESTAMP(@today - INTERVAL 12 DAY, '10:00:00') + INTERVAL @appOffsetHours HOUR;
 
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
                    checked_in_at, checked_out_at, status)
 SELECT @chuaElder, h.caregiver_id, 'Rehabilitation exercises', h.starts, h.starts + INTERVAL 1 HOUR,
        h.starts + INTERVAL 3 MINUTE, h.starts + INTERVAL 57 MINUTE, 'VERIFIED'
@@ -208,14 +212,14 @@ SELECT @chuaElder, h.caregiver_id, 'Rehabilitation exercises', h.starts, h.start
   UNION ALL SELECT @farahCg, @farahVisitStart
        ) AS h
  WHERE @chuaHistory = 1
-   AND NOT EXISTS (SELECT 1 FROM visit v WHERE v.elder_id = @chuaElder AND v.scheduled_start = h.starts);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit v WHERE v.elder_id = @chuaElder AND v.scheduled_start = h.starts);
 
-SET @huiminVisit := (SELECT id FROM visit WHERE elder_id = @chuaElder AND caregiver_id = @huiminCg
+SET @huiminVisit := (SELECT id FROM carelink_visit.visit WHERE elder_id = @chuaElder AND caregiver_id = @huiminCg
                         AND scheduled_start = @huiminVisitStart ORDER BY id LIMIT 1);
-SET @farahVisit  := (SELECT id FROM visit WHERE elder_id = @chuaElder AND caregiver_id = @farahCg
+SET @farahVisit  := (SELECT id FROM carelink_visit.visit WHERE elder_id = @chuaElder AND caregiver_id = @farahCg
                         AND scheduled_start = @farahVisitStart ORDER BY id LIMIT 1);
 
-INSERT INTO visit_task (visit_id, name, status, caregiver_note, completed_at)
+INSERT INTO carelink_visit.visit_task (visit_id, name, status, caregiver_note, completed_at)
 SELECT notes.visit_id, 'Range-of-motion exercises', 'DONE', notes.note, notes.done
   FROM (
         SELECT @huiminVisit AS visit_id,
@@ -226,7 +230,7 @@ SELECT notes.visit_id, 'Range-of-motion exercises', 'DONE', notes.note, notes.do
                @farahVisitStart + INTERVAL 40 MINUTE
        ) AS notes
  WHERE notes.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit_task t WHERE t.visit_id = notes.visit_id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_task t WHERE t.visit_id = notes.visit_id);
 
 INSERT INTO spot_check (elder_id, caregiver_id, visit_id, raised_by_user_id, approving_family_member_id,
                         proposed_time, reason, approval_status, decided_at, finding, result, outcome,
@@ -298,7 +302,7 @@ SET @graceFirst  := TIMESTAMP(@firstDay, '10:00:00') + INTERVAL @appOffsetHours 
 SET @chuaFirst   := TIMESTAMP(@firstDay, '14:00:00') + INTERVAL @appOffsetHours HOUR;
 SET @graceSecond := TIMESTAMP(@firstDay + INTERVAL 1 DAY, '10:00:00') + INTERVAL @appOffsetHours HOUR;
 
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
 SELECT p.elder_id, p.caregiver_id, p.service_type, p.starts, p.starts + INTERVAL 1 HOUR, 'SCHEDULED'
   FROM (
         SELECT @graceElder AS elder_id, @aishaCg AS caregiver_id, 'Personal care' AS service_type, @graceFirst AS starts
@@ -309,7 +313,7 @@ SELECT p.elder_id, p.caregiver_id, p.service_type, p.starts, p.starts + INTERVAL
  WHERE @freshAbsence = 1
    AND p.elder_id IS NOT NULL
    AND p.caregiver_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit v WHERE v.elder_id = p.elder_id AND v.scheduled_start = p.starts);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit v WHERE v.elder_id = p.elder_id AND v.scheduled_start = p.starts);
 
 -- Nora's own request, waiting for a manager, with the visit approving it vacates.
 -- A new one only when she has no request still ahead of her waiting.
@@ -327,13 +331,13 @@ SELECT @noraCg, 'ANNUAL', @noraDay, @noraDay, 'My daughter''s graduation', 'PEND
  WHERE @noraCg IS NOT NULL
    AND @noraWaiting = 0;
 
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
 SELECT @graceElder, @noraCg, 'Personal care', @noraVisitStart, @noraVisitStart + INTERVAL 1 HOUR, 'SCHEDULED'
   FROM DUAL
  WHERE @noraCg IS NOT NULL
    AND @graceElder IS NOT NULL
    AND @noraWaiting = 0
-   AND NOT EXISTS (SELECT 1 FROM visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = @noraVisitStart);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = @noraVisitStart);
 
 -- ------------------------------------------------------------ spot checks ---
 -- One check waiting for Fiona's consent, on a visit of Mei Ling's, with the
@@ -344,15 +348,15 @@ SET @consentWaiting := (SELECT COUNT(*) FROM spot_check
 SET @consentVisitStart := TIMESTAMP(@today + INTERVAL 4 DAY, '15:00:00') + INTERVAL @appOffsetHours HOUR;
 SET @consentReason := 'Routine quality check: Mei Ling has looked after Grace for five weeks';
 
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
 SELECT @graceElder, @meilingCg, 'Personal care', @consentVisitStart, @consentVisitStart + INTERVAL 1 HOUR, 'SCHEDULED'
   FROM DUAL
  WHERE @consentWaiting = 0
    AND @graceElder IS NOT NULL
    AND @meilingCg IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = @consentVisitStart);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = @consentVisitStart);
 
-SET @consentVisit := (SELECT id FROM visit WHERE elder_id = @graceElder AND caregiver_id = @meilingCg
+SET @consentVisit := (SELECT id FROM carelink_visit.visit WHERE elder_id = @graceElder AND caregiver_id = @meilingCg
                          AND scheduled_start = @consentVisitStart AND status = 'SCHEDULED' ORDER BY id LIMIT 1);
 
 INSERT INTO spot_check (elder_id, caregiver_id, visit_id, raised_by_user_id, proposed_time, reason,
@@ -395,15 +399,15 @@ SET @agreedWaiting := (SELECT COUNT(*) FROM spot_check
                           AND outcome IS NULL AND proposed_time > @nowStored);
 SET @agreedVisitStart := TIMESTAMP(@today + INTERVAL 5 DAY, '11:30:00') + INTERVAL @appOffsetHours HOUR;
 
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)
 SELECT @graceElder, @farahCg, 'Personal care', @agreedVisitStart, @agreedVisitStart + INTERVAL 1 HOUR, 'SCHEDULED'
   FROM DUAL
  WHERE @agreedWaiting = 0
    AND @graceElder IS NOT NULL
    AND @farahCg IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = @agreedVisitStart);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit v WHERE v.elder_id = @graceElder AND v.scheduled_start = @agreedVisitStart);
 
-SET @agreedVisit := (SELECT id FROM visit WHERE elder_id = @graceElder AND caregiver_id = @farahCg
+SET @agreedVisit := (SELECT id FROM carelink_visit.visit WHERE elder_id = @graceElder AND caregiver_id = @farahCg
                         AND scheduled_start = @agreedVisitStart AND status = 'SCHEDULED' ORDER BY id LIMIT 1);
 
 INSERT INTO spot_check (elder_id, caregiver_id, visit_id, raised_by_user_id, approving_family_member_id,
@@ -421,13 +425,13 @@ SELECT @graceElder, @farahCg, @agreedVisit, @alice, @fionaFamily, @agreedVisitSt
 -- Every visit above that is still to come was rostered by a manager, and the
 -- re-rostering records who replaced whom against these rows. Visits the
 -- application has already moved or reassigned have rows of their own.
-INSERT INTO visit_assignment (visit_id, caregiver_id, assigned_by_user_id, status, reason, assigned_at)
+INSERT INTO carelink_visit.visit_assignment (visit_id, caregiver_id, assigned_by_user_id, status, reason, assigned_at)
 SELECT v.id, v.caregiver_id, @alice, 'ACTIVE', 'Weekly roster', @nowStored - INTERVAL 7 DAY
-  FROM visit v
+  FROM carelink_visit.visit v
  WHERE v.caregiver_id IN (@aishaCg, @meilingCg, @farahCg, @huiminCg, @siewlanCg, @josephCg, @noraCg)
    AND v.status = 'SCHEDULED'
    AND v.care_plan_id IS NULL
    AND v.scheduled_start > @nowStored
-   AND NOT EXISTS (SELECT 1 FROM visit_assignment a WHERE a.visit_id = v.id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_assignment a WHERE a.visit_id = v.id);
 
 COMMIT;

@@ -151,12 +151,14 @@ public class VisitStandIn implements VisitApi {
 	}
 
 	/**
-	 * Takes over the visits in core's database that the stand-in does not hold yet. The demo scripts
-	 * still write visit's tables there, so a test that loads one copies its visits across.
+	 * Takes over the visits that demonstration data laid out in visit's database on the same server
+	 * (VisitDatabaseForDemoData), which the stand-in does not hold yet, so a test that loads a demo
+	 * script sees its visits the way core sees visit's.
 	 */
 	public synchronized void copyVisitTable(JdbcTemplate jdbc) {
 		jdbc.query("select id, elder_id, caregiver_id, care_plan_id, care_plan_node_id, service_type, scheduled_start,"
-				+ " scheduled_end, status, absence_id, checked_in_at from visit order by id", (ResultSet row) -> {
+				+ " scheduled_end, status, absence_id, checked_in_at from " + VisitDatabaseForDemoData.NAME
+				+ ".visit order by id", (ResultSet row) -> {
 					Long id = row.getLong("id");
 					if (!visits.containsKey(id)) {
 						add(new Held(id, row.getLong("elder_id"), nullable(row, "caregiver_id"),

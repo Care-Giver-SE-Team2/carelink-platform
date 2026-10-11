@@ -51,6 +51,10 @@
 -- stored them; see TIMESTAMPS in demo-seed.sql. A backend started with
 -- ./mvnw spring-boot:run on a machine set to Singapore time needs 0. Use 8 when
 -- the backend runs in the compose container (its JVM is on UTC) or on staging.
+--
+-- VISIT'S ROWS go to visit's own database, carelink_visit, on the same server
+-- (docs/platform/service-boundaries.md, section 9): every visit table below is
+-- named with it. Load the file with an account that can write both databases.
 SET @appOffsetHours := 0;
 
 -- CURRENT_DATE() follows the session zone, and the MySQL container runs on UTC.
@@ -260,38 +264,38 @@ SELECT p.k, p.elder_id, p.caregiver_id, p.service_type,
        ) AS p;
 
 -- Only on the first load: an elder that already has visits keeps its schedule.
-INSERT INTO visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
+INSERT INTO carelink_visit.visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,
                    checked_in_at, checked_out_at, status)
 SELECT d.elder_id, d.caregiver_id, d.service_type, d.scheduled_start, d.scheduled_end,
        d.checked_in_at, d.checked_out_at, d.status
   FROM demo_fam_visit d
- WHERE NOT EXISTS (SELECT 1 FROM visit v WHERE v.elder_id = d.elder_id);
+ WHERE NOT EXISTS (SELECT 1 FROM carelink_visit.visit v WHERE v.elder_id = d.elder_id);
 
 -- Resolve each key to the row just inserted. On a re-run on a later day the
 -- times no longer match, visit_id stays NULL and every insert below is skipped.
 UPDATE demo_fam_visit d
-  JOIN visit v ON v.elder_id = d.elder_id AND v.scheduled_start = d.scheduled_start
+  JOIN carelink_visit.visit v ON v.elder_id = d.elder_id AND v.scheduled_start = d.scheduled_start
               AND v.service_type = d.service_type
    SET d.visit_id = v.id;
 
 -- Assignment history. k08 was Chen Ming's until Siti Rahmah took it over.
-INSERT INTO visit_assignment (visit_id, caregiver_id, status, reason, assigned_at, ended_at)
+INSERT INTO carelink_visit.visit_assignment (visit_id, caregiver_id, status, reason, assigned_at, ended_at)
 SELECT d.visit_id, d.caregiver_id, IF(d.status = 'CANCELLED', 'CANCELLED', 'ACTIVE'), 'Demo roster',
        d.scheduled_start - INTERVAL 7 DAY, IF(d.status = 'CANCELLED', d.scheduled_start - INTERVAL 1 DAY, NULL)
   FROM demo_fam_visit d
  WHERE d.visit_id IS NOT NULL AND d.caregiver_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit_assignment a WHERE a.visit_id = d.visit_id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_assignment a WHERE a.visit_id = d.visit_id);
 
-INSERT INTO visit_assignment (visit_id, caregiver_id, status, reason, assigned_at, ended_at)
+INSERT INTO carelink_visit.visit_assignment (visit_id, caregiver_id, status, reason, assigned_at, ended_at)
 SELECT d.visit_id, @cMing, 'REPLACED', 'Caregiver on leave; reassigned',
        d.scheduled_start - INTERVAL 10 DAY, d.scheduled_start - INTERVAL 2 DAY
   FROM demo_fam_visit d
  WHERE d.k = 'k08' AND d.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit_assignment a WHERE a.visit_id = d.visit_id AND a.status = 'REPLACED');
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_assignment a WHERE a.visit_id = d.visit_id AND a.status = 'REPLACED');
 
 -- State history (FM03 timeline). APPLIED rows are what the family sees; the one
 -- REJECTED attempt on today's visit must stay hidden from them.
-INSERT INTO visit_state_transition (visit_id, from_state, to_state, actor_user_id, result, rejection_reason, occurred_at)
+INSERT INTO carelink_visit.visit_state_transition (visit_id, from_state, to_state, actor_user_id, result, rejection_reason, occurred_at)
 SELECT d.visit_id, t.from_state, t.to_state,
        IF(t.actor_kind = 'cg', (SELECT c.user_id FROM caregiver c WHERE c.id = d.caregiver_id), NULL),
        t.result, t.reason,
@@ -325,11 +329,11 @@ SELECT d.visit_id, t.from_state, t.to_state,
   UNION ALL SELECT 'ARRIVED',     'SCHEDULED',   'ARRIVED',     0,    'APPLIED', NULL, 'cg'
        ) AS t ON t.status = d.status
  WHERE d.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit_state_transition x WHERE x.visit_id = d.visit_id)
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_state_transition x WHERE x.visit_id = d.visit_id)
    AND (t.actor_kind = 'sys' OR d.caregiver_id IS NOT NULL);
 
 -- Tasks (FM03 checklist). Today's live visit has one of every task outcome.
-INSERT INTO visit_task (visit_id, name, status, outcome, caregiver_note, completed_at)
+INSERT INTO carelink_visit.visit_task (visit_id, name, status, outcome, caregiver_note, completed_at)
 SELECT d.visit_id, t.name, t.status, t.outcome, t.note,
        IF(t.done_min IS NULL, NULL, d.checked_in_at + INTERVAL t.done_min MINUTE)
   FROM demo_fam_visit d
@@ -355,9 +359,9 @@ SELECT d.visit_id, t.name, t.status, t.outcome, t.note,
   UNION ALL SELECT 's02', 'Tea and conversation', 'PENDING', NULL, NULL, NULL
        ) AS t ON t.k = d.k
  WHERE d.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM visit_task x WHERE x.visit_id = d.visit_id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.visit_task x WHERE x.visit_id = d.visit_id);
 
-INSERT INTO vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at)
+INSERT INTO carelink_visit.vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at)
 SELECT d.visit_id, r.metric, r.value, r.unit, r.out_of_range, d.checked_in_at + INTERVAL 10 MINUTE
   FROM demo_fam_visit d
   JOIN (
@@ -368,7 +372,7 @@ SELECT d.visit_id, r.metric, r.value, r.unit, r.out_of_range, d.checked_in_at + 
   UNION ALL SELECT 'k07', 'diastolic', 84.00, 'mmHg', FALSE
        ) AS r ON r.k = d.k
  WHERE d.visit_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM vital_sign x WHERE x.visit_id = d.visit_id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_visit.vital_sign x WHERE x.visit_id = d.visit_id);
 
 DROP TEMPORARY TABLE demo_fam_visit;
 

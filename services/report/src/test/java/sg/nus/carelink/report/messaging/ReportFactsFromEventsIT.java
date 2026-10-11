@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -51,13 +52,14 @@ import sg.nus.carelink.report.domain.model.VisitFact;
 import sg.nus.carelink.report.domain.model.VitalFact;
 import sg.nus.carelink.report.domain.repository.ReportFactsSource;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitDatabaseForDemoData;
 
 /**
  * What visit and core tell report becomes the facts a report is made from: each event goes through
  * the handler report's queue gives it to, in a transaction as the library runs it, and the week is
  * read back through {@link ReportFactsSource}. Events arrive at least once and in no particular
- * order, so it also proves the ordering rules of the event catalogue, and the copy the first
- * deployment makes of the tables report used to read (platform migration V10).
+ * order, so it also proves the ordering rules of the event catalogue, and the copy that gives report
+ * the facts of demonstration data, which sends no events (core's db/demo/report-facts.sql).
  *
  * <p>The connection is configured as production's is ({@code ReportFlowIT} explains why): times
  * cross it as {@link Timestamp}s on a JVM in UTC.
@@ -77,6 +79,8 @@ class ReportFactsFromEventsIT {
 
 	/** Ids as visit and core would number their records, one series for the class. */
 	private static final AtomicLong IDS = new AtomicLong(5_000);
+
+	private static final String VISIT_DATABASE = VisitDatabaseForDemoData.NAME;
 
 	@Autowired
 	private List<EventHandler<?>> handlers;
@@ -264,25 +268,28 @@ class ReportFactsFromEventsIT {
 	}
 
 	/**
-	 * V10 copies what the shared tables hold, and running it again - as after loading demonstration
-	 * data - refreshes the copy without adding to it. An event older than the copy changes nothing.
+	 * Demonstration data goes straight into the databases and sends no events, so core's
+	 * db/demo/report-facts.sql copies its facts in: visit's from visit's own database on the same server,
+	 * core's from core's. Running it again refreshes the copy without adding to it, and an event older
+	 * than the copy changes nothing.
 	 */
 	@Test
-	void theFirstDeploymentCopiesWhatTheSharedTablesHold() throws SQLException {
-		long visit = insert("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,"
+	void demonstrationDataReachesReportThroughItsCopyStep() throws SQLException {
+		VisitDatabaseForDemoData.build(new JdbcTemplate(dataSource));
+		long visit = insert("insert into " + VISIT_DATABASE + ".visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end,"
 				+ " checked_in_at, checked_out_at, status, version) values (" + elder + ", " + caregiver
 				+ ", 'Personal care', ?, ?, ?, ?, 'COMPLETED', 3)", ts(TUESDAY_NINE), ts(TUESDAY_NINE.plusHours(1)),
 				ts(TUESDAY_NINE.plusMinutes(5)), ts(TUESDAY_NINE.plusHours(1)));
-		jdbc.sql("insert into visit_evidence (visit_id, kind, reference, verification_status) values"
+		jdbc.sql("insert into " + VISIT_DATABASE + ".visit_evidence (visit_id, kind, reference, verification_status) values"
 				+ " (:visit, 'PHOTO', 'copy/1', 'VERIFIED'), (:visit, 'NOTE', 'copy/2', 'UNVERIFIED')")
 				.param("visit", visit).update();
-		jdbc.sql("insert into visit_task (visit_id, name, status, caregiver_note, completed_at)"
+		jdbc.sql("insert into " + VISIT_DATABASE + ".visit_task (visit_id, name, status, caregiver_note, completed_at)"
 				+ " values (:visit, 'Mobility', 'DONE', 'Walked with the cane.', :at)")
 				.param("visit", visit).param("at", ts(TUESDAY_NINE.plusMinutes(30))).update();
-		jdbc.sql("insert into vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at)"
+		jdbc.sql("insert into " + VISIT_DATABASE + ".vital_sign (visit_id, metric, value, unit, out_of_range, recorded_at)"
 				+ " values (:visit, 'systolic', 131.00, 'mmHg', false, :at), (:visit, 'pulse', 70.00, 'bpm', false, :at)")
 				.param("visit", visit).param("at", ts(TUESDAY_NINE.plusMinutes(10))).update();
-		jdbc.sql("insert into elder_confirmation (visit_id, elder_id, confirmation_status, rating, confirmed_at)"
+		jdbc.sql("insert into " + VISIT_DATABASE + ".elder_confirmation (visit_id, elder_id, confirmation_status, rating, confirmed_at)"
 				+ " values (:visit, :elder, 'CONFIRMED', 4, :at)")
 				.param("visit", visit).param("elder", elder).param("at", ts(TUESDAY_NINE.plusHours(2))).update();
 		long incident = insert("insert into incident (elder_id, visit_id, source, category, severity, status, description,"
@@ -292,8 +299,8 @@ class ReportFactsFromEventsIT {
 				+ " values (:incident, 'system', 'REPORTED', null, :at)")
 				.param("incident", incident).param("at", ts(TUESDAY_NINE.plusMinutes(15))).update();
 
-		copyFromTheSharedTables();
-		copyFromTheSharedTables();
+		copyTheDemonstrationFacts();
+		copyTheDemonstrationFacts();
 		// visit's event of version 1, still on its way when the copy was made
 		deliver(new VisitCheckedIn(visit, elder, at(TUESDAY_NINE), caregiver, at(TUESDAY_NINE.plusMinutes(7)), false, 1));
 
@@ -330,11 +337,11 @@ class ReportFactsFromEventsIT {
 				new EventMetadata(UUID.randomUUID().toString(), handler.type(), "visit", Instant.now(), sequenceNumber)));
 	}
 
-	private void copyFromTheSharedTables() throws SQLException {
+	private void copyTheDemonstrationFacts() throws SQLException {
 		try (Connection connection = dataSource.getConnection()) {
-			// Run from the service's module directory, as the platform migrations are in the tests
+			// Run from the service's module directory, as the migrations are in the tests
 			ScriptUtils.executeSqlScript(connection,
-					new FileSystemResource("../core/src/main/resources/db/platform/V10__report_facts_from_shared_tables.sql"));
+					new FileSystemResource("../core/src/main/resources/db/demo/report-facts.sql"));
 		}
 	}
 

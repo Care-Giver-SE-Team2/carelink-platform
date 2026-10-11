@@ -22,6 +22,10 @@
 -- a rostering run that considered it), the delete fails and the transaction
 -- rolls back, leaving everything as it was.
 -- =====================================================================
+--
+-- VISIT'S ROWS go to visit's own database, carelink_visit, on the same server
+-- (docs/platform/service-boundaries.md, section 9): every visit table below is
+-- named with it. Load the file with an account that can write both databases.
 
 START TRANSACTION;
 
@@ -35,7 +39,7 @@ SELECT e.id
    AND e.full_name IN ('Lim Boon Huat', 'Tan Siew Lan');
 
 CREATE TEMPORARY TABLE demo_fam_visit_id AS
-SELECT v.id FROM visit v WHERE v.elder_id IN (SELECT id FROM demo_fam_elder);
+SELECT v.id FROM carelink_visit.visit v WHERE v.elder_id IN (SELECT id FROM demo_fam_elder);
 
 -- Rows from family-changes-spot-checks.sql, which reference these visits.
 DELETE FROM roster_change          WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
@@ -45,13 +49,13 @@ DELETE FROM rostering_candidate_check
 DELETE FROM rostering_candidate    WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
 DELETE FROM spot_check             WHERE elder_id IN (SELECT id FROM demo_fam_elder);
 
-DELETE FROM visit_task             WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
-DELETE FROM vital_sign             WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
-DELETE FROM visit_evidence         WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
-DELETE FROM visit_state_transition WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
-DELETE FROM visit_assignment       WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
-DELETE FROM elder_confirmation     WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
-DELETE FROM visit                  WHERE id       IN (SELECT id FROM demo_fam_visit_id);
+DELETE FROM carelink_visit.visit_task             WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
+DELETE FROM carelink_visit.vital_sign             WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
+DELETE FROM carelink_visit.visit_evidence         WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
+DELETE FROM carelink_visit.visit_state_transition WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
+DELETE FROM carelink_visit.visit_assignment       WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
+DELETE FROM carelink_visit.elder_confirmation     WHERE visit_id IN (SELECT id FROM demo_fam_visit_id);
+DELETE FROM carelink_visit.visit                  WHERE id       IN (SELECT id FROM demo_fam_visit_id);
 
 DELETE FROM report_amendment
  WHERE report_id IN (SELECT r.id FROM report r WHERE r.elder_id IN (SELECT id FROM demo_fam_elder));
