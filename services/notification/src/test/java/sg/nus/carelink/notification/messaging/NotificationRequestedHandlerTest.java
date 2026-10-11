@@ -37,7 +37,7 @@ class NotificationRequestedHandlerTest {
 				Instant.parse("2026-10-12T01:35:01Z"), 12L));
 
 		verify(requests).keep(7L, "INCIDENT_RAISED", Notification.Channel.IN_APP, "Urgent care alert: HIGH",
-				"A FALL incident has been reported.", "INCIDENT", 601L, LocalDateTime.of(2026, 10, 12, 9, 35));
+				"A FALL incident has been reported.", "INCIDENT", 601L, 101L, LocalDateTime.of(2026, 10, 12, 9, 35));
 	}
 
 }

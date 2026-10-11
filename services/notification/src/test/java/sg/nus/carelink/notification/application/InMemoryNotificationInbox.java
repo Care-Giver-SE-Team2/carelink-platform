@@ -29,7 +29,7 @@ class InMemoryNotificationInbox implements NotificationInbox {
 	long add(Long recipient, String title, Notification.Status status, LocalDateTime at, Long elderId) {
 		long id = nextId++;
 		rows.put(id, new InboxItem(new Notification(id, recipient, "ROSTER_CHANGE_SETTLED", Notification.Channel.IN_APP,
-				title, "body", elderId == null ? null : "ROSTER_CHANGE", elderId == null ? null : 40L, status, at,
+				title, "body", elderId == null ? null : "ROSTER_CHANGE", elderId == null ? null : 40L, elderId, status, at,
 				status == Notification.Status.PENDING ? null : at, status == Notification.Status.READ ? at : null),
 				elderId));
 		return id;
@@ -112,6 +112,6 @@ class InMemoryNotificationInbox implements NotificationInbox {
 			LocalDateTime readAt) {
 		Notification n = item.notification();
 		return new InboxItem(new Notification(n.id(), n.recipientUserId(), n.eventType(), n.channel(), n.title(), n.body(),
-				n.resourceType(), n.resourceId(), status, n.createdAt(), sentAt, readAt), item.elderId());
+				n.resourceType(), n.resourceId(), n.elderId(), status, n.createdAt(), sentAt, readAt), item.elderId());
 	}
 }

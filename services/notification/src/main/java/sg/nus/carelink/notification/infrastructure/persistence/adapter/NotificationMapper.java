@@ -23,6 +23,7 @@ final class NotificationMapper {
 				e.getBody(),
 				e.getResourceType(),
 				e.getResourceId(),
+				e.getElderId(),
 				e.getStatus() == null ? null : Notification.Status.valueOf(e.getStatus().name()),
 				e.getCreatedAt(),
 				e.getSentAt(),
@@ -38,6 +39,7 @@ final class NotificationMapper {
 		e.setTitle(d.title());
 		e.setBody(d.body());
 		e.setResourceType(d.resourceType());
+		e.setElderId(d.elderId());
 		e.setResourceId(d.resourceId());
 		e.setStatus(d.status() == null ? null : NotificationJpaEntity.Status.valueOf(d.status().name()));
 		e.setCreatedAt(d.createdAt());

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,7 @@ class NotificationTest {
 
 	@Test
 	void aReaderIsAnAccountAndWhetherTheFamilyRuleApplies() {
-		InboxReader reader = new InboxReader(2L, true);
+		InboxReader reader = InboxReader.family(2L, Set.of(101L));
 
 		assertThat(reader.userId()).isEqualTo(2L);
 		assertThat(reader.family()).isTrue();
@@ -47,7 +48,7 @@ class NotificationTest {
 
 	private static Notification message(Notification.Status status) {
 		return new Notification(1L, 2L, "SPOT_CHECK_REQUESTED", Notification.Channel.IN_APP, "May a manager watch?",
-				"body", "SPOT_CHECK", 9L, status, SENT, status == Notification.Status.PENDING ? null : SENT,
+				"body", "SPOT_CHECK", 9L, 101L, status, SENT, status == Notification.Status.PENDING ? null : SENT,
 				status == Notification.Status.READ ? SENT : null);
 	}
 }

@@ -14,3 +14,9 @@ spring:
       redis:
         # The same namespace as core, so the login made through core is seen here
         namespace: carelink:session
+
+carelink:
+  core-api:
+    # Who reads the inbox and which elders a family member may read. For a run outside Docker;
+    # overridden by CARELINK_COREAPI_BASEURL
+    base-url: http://localhost:8080

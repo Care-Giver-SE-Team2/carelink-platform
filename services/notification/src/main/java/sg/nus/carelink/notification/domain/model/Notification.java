@@ -23,6 +23,7 @@ public record Notification(
 		String body,
 		String resourceType,
 		Long resourceId,
+		Long elderId,
 		Notification.Status status,
 		LocalDateTime createdAt,
 		LocalDateTime sentAt,
@@ -42,13 +43,14 @@ public record Notification(
 	/**
 	 * A message somebody asked for, waiting for its recipient: PENDING until their client next asks
 	 * for the inbox. {@code resourceType} and {@code resourceId} are both null for an account-only
-	 * message.
+	 * message; {@code elderId} names the elder a message about care is about, which the family rule
+	 * checks.
 	 */
 	public static Notification requested(Long recipientUserId, String eventType, Channel channel, String title,
-			String body, String resourceType, Long resourceId, LocalDateTime createdAt) {
+			String body, String resourceType, Long resourceId, Long elderId, LocalDateTime createdAt) {
 		return new Notification(null, Objects.requireNonNull(recipientUserId, "recipientUserId"),
 				Objects.requireNonNull(eventType, "eventType"), Objects.requireNonNull(channel, "channel"),
-				Objects.requireNonNull(title, "title"), body, resourceType, resourceId, Status.PENDING,
+				Objects.requireNonNull(title, "title"), body, resourceType, resourceId, elderId, Status.PENDING,
 				Objects.requireNonNull(createdAt, "createdAt"), null, null);
 	}
 

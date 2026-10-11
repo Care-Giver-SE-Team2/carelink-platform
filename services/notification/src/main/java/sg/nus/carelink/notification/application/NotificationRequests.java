@@ -24,9 +24,9 @@ public class NotificationRequests {
 	}
 
 	public Notification keep(Long recipientUserId, String kind, Notification.Channel channel, String title, String body,
-			String resourceType, Long resourceId, LocalDateTime requestedAt) {
+			String resourceType, Long resourceId, Long elderId, LocalDateTime requestedAt) {
 		return notifications.save(Notification.requested(recipientUserId, kind, channel, title, body, resourceType,
-				resourceId, requestedAt));
+				resourceId, elderId, requestedAt));
 	}
 
 }

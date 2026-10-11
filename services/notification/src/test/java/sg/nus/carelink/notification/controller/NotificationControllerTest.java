@@ -121,7 +121,7 @@ class NotificationControllerTest {
 
 	private static Notification message(Long id, Notification.Status status) {
 		return new Notification(id, 2L, "ROSTER_CHANGE_SETTLED", Notification.Channel.IN_APP, "Visit moved", "body",
-				"ROSTER_CHANGE", 9L, status, AT, AT, status == Notification.Status.READ ? AT : null);
+				"ROSTER_CHANGE", 9L, 101L, status, AT, AT, status == Notification.Status.READ ? AT : null);
 	}
 
 	private static RequestPostProcessor as(String username, String role) {

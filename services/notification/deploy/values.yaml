@@ -11,3 +11,7 @@ resources:
     memory: 512Mi
   limits:
     memory: 768Mi
+
+# core's internal API, at the Service the chart creates for the release core
+env:
+  CARELINK_COREAPI_BASEURL: http://core

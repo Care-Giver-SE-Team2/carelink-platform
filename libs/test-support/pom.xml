@@ -40,6 +40,25 @@
 			<artifactId>spring-boot-test</artifactId>
 			<scope>provided</scope>
 		</dependency>
+		<!--
+		  CoreStandIn answers core's internal API for a service's tests. Provided: the services that use
+		  it have Spring's JDBC and security on their classpath already.
+		-->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>core-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jdbc</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+			<scope>provided</scope>
+		</dependency>
 		<!-- GlobalExceptionHandlerTestSupport hands out the shared exception handler -->
 		<dependency>
 			<groupId>sg.nus</groupId>

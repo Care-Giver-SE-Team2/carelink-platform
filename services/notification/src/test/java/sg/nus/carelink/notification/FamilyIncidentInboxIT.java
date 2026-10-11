@@ -196,12 +196,19 @@ class FamilyIncidentInboxIT {
 		assertThat(state(visible)).isEqualTo("READ");
 	}
 
-	@Test void otherRecipientsNoticeAndOrphanIncidentCannotBeOpened() throws Exception {
+	/**
+	 * A message keeps the elder it is about, as the event named it, so it no longer depends on the
+	 * incident row. One without an elder - an old message whose record was gone when V7 filled the
+	 * column in - is shown to no family member.
+	 */
+	@Test void otherRecipientsNoticeAndOneWithoutAnElderCannotBeOpened() throws Exception {
 		publish(601);
 		Browser a=login("family-a");
 		long own=notification(7,601), other=notification(9,601);
 		mvc.perform(write(a,"/api/notifications/"+other+"/read")).andExpect(status().isNotFound());
 		jdbc.update("DELETE FROM incident WHERE id=601");
+		assertThat(ids(fetch(a,"/api/notifications/me"))).containsExactly(own);
+		jdbc.update("UPDATE notification SET elder_id=NULL WHERE id=?", own);
 		assertThat(ids(fetch(a,"/api/notifications/me"))).isEmpty();
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isZero();
 		mvc.perform(write(a,"/api/notifications/"+own+"/read")).andExpect(status().isNotFound());
@@ -412,8 +419,8 @@ class FamilyIncidentInboxIT {
 		LocalDateTime now=LocalDateTime.ofInstant(clock.now,SINGAPORE);
 		for(var member:jdbc.queryForList("SELECT f.id,f.user_id FROM elder_family_binding b JOIN family_member f ON f.id=b.family_member_id WHERE b.elder_id=? AND b.status='ACTIVE' ORDER BY f.id",incidentId-500)) {
 			long userId=((Number)member.get("user_id")).longValue();
-			jdbc.update("INSERT INTO notification (recipient_user_id,event_type,channel,title,body,resource_type,resource_id,status,created_at) VALUES (?,'INCIDENT_RAISED','IN_APP','Urgent care alert: HIGH','A FALL incident has been reported. Open the incident details.','INCIDENT',?,'PENDING',?)",
-					userId,incidentId,Timestamp.valueOf(now));
+			jdbc.update("INSERT INTO notification (recipient_user_id,event_type,channel,title,body,resource_type,resource_id,elder_id,status,created_at) VALUES (?,'INCIDENT_RAISED','IN_APP','Urgent care alert: HIGH','A FALL incident has been reported. Open the incident details.','INCIDENT',?,?,'PENDING',?)",
+					userId,incidentId,incidentId-500,Timestamp.valueOf(now));
 			jdbc.update("INSERT INTO family_alert_window (incident_id,family_member_id,first_notification_id,opened_at,acknowledge_by) VALUES (?,?,?,?,?)",
 					incidentId,member.get("id"),notification(userId,incidentId),Timestamp.valueOf(now),Timestamp.valueOf(now.plusHours(2)));
 		}
@@ -424,9 +431,12 @@ class FamilyIncidentInboxIT {
 	private String state(long id) { return jdbc.queryForObject("SELECT status FROM notification WHERE id=?",String.class,id); }
 	private List<Map<String,Object>> rows(String table) { return jdbc.queryForList("SELECT * FROM "+table); }
 	private static Timestamp time(int hour,int minute) { return Timestamp.valueOf(LocalDateTime.of(2026,10,7,hour,minute)); }
+	/** A message as its sender would ask for it: one about an incident names the incident's elder, if there is such an incident. */
 	private long manual(long userId,String resourceType,Long resourceId,String channel,String state) {
-		jdbc.update("INSERT INTO notification (recipient_user_id,event_type,channel,title,body,resource_type,resource_id,status,created_at) VALUES (?,'COMPATIBILITY',?,'Compatibility notice','Safe fixture',?,?,?,?)",
-				userId,channel,resourceType,resourceId,state,time(16,0));
+		Long elderId="INCIDENT".equals(resourceType)&&resourceId!=null
+				? jdbc.queryForList("SELECT elder_id FROM incident WHERE id=?",Long.class,resourceId).stream().findFirst().orElse(null) : null;
+		jdbc.update("INSERT INTO notification (recipient_user_id,event_type,channel,title,body,resource_type,resource_id,elder_id,status,created_at) VALUES (?,'COMPATIBILITY',?,'Compatibility notice','Safe fixture',?,?,?,?,?)",
+				userId,channel,resourceType,resourceId,elderId,state,time(16,0));
 		return jdbc.queryForObject("SELECT MAX(id) FROM notification",Long.class);
 	}
 }

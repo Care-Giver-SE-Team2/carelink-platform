@@ -21,7 +21,7 @@ class InMemoryNotificationRepository implements NotificationRepository {
 	@Override
 	public Notification save(Notification notification) {
 		Notification stored = notification.id() == null
-				? new Notification(nextId, notification.recipientUserId(), notification.eventType(), notification.channel(), notification.title(), notification.body(), notification.resourceType(), notification.resourceId(), notification.status(), notification.createdAt(), notification.sentAt(), notification.readAt())
+				? new Notification(nextId, notification.recipientUserId(), notification.eventType(), notification.channel(), notification.title(), notification.body(), notification.resourceType(), notification.resourceId(), notification.elderId(), notification.status(), notification.createdAt(), notification.sentAt(), notification.readAt())
 				: notification;
 		rows.put(stored.id(), stored);
 		if (notification.id() == null) {
