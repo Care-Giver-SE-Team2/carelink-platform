@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import sg.nus.carelink.incident.domain.repository.SpotCheckLookups;
 
 /**
- * What UC-MG08 looks up outside the spot check: the visits it is about, from visit
+ * What UC-MG08 looks up outside the spot check: the visits it is about, from visit's internal API
  * ({@link SpotCheckVisits}), and family_member and the family's asks with plain statements that
  * take an id.
  *

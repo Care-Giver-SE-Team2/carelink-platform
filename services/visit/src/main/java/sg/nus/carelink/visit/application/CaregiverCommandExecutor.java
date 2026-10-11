@@ -10,7 +10,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
+import sg.nus.carelink.visit.application.CaregiverWorkDirectory;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.model.Visit;

@@ -70,7 +70,7 @@
 			<artifactId>core-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-		<!-- The contract of visit's internal API, which core serves until visit becomes a service -->
+		<!-- visit's internal API, which rostering and incident call -->
 		<dependency>
 			<groupId>sg.nus</groupId>
 			<artifactId>visit-api</artifactId>

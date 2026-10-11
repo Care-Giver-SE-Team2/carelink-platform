@@ -10,7 +10,6 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.model.ElderConfirmation;
@@ -36,13 +35,13 @@ public class VisitService {
 
     private final VisitRepository visits;
     private final ElderConfirmationRepository confirmations;
-    private final IncidentService incidents;
+    private final ElderServiceDisputes incidents;
     private final Clock clock;
 
     public VisitService(
             VisitRepository visits,
             ElderConfirmationRepository confirmations,
-            IncidentService incidents,
+            ElderServiceDisputes incidents,
             Clock clock) {
 
         this.visits = visits;

@@ -14,25 +14,19 @@ import sg.nus.carelink.testsupport.CaregiverHttpITSupport;
 import sg.nus.carelink.testsupport.SharedMySql;
 import sg.nus.carelink.visit.domain.repository.CaregiverCommandStore;
 
-/** Every positive execution begins with manager HTTP plan publication and assignment. */
+/** Every positive execution begins with a published plan's visit, reaching visit as rostering sends it. */
 class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) { SharedMySql.register(registry,CaregiverVisitExecutionWorkflowIT.class,"+05:00"); }
     @MockitoSpyBean CaregiverCommandStore receipts;
-    private long plannedVisit() throws Exception {
+    private long plannedVisit() {
         var start=LocalDateTime.now(ZoneId.of("Asia/Singapore")).plusMinutes(5).withSecond(0).withNano(0);
-        try(var mgr=browser(managerName)) {
-            body(mgr.put("/api/elders/"+elder+"/primary-caregiver",Map.of("caregiverId",caregiver)),200);
-            long plan=body(mgr.post("/api/care-plans",Map.of("elderId",elder)),201).path("id").asLong();
-            body(mgr.post("/api/care-plans/"+plan+"/publish",Map.of("startDate",start.toLocalDate().toString(),"nodes",List.of(Map.of(
-                    "groupName","Personal care","name","Care routine","evidenceType","CHECKLIST","visits",List.of(Map.of("day",start.getDayOfWeek().name(),"startTime",start.toLocalTime().toString(),"minutes",60)))))),200);
-            return jdbc.queryForObject("select id from visit where care_plan_id=? and scheduled_start=?",Long.class,plan,start);
-        }
+        return publishPlan(start,60,"CHECKLIST","Care routine").visits().getFirst();
     }
     private Map<String,Object> check(int version) { return new HashMap<>(Map.of("expectedVersion",version,"clientRequestId",UUID.randomUUID().toString(),"locationSource","MANUAL_LOCATION_NOTE","locationNote","At the service doorway")); }
     private Map<String,Object> task(int version,String status) { return new HashMap<>(Map.of("expectedVersion",version,"clientRequestId",UUID.randomUUID().toString(),"status",status,"outcome","Observed result","caregiverNote","Internal factual reason")); }
     @Test void realRosterCheckInTaskIncidentAndFamilyReadsShareOneSourceOfTruth() throws Exception {
         long id=plannedVisit();
-        try(var a=browser(caregiverName);var familyBrowser=browser(familyName);var mgr=browser(managerName)) {
+        try(var a=browser(caregiverName);var familyBrowser=browser(familyName)) {
             assertThat(jdbc.queryForObject("select count(*) from visit_task where visit_id=?",Long.class,id)).isZero();
             assertThat(a.read("/api/visits/"+id+"/work-pack").path("execution").path("allowedActions").toString()).contains("CHECK_IN");
             var input=check(0);body(a.post("/api/visits/"+id+"/check-in",input),200);
@@ -53,12 +47,14 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
             var familyTasks=familyBrowser.read("/api/visits/"+id+"/tasks");assertThat(familyTasks.get(0).path("status").asString()).isEqualTo("DONE");
             assertThat(familyTasks.get(0).path("completedAt").isNull()).isFalse();assertThat(familyTasks.toString()).doesNotContain("caregiverNote","outcome","Internal factual reason");
             assertThat(familyBrowser.read("/api/visits/"+id).toString()).contains("IN_PROGRESS");
-            var report=body(a.post("/api/incidents",Map.of("visitId",id,"expectedVersion",2,"clientRequestId",UUID.randomUUID().toString(),"category","SERVICE","severity","LOW","description","Observed a service issue")),201);
-            assertThat(mgr.read("/api/incidents/"+report.path("report").path("id").asLong()).toString()).contains("Observed a service issue");
+            var report=body(a.post("/api/caregivers/me/incidents",Map.of("visitId",id,"expectedVersion",2,"clientRequestId",UUID.randomUUID().toString(),"category","SERVICE","severity","LOW","description","Observed a service issue")),201);
+            assertThat(core.incidentsOf(id)).singleElement().satisfies(raised -> {
+                assertThat(raised.id()).isEqualTo(report.path("report").path("id").asLong());
+                assertThat(raised.description()).isEqualTo("Observed a service issue");
+            });
             assertThat(a.read("/api/visits/"+id+"/work-pack").path("visit").path("status").asString()).isEqualTo("EXCEPTION");
             assertThat(a.post("/api/visits/"+id+"/tasks/"+taskId+"/complete",task(3,"DONE")).statusCode()).isEqualTo(409);
             assertThat(familyBrowser.read("/api/visits/"+id+"/timeline").size()).isEqualTo(3);
-            assertThat(jdbc.queryForObject("select count(*) from notification where resource_type='VISIT' and resource_id=? and event_type='VISIT_COMPLETED'",Long.class,id)).isZero();
         }
     }
     @Test void skippedAndRefusedRequireReasonsAndNeverCountAsDone() throws Exception {
@@ -100,7 +96,7 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
             assertThat(jdbc.queryForObject("select count(*) from visit_check_in_record where visit_id=?",Long.class,id)).isEqualTo(1L);
             long taskId=a.read("/api/visits/"+id+"/work-pack").path("tasks").get(0).path("id").asLong();
             var write=CompletableFuture.supplyAsync(()->{try{return a.post("/api/visits/"+id+"/tasks/"+taskId+"/complete",task(1,"DONE"));}catch(Exception e){throw new RuntimeException(e);}});
-            var incident=second.post("/api/incidents",Map.of("visitId",id,"expectedVersion",1,"clientRequestId",UUID.randomUUID().toString(),"category","SERVICE","severity","LOW","description","Observed issue"));
+            var incident=second.post("/api/caregivers/me/incidents",Map.of("visitId",id,"expectedVersion",1,"clientRequestId",UUID.randomUUID().toString(),"category","SERVICE","severity","LOW","description","Observed issue"));
             int taskStatus=write.get().statusCode();assertThat(List.of(taskStatus,incident.statusCode())).contains(409);
             assertThat((taskStatus==200) ^ (incident.statusCode()==201)).isTrue();
             assertThat(jdbc.queryForObject("select version from visit where id=?",Integer.class,id)).isEqualTo(2);
@@ -115,19 +111,21 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
         assertThat(jdbc.queryForObject("select count(*) from visit_state_transition where visit_id=? and result='APPLIED'",Long.class,id)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from caregiver_command_receipt where visit_id=?",Long.class,id)).isZero();
     }
-    @Test void receiptFailureRollsBackIncidentRoutingNotificationsAndVisitPause() throws Exception {
+    /**
+     * The receipt fails after core has raised the incident: visit's pause rolls back, but core keeps the
+     * incident it raised, because the two services share no transaction (docs/service-boundaries.md).
+     */
+    @Test void receiptFailureRollsBackVisitPauseButNotTheIncidentCoreRaised() throws Exception {
         long id=plannedVisit();
         try(var a=browser(caregiverName)) {
             body(a.post("/api/visits/"+id+"/check-in",check(0)),200);
-            long notifications=jdbc.queryForObject("select count(*) from notification",Long.class);
             doThrow(new IllegalStateException("simulated receipt fault")).when(receipts).save(any());
-            assertThat(a.post("/api/incidents",Map.of("visitId",id,"expectedVersion",1,"clientRequestId",UUID.randomUUID().toString(),
+            assertThat(a.post("/api/caregivers/me/incidents",Map.of("visitId",id,"expectedVersion",1,"clientRequestId",UUID.randomUUID().toString(),
                     "category","SERVICE","severity","LOW","description","Atomic rollback fixture")).statusCode()).isEqualTo(503);
-            assertThat(jdbc.queryForObject("select count(*) from notification",Long.class)).isEqualTo(notifications);
         }
         assertThat(jdbc.queryForObject("select status from visit where id=?",String.class,id)).isEqualTo("IN_PROGRESS");
         assertThat(jdbc.queryForObject("select version from visit where id=?",Integer.class,id)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("select count(*) from incident where visit_id=?",Long.class,id)).isZero();
+        assertThat(core.incidentsOf(id)).hasSize(1);
         assertThat(jdbc.queryForObject("select count(*) from visit_state_transition where visit_id=? and result='APPLIED'",Long.class,id)).isEqualTo(2);
         assertThat(jdbc.queryForObject("select count(*) from caregiver_command_receipt where visit_id=?",Long.class,id)).isEqualTo(1);
     }

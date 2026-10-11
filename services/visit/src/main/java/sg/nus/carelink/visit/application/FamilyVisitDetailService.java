@@ -6,8 +6,8 @@ import java.time.ZoneId;
 
 import org.springframework.stereotype.Service;
 
-import sg.nus.carelink.profile.application.FamilyAccessQuery;
-import sg.nus.carelink.profile.application.FamilyReadAudit;
+import sg.nus.carelink.visit.application.FamilyAccessQuery;
+import sg.nus.carelink.visit.application.FamilyReadAudit;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.model.Visit;
 import sg.nus.carelink.visit.domain.repository.VisitRepository;

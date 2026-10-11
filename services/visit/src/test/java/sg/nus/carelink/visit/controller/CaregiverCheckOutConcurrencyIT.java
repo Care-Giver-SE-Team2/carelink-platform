@@ -65,7 +65,7 @@ class CaregiverCheckOutConcurrencyIT extends MissedCheckInITSupport {
             String otherPath=switch(other) {
                 case "TASK" -> "/api/visits/"+id+"/tasks/"+taskId+"/complete";
                 case "HEALTH" -> "/api/visits/"+id+"/health-records";
-                default -> "/api/incidents";
+                default -> "/api/caregivers/me/incidents";
             };
             Map<String,Object> otherInput=switch(other) {
                 case "TASK" -> Map.of("expectedVersion",1,"clientRequestId",UUID.randomUUID().toString(),"status","DONE");

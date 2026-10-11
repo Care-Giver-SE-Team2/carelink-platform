@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
-import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
+import sg.nus.carelink.visit.application.MissedCheckInIncidentGateway;
 import sg.nus.carelink.visit.domain.model.Visit;
 import sg.nus.carelink.visit.domain.repository.MissedCheckInRepository;
 import sg.nus.carelink.visit.domain.repository.VisitCommandRepository;

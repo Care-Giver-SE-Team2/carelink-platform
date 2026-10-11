@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
-import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
+import sg.nus.carelink.visit.application.MissedCheckInIncidentGateway;
 import sg.nus.carelink.visit.domain.model.MissedCheckInTrigger;
 import sg.nus.carelink.visit.domain.repository.MissedCheckInRepository;
 import sg.nus.carelink.visit.domain.repository.VisitCommandRepository;

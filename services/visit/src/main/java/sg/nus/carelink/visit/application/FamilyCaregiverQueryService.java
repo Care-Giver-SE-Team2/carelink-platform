@@ -5,11 +5,11 @@ import java.util.List;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
-import sg.nus.carelink.profile.application.CaregiverDirectory;
-import sg.nus.carelink.profile.application.CaregiverPublicProfile;
-import sg.nus.carelink.profile.application.CaregiverPublicCredential;
-import sg.nus.carelink.profile.application.FamilyAccessQuery;
-import sg.nus.carelink.profile.application.FamilyReadAudit;
+import sg.nus.carelink.visit.application.CaregiverDirectory;
+import sg.nus.carelink.visit.application.CaregiverDirectory.CaregiverPublicProfile;
+import sg.nus.carelink.visit.application.CaregiverDirectory.CaregiverPublicCredential;
+import sg.nus.carelink.visit.application.FamilyAccessQuery;
+import sg.nus.carelink.visit.application.FamilyReadAudit;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.repository.VisitScheduleQuery;
 

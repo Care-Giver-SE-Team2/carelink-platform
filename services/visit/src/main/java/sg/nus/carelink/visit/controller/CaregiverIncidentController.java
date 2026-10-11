@@ -16,7 +16,7 @@ import sg.nus.carelink.visit.controller.dto.CaregiverIncidentRequest;
 public class CaregiverIncidentController {
     private final CaregiverIncidentReportingService service;
     public CaregiverIncidentController(CaregiverIncidentReportingService service) { this.service = service; }
-    @PostMapping("/incidents")
+    @PostMapping("/caregivers/me/incidents")
     public ResponseEntity<CaregiverIncidentReportingService.Result> report(Authentication auth, @Valid @RequestBody CaregiverIncidentRequest input) {
         var result = service.report(auth.getName(), input.visitId(), input.category(), input.severity(), input.description(), input.expectedVersion(), input.clientRequestId());
         return ResponseEntity.status(result.replayed() ? 200 : 201).body(result);

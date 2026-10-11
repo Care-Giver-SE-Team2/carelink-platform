@@ -7,7 +7,6 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.springframework.stereotype.Component;
-import sg.nus.carelink.platform.VisitOutsideCore;
 import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
@@ -16,16 +15,14 @@ import sg.nus.carelink.visitapi.VisitNotFound;
 import sg.nus.carelink.visitapi.VisitRuleViolation;
 
 /**
- * {@link VisitReassignment} from visit's internal API, once {@code carelink.visit-api.base-url} is
- * set. visit's 404 and 409 become the errors visit throws in process, with the same code, so
- * re-rostering answers the manager as before.
+ * {@link VisitReassignment} from visit's internal API. visit's 404 and 409 become the errors visit
+ * threw when it ran in core, with the same code, so re-rostering answers the manager as before.
  *
  * <p>Each change is its own call, and so its own transaction in visit: a run that changes several
  * visits is no longer all-or-nothing. Making it so is the re-rostering saga's job, which is still
  * to be built.
  */
 @Component
-@VisitOutsideCore
 class VisitApiVisitReassignment implements VisitReassignment {
 
 	private final VisitApi visit;

@@ -17,6 +17,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
+import sg.nus.carelink.testsupport.CoreStandIn;
 import sg.nus.carelink.testsupport.MissedCheckInITSupport;
 import sg.nus.carelink.testsupport.SharedMySql;
 import sg.nus.carelink.visit.application.VisitReassignment;
@@ -32,7 +33,7 @@ class MissedCheckInConcurrencyIT extends MissedCheckInITSupport {
     @Autowired PlatformTransactionManager transactions;
     @Autowired EntityManager em;
     @Autowired sg.nus.carelink.visit.domain.repository.MissedCheckInRepository facts;
-    @Autowired sg.nus.carelink.incident.application.MissedCheckInIncidentGateway incidentGateway;
+    @Autowired sg.nus.carelink.visit.application.MissedCheckInIncidentGateway incidentGateway;
     private final ExecutorService workers=Executors.newFixedThreadPool(3);
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         SharedMySql.register(registry, MissedCheckInConcurrencyIT.class, "+05:00", "connectionTimeZone=Asia/Singapore");
@@ -80,7 +81,7 @@ class MissedCheckInConcurrencyIT extends MissedCheckInITSupport {
             body(cg.post("/api/visits/"+id+"/check-in",check(1)),200);assertOneFact(id);
             assertThat(count("visit_check_in_record",id)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("IN_PROGRESS");
-            assertThat(jdbc.queryForObject("SELECT status FROM incident WHERE id=?",String.class,incident(id))).isEqualTo("OPEN");
+            assertThat(core.incidentsOf(id).getFirst().status()).isEqualTo("OPEN");
         }
     }
     private Object managerChange(String action,long id) {
@@ -147,18 +148,14 @@ class MissedCheckInConcurrencyIT extends MissedCheckInITSupport {
     @Test void planStopHoldsWriteLockThenScannerSeesCommittedCancellation() throws Exception {
         long id=plannedVisit();long plan=jdbc.queryForObject("SELECT care_plan_id FROM visit WHERE id=?",Long.class,id);
         var gate=holdFirstCommand(id);
-        try(var mgr=browser(managerName)) {
-            var stopped=workers.submit(()->mgr.post("/api/care-plans/"+plan+"/stop",Map.of("effectiveDate","2026-10-08","reason","Controlled stop")));await(gate.held());
-            overdue();
-            var alarm=workers.submit(()->scan.trigger(id));await(gate.entered());gate.release().countDown();
-            body(stopped.get(20,TimeUnit.SECONDS),200);assertThat(alarm.get(20,TimeUnit.SECONDS)).isFalse();assertThat(count("incident",id)).isZero();
-        }
+        var stopped=workers.submit(()->{stopPlan(plan,LocalDate.of(2026,10,8));return null;});await(gate.held());
+        overdue();
+        var alarm=workers.submit(()->scan.trigger(id));await(gate.entered());gate.release().countDown();
+        stopped.get(20,TimeUnit.SECONDS);assertThat(alarm.get(20,TimeUnit.SECONDS)).isFalse();assertThat(count("incident",id)).isZero();
     }
     @Test void planStoppedAfterVisitWasDueRetainsItForAttendanceReviewAsExistingMg03Requires() throws Exception {
         long id=plannedVisit();overdue();long plan=jdbc.queryForObject("SELECT care_plan_id FROM visit WHERE id=?",Long.class,id);
-        try(var mgr=browser(managerName)) {
-            body(mgr.post("/api/care-plans/"+plan+"/stop",Map.of("effectiveDate","2026-10-08","reason","Stopped after service was due")),200);
-        }
+        stopPlan(plan,LocalDate.of(2026,10,8));
         assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("SCHEDULED");
         assertThat(scan.trigger(id)).isTrue();assertOneFact(id);
     }
@@ -175,7 +172,6 @@ class MissedCheckInConcurrencyIT extends MissedCheckInITSupport {
     private void assertOneFact(long id) {
         assertThat(count("incident",id)).isEqualTo(1);assertThat(count("visit_missed_check_in_trigger",id)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_state_transition WHERE visit_id=? AND from_state='SCHEDULED' AND to_state='EXCEPTION' AND result='APPLIED' AND actor_user_id IS NULL",Long.class,id)).isZero();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=? AND event_type='INCIDENT_RAISED'",Long.class,incident(id))).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id=? AND resource_id=? AND event_type='INCIDENT_RAISED'",Long.class,family,incident(id))).isEqualTo(1);
+        assertThat(core.incidentsOf(id)).singleElement().extracting(CoreStandIn.Raised::id).isEqualTo(incident(id));
     }
 }

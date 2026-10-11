@@ -17,17 +17,20 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
+import jakarta.servlet.http.Cookie;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.client.MockMvcClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+import sg.nus.carelink.platform.security.ServiceSecurityAutoConfiguration;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.visit.application.StandaloneVisits;
 import sg.nus.carelink.visit.application.UpcomingAssignments;
@@ -44,15 +47,15 @@ import sg.nus.carelink.visitapi.VisitRuleViolation;
 
 /**
  * Both sides of visit's internal API in one test, as CoreApiContractTest does for core's. The client
- * rostering, report and incident will use (visit-api's {@link VisitApi}) calls the controllers core
- * serves it with through MockMvc, so a path, a parameter or a field that differs between the two
- * fails here. visit's services behind the controllers are mocks: each test checks that a call
- * reaches them with the caller's values, and that their answer, or their error, comes back the way
- * the caller expects. When visit moves out, the controllers go with it and this test with them.
+ * rostering, report and incident use (visit-api's {@link VisitApi}) calls the controllers visit
+ * serves it with through MockMvc, behind the service's own security chain, so a path, a parameter or
+ * a field that differs between the two fails here. visit's services behind the controllers are
+ * mocks: each test checks that a call reaches them with the caller's values, and that their answer,
+ * or their error, comes back the way the caller expects.
  */
 @WebMvcTest(controllers = {InternalVisitReassignmentController.class, InternalVisitPlanningController.class,
 		InternalVisitQueryController.class})
-@Import(InternalApiSecurity.class)
+@ImportAutoConfiguration(ServiceSecurityAutoConfiguration.class)
 class VisitApiContractTest {
 
 	private static final LocalDateTime NINE = LocalDateTime.of(2026, 10, 12, 9, 0);
@@ -205,7 +208,8 @@ class VisitApiContractTest {
 				.andReturn();
 
 		assertThat(result.getRequest().getSession(false)).isNull();
-		assertThat(result.getResponse().getCookies()).isEmpty();
+		// The service chain hands every caller the CSRF cookie; a session cookie is what must not appear
+		assertThat(result.getResponse().getCookies()).extracting(Cookie::getName).doesNotContain("JSESSIONID", "SESSION");
 	}
 
 }

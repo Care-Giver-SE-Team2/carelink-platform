@@ -12,3 +12,7 @@ resources:
     memory: 768Mi
   limits:
     memory: 1Gi
+
+# visit's internal API, at the Service the chart creates for the release visit
+env:
+  CARELINK_VISITAPI_BASEURL: http://visit

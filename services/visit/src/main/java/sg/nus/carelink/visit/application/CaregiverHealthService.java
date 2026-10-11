@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
+import sg.nus.carelink.visit.application.CaregiverWorkDirectory;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.model.*;

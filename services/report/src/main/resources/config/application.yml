@@ -20,6 +20,5 @@ carelink:
     # For a run outside Docker; overridden by CARELINK_COREAPI_BASEURL
     base-url: http://localhost:8080
   visit-api:
-    # core serves visit's internal API until visit moves out; then this points at visit.
-    # Overridden by CARELINK_VISITAPI_BASEURL
-    base-url: http://localhost:8080
+    # For a run outside Docker, where visit listens on 8081; overridden by CARELINK_VISITAPI_BASEURL
+    base-url: http://localhost:8081

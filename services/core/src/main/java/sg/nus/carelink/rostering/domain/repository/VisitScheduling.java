@@ -5,9 +5,8 @@ import java.util.List;
 
 /**
  * UC-MG03: rostering decides which visits a care plan needs and who takes them; visit owns how a
- * visit comes into being and how it is called off. Rostering asks this port, which it owns, and
- * never visit's classes: while visit runs inside core an adapter asks visit's service, once visit
- * runs on its own an adapter asks visit's internal API.
+ * visit comes into being and how it is called off. Rostering asks this port, which it owns; the
+ * adapter asks visit's internal API.
  *
  * <p>Both operations are safe to repeat: a visit is identified by its plan task and start
  * time, so running the same request twice changes nothing the second time.

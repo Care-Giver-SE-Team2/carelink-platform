@@ -6,7 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
+import sg.nus.carelink.visit.application.CaregiverWorkDirectory;
 import sg.nus.carelink.visit.application.CaregiverWorkService;
 
 @RestController

@@ -4,16 +4,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
-import sg.nus.carelink.platform.VisitOutsideCore;
 import sg.nus.carelink.rostering.domain.repository.VisitScheduling;
 import sg.nus.carelink.visitapi.VisitApi;
 
 /**
- * {@link VisitScheduling} from visit's internal API, once {@code carelink.visit-api.base-url} is
- * set. Both changes are safe to repeat, so a call that failed half-way can simply be made again.
+ * {@link VisitScheduling} from visit's internal API. Both changes are safe to repeat, so a call
+ * that failed half-way can simply be made again.
  */
 @Component
-@VisitOutsideCore
 class VisitApiVisitScheduling implements VisitScheduling {
 
 	private final VisitApi visit;

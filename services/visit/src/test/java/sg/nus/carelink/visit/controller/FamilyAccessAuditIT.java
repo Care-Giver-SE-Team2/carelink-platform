@@ -47,7 +47,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import sg.nus.carelink.profile.application.CaregiverDirectory;
+import sg.nus.carelink.visit.application.CaregiverDirectory;
 import sg.nus.carelink.shared.audit.application.AccessAudit;
 import sg.nus.carelink.shared.audit.application.AccessAuditEntry;
 import sg.nus.carelink.shared.error.ResourceNotFound;
@@ -69,9 +69,12 @@ import tools.jackson.databind.json.JsonMapper;
 class FamilyAccessAuditIT {
 
 	private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 28, 0, 30);
+	private static final int VISITS = 0;
+	private static final int CAREGIVER = 1;
+	private static final int CREDENTIALS = 2;
 	private static final String FAILURE_SECRET = "PRIVATE-FAILURE password=hidden SELECT medical_notes";
+	/** visit's audited family reads; the list of the family's elders is core's, and core audits it. */
 	private static final List<ReadCase> READS = List.of(
-			new ReadCase("/api/elders", "ELDER", null, "FM02_LIST_ELDERS", "$[0].id", 101),
 			new ReadCase("/api/visits", "VISIT", null, "FM02_LIST_VISITS", "$.items[0].id", 301),
 			new ReadCase("/api/caregivers/201", "CAREGIVER", 201L, "FM02_READ_CAREGIVER", "$.id", 201),
 			new ReadCase("/api/caregivers/201/credentials", "CAREGIVER_CREDENTIALS", 201L,
@@ -197,16 +200,15 @@ class FamilyAccessAuditIT {
 		assertThat(active).isTrue();
 		assertThat(readOnly).isTrue();
 		assertThat(auditRows()).hasSize(1);
-		assertAudit(auditRows().getFirst(), READS.get(2), 7L, "OK");
+		assertAudit(auditRows().getFirst(), READS.get(CAREGIVER), 7L, "OK");
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "elders", "visits", "credentials" })
+	@ValueSource(strings = { "visits", "credentials" })
 	void emptySuccessfulListsStillCreateOkAudits(String operation) throws Exception {
 		ReadCase read = switch (operation) {
-			case "elders" -> READS.get(0);
-			case "visits" -> READS.get(1);
-			case "credentials" -> READS.get(3);
+			case "visits" -> READS.get(VISITS);
+			case "credentials" -> READS.get(CREDENTIALS);
 			default -> throw new IllegalArgumentException("Unknown read: " + operation);
 		};
 		boolean credentials = operation.equals("credentials");
@@ -230,7 +232,7 @@ class FamilyAccessAuditIT {
 				.andExpect(status().isOk());
 		assertThat(auditRows()).hasSize(1);
 		var row = auditRows().getFirst();
-		assertAudit(row, READS.get(1), 7L, "OK");
+		assertAudit(row, READS.get(VISITS), 7L, "OK");
 		assertThat(row.detail()).contains("101", "201", "2026-09-28", "2026-09-29", "SCHEDULED", "page=0", "size=5")
 				.doesNotContain("PRIVATE-RAW-QUERY");
 	}
@@ -264,10 +266,10 @@ class FamilyAccessAuditIT {
 	void anAuthorizedMissingCaregiverCreatesFailedAuditAndPreservesNotFound(String operation) throws Exception {
 		ReadCase read;
 		if (operation.equals("profile")) {
-			read = READS.get(2);
+			read = READS.get(CAREGIVER);
 			doReturn(Optional.empty()).when(caregivers).findPublicProfile(201L);
 		} else {
-			read = READS.get(3);
+			read = READS.get(CREDENTIALS);
 			doThrow(new ResourceNotFound("Caregiver", 201L)).when(caregivers).listPublicCredentials(201L);
 		}
 		mvc.perform(get(read.path()).session(loginAs("family-a")))
@@ -280,11 +282,11 @@ class FamilyAccessAuditIT {
 	@Test
 	void unexpectedReadFailureIsAuditedWithoutPersistingItsExceptionMessage() throws Exception {
 		doThrow(new DataAccessResourceFailureException(FAILURE_SECRET)).when(caregivers).findPublicProfile(201L);
-		var response = mvc.perform(get(READS.get(2).path()).session(loginAs("family-a")))
+		var response = mvc.perform(get(READS.get(CAREGIVER).path()).session(loginAs("family-a")))
 				.andExpect(status().isInternalServerError()).andReturn().getResponse();
 		assertThat(response.getContentAsString()).doesNotContain(FAILURE_SECRET, "Confidential caregiver");
 		assertThat(auditRows()).hasSize(1);
-		assertAudit(auditRows().getFirst(), READS.get(2), 7L, "FAILED");
+		assertAudit(auditRows().getFirst(), READS.get(CAREGIVER), 7L, "FAILED");
 		assertThat(auditRows().getFirst().detail()).doesNotContain(FAILURE_SECRET, "SELECT", "password");
 	}
 
@@ -302,11 +304,9 @@ class FamilyAccessAuditIT {
 	}
 
 	@Test
-	void managerKeepsTheExistingElderListAndDoesNotCreateFamilyAudits() throws Exception {
+	void managerCannotUseTheFamilyReadsAndCreatesNoFamilyAudits() throws Exception {
 		var session = loginAs("manager");
-		mvc.perform(get("/api/elders").session(session))
-				.andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2));
-		for (ReadCase read : READS.subList(1, READS.size())) {
+		for (ReadCase read : READS) {
 			mvc.perform(get(read.path()).session(session)).andExpect(status().isForbidden());
 		}
 		assertThat(auditRows()).isEmpty();
@@ -325,7 +325,7 @@ class FamilyAccessAuditIT {
 	@Test
 	void unavailableAuditStorageAlsoFailsClosedForADeniedRead() throws Exception {
 		doThrow(new DataAccessResourceFailureException(FAILURE_SECRET)).when(audit).append(any(AccessAuditEntry.class));
-		assertSafeAuditFailure(READS.get(2), loginAs("no-profile"));
+		assertSafeAuditFailure(READS.get(CAREGIVER), loginAs("no-profile"));
 		assertThat(auditRows()).isEmpty();
 	}
 
@@ -386,7 +386,7 @@ class FamilyAccessAuditIT {
 	}
 
 	private static Stream<ReadCase> relationshipReads() {
-		return READS.subList(1, READS.size()).stream();
+		return READS.stream();
 	}
 
 	private record ReadCase(String path, String resourceType, Long resourceId, String operation,

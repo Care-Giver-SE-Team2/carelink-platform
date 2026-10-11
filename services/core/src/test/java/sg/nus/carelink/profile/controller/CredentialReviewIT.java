@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 
@@ -32,11 +33,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitStandIn;
+import sg.nus.carelink.testsupport.VisitStandIn.Held;
 
 /**
  * UC-MG06 end to end on real MySQL: V11 applies, the register folds a pending renewal into
- * one row, rostering counts the visits it puts at risk, and each review is stored with who
- * and when. Today is 2026-10-02.
+ * one row, rostering counts the visits it puts at risk from what visit answers, and each review
+ * is stored with who and when. Today is 2026-10-02.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -55,6 +58,8 @@ class CredentialReviewIT {
 	private JdbcTemplate jdbc;
 	@Autowired
 	private EntityManager entityManager;
+	@Autowired
+	private VisitStandIn visits;
 
 	@TestConfiguration(proxyBeanMethods = false)
 	static class FixedTime {
@@ -80,12 +85,13 @@ class CredentialReviewIT {
 		jdbc.update("insert into elder(id,full_name) values (8401,'Chan Bee Choo')");
 		jdbc.update("insert into care_plan(id,elder_id,version,status) values (8501,8401,1,'PUBLISHED')");
 		jdbc.update("insert into care_plan_required_credential(care_plan_id,credential_type_id) values (8501,8201)");
-		// Before the old certificate lapses, two after it, and one after that nobody is going to.
-		jdbc.update("insert into visit(elder_id,caregiver_id,care_plan_id,scheduled_start,status) values"
-				+ " (8401,8101,8501,'2026-10-05 08:00:00','SCHEDULED'),"
-				+ " (8401,8101,8501,'2026-10-06 08:00:00','SCHEDULED'),"
-				+ " (8401,8101,8501,'2026-10-07 08:00:00','SCHEDULED'),"
-				+ " (8401,8101,8501,'2026-10-08 08:00:00','CANCELLED')");
+		// visit holds one visit before the old certificate lapses, two after it, and one after that
+		// nobody is going to.
+		for (int day = 5; day <= 7; day++) {
+			visits.add(Held.scheduled(8401L, 8101L, LocalDateTime.of(2026, 10, day, 8, 0), null).withPlan(8501L));
+		}
+		visits.add(Held.scheduled(8401L, 8101L, LocalDateTime.of(2026, 10, 8, 8, 0), null).withPlan(8501L)
+				.withStatus("CANCELLED"));
 	}
 
 	@Test

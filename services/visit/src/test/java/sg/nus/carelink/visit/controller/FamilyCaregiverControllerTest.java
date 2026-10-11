@@ -17,8 +17,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import sg.nus.carelink.profile.application.CaregiverPublicProfile;
-import sg.nus.carelink.profile.application.CaregiverPublicCredential;
+import sg.nus.carelink.visit.application.CaregiverDirectory.CaregiverPublicProfile;
+import sg.nus.carelink.visit.application.CaregiverDirectory.CaregiverPublicCredential;
 import sg.nus.carelink.visit.application.FamilyCaregiverQueryService;
 
 /**

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.support.EncodedResource;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -48,7 +48,7 @@ class CaregiverWorkIT {
     void loadSeed() {
         jdbc.execute((ConnectionCallback<Void>) connection -> {
             ScriptUtils.executeSqlScript(connection,new EncodedResource(
-                new ClassPathResource("db/demo/caregiver-slice1.sql"),StandardCharsets.UTF_8));
+                new FileSystemResource("../core/src/main/resources/db/demo/caregiver-slice1.sql"),StandardCharsets.UTF_8));
             return null;
         });
     }

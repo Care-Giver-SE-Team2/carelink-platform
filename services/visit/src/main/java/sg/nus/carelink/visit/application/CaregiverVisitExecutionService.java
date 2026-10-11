@@ -3,7 +3,7 @@ package sg.nus.carelink.visit.application;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import sg.nus.carelink.careplan.application.VisitPlanReader;
+import sg.nus.carelink.visit.application.VisitPlanReader;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.model.*;

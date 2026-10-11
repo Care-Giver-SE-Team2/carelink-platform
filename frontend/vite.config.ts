@@ -18,6 +18,16 @@ export default defineConfig({
       '/api/family/value-added-service': 'http://localhost:8082',
       '/api/elders/me/value-added-service': 'http://localhost:8082',
       '^/api/elders/[^/]+/weekly-summary': 'http://localhost:8082',
+      // The visit service (8081): visits, their execution, the elder's confirmation, the family's
+      // view of caregivers. /api/caregivers is shared with core, so visit's paths there are
+      // matched in full: the caregiver's own page, schedule and incident reports, and a
+      // caregiver's public profile and certificates.
+      '/api/visits': 'http://localhost:8081',
+      '/api/elders/me/visits': 'http://localhost:8081',
+      '^/api/caregivers/me([?].*)?$': 'http://localhost:8081',
+      '/api/caregivers/me/schedule': 'http://localhost:8081',
+      '/api/caregivers/me/incidents': 'http://localhost:8081',
+      '^/api/caregivers/[0-9]+(/credentials)?([?].*)?$': 'http://localhost:8081',
       '/api': 'http://localhost:8080',
     },
   },

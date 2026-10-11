@@ -30,6 +30,7 @@ import sg.nus.carelink.incident.application.SpotCheckHistory;
 import sg.nus.carelink.rostering.application.AbsenceReRosteringService;
 import sg.nus.carelink.rostering.domain.model.RosteringRun;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitStandIn;
 
 /**
  * The Absences and Quality screens' demonstration script loads after demo-seed.sql, can be loaded
@@ -39,7 +40,8 @@ import sg.nus.carelink.testsupport.SharedMySql;
  * only looks right in the tables proves nothing about the screen.
  *
  * <p>Loaded as a script on one connection, as DemoSeedIT does, through the JDBC time-zone setting
- * the application runs with.
+ * the application runs with. The script still writes visit's tables in core's database, and the
+ * visit stand-in takes the visits over from there.
  *
  * @author Wang Ziyu
  */
@@ -68,6 +70,8 @@ class AbsencesAndSpotChecksDemoIT {
 	private SpotCheckHistory spotChecks;
 	@Autowired
 	private Clock clock;
+	@Autowired
+	private VisitStandIn visits;
 
 	@Test
 	void laysOutTheScenarioOnceAndAgainOnlyAfterItHasBeenUsed() throws Exception {
@@ -170,11 +174,13 @@ class AbsencesAndSpotChecksDemoIT {
 				table -> jdbc.queryForObject("select count(*) from " + table, Long.class)));
 	}
 
+	/** Loads the script; the visits it lays out are visit's, so they go to visit's stand-in as well. */
 	private void load(String script) {
 		jdbc.execute((ConnectionCallback<Void>) connection -> {
 			ScriptUtils.executeSqlScript(connection,
 					new EncodedResource(new ClassPathResource(script), StandardCharsets.UTF_8));
 			return null;
 		});
+		visits.copyVisitTable(jdbc);
 	}
 }

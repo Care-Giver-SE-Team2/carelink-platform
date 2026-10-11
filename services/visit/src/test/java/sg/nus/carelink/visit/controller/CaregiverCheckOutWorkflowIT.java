@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import sg.nus.carelink.testsupport.CoreStandIn;
 import sg.nus.carelink.testsupport.MissedCheckInITSupport;
 import sg.nus.carelink.testsupport.SharedMySql;
 import sg.nus.carelink.visit.domain.repository.CaregiverCommandStore;
@@ -54,8 +55,8 @@ class CaregiverCheckOutWorkflowIT extends MissedCheckInITSupport {
             assertThat(cg.post("/api/visits/"+id+"/tasks/"+taskId+"/complete",Map.of("expectedVersion",3,"clientRequestId",UUID.randomUUID().toString(),"status","DONE")).statusCode()).isEqualTo(409);
             assertThat(familyBrowser.read("/api/visits/"+id).path("status").asString()).isEqualTo("COMPLETED");
             assertThat(familyBrowser.read("/api/visits/"+id+"/timeline").size()).isEqualTo(3);
-            assertThat(jdbc.queryForObject("SELECT status FROM incident WHERE id=?",String.class,event)).isEqualTo("OPEN");
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=?",Long.class,event)).isEqualTo(1);
+            assertThat(core.incidentsOf(id)).filteredOn(raised -> raised.id() == event).singleElement()
+                    .extracting(CoreStandIn.Raised::status).isEqualTo("OPEN");
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_state_transition WHERE visit_id=? AND to_state='COMPLETED' AND result='APPLIED'",Long.class,id)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_evidence WHERE visit_id=?",Long.class,id)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM vital_sign WHERE visit_id=?",Long.class,id)).isZero();
@@ -116,7 +117,7 @@ class CaregiverCheckOutWorkflowIT extends MissedCheckInITSupport {
             assertThat(jdbc.queryForObject("SELECT health_note FROM visit WHERE id=?",String.class,id)).isEqualTo("Synthetic observation");
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM vital_sign WHERE visit_id=?",Long.class,id)).isEqualTo(4);
             assertThat(cg.post("/api/visits/"+id+"/health-records",new HashMap<>(Map.of("expectedVersion",3,"clientRequestId",UUID.randomUUID().toString(),"healthFlag","NO_CONCERN","healthNote","Not measured"))).statusCode()).isEqualTo(409);
-            body(cg.post("/api/incidents",report(id,3)),201);
+            body(cg.post("/api/caregivers/me/incidents",report(id,3)),201);
             assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("COMPLETED");
         }
     }
@@ -124,7 +125,7 @@ class CaregiverCheckOutWorkflowIT extends MissedCheckInITSupport {
         long id=plannedVisit();clock.at(START.plusSeconds(300));
         try(var cg=browser(caregiverName)) {
             body(cg.post("/api/visits/"+id+"/check-in",check(0)),200);
-            body(cg.post("/api/incidents",report(id,1)),201);
+            body(cg.post("/api/caregivers/me/incidents",report(id,1)),201);
             assertThat(cg.post(path(id),departure(2)).statusCode()).isEqualTo(409);
             assertThat(jdbc.queryForObject("SELECT checked_out_at FROM visit WHERE id=?",String.class,id)).isNull();
         }

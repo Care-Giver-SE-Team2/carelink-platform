@@ -33,7 +33,7 @@ class CaregiverSpotCheckWorkflowIT extends CaregiverHttpITSupport {
             body(a.post("/api/spot-checks/" + id + "/response", Map.of("response", "Updated response")), 200);
             assertThat(mgr.read("/api/spot-checks").toString()).contains("Updated response");
             assertThat(jdbc.queryForObject("select result from spot_check where id=?", String.class, id)).isEqualTo("NEEDS_IMPROVEMENT");
-            assertThat(jdbc.queryForObject("select caregiver_id from visit where id=?", Long.class, visit)).isEqualTo(caregiver);
+            assertThat(visits.current(visit).caregiverId()).isEqualTo(caregiver);
             assertThat(relative.read("/api/spot-checks").toString()).contains("COMPLETED");
             assertThat(a.post("/api/auth/logout", Map.of()).statusCode()).isEqualTo(204);
             assertThat(a.get("/api/spot-checks").statusCode()).isEqualTo(401);

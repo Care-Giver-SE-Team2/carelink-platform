@@ -1,0 +1,18 @@
+# visit in the cluster. Anything not set here comes from charts/carelink-service/values.yaml.
+# Two replicas, one per availability zone. Scaling on CPU (HPA) comes with the load test; the
+# missed check-in scan is a scheduled job, which ShedLock lets one replica at a time run.
+replicaCount: 2
+
+autoscaling:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 768Mi
+
+# core's internal API, at the Service the chart creates for the release core
+env:
+  CARELINK_COREAPI_BASEURL: http://core

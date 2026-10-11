@@ -10,5 +10,5 @@ export function listReports(page = 0, signal?: AbortSignal) { return api<ReportP
 export function getReport(id: string, signal?: AbortSignal) { return api<ReportView>('/caregivers/me/incidents/' + encodeURIComponent(id), { signal }) }
 export async function reportIncident(input: ReportInput, signal?: AbortSignal) {
   await api('/auth/csrf', { signal })
-  return api<ReportResult>('/incidents', { method: 'POST', body: JSON.stringify(input), signal })
+  return api<ReportResult>('/caregivers/me/incidents', { method: 'POST', body: JSON.stringify(input), signal })
 }

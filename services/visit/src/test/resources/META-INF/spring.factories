@@ -1,0 +1,2 @@
+# Empties the core stand-in before each test (sg.nus.carelink.testsupport.CoreStandIn)
+org.springframework.test.context.TestExecutionListener=sg.nus.carelink.testsupport.CoreStandInReset

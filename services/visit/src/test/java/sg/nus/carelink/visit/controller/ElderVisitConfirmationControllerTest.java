@@ -8,16 +8,12 @@ import static org.mockito.Mockito.when;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.identity.domain.model.AppUser;
-import sg.nus.carelink.profile.application.ProfileService;
-import sg.nus.carelink.profile.domain.model.Elder;
-import sg.nus.carelink.shared.security.Role;
+import sg.nus.carelink.visit.application.Accounts;
+import sg.nus.carelink.visit.application.Elders;
 import sg.nus.carelink.visit.application.VisitService;
 import sg.nus.carelink.visit.controller.dto.ElderVisitConfirmationRequest;
 import sg.nus.carelink.visit.controller.dto.ElderVisitConfirmationResponse;
@@ -27,80 +23,50 @@ import sg.nus.carelink.visit.domain.model.Visit;
 
 class ElderVisitConfirmationControllerTest {
 
-    private IdentityService identityService;
-    private ProfileService profileService;
+    private Accounts accounts;
+    private Elders elders;
     private VisitService visitService;
 
     private ElderVisitConfirmationController controller;
 
     private Principal principal;
-    private AppUser elderUser;
-    private Elder elder;
 
     @BeforeEach
     void setUp() {
-        identityService =
-                mock(IdentityService.class);
+        accounts =
+                mock(Accounts.class);
 
-        profileService =
-                mock(ProfileService.class);
+        elders =
+                mock(Elders.class);
 
         visitService =
                 mock(VisitService.class);
 
         controller =
                 new ElderVisitConfirmationController(
-                        identityService,
-                        profileService,
+                        accounts,
+                        elders,
                         visitService
                 );
 
         principal =
                 () -> "elder_test";
 
-        elderUser =
-                new AppUser(
-                        1L,
-                        "elder_test",
-                        "Test Elder",
-                        Set.of(Role.ELDER),
-                        true
-                );
-
-        elder =
-                new Elder(
-                        1L,
-                        1L,
-                        "Test Elder",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        Elder.ContinuityPreference.PREFERRED,
-                        null,
-                        null,
-                        null
-                );
-
+        // The elder's account is user 1, and user 1 is elder 1
         when(
-                identityService.require(
+                accounts.idOf(
                         "elder_test"
                 )
         ).thenReturn(
-                elderUser
+                1L
         );
 
         when(
-                profileService.requireElderByUserId(
+                elders.requireElderIdOfUser(
                         1L
                 )
         ).thenReturn(
-                elder
+                1L
         );
     }
 

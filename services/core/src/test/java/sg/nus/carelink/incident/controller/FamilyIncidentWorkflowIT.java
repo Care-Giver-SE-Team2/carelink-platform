@@ -30,16 +30,22 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.web.client.RestClient;
+import sg.nus.carelink.coreapi.CoreApi;
+import sg.nus.carelink.coreapi.CoreApiClients;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitStandIn;
 
 /** HTTP acceptance from published/assigned care to each family's independent receipts.
  * SQL supplies synthetic identities/bindings and observes durable facts, never the source event.
  * Each family's messages are observed where incident writes them; the inbox that shows them is the
- * notification service's, and FamilyIncidentInboxIT there covers it.
+ * notification service's, and FamilyIncidentInboxIT there covers it. The plan's visit is visit's,
+ * held by its stand-in, and the caregiver's report reaches core's internal API the way visit hands
+ * it over; the report's receipt, replay and rollback are visit's, and visit's own tests cover them.
  * @author Wang Zhili
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -55,9 +61,11 @@ class FamilyIncidentWorkflowIT {
     @LocalServerPort private int port;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ScenarioClock clock;
+    @Autowired private VisitStandIn visits;
+    private CoreApi core;
     private final JsonMapper json = JsonMapper.builder().build();
     private String managerName, caregiverName, elderName, familyAName, familyBName;
-    private long elder, caregiver, familyA, familyB, familyAUser, familyBUser;
+    private long elder, caregiver, caregiverUser, familyA, familyB, familyAUser, familyBUser;
 
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         SharedMySql.register(registry, FamilyIncidentWorkflowIT.class, "+05:00", "connectionTimeZone=Asia/Singapore");
@@ -82,10 +90,12 @@ class FamilyIncidentWorkflowIT {
         managerName = "fm05-manager-" + run; caregiverName = "fm05-caregiver-" + run;
         elderName = "fm05-elder-" + run; familyAName = "fm05-family-a-" + run; familyBName = "fm05-family-b-" + run;
         account(managerName, "MANAGER");
-        caregiver = insert("INSERT INTO caregiver(user_id,full_name,status,sector,dialects) VALUES (?,'Fictional caregiver','AVAILABLE','North','English')", account(caregiverName, "CAREGIVER"));
+        caregiverUser = account(caregiverName, "CAREGIVER");
+        caregiver = insert("INSERT INTO caregiver(user_id,full_name,status,sector,dialects) VALUES (?,'Fictional caregiver','AVAILABLE','North','English')", caregiverUser);
         elder = insert("INSERT INTO elder(user_id,full_name,sector,preferred_dialects) VALUES (?,'Fictional elder','North','English')", account(elderName, "ELDER"));
         familyAUser = account(familyAName, "FAMILY"); familyBUser = account(familyBName, "FAMILY");
         familyA = relative(familyAUser, "FULL"); familyB = relative(familyBUser, "READ_ONLY");
+        core = CoreApiClients.create(RestClient.builder().baseUrl("http://127.0.0.1:" + port));
     }
 
     @Test void publishedAssignedCareReachesTwoInboxesAndReadViewAwarenessStayIndependent() throws Exception {
@@ -122,31 +132,8 @@ class FamilyIncidentWorkflowIT {
             assertEmptyReceipt(detail(b, reported.id()));
             assertThat(notice(familyBUser, reported.id())).isEqualTo(noticeB);
             assertThat(manager.read("/api/incidents/" + reported.id())).isEqualTo(managerBefore);
-            assertThat(a.read("/api/visits/" + reported.visit()).path("status").asString()).isEqualTo("EXCEPTION");
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=?", Long.class, reported.id())).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE incident_id=?", Long.class, reported.id())).isEqualTo(2);
-        }
-    }
-
-    @Test void concurrentCg04CommandReplayCreatesOneFactAndOneMessagePerFamily() throws Exception {
-        long visit = plannedVisit(); var input = reportInput(visit);
-        try (var first = browser(caregiverName); var second = browser(caregiverName);
-                var a = browser(familyAName); var b = browser(familyBName)) {
-            var pending = commandAsync(first, "/api/incidents", input);
-            var response = second.command("POST", "/api/incidents", input);
-            var earlier = pending.get();
-            assertThat(List.of(earlier.statusCode(), response.statusCode())).containsExactlyInAnyOrder(201, 200);
-            long id = json.readTree(response.body()).path("report").path("id").asLong();
-            assertThat(json.readTree(earlier.body()).path("report").path("id").asLong()).isEqualTo(id);
-            var noticeA = notice(familyAUser, id); var noticeB = notice(familyBUser, id);
-            var deadline = detail(a, id).path("acknowledgeBy");
-            clock.at(START.plusSeconds(600));
-            assertThat(body(first.command("POST", "/api/incidents", input), 200).path("replayed").asBoolean()).isTrue();
-            assertThat(notice(familyAUser, id)).isEqualTo(noticeA); assertThat(notice(familyBUser, id)).isEqualTo(noticeB);
-            assertThat(detail(a, id).path("acknowledgeBy")).isEqualTo(deadline);
-            assertEmptyReceipt(detail(a, id)); assertEmptyReceipt(detail(b, id));
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE incident_id=?", Long.class, id)).isEqualTo(1);
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE incident_id=?", Long.class, id)).isEqualTo(2);
         }
     }
 
@@ -223,45 +210,19 @@ class FamilyIncidentWorkflowIT {
         }
     }
 
-    @Test void failureSavingCg04ReceiptRollsBackReportVisitAndAllNotificationEffects() throws Exception {
-        long visit = plannedVisit();
-        // Database-boundary failure occurs after routing but before the caregiver source commits.
-        jdbc.execute("CREATE TRIGGER fm05_workflow_source_fault BEFORE INSERT ON caregiver_command_receipt FOR EACH ROW BEGIN IF NEW.visit_id="
-                + visit + " AND NEW.action_code='REPORT_INCIDENT' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic source persistence failure'; END IF; END");
-        try (var caregiver = browser(caregiverName)) {
-            assertThat(caregiver.command("POST", "/api/incidents", reportInput(visit)).statusCode()).isEqualTo(503);
-            var pack = caregiver.read("/api/visits/" + visit + "/work-pack");
-            assertThat(pack.path("visit").path("status").asString()).isEqualTo("SCHEDULED");
-            assertThat(pack.path("visit").path("version").asInt()).isZero();
-            assertThat(caregiver.read("/api/caregivers/me/incidents?visitId=" + visit).path("totalElements").asInt()).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE elder_id=?", Long.class, elder)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident WHERE visit_id=?", Long.class, visit)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM caregiver_command_receipt WHERE visit_id=?", Long.class, visit)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM visit_state_transition WHERE visit_id=? AND result='APPLIED'", Long.class, visit)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id IN (?,?)", Long.class, familyAUser, familyBUser)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE family_member_id IN (?,?)", Long.class, familyA, familyB)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_delivery WHERE recipient_user_id IN (?,?)", Long.class, familyAUser, familyBUser)).isZero();
-        } finally { jdbc.execute("DROP TRIGGER fm05_workflow_source_fault"); }
-    }
-
     @Test void oneFamilyStorageFailureDoesNotUndoCommittedReportOrBlockTheOtherFamily() throws Exception {
         jdbc.execute("CREATE TRIGGER fm05_workflow_notice_fault BEFORE INSERT ON notification FOR EACH ROW BEGIN IF NEW.recipient_user_id="
                 + familyAUser + " AND NEW.resource_type='INCIDENT' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic recipient persistence failure'; END IF; END");
         try {
             var report = report();
-            try (var a = browser(familyAName); var b = browser(familyBName); var caregiver = browser(caregiverName)) {
+            try (var a = browser(familyAName); var b = browser(familyBName)) {
                 assertThat(notices(familyAUser, report.id())).isEmpty();
                 assertThat(detail(a, report.id()).path("acknowledgeBy").isNull()).isTrue();
-                var delivered = notice(familyBUser, report.id()); var deadline = detail(b, report.id()).path("acknowledgeBy");
-                assertThat(deadline.asString()).isEqualTo("2026-10-08T12:05:00+08:00");
+                assertThat(notice(familyBUser, report.id()).get("status")).isEqualTo("PENDING");
+                assertThat(detail(b, report.id()).path("acknowledgeBy").asString()).isEqualTo("2026-10-08T12:05:00+08:00");
                 assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event WHERE incident_id=?", String.class, report.id())).isEqualTo("FAILED");
                 assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, familyA, report.id())).isEqualTo("FAILED");
                 assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, familyB, report.id())).isEqualTo("CREATED");
-                assertThat(caregiver.read("/api/visits/" + report.visit() + "/work-pack").path("visit").path("status").asString()).isEqualTo("EXCEPTION");
-                assertThat(body(caregiver.command("POST", "/api/incidents", report.input()), 200).path("replayed").asBoolean()).isTrue();
-                assertThat(notices(familyAUser, report.id())).isEmpty();
-                assertThat(notice(familyBUser, report.id())).isEqualTo(delivered);
-                assertThat(detail(b, report.id()).path("acknowledgeBy")).isEqualTo(deadline);
                 assertThat(body(b.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Independent recipient can respond")), 200).path("acknowledgedAt").isNull()).isFalse();
             }
         } finally { jdbc.execute("DROP TRIGGER fm05_workflow_notice_fault"); }
@@ -325,27 +286,19 @@ class FamilyIncidentWorkflowIT {
                     "groupName", "Personal care", "name", "FM05 workflow care", "evidenceType", "CHECKLIST", "visits", List.of(Map.of("day", "THURSDAY", "startTime", "10:05", "minutes", 60)))))), 200);
             // Publishing also tells the family the plan is ready; these tests count incident messages only.
             jdbc.update("DELETE FROM notification WHERE resource_type = 'CARE_PLAN'");
-            for (var row : manager.read("/api/visits/roster?date=2026-10-08")) {
-                if (row.path("carePlanId").asLong() == plan) {
-                    assertThat(row.path("caregiverId").asLong()).isEqualTo(caregiver);
-                    clock.at(START.plusSeconds(300));
-                    return row.path("id").asLong();
-                }
-            }
-            throw new AssertionError("Published/assigned plan must produce its visit through the roster API");
+            var planned = visits.ofElder(elder).stream().filter(visit -> Long.valueOf(plan).equals(visit.carePlanId()))
+                    .findFirst().orElseThrow(() -> new AssertionError("Published/assigned plan must produce its visit in visit"));
+            assertThat(planned.caregiverId()).isEqualTo(caregiver);
+            clock.at(START.plusSeconds(300));
+            return planned.id();
         }
     }
+    /** The caregiver reports a fall at the plan's visit; visit hands the report to core like this. */
     private Report report() throws Exception {
         long visit = plannedVisit();
-        var input = reportInput(visit);
-        try (var caregiver = browser(caregiverName)) {
-            long id = body(caregiver.command("POST", "/api/incidents", input), 201).path("report").path("id").asLong();
-            return new Report(id, visit, input);
-        }
-    }
-    private Map<String, Object> reportInput(long visit) {
-        return Map.of("visitId", visit, "expectedVersion", 0, "clientRequestId", UUID.randomUUID().toString(),
-                "category", "FALL", "severity", "HIGH", "description", DESCRIPTION);
+        long id = core.reportIncident(new CoreApi.CaregiverIncidentRequest(elder, visit, caregiverUser, "FALL", "HIGH",
+                DESCRIPTION)).id();
+        return new Report(id, visit);
     }
     private CompletableFuture<HttpResponse<String>> commandAsync(Browser browser, String path, Map<String, ?> payload) {
         return CompletableFuture.supplyAsync(() -> {
@@ -353,7 +306,7 @@ class FamilyIncidentWorkflowIT {
             catch (Exception failure) { throw new IllegalStateException(failure); }
         });
     }
-    private record Report(long id, long visit, Map<String, Object> input) { }
+    private record Report(long id, long visit) { }
     private JsonNode detail(Browser browser, long id) throws Exception { return browser.read("/api/family/incidents/" + id); }
     /** The one message incident wrote this account about the incident. */
     private Map<String, Object> notice(long user, long id) {

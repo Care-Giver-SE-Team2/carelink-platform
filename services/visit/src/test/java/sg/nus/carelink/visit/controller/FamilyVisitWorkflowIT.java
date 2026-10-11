@@ -119,8 +119,6 @@ class FamilyVisitWorkflowIT {
 		var original = careFacts();
 		try (var family = newBrowser()) {
 			login(family, "family-a");
-			assertThat(getJson(family, "/api/elders")).extracting(node -> node.path("id").longValue())
-					.containsExactly(101L, 102L);
 			var schedule = getJson(family, "/api/visits?elderId=101&dateFrom=2026-09-28&dateTo=2026-10-04");
 			long visitId = schedule.path("items").get(0).path("id").longValue();
 			assertThat(visitId).isEqualTo(501);
@@ -286,7 +284,6 @@ class FamilyVisitWorkflowIT {
 			}
 			assertReadDenied(manager, "/api/visits/501/tasks", 403);
 			assertThat(getJson(caregiver, "/api/visits/501/tasks").toString()).contains("Meal preparation", "PRIVATE-NOTE");
-			assertThat(getJson(family, "/api/intake-applications").path("items")).isEmpty();
 			assertThat(getJson(family, "/api/visits?elderId=101").path("totalElements").longValue()).isEqualTo(2);
 		}
 		assertThat(careFacts()).isEqualTo(original);

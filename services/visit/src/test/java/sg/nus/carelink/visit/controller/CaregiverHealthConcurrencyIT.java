@@ -71,7 +71,7 @@ class CaregiverHealthConcurrencyIT extends CaregiverHealthITSupport {
         long id = plannedVisit();
         try (var a = browser(caregiverName); var b = browser(caregiverName)) {
             checkIn(a, id); long taskId = a.read("/api/visits/" + id + "/work-pack").path("tasks").get(0).path("id").asLong();
-            String otherPath = "INCIDENT".equals(other) ? "/api/incidents" : "/api/visits/" + id + "/tasks/" + taskId + "/complete";
+            String otherPath = "INCIDENT".equals(other) ? "/api/caregivers/me/incidents" : "/api/visits/" + id + "/tasks/" + taskId + "/complete";
             Map<String, Object> otherInput = "INCIDENT".equals(other)
                     ? Map.of("visitId", id, "expectedVersion", 1, "clientRequestId", UUID.randomUUID().toString(), "category", "SERVICE", "severity", "LOW", "description", "Synthetic paused visit")
                     : Map.of("expectedVersion", 1, "clientRequestId", UUID.randomUUID().toString(), "status", "DONE");

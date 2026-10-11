@@ -15,7 +15,6 @@ import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.model.ElderConfirmation;
@@ -33,7 +32,7 @@ class VisitServiceTest {
 
     private InMemoryVisitRepository visits;
     private InMemoryElderConfirmationRepository confirmations;
-    private IncidentService incidents;
+    private ElderServiceDisputes incidents;
     private VisitService service;
 
     @BeforeEach
@@ -45,7 +44,7 @@ class VisitServiceTest {
                 new InMemoryElderConfirmationRepository();
 
         incidents =
-                mock(IncidentService.class);
+                mock(ElderServiceDisputes.class);
 
         service =
                 new VisitService(

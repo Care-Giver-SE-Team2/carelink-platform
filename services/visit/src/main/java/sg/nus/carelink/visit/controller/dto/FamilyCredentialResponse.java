@@ -2,7 +2,7 @@ package sg.nus.carelink.visit.controller.dto;
 
 import java.time.LocalDate;
 
-import sg.nus.carelink.profile.application.CaregiverPublicCredential;
+import sg.nus.carelink.visit.application.CaregiverDirectory.CaregiverPublicCredential;
 
 /**
  * Exposes public credential details and their read-time status.

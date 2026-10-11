@@ -6,12 +6,10 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Component;
 import sg.nus.carelink.incident.domain.repository.SpotCheckLookups.VisitFacts;
-import sg.nus.carelink.platform.VisitOutsideCore;
 import sg.nus.carelink.visitapi.VisitApi;
 
-/** {@link SpotCheckVisits} from visit's internal API, once {@code carelink.visit-api.base-url} is set. */
+/** {@link SpotCheckVisits} from visit's internal API. */
 @Component
-@VisitOutsideCore
 class VisitApiSpotCheckVisits implements SpotCheckVisits {
 
 	private final VisitApi visit;

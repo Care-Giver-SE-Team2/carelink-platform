@@ -10,7 +10,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import sg.nus.carelink.visit.application.MissedCheckInScanService;
 
-/** Positive Visit setup uses real manager commands, not Visit/Incident/notification SQL. */
+/**
+ * Positive Visit setup goes the way a manager's published plan reaches visit, not through Visit SQL.
+ * The incidents a missed check-in raises are core's, so the tests read them from the core stand-in.
+ */
 @Import(MissedCheckInITSupport.TimeConfiguration.class)
 public abstract class MissedCheckInITSupport extends CaregiverHttpITSupport {
     protected static final Instant START = Instant.parse("2026-10-08T02:00:00Z");
@@ -38,22 +41,13 @@ public abstract class MissedCheckInITSupport extends CaregiverHttpITSupport {
         secondFamily = insert("INSERT INTO family_member(user_id,full_name) VALUES (?,'Fictional read-only family')", secondFamilyUser);
         jdbc.update("INSERT INTO elder_family_binding(elder_id,family_member_id,relationship,access_scope,status) VALUES (?,?,'SON','READ_ONLY','ACTIVE')", elder, secondFamily);
     }
-    protected long plannedVisit() throws Exception { return plannedVisits(1).getFirst(); }
-    protected List<Long> plannedVisits(int count) throws Exception {
-        try (var mgr = browser(managerName)) {
-            body(mgr.put("/api/elders/" + elder + "/primary-caregiver", Map.of("caregiverId", caregiver)), 200);
-            long plan = body(mgr.post("/api/care-plans", Map.of("elderId", elder)), 201).path("id").asLong();
-            List<Map<String, Object>> nodes = new ArrayList<>();
-            for (int i=0; i<count; i++) nodes.add(Map.of("groupName", "Personal care", "name", "SYS03 routine " + i,
-                    "evidenceType", "CHECKLIST", "visits", List.of(Map.of("day", "THURSDAY", "startTime", "10:05", "minutes", 60))));
-            body(mgr.post("/api/care-plans/" + plan + "/publish", Map.of("startDate", "2026-10-08", "nodes", nodes)), 200);
-            List<Long> ids = new ArrayList<>();
-            for (var row : mgr.read("/api/visits/roster?date=2026-10-08")) {
-                if (row.path("carePlanId").asLong()==plan) ids.add(row.path("id").asLong());
-            }
-            org.assertj.core.api.Assertions.assertThat(ids).hasSize(count);
-            return ids;
-        }
+    protected long plannedVisit() { return plannedVisits(1).getFirst(); }
+    protected List<Long> plannedVisits(int count) {
+        String[] tasks = new String[count];
+        for (int i=0; i<count; i++) tasks[i] = "SYS03 routine " + i;
+        List<Long> ids = publishPlan(LocalDateTime.of(2026, 10, 8, 10, 5), 60, "CHECKLIST", tasks).visits();
+        org.assertj.core.api.Assertions.assertThat(ids).hasSize(count);
+        return ids;
     }
     protected void overdue() { clock.at(START.plusSeconds(901)); }
     protected Map<String,Object> check(int version) {
@@ -64,8 +58,10 @@ public abstract class MissedCheckInITSupport extends CaregiverHttpITSupport {
         return jdbc.queryForObject("SELECT incident_id FROM visit_missed_check_in_trigger WHERE visit_id=?", Long.class, id);
     }
     protected int version(long id) { return jdbc.queryForObject("SELECT version FROM visit WHERE id=?", Integer.class, id); }
+    /** The visit's rows in one of visit's tables, or for "incident", the incidents visit asked core to raise about it. */
     protected long count(String table, long id) {
-        if (!Set.of("incident", "visit_missed_check_in_trigger", "visit_state_transition", "visit_check_in_record").contains(table)) throw new IllegalArgumentException("Unknown fixture table");
+        if (table.equals("incident")) return core.incidentsOf(id).size();
+        if (!Set.of("visit_missed_check_in_trigger", "visit_state_transition", "visit_check_in_record").contains(table)) throw new IllegalArgumentException("Unknown fixture table");
         return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE visit_id=?", Long.class, id);
     }
 }

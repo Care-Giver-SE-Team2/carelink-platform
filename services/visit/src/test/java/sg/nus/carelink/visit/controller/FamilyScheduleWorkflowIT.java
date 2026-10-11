@@ -131,10 +131,8 @@ class FamilyScheduleWorkflowIT {
 			assertThat(currentUser.path("id").longValue()).isEqualTo(7L);
 			assertThat(currentUser.path("roles")).extracting(JsonNode::asString).containsExactly("FAMILY");
 
-			var elders = getJson(browser, "/api/elders");
-			assertThat(elders.isArray()).isTrue();
-			assertThat(elders).extracting(elder -> elder.path("id").longValue()).containsExactly(101L);
-			long selectedElderId = elders.get(0).path("id").longValue();
+			// The elder the family picks from their list, which core serves
+			long selectedElderId = 101L;
 			var firstPage = getJson(browser, "/api/visits?elderId=" + selectedElderId + "&page=0&size=2");
 			assertThat(firstPage.path("page").intValue()).isZero();
 			assertThat(firstPage.path("size").intValue()).isEqualTo(2);
@@ -167,11 +165,11 @@ class FamilyScheduleWorkflowIT {
 			var audits = auditRows();
 			assertThat(audits).extracting(AuditEvidence::actorUserId).containsOnly(7L);
 			assertThat(audits).extracting(AuditEvidence::resourceType)
-					.containsExactly("ELDER", "VISIT", "VISIT", "CAREGIVER", "CAREGIVER_CREDENTIALS");
-			assertThat(audits).extracting(AuditEvidence::resourceId).containsExactly(null, null, null, 201L, 201L);
+					.containsExactly("VISIT", "VISIT", "CAREGIVER", "CAREGIVER_CREDENTIALS");
+			assertThat(audits).extracting(AuditEvidence::resourceId).containsExactly(null, null, 201L, 201L);
 			assertThat(audits).extracting(AuditEvidence::result).containsOnly("OK");
-			assertThat(audits.get(1).detail()).contains("dateFrom=2026-09-28", "dateTo=2026-10-04", "page=0", "size=2");
-			assertThat(audits.get(2).detail()).contains("page=1");
+			assertThat(audits.get(0).detail()).contains("dateFrom=2026-09-28", "dateTo=2026-10-04", "page=0", "size=2");
+			assertThat(audits.get(1).detail()).contains("page=1");
 		}
 	}
 
@@ -179,16 +177,14 @@ class FamilyScheduleWorkflowIT {
 	void revokingTheSelectedBindingRemovesAccessAcrossTheSameLoggedInWorkflow() throws Exception {
 		try (var browser = newBrowser()) {
 			login(browser, "family-a");
-			getJson(browser, "/api/elders");
 			getJson(browser, "/api/visits?elderId=101");
 			getJson(browser, "/api/caregivers/201");
 			getJson(browser, "/api/caregivers/201/credentials");
 			var before = auditRows();
-			assertThat(before).hasSize(4);
+			assertThat(before).hasSize(3);
 
 			jdbc.update("UPDATE elder_family_binding SET status = 'REVOKED' WHERE id = 501");
 			assertThat(getJson(browser, "/api/auth/me").path("id").longValue()).isEqualTo(7L);
-			assertThat(getJson(browser, "/api/elders")).isEmpty();
 			var remainingVisits = getJson(browser, "/api/visits");
 			assertThat(remainingVisits.path("items")).isEmpty();
 			assertThat(remainingVisits.path("totalElements").longValue()).isZero();
@@ -199,11 +195,11 @@ class FamilyScheduleWorkflowIT {
 				assertThat(response.body()).doesNotContain("Elder Tan", "Caregiver Mei", "Training provider", "PRIVATE-");
 			}
 			var after = auditRows();
-			assertThat(after).hasSize(9);
-			assertThat(after.subList(0, 4)).isEqualTo(before);
-			assertThat(after.subList(4, 6)).extracting(AuditEvidence::result).containsExactly("OK", "OK");
-			assertThat(after.subList(6, 9)).extracting(AuditEvidence::result).containsOnly("DENIED");
-			assertThat(after.subList(6, 9)).extracting(AuditEvidence::resourceType)
+			assertThat(after).hasSize(7);
+			assertThat(after.subList(0, 3)).isEqualTo(before);
+			assertThat(after.subList(3, 4)).extracting(AuditEvidence::result).containsExactly("OK");
+			assertThat(after.subList(4, 7)).extracting(AuditEvidence::result).containsOnly("DENIED");
+			assertThat(after.subList(4, 7)).extracting(AuditEvidence::resourceType)
 					.containsExactly("VISIT", "CAREGIVER", "CAREGIVER_CREDENTIALS");
 			assertThat(after).extracting(AuditEvidence::actorUserId).containsOnly(7L);
 		}
@@ -229,7 +225,7 @@ class FamilyScheduleWorkflowIT {
 			oldCookie.setVersion(0);
 			replay.cookies().getCookieStore().add(uri("/"), oldCookie);
 			for (var client : List.of(browser, fresh, replay)) {
-				for (String path : List.of("/api/elders", "/api/visits?elderId=101",
+				for (String path : List.of("/api/visits?elderId=101",
 						"/api/caregivers/201", "/api/caregivers/201/credentials")) {
 					var response = get(client, path);
 					assertThat(response.statusCode()).as("Unauthenticated read of %s", path).isEqualTo(401);
@@ -241,43 +237,6 @@ class FamilyScheduleWorkflowIT {
 			assertThat(cookie(browser, "JSESSIONID").getValue()).isNotEqualTo(oldSessionId);
 			assertThat(getJson(browser, "/api/caregivers/201").path("id").longValue()).isEqualTo(201L);
 			assertThat(auditRows()).hasSize(2).extracting(AuditEvidence::result).containsOnly("OK");
-		}
-	}
-
-	@Test
-	void familyScheduleReadsPreserveManagerElderListingAndFm01ApplicationOwnership() throws Exception {
-		try (var family = newBrowser(); var manager = newBrowser(); var otherFamily = newBrowser()) {
-			login(manager, "manager");
-			var managerElders = getJson(manager, "/api/elders");
-			assertThat(managerElders.isArray()).isTrue();
-			assertThat(managerElders).extracting(elder -> elder.path("id").longValue())
-					.containsExactlyInAnyOrder(101L, 110L);
-			assertThat(auditRows()).isEmpty();
-
-			login(family, "family-a");
-			jdbc.update("INSERT INTO intake_application (id, applicant_family_member_id, target_elder_name, target_address, "
-						+ "postal_code, status, created_at) VALUES (901, 42, 'New elder', '12 Example Road', '123456', 'SUBMITTED', "
-						+ "'2026-09-20 10:00:00')");
-			long applicationId = 901L;
-			var application = getJson(family, "/api/intake-applications/" + applicationId);
-			assertThat(application.path("applicantFamilyMemberId").longValue()).isEqualTo(42L);
-			assertThat(application.path("status").asString()).isEqualTo("SUBMITTED");
-			assertThat(application.path("elderId").isNull()).isTrue();
-			assertThat(getJson(family, "/api/visits?elderId=101").path("totalElements").longValue()).isEqualTo(3L);
-			var applications = getJson(family, "/api/intake-applications");
-			assertThat(applications.path("totalElements").longValue()).isEqualTo(1L);
-			assertThat(applications.path("items").get(0)).isEqualTo(application);
-			assertThat(getJson(family, "/api/intake-applications/" + applicationId)).isEqualTo(application);
-
-			login(otherFamily, "family-b");
-			assertThat(getJson(otherFamily, "/api/intake-applications").path("items")).isEmpty();
-			var unauthorizedDetail = get(otherFamily, "/api/intake-applications/" + applicationId);
-			assertThat(unauthorizedDetail.statusCode()).isEqualTo(403);
-			assertThat(unauthorizedDetail.body()).doesNotContain("New elder", "12 Example Road");
-			assertThat(auditRows()).hasSize(1);
-			assertThat(auditRows().getFirst().actorUserId()).isEqualTo(7L);
-			assertThat(auditRows().getFirst().resourceType()).isEqualTo("VISIT");
-			assertThat(auditRows().getFirst().result()).isEqualTo("OK");
 		}
 	}
 

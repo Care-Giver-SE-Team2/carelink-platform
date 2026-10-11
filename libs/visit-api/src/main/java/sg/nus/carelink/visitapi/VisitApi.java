@@ -16,12 +16,10 @@ import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 
 /**
- * What visit offers the other services in place of the in-process calls they make today: rostering
- * and report call visit's VisitReassignment, VisitScheduling, UpcomingAssignments, StandaloneVisits
- * and VisitScheduleQuery, and incident reads visit's table. The records carry the same fields as the
- * in-process types. Whoever holds visit serves it under {@code /internal/v1}: core until visit moves
- * out, then visit itself, so a caller that has switched to this client changes only its address when
- * visit moves.
+ * What visit offers the other services: rostering and report reach visit's VisitReassignment,
+ * VisitScheduling, UpcomingAssignments, StandaloneVisits and VisitScheduleQuery through it, and
+ * incident asks it about visits. The records carry the same fields as those types did when the
+ * callers called them in-process. visit serves it under {@code /internal/v1}.
  *
  * <p>Errors come back as they did in-process: 403 as {@link AccessDeniedException}, 404 as
  * {@link VisitNotFound}, and a broken business rule (409) as {@link VisitRuleViolation} with visit's

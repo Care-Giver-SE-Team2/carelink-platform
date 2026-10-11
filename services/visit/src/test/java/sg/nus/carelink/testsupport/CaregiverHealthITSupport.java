@@ -1,25 +1,16 @@
 package sg.nus.carelink.testsupport;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Positive fixtures are produced through manager plan publication and caregiver check-in. */
+/** Positive fixtures are produced the way a published plan produces them, and through caregiver check-in. */
 public abstract class CaregiverHealthITSupport extends CaregiverHttpITSupport {
-    protected long plannedVisit() throws Exception {
+    protected long plannedVisit() {
         var start = LocalDateTime.now(ZoneId.of("Asia/Singapore")).plusMinutes(5).withSecond(0).withNano(0);
-        try (var mgr = browser(managerName)) {
-            body(mgr.put("/api/elders/" + elder + "/primary-caregiver", Map.of("caregiverId", caregiver)), 200);
-            long plan = body(mgr.post("/api/care-plans", Map.of("elderId", elder)), 201).path("id").asLong();
-            body(mgr.post("/api/care-plans/" + plan + "/publish", Map.of("startDate", start.toLocalDate().toString(), "nodes", List.of(Map.of(
-                    "groupName", "Personal care", "name", "Care routine", "evidenceType", "NONE", "visits", List.of(Map.of(
-                    "day", start.getDayOfWeek().name(), "startTime", start.toLocalTime().toString(), "minutes", 60)))))), 200);
-            return jdbc.queryForObject("select id from visit where care_plan_id=? and scheduled_start=?", Long.class, plan, Timestamp.valueOf(start));
-        }
+        return publishPlan(start, 60, "NONE", "Care routine").visits().getFirst();
     }
     protected void checkIn(Browser browser, long id) throws Exception {
         body(browser.post("/api/visits/" + id + "/check-in", Map.of("expectedVersion", 0, "clientRequestId", UUID.randomUUID().toString(),

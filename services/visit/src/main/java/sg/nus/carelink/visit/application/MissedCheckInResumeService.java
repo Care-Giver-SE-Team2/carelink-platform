@@ -2,7 +2,7 @@ package sg.nus.carelink.visit.application;
 
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
-import sg.nus.carelink.incident.application.MissedCheckInPauseEvidence;
+import sg.nus.carelink.visit.application.MissedCheckInPauseEvidence;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.visit.domain.model.Visit;
 import sg.nus.carelink.visit.domain.repository.MissedCheckInRepository;

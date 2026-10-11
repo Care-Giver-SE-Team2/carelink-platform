@@ -9,8 +9,8 @@ import java.util.Set;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
-import sg.nus.carelink.profile.application.FamilyAccessQuery;
-import sg.nus.carelink.profile.application.FamilyReadAudit;
+import sg.nus.carelink.visit.application.FamilyAccessQuery;
+import sg.nus.carelink.visit.application.FamilyReadAudit;
 import sg.nus.carelink.visit.domain.model.VisitPage;
 import sg.nus.carelink.visit.domain.model.VisitScheduleFilter;
 import sg.nus.carelink.visit.domain.repository.VisitScheduleQuery;

@@ -22,8 +22,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import sg.nus.carelink.careplan.application.VisitPlanReader;
-import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
+import sg.nus.carelink.visit.application.VisitPlanReader;
+import sg.nus.carelink.visit.application.CaregiverWorkDirectory;
 import sg.nus.carelink.visit.domain.model.CheckInLocation;
 import sg.nus.carelink.visit.domain.model.Visit;
 import sg.nus.carelink.visit.domain.model.VisitExecutionPolicy;

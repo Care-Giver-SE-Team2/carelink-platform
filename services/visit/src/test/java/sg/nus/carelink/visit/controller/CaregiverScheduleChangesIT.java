@@ -18,7 +18,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.support.EncodedResource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -155,7 +155,7 @@ class CaregiverScheduleChangesIT {
 
     private void loadDemo() {
         jdbc.execute((ConnectionCallback<Void>) connection -> {
-            ScriptUtils.executeSqlScript(connection,new EncodedResource(new ClassPathResource("db/demo/caregiver-slice3.sql"),StandardCharsets.UTF_8));
+            ScriptUtils.executeSqlScript(connection,new EncodedResource(new FileSystemResource("../core/src/main/resources/db/demo/caregiver-slice3.sql"),StandardCharsets.UTF_8));
             return null;
         });
     }

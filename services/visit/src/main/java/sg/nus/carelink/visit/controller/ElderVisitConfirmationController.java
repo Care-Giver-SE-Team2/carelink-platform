@@ -15,10 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
-import sg.nus.carelink.identity.application.IdentityService;
-import sg.nus.carelink.identity.domain.model.AppUser;
-import sg.nus.carelink.profile.application.ProfileService;
-import sg.nus.carelink.profile.domain.model.Elder;
+import sg.nus.carelink.visit.application.Accounts;
+import sg.nus.carelink.visit.application.Elders;
 import sg.nus.carelink.visit.application.VisitService;
 import sg.nus.carelink.visit.controller.dto.ElderVisitConfirmationRequest;
 import sg.nus.carelink.visit.controller.dto.ElderVisitConfirmationResponse;
@@ -33,20 +31,20 @@ import sg.nus.carelink.visit.domain.model.ElderConfirmation;
 @PreAuthorize("hasRole('ELDER')")
 public class ElderVisitConfirmationController {
 
-    private final IdentityService identityService;
-    private final ProfileService profileService;
+    private final Accounts accounts;
+    private final Elders elders;
     private final VisitService visitService;
 
     public ElderVisitConfirmationController(
-            IdentityService identityService,
-            ProfileService profileService,
+            Accounts accounts,
+            Elders elders,
             VisitService visitService) {
 
-        this.identityService =
-                identityService;
+        this.accounts =
+                accounts;
 
-        this.profileService =
-                profileService;
+        this.elders =
+                elders;
 
         this.visitService =
                 visitService;
@@ -60,12 +58,12 @@ public class ElderVisitConfirmationController {
             awaitingConfirmation(
                     Principal principal) {
 
-        Elder elder =
-                currentElder(principal);
+        Long elderId =
+                currentElderId(principal);
 
         return visitService
                 .findAwaitingConfirmation(
-                        elder.id()
+                        elderId
                 )
                 .stream()
                 .map(
@@ -86,22 +84,21 @@ public class ElderVisitConfirmationController {
             ElderVisitConfirmationRequest request,
             Principal principal) {
 
-        AppUser user =
-                identityService.require(
+        Long userId =
+                accounts.idOf(
                         principal.getName()
                 );
 
-        Elder elder =
-                profileService
-                        .requireElderByUserId(
-                                user.id()
-                        );
+        Long elderId =
+                elders.requireElderIdOfUser(
+                        userId
+                );
 
         ElderConfirmation saved =
                 visitService
                         .submitElderConfirmation(
-                                elder.id(),
-                                user.id(),
+                                elderId,
+                                userId,
                                 visitId,
                                 request.confirmationStatus(),
                                 request.rating(),
@@ -112,17 +109,13 @@ public class ElderVisitConfirmationController {
                 .from(saved);
     }
 
-    private Elder currentElder(
+    private Long currentElderId(
             Principal principal) {
 
-        AppUser user =
-                identityService.require(
+        return elders.requireElderIdOfUser(
+                accounts.idOf(
                         principal.getName()
-                );
-
-        return profileService
-                .requireElderByUserId(
-                        user.id()
-                );
+                )
+        );
     }
 }

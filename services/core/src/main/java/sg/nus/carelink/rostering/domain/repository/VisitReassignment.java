@@ -9,9 +9,7 @@ import java.util.Optional;
  * What re-rostering after an absence (UC-MG04) needs from the visits, which visit owns: which ones
  * the absence vacates, who is booked when, who has been to an elder before, and the four changes
  * it can make: give a visit to someone else, leave it uncovered as an exception, call it off, or
- * move it. Rostering asks this port, which it owns, and never visit's classes: while visit runs
- * inside core an adapter asks visit's service, once visit runs on its own an adapter asks visit's
- * internal API.
+ * move it. Rostering asks this port, which it owns; the adapter asks visit's internal API.
  *
  * <p>Every change also writes visit_assignment, so a visit's caregivers stay on record after it
  * changes hands (DECISION 17: "accepting a candidate creates a visit_assignment").

@@ -12,7 +12,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import sg.nus.carelink.profile.application.CaregiverWorkDirectory;
+import sg.nus.carelink.visit.application.CaregiverWorkDirectory;
 import sg.nus.carelink.visit.application.CaregiverWorkService;
 
 /** HTTP binding tests; real role/session and database isolation are exercised in CaregiverWorkIT. */

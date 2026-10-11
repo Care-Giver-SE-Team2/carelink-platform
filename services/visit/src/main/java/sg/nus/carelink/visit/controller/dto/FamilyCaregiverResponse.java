@@ -2,7 +2,7 @@ package sg.nus.carelink.visit.controller.dto;
 
 import java.util.List;
 
-import sg.nus.carelink.profile.application.CaregiverPublicProfile;
+import sg.nus.carelink.visit.application.CaregiverDirectory.CaregiverPublicProfile;
 
 /**
  * Contains only family-visible caregiver profile fields.

@@ -100,7 +100,7 @@ class CaregiverHealthWorkflowIT extends CaregiverHealthITSupport {
             body(a.post("/api/visits/" + id + "/tasks/" + taskId + "/complete", Map.of("expectedVersion", 1, "clientRequestId", UUID.randomUUID().toString(), "status", "DONE")), 200);
             assertThat(a.post(path(id), health(1)).statusCode()).isEqualTo(409);
             var good = health(2); body(a.post(path(id), good), 201);
-            body(a.post("/api/incidents", Map.of("visitId", id, "expectedVersion", 3, "clientRequestId", UUID.randomUUID().toString(), "category", "SERVICE", "severity", "LOW", "description", "Synthetic exception")), 201);
+            body(a.post("/api/caregivers/me/incidents", Map.of("visitId", id, "expectedVersion", 3, "clientRequestId", UUID.randomUUID().toString(), "category", "SERVICE", "severity", "LOW", "description", "Synthetic exception")), 201);
             assertThat(a.post(path(id), health(4)).statusCode()).isEqualTo(409);
             assertThat(body(a.post(path(id), good), 200).path("replayed").asBoolean()).isTrue();
             assertThat(count("vital_sign", id)).isEqualTo(4);

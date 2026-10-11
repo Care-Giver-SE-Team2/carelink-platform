@@ -4,8 +4,7 @@ import java.util.Optional;
 
 /**
  * The caregiver on an elder's most recent visit, which visit knows: an incident alert reaches
- * them too. One adapter asks visit's service while visit runs inside core, the other asks
- * visit's internal API once it runs on its own.
+ * them too. Asked of visit's internal API.
  */
 interface LatestCaregivers {
 
