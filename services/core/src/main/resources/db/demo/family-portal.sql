@@ -55,6 +55,10 @@
 -- VISIT'S ROWS go to visit's own database, carelink_visit, on the same server
 -- (docs/platform/service-boundaries.md, section 9): every visit table below is
 -- named with it. Load the file with an account that can write both databases.
+--
+-- REPORT'S ROWS go to report's own database, carelink_report, on the same server
+-- (docs/platform/service-boundaries.md, section 9): every report table below is
+-- named with it.
 SET @appOffsetHours := 0;
 
 -- CURRENT_DATE() follows the session zone, and the MySQL container runs on UTC.
@@ -381,7 +385,7 @@ DROP TEMPORARY TABLE demo_fam_visit;
 -- rows the family must never see (a DRAFT and an INTERNAL one), so a leak shows.
 SET @disclaimer := 'This summary is prepared from care records for information only and does not constitute medical advice.';
 
-INSERT INTO report (elder_id, audience, period_start, period_end, status, content, created_at)
+INSERT INTO carelink_report.report (elder_id, audience, period_start, period_end, status, content, created_at)
 SELECT r.elder_id, r.audience, r.period_start, r.period_start + INTERVAL 6 DAY, r.status,
        JSON_OBJECT('sections', r.sections, 'dataComplete', IF(r.complete, CAST('true' AS JSON), CAST('false' AS JSON)), 'missingItems', r.missing,
                    'disclaimer', IF(r.audience = 'FAMILY', @disclaimer, NULL), 'generatedBy', 'TEMPLATE'),
@@ -424,16 +428,16 @@ SELECT r.elder_id, r.audience, r.period_start, r.period_start + INTERVAL 6 DAY, 
                  JSON_OBJECT('title', 'Incidents', 'body', 'No incidents this week.')),
                TRUE, JSON_ARRAY()
        ) AS r
- WHERE NOT EXISTS (SELECT 1 FROM report x WHERE x.elder_id = r.elder_id);
+ WHERE NOT EXISTS (SELECT 1 FROM carelink_report.report x WHERE x.elder_id = r.elder_id);
 
 -- A correction appended to last week's report: the original text stays as it was.
-INSERT INTO report_amendment (report_id, note, author_user_id, created_at)
+INSERT INTO carelink_report.report_amendment (report_id, note, author_user_id, created_at)
 SELECT x.id, 'Correction: the missed visit was rescheduled to the following morning and took place as planned.',
        COALESCE((SELECT MIN(user_id) FROM user_role WHERE role = 'MANAGER'), @uMing),
        TIMESTAMP(@lastMon + INTERVAL 8 DAY, '15:20:00') + INTERVAL @appOffsetHours HOUR
-  FROM report x
+  FROM carelink_report.report x
  WHERE x.elder_id = @eKow AND x.audience = 'FAMILY' AND x.status = 'PUBLISHED' AND x.period_start = @lastMon
-   AND NOT EXISTS (SELECT 1 FROM report_amendment a WHERE a.report_id = x.id);
+   AND NOT EXISTS (SELECT 1 FROM carelink_report.report_amendment a WHERE a.report_id = x.id);
 
 COMMIT;
 
