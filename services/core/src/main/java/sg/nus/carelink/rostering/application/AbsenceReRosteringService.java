@@ -73,6 +73,9 @@ public class AbsenceReRosteringService {
 	/** How many suggestions the family is offered to choose between. */
 	public static final int FAMILY_OPTIONS = 3;
 
+	/** The resource a missing roster change is reported as. */
+	private static final String ROSTER_CHANGE = "RosterChange";
+
 	/** English month names whatever the server's locale: these words end up in notes families read. */
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH);
 
@@ -174,12 +177,7 @@ public class AbsenceReRosteringService {
 			Optional<Shortlist.Verdict> best = shortlist.best();
 
 			if (best.isEmpty()) {
-				if (existing == null) {
-					uncover(absenceId, slot, run.id(), null, "Nobody was free to cover this visit", managerUserId);
-				}
-				else {
-					changes.save(existing.searchedAgain(run.id(), now));
-				}
+				nobodyFree(absenceId, slot, existing, run.id(), managerUserId, now);
 				uncovered++;
 				continue;
 			}
@@ -189,12 +187,7 @@ public class AbsenceReRosteringService {
 				continuity++;
 			}
 			if (existing != null) {
-				boolean bySystem = managerUserId == null;
-				replace(existing, slot, best.get(), run.id(), candidateIds,
-						bySystem ? RosterChange.DecidedBy.DEFAULT_PLAN : RosterChange.DecidedBy.MANAGER, managerUserId,
-						bySystem
-								? "Somebody became free for the uncovered visit, so the default plan put them on it"
-								: "A manager re-rostered the uncovered visit once somebody was free");
+				takeUpUncovered(existing, slot, best.get(), run.id(), candidateIds, managerUserId);
 				settled++;
 				continue;
 			}
@@ -217,6 +210,31 @@ public class AbsenceReRosteringService {
 		return new ReRosterOutcome(absenceId, run.id(), slots.size(), offered, settled, uncovered);
 	}
 
+	/** Nobody is free: a visit seen for the first time is left uncovered; one left uncovered before was searched again. */
+	private void nobodyFree(Long absenceId, VacatedSlot slot, RosterChange existing, Long runId, Long managerUserId,
+			LocalDateTime now) {
+		if (existing == null) {
+			uncover(absenceId, slot, runId, null, "Nobody was free to cover this visit", managerUserId);
+		}
+		else {
+			changes.save(existing.searchedAgain(runId, now));
+		}
+	}
+
+	/**
+	 * Somebody has become free for a visit an earlier run left uncovered: the nightly run puts them on it as
+	 * the default plan, a manager's re-roster in the manager's name.
+	 */
+	private void takeUpUncovered(RosterChange existing, VacatedSlot slot, Shortlist.Verdict best, Long runId,
+			Map<Long, Long> candidateIds, Long managerUserId) {
+		boolean bySystem = managerUserId == null;
+		replace(existing, slot, best, runId, candidateIds,
+				bySystem ? RosterChange.DecidedBy.DEFAULT_PLAN : RosterChange.DecidedBy.MANAGER, managerUserId,
+				bySystem
+						? "Somebody became free for the uncovered visit, so the default plan put them on it"
+						: "A manager re-rostered the uncovered visit once somebody was free");
+	}
+
 	// ------------------------------------------------------------------ steps 5-6 ---
 
 	/**
@@ -233,7 +251,7 @@ public class AbsenceReRosteringService {
 	}
 
 	private RosterChange familyDecision(Long changeId, String familyUsername, FamilyChoice choice) {
-		RosterChange change = changes.lock(changeId).orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
+		RosterChange change = changes.lock(changeId).orElseThrow(() -> new ResourceNotFound(ROSTER_CHANGE, changeId));
 		familyAccess.requireReadableElder(familyUsername, change.elderId());
 		requireNoChangeUnderWay(change);
 		Long familyUserId = users.findByUsername(familyUsername).map(AppUser::id).orElse(null);
@@ -336,7 +354,7 @@ public class AbsenceReRosteringService {
 	private RosterChange managerDecision(Long absenceId, Long changeId, Long caregiverId, Long managerUserId) {
 		RosterChange change = changes.lock(changeId)
 				.filter(c -> c.absenceId().equals(absenceId))
-				.orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
+				.orElseThrow(() -> new ResourceNotFound(ROSTER_CHANGE, changeId));
 		requireNoChangeUnderWay(change);
 		change.requireManagerMayAssign(caregiverId);
 		LocalDateTime now = now();
@@ -427,7 +445,7 @@ public class AbsenceReRosteringService {
 				familyUserId, now));
 		search.record(run.id(), shortlist, rules);
 		runs.save(run.committed(1, 1, snapshot.elder(moved.elderId()).priorVisitsBy(best.caregiverId()) > 0 ? 1 : 0, now));
-		saga.record(change.absenceId(), change.id(), current,
+		saga.recordStep(change.absenceId(), change.id(), current,
 				VisitChangeStep.Request.move(newStart, best.caregiverId(), familyUserId,
 						"Moved at the family's request while the caregiver is absent (absence %d); the family chooses who comes"
 								.formatted(change.absenceId())),
@@ -466,7 +484,7 @@ public class AbsenceReRosteringService {
 		String why = "Skipped at the family's request";
 		// May be skipped: the check, before visit is asked
 		change.skipped(familyUserId, why, now());
-		saga.record(change.absenceId(), change.id(), slot, VisitChangeStep.Request.callOff(familyUserId,
+		saga.recordStep(change.absenceId(), change.id(), slot, VisitChangeStep.Request.callOff(familyUserId,
 				"Skipped at the family's request while the caregiver is absent (absence " + change.absenceId() + ")"),
 				new VisitChangeStep.Decision(change.rosteringRunId(), RosterChange.DecidedBy.FAMILY, familyUserId, null,
 						why));
@@ -524,7 +542,7 @@ public class AbsenceReRosteringService {
 		Long candidateId = candidateIds.get(verdict.caregiverId());
 		// May be given to them: the check, before visit is asked
 		change.replacedBy(verdict.caregiverId(), runId, by, userId, why, now());
-		saga.record(change.absenceId(), change.id(), slot, VisitChangeStep.Request.reassign(verdict.caregiverId(),
+		saga.recordStep(change.absenceId(), change.id(), slot, VisitChangeStep.Request.reassign(verdict.caregiverId(),
 				userId, candidateId, "%s (absence %d): %s".formatted(byWhom(by), change.absenceId(), why)),
 				new VisitChangeStep.Decision(runId, by, userId, verdict.name(), why));
 		return change;
@@ -541,7 +559,7 @@ public class AbsenceReRosteringService {
 	 */
 	private RosterChange uncover(Long absenceId, VacatedSlot slot, Long runId, RosterChange existing, String why,
 			Long userId) {
-		saga.record(absenceId, existing == null ? null : existing.id(), slot,
+		saga.recordStep(absenceId, existing == null ? null : existing.id(), slot,
 				VisitChangeStep.Request.markUncovered(why), new VisitChangeStep.Decision(runId, null, userId, null, why));
 		return existing;
 	}
@@ -690,11 +708,11 @@ public class AbsenceReRosteringService {
 	}
 
 	private RosterChange lock(Long changeId) {
-		return changes.lock(changeId).orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
+		return changes.lock(changeId).orElseThrow(() -> new ResourceNotFound(ROSTER_CHANGE, changeId));
 	}
 
 	private RosterChange current(Long changeId) {
-		return changes.findById(changeId).orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
+		return changes.findById(changeId).orElseThrow(() -> new ResourceNotFound(ROSTER_CHANGE, changeId));
 	}
 
 	private Map<Long, RosterChange> changesByVisit(Long absenceId) {

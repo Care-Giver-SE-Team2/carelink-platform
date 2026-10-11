@@ -95,7 +95,7 @@ class VisitChangeSagaIT {
 	@ParameterizedTest(name = "visit {0} on change {1} of 3")
 	@CsvSource({"UNAVAILABLE, 1", "UNAVAILABLE, 2", "SERVER_ERROR, 3"})
 	void aRerosterVisitCannotReachIsCaughtUpAsIfNothingHadFailed(Fault fault, int k) {
-		Outcome control = nobodyFree(world -> rerosterNow(world));
+		Outcome control = nobodyFree(this::rerosterNow);
 
 		Outcome caughtUp = nobodyFree(world -> {
 			visits.failChanges(fault, k, 1);
@@ -234,12 +234,14 @@ class VisitChangeSagaIT {
 
 		Outcome refusedFirst = threeOffers(world -> {
 			Long change = world.changeOf(0);
+			String family = world.family;
+			FamilyChoice keep = FamilyChoice.keepSuggestion();
 			visits.failChanges(Fault.REFUSED, 1, 1);
-			assertThatThrownBy(() -> reRostering.decide(change, world.family, FamilyChoice.keepSuggestion()))
+			assertThatThrownBy(() -> reRostering.decide(change, family, keep))
 					.isInstanceOfSatisfying(BusinessRuleViolation.class,
 							refused -> assertThat(refused.code()).isEqualTo("VISIT_NOT_OPEN"));
 			visits.failChanges(Fault.MISSING, 1, 1);
-			assertThatThrownBy(() -> reRostering.decide(change, world.family, FamilyChoice.keepSuggestion()))
+			assertThatThrownBy(() -> reRostering.decide(change, family, keep))
 					.isInstanceOf(ResourceNotFound.class);
 
 			assertThat(world.changeStates()).containsOnly("AWAITING_FAMILY");

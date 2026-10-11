@@ -97,7 +97,7 @@ class VisitChangeSagaTest {
 	void aMoveIsSettledWithTheVisitItCreated() {
 		visits.moved = 777L;
 
-		saga.decideThenChange(() -> saga.record(12L, 100L, VISIT,
+		saga.decideThenChange(() -> saga.recordStep(12L, 100L, VISIT,
 				VisitChangeStep.Request.move(NOW.plusDays(3), 9L, 41L, "Moved"),
 				new VisitChangeStep.Decision(3L, RosterChange.DecidedBy.FAMILY, 41L, "Farah", "Moved")), settle);
 
@@ -329,12 +329,12 @@ class VisitChangeSagaTest {
 	}
 
 	private VisitChangeStep handOver(VacatedSlot visit, Long decidedBy, Long changeId) {
-		return saga.record(12L, changeId, visit, VisitChangeStep.Request.reassign(9L, decidedBy, 77L, "Chosen"),
+		return saga.recordStep(12L, changeId, visit, VisitChangeStep.Request.reassign(9L, decidedBy, 77L, "Chosen"),
 				new VisitChangeStep.Decision(3L, RosterChange.DecidedBy.FAMILY, decidedBy, "Farah", "kept"));
 	}
 
 	private VisitChangeStep uncover(VacatedSlot visit, Long decidedBy) {
-		return saga.record(12L, null, visit, VisitChangeStep.Request.markUncovered("Nobody was free"),
+		return saga.recordStep(12L, null, visit, VisitChangeStep.Request.markUncovered("Nobody was free"),
 				new VisitChangeStep.Decision(3L, null, decidedBy, null, "Nobody was free"));
 	}
 

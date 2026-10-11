@@ -7,6 +7,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -146,7 +147,7 @@ public class VisitChangeSaga {
 	 * Writes down a change for visit to make, in the deciding transaction. Inside
 	 * {@link #decideThenChange} it is made as soon as the decision commits; the sweep makes it otherwise.
 	 */
-	VisitChangeStep record(Long absenceId, Long rosterChangeId, VacatedSlot visit, VisitChangeStep.Request request,
+	VisitChangeStep recordStep(Long absenceId, Long rosterChangeId, VacatedSlot visit, VisitChangeStep.Request request,
 			VisitChangeStep.Decision decision) {
 		LocalDateTime now = now();
 		VisitChangeStep recorded = steps.add(VisitChangeStep.decided(absenceId, rosterChangeId, visit, request,
@@ -194,8 +195,8 @@ public class VisitChangeSaga {
 
 	/** The steps due for another try, for the sweep. */
 	List<Long> due() {
-		List<VisitChangeStep> due = transaction.execute(status -> steps.findDue(now(), SWEEP_SIZE));
-		return due == null ? List.of() : due.stream().map(VisitChangeStep::id).toList();
+		return transaction.execute(status -> steps.findDue(now(), SWEEP_SIZE)).stream().map(VisitChangeStep::id)
+				.toList();
 	}
 
 	/**
@@ -205,9 +206,8 @@ public class VisitChangeSaga {
 	 * @return how many incidents were raised
 	 */
 	int handOverGivenUp() {
-		List<VisitChangeStep> unreported = transaction.execute(status -> steps.findGivenUpWithoutIncident(SWEEP_SIZE));
 		int raised = 0;
-		for (VisitChangeStep step : unreported == null ? List.<VisitChangeStep>of() : unreported) {
+		for (VisitChangeStep step : transaction.execute(status -> steps.findGivenUpWithoutIncident(SWEEP_SIZE))) {
 			if (handToManager(step)) {
 				raised++;
 			}
@@ -249,11 +249,13 @@ public class VisitChangeSaga {
 	}
 
 	private Try makeOne(Long stepId, Settlement settlement, Deque<Long> followUps, boolean answering) {
-		VisitChangeStep step = transaction.execute(status -> steps.findById(stepId).orElse(null));
-		if (step == null || !step.isPending()) {
+		Optional<VisitChangeStep> pending = transaction.execute(status -> steps.findById(stepId))
+				.filter(VisitChangeStep::isPending);
+		if (pending.isEmpty()) {
 			// Settled, refused or given up meanwhile, or rolled back with the decision that recorded it
 			return Try.of(Result.GONE);
 		}
+		VisitChangeStep step = pending.get();
 		Long newVisitId;
 		try {
 			newVisitId = send(step);

@@ -31,6 +31,12 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 			next_attempt_at, last_error, result_visit_id, incident_id, created_at, updated_at
 			""";
 
+	private static final String SELECT = "select " + COLUMNS + " from visit_change_step where ";
+
+	private static final String STATUS = "status";
+
+	private static final String ATTEMPTS = "attempts";
+
 	private static final String INSERT = """
 			insert into visit_change_step (absence_id, roster_change_id, visit_id, elder_id, care_plan_id,
 			    service_type, visit_start, visit_end, original_caregiver_id, kind, to_caregiver_id, new_start,
@@ -85,8 +91,8 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 				.param("caregiverName", decision.caregiverName())
 				.param("note", decision.note())
 				.param("requestKey", step.requestKey())
-				.param("status", step.status().name())
-				.param("attempts", step.attempts())
+				.param(STATUS, step.status().name())
+				.param(ATTEMPTS, step.attempts())
 				.param("nextTryAt", time(step.nextTryAt()))
 				.param("lastError", step.lastError())
 				.param("resultVisitId", step.resultVisitId())
@@ -103,7 +109,7 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 
 	@Override
 	public Optional<VisitChangeStep> findById(Long id) {
-		return jdbc.sql("select " + COLUMNS + " from visit_change_step where id = :id")
+		return jdbc.sql(SELECT + "id = :id")
 				.param("id", id)
 				.query(JdbcVisitChangeStepRepository::step)
 				.optional();
@@ -113,8 +119,8 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 	public boolean advance(VisitChangeStep from, VisitChangeStep to) {
 		return jdbc.sql(ADVANCE)
 				.param("rosterChangeId", to.rosterChangeId())
-				.param("status", to.status().name())
-				.param("attempts", to.attempts())
+				.param(STATUS, to.status().name())
+				.param(ATTEMPTS, to.attempts())
 				.param("nextTryAt", time(to.nextTryAt()))
 				.param("lastError", to.lastError())
 				.param("resultVisitId", to.resultVisitId())
@@ -128,7 +134,7 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 
 	@Override
 	public List<VisitChangeStep> findHoldingByAbsenceId(Long absenceId) {
-		return jdbc.sql("select " + COLUMNS + " from visit_change_step where absence_id = :absenceId"
+		return jdbc.sql(SELECT + "absence_id = :absenceId"
 						+ " and status in ('PENDING', 'ABANDONED') order by id")
 				.param("absenceId", absenceId)
 				.query(JdbcVisitChangeStepRepository::step)
@@ -137,7 +143,7 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 
 	@Override
 	public List<VisitChangeStep> findDue(LocalDateTime now, int limit) {
-		return jdbc.sql("select " + COLUMNS + " from visit_change_step where status = 'PENDING'"
+		return jdbc.sql(SELECT + "status = 'PENDING'"
 						+ " and next_attempt_at <= :now order by next_attempt_at, id limit :limit")
 				.param("now", time(now))
 				.param("limit", limit)
@@ -147,7 +153,7 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 
 	@Override
 	public List<VisitChangeStep> findGivenUpWithoutIncident(int limit) {
-		return jdbc.sql("select " + COLUMNS + " from visit_change_step where status = 'ABANDONED'"
+		return jdbc.sql(SELECT + "status = 'ABANDONED'"
 						+ " and incident_id is null order by id limit :limit")
 				.param("limit", limit)
 				.query(JdbcVisitChangeStepRepository::step)
@@ -168,7 +174,7 @@ class JdbcVisitChangeStepRepository implements VisitChangeStepRepository {
 				row.getObject("decided_by_user_id", Long.class), row.getString("caregiver_name"), row.getString("note"));
 		return new VisitChangeStep(row.getLong("id"), row.getLong("absence_id"),
 				row.getObject("roster_change_id", Long.class), visit, request, decision, row.getString("request_key"),
-				VisitChangeStep.Status.valueOf(row.getString("status")), row.getInt("attempts"),
+				VisitChangeStep.Status.valueOf(row.getString(STATUS)), row.getInt(ATTEMPTS),
 				time(row, "next_attempt_at"), row.getString("last_error"), row.getObject("result_visit_id", Long.class),
 				row.getObject("incident_id", Long.class), time(row, "created_at"), time(row, "updated_at"));
 	}

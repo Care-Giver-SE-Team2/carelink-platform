@@ -153,7 +153,7 @@ public class LeaveCoverService {
 			String why = "%s already covers this elder during the leave, so the new visit went to them too"
 					.formatted(verdict.get().name());
 			// The change is recorded, and the family told, once visit has given them the visit
-			saga.record(absence.id(), null, slot, VisitChangeStep.Request.reassign(coverId, null, candidateId,
+			saga.recordStep(absence.id(), null, slot, VisitChangeStep.Request.reassign(coverId, null, candidateId,
 					"Default plan (absence %d): %s".formatted(absence.id(), why)),
 					new VisitChangeStep.Decision(run.id(), RosterChange.DecidedBy.DEFAULT_PLAN, null,
 							verdict.get().name(), why));
