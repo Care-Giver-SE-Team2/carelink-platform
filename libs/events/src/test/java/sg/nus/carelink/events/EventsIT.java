@@ -136,8 +136,10 @@ class EventsIT {
 		EventMetadata metadata = awaitHandled(101L);
 		assertThat(metadata.type()).isEqualTo("VisitMissed");
 		assertThat(metadata.source()).isEqualTo("visit");
-		assertThat(jdbc.queryForObject("SELECT published_at IS NOT NULL FROM outbox_event WHERE event_id = ?",
-				Boolean.class, metadata.id())).isTrue();
+		// The handler can see the event before the relay has noted it sent: SQS delivers as soon as SNS
+		// accepts it, and the relay marks the row after that answer
+		await().atMost(Duration.ofSeconds(10)).until(() -> jdbc.queryForObject(
+				"SELECT published_at IS NOT NULL FROM outbox_event WHERE event_id = ?", Boolean.class, metadata.id()));
 		assertThat(metadata.sequence()).as("the outbox row's number")
 				.isEqualTo(jdbc.queryForObject("SELECT id FROM outbox_event WHERE event_id = ?", Long.class, metadata.id()));
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM consumed_message WHERE consumer = 'visit' AND message_id = ?",
