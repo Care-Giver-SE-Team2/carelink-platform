@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import sg.nus.carelink.events.Events;
 import sg.nus.carelink.eventtypes.NotificationRequested;
 import sg.nus.carelink.rostering.domain.model.RosterChange;
+import sg.nus.carelink.rostering.domain.model.VisitChangeStep;
 import sg.nus.carelink.rostering.domain.repository.RosterChangeAlert;
 
 /**
@@ -120,6 +121,22 @@ class NotificationRequestedRosterAlert implements RosterChangeAlert {
 		caregiverAccount(change.originalCaregiverId()).ifPresent(user -> write(user, "VISIT_RELEASED",
 				"Your visit on %s is taken care of".formatted(was),
 				"Nothing more is needed from you for this visit.", change));
+	}
+
+	@Override
+	public void notMade(VisitChangeStep step, Notice notice) {
+		Long decidedBy = step.decision().decidedByUserId();
+		if (decidedBy == null) {
+			return;
+		}
+		String when = step.visit().start().format(WHEN);
+		String why = notice.why() == null ? "" : ": " + notice.why();
+		events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(decidedBy, "ROSTER_CHANGE_NOT_MADE",
+				"Your change to the visit on %s did not go ahead".formatted(when),
+				"%s's visit on %s was not changed%s.".formatted(elder(notice), when, why),
+				step.rosterChangeId() == null ? "ABSENCE" : "ROSTER_CHANGE",
+				step.rosterChangeId() == null ? step.absenceId() : step.rosterChangeId(), step.visit().elderId(),
+				LocalDateTime.now(clock)));
 	}
 
 	// -------------------------------------------------------------------- the three ends ---

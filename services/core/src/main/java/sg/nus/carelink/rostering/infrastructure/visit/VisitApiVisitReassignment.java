@@ -16,11 +16,13 @@ import sg.nus.carelink.visitapi.VisitRuleViolation;
 
 /**
  * {@link VisitReassignment} from visit's internal API. visit's 404 and 409 become the errors visit
- * threw when it ran in core, with the same code, so re-rostering answers the manager as before.
+ * threw when it ran in core, with the same code, so re-rostering answers the manager as before. A
+ * change's request key goes in the {@value VisitApi#IDEMPOTENCY_KEY} header.
  *
  * <p>Each change is its own call, and so its own transaction in visit: a run that changes several
- * visits is no longer all-or-nothing. Making it so is the re-rostering saga's job, which is still
- * to be built.
+ * visits is not all-or-nothing. The re-rostering saga (VisitChangeSaga) keeps core and visit in step:
+ * a refusal (409, 404) is final, and anything else - no connection, a read timeout, a 5xx, a 403 - is
+ * passed on as it came, for the saga to send the change again with the same key.
  */
 @Component
 class VisitApiVisitReassignment implements VisitReassignment {
@@ -55,33 +57,33 @@ class VisitApiVisitReassignment implements VisitReassignment {
 	}
 
 	@Override
-	public void reassign(Long visitId, Long toCaregiverId, Change why) {
+	public void reassign(Long visitId, Long toCaregiverId, Change why, String requestKey) {
 		translated(visitId, () -> {
-			visit.reassign(visitId, new VisitApi.Reassignment(toCaregiverId, change(why)), null);
+			visit.reassign(visitId, new VisitApi.Reassignment(toCaregiverId, change(why)), requestKey);
 			return null;
 		});
 	}
 
 	@Override
-	public void markUncovered(Long visitId, Change why) {
+	public void markUncovered(Long visitId, Change why, String requestKey) {
 		translated(visitId, () -> {
-			visit.markUncovered(visitId, change(why), null);
+			visit.markUncovered(visitId, change(why), requestKey);
 			return null;
 		});
 	}
 
 	@Override
-	public void callOff(Long visitId, Change why) {
+	public void callOff(Long visitId, Change why, String requestKey) {
 		translated(visitId, () -> {
-			visit.callOff(visitId, change(why), null);
+			visit.callOff(visitId, change(why), requestKey);
 			return null;
 		});
 	}
 
 	@Override
-	public Long moveTo(Long visitId, LocalDateTime newStart, Long toCaregiverId, Change why) {
+	public Long moveTo(Long visitId, LocalDateTime newStart, Long toCaregiverId, Change why, String requestKey) {
 		return translated(visitId,
-				() -> visit.moveTo(visitId, new VisitApi.Move(newStart, toCaregiverId, change(why)), null).visitId());
+				() -> visit.moveTo(visitId, new VisitApi.Move(newStart, toCaregiverId, change(why)), requestKey).visitId());
 	}
 
 	/** visit's answer, or its 404 and 409 as the errors visit throws in process. */

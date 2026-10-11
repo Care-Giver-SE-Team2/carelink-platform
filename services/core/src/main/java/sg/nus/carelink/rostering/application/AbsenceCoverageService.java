@@ -86,6 +86,10 @@ public class AbsenceCoverageService {
 			return false;
 		}
 		AbsenceReRosteringService.ReRosterOutcome outcome = reRostering.reroster(absenceId, null, null);
+		if (outcome.searched() == 0) {
+			// Every one of them is held by a change visit has not made yet (a cover carrying on): nothing new
+			return false;
+		}
 		AbsenceReport reopened = absences.save(absences.findById(absenceId).orElseThrow().coverageReopened());
 		alert.visitsRerostered(reopened, caregiverName(absence.caregiverId()),
 				new AbsenceAlert.Rerostered(outcome.offered(), outcome.settled(), outcome.uncovered()));

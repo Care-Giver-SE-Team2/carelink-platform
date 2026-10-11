@@ -42,4 +42,9 @@ class RosteringCandidateRepositoryAdapter implements RosteringCandidateRepositor
 						.thenComparing(c -> c.optionRank() == null ? Integer.MAX_VALUE : c.optionRank()))
 				.toList();
 	}
+
+	@Override
+	public void moveToVisit(Long rosteringRunId, Long fromVisitId, Long toVisitId) {
+		jpa.moveToVisit(rosteringRunId, fromVisitId, toVisitId);
+	}
 }

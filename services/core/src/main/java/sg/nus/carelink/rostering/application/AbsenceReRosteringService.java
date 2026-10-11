@@ -6,17 +6,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.identity.application.UserDirectory;
 import sg.nus.carelink.identity.domain.model.AppUser;
@@ -29,6 +29,7 @@ import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.RosteringCandidate;
 import sg.nus.carelink.rostering.domain.model.RosteringRun;
 import sg.nus.carelink.rostering.domain.model.VacatedSlot;
+import sg.nus.carelink.rostering.domain.model.VisitChangeStep;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
 import sg.nus.carelink.rostering.domain.repository.RosterAudit;
 import sg.nus.carelink.rostering.domain.repository.RosterChangeAlert;
@@ -58,9 +59,15 @@ import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
  *
  * <p>Every way a visit can end up is written to its roster_change, which is how the use case's
  * first rule is kept: no vacated visit disappears without a record.
+ *
+ * <p>visit is another service, so a step cannot change a visit and core's records in one transaction.
+ * Each public method is the re-rostering saga ({@link VisitChangeSaga}): it decides in a transaction of
+ * its own and writes down each change visit is to make; once that has committed, visit is asked, and only
+ * when visit has made a change is the roster change settled and anybody told ({@link #settle}). Until
+ * then the step holds its visit, and nothing else is decided for it (the saga's semantic lock). When
+ * visit is well, all of this happens before the method returns, as it did when visit was a module.
  */
 @Service
-@Transactional
 public class AbsenceReRosteringService {
 
 	/** How many suggestions the family is offered to choose between. */
@@ -83,6 +90,7 @@ public class AbsenceReRosteringService {
 	private final RosterChangeAlert alert;
 	private final RosterAudit audit;
 	private final FamilyResponseWindow window;
+	private final VisitChangeSaga saga;
 	private final Clock clock;
 
 	@SuppressWarnings("java:S107") // one collaborator per module this use case reaches; a facade would only hide that
@@ -91,7 +99,7 @@ public class AbsenceReRosteringService {
 			RosteringCandidateCheckRepository checks, RosteringConstraintRepository constraints,
 			RosterSnapshotLoader snapshots, VisitReassignment visits, RosteringProfiles profiles,
 			IncidentService incidents, FamilyAccessQuery familyAccess, UserDirectory users, RosterChangeAlert alert,
-			RosterAudit audit, FamilyResponseWindow window, Clock clock) {
+			RosterAudit audit, FamilyResponseWindow window, VisitChangeSaga saga, Clock clock) {
 		this.absences = absences;
 		this.changes = changes;
 		this.runs = runs;
@@ -106,6 +114,7 @@ public class AbsenceReRosteringService {
 		this.alert = alert;
 		this.audit = audit;
 		this.window = window;
+		this.saga = saga;
 		this.clock = clock;
 	}
 
@@ -121,17 +130,28 @@ public class AbsenceReRosteringService {
 	 * <p>Safe to repeat: a visit already offered or settled is not touched again, which is also
 	 * how visits the nightly roster adds to the absence's days later get picked up.
 	 *
+	 * <p>A manager's re-roster also sends again every change of the absence visit could not be reached
+	 * for in time (an abandoned saga step), with the key it was first sent with.
+	 *
 	 * @param managerUserId null when the nightly run re-rosters, not a manager
 	 *     ({@link AbsenceCoverageService}); an uncovered visit it takes up is then settled by the
 	 *     default plan rather than in a manager's name
 	 */
 	public ReRosterOutcome reroster(Long absenceId, RosteringRun.Objective objective, Long managerUserId) {
+		return saga.decideThenChange(() -> rerosterDecision(absenceId, objective, managerUserId), this::settle);
+	}
+
+	private ReRosterOutcome rerosterDecision(Long absenceId, RosteringRun.Objective objective, Long managerUserId) {
 		AbsenceReport absence = requireApproved(absenceId);
 		ScoringObjective scoring = ScoringObjective.of(objective);
 		LocalDateTime now = now();
+		if (managerUserId != null) {
+			saga.sendAgain(absenceId);
+		}
 		Map<Long, RosterChange> byVisit = changesByVisit(absenceId);
-		List<VacatedSlot> slots = new ArrayList<>(unhandled(absence, byVisit, now));
-		slots.addAll(uncoveredToRetry(absence, byVisit.values(), now));
+		Set<Long> held = saga.heldVisits(absenceId);
+		List<VacatedSlot> slots = new ArrayList<>(unhandled(absence, byVisit, held, now));
+		slots.addAll(uncoveredToRetry(absence, byVisit.values(), held, now));
 		slots.sort(Comparator.comparing(VacatedSlot::start));
 		if (slots.isEmpty()) {
 			return new ReRosterOutcome(absenceId, null, 0, 0, 0, 0);
@@ -155,7 +175,7 @@ public class AbsenceReRosteringService {
 
 			if (best.isEmpty()) {
 				if (existing == null) {
-					uncover(absenceId, slot, run.id(), null, "Nobody was free to cover this visit");
+					uncover(absenceId, slot, run.id(), null, "Nobody was free to cover this visit", managerUserId);
 				}
 				else {
 					changes.save(existing.searchedAgain(run.id(), now));
@@ -202,11 +222,20 @@ public class AbsenceReRosteringService {
 	/**
 	 * Steps 5 and 6: the family answers, and the roster is rewritten their way. A family may
 	 * only answer for an elder they are bound to, and only while their time is not up; after
-	 * that the default plan is already due and a late answer would race it.
+	 * that the default plan is already due and a late answer would race it. Not while an earlier
+	 * change to the visit is still being made.
+	 *
+	 * @return the change as it stands once visit has been asked: settled, or still waiting for visit
 	 */
 	public RosterChange decide(Long changeId, String familyUsername, FamilyChoice choice) {
+		saga.decideThenChange(() -> familyDecision(changeId, familyUsername, choice), this::settle);
+		return current(changeId);
+	}
+
+	private RosterChange familyDecision(Long changeId, String familyUsername, FamilyChoice choice) {
 		RosterChange change = changes.lock(changeId).orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
 		familyAccess.requireReadableElder(familyUsername, change.elderId());
+		requireNoChangeUnderWay(change);
 		Long familyUserId = users.findByUsername(familyUsername).map(AppUser::id).orElse(null);
 
 		if (!change.awaitingFamily()) {
@@ -233,14 +262,19 @@ public class AbsenceReRosteringService {
 	 *
 	 * <p>Its own transaction, called once per change by the scan, so one change that cannot be
 	 * settled does not hold back the others. The change is locked and checked again first: the
-	 * family may have answered between the scan's read and this call.
+	 * family may have answered between the scan's read and this call. A change whose visit an earlier
+	 * change is still being made to is left for a later sweep.
 	 *
 	 * @return whether the default plan ran
 	 */
-	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public boolean applyDefaultIfStillDue(Long changeId) {
+		return Boolean.TRUE.equals(saga.decideThenChange(() -> defaultPlanDecision(changeId), this::settle));
+	}
+
+	private boolean defaultPlanDecision(Long changeId) {
 		Optional<RosterChange> locked = changes.lock(changeId);
-		if (locked.isEmpty() || !locked.get().defaultPlanDue(now())) {
+		if (locked.isEmpty() || !locked.get().defaultPlanDue(now())
+				|| saga.heldVisits(locked.get().absenceId()).contains(locked.get().visitId())) {
 			return false;
 		}
 		RosterChange change = locked.get();
@@ -254,9 +288,14 @@ public class AbsenceReRosteringService {
 	/**
 	 * Step 7: the manager confirms every visit the absence vacated is accounted for - given to
 	 * somebody, moved, skipped, or uncovered with an incident somebody answers for. Not while a
-	 * family is still deciding, and not while visits are left nobody has re-rostered.
+	 * family is still deciding, not while a change to a visit is still being made or has been given up
+	 * (a re-roster sends it again), and not while visits are left nobody has re-rostered.
 	 */
 	public AbsenceReport confirmCoverage(Long absenceId, Long managerUserId) {
+		return saga.decideThenChange(() -> confirmation(absenceId, managerUserId), this::settle);
+	}
+
+	private AbsenceReport confirmation(Long absenceId, Long managerUserId) {
 		AbsenceReport absence = requireApproved(absenceId);
 		Map<Long, RosterChange> byVisit = changesByVisit(absenceId);
 		long deciding = byVisit.values().stream().filter(RosterChange::awaitingFamily).count();
@@ -264,7 +303,11 @@ public class AbsenceReRosteringService {
 			throw new BusinessRuleViolation("FAMILY_STILL_DECIDING",
 					"%d visit%s still waiting for the family's answer".formatted(deciding, deciding == 1 ? " is" : "s are"));
 		}
-		int notYet = unhandled(absence, byVisit, now()).size();
+		List<VisitChangeStep> held = saga.holding(absenceId);
+		if (!held.isEmpty()) {
+			throw changesUnderWay(held);
+		}
+		int notYet = unhandled(absence, byVisit, Set.of(), now()).size();
 		if (notYet > 0) {
 			throw new BusinessRuleViolation("VISITS_NOT_REROSTERED",
 					"%d visit%s the absence vacates %s not been re-rostered yet; re-roster first"
@@ -280,12 +323,21 @@ public class AbsenceReRosteringService {
 	 * search ranked first: when nobody was free, or over the institution's own pick, never over
 	 * the family's ({@link RosterChange#managerMayAssign()}). The caregiver must still pass every
 	 * hard rule against the roster as it is now; if not, nothing changes and the manager is told
-	 * which rule stopped them. The family is told who is coming.
+	 * which rule stopped them. The family is told who is coming. Not while an earlier change to the visit
+	 * is still being made.
+	 *
+	 * @return the change as it stands once visit has been asked
 	 */
 	public RosterChange assignByManager(Long absenceId, Long changeId, Long caregiverId, Long managerUserId) {
+		saga.decideThenChange(() -> managerDecision(absenceId, changeId, caregiverId, managerUserId), this::settle);
+		return current(changeId);
+	}
+
+	private RosterChange managerDecision(Long absenceId, Long changeId, Long caregiverId, Long managerUserId) {
 		RosterChange change = changes.lock(changeId)
 				.filter(c -> c.absenceId().equals(absenceId))
 				.orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
+		requireNoChangeUnderWay(change);
 		change.requireManagerMayAssign(caregiverId);
 		LocalDateTime now = now();
 		VisitReassignment.VisitSlot visit = visits.find(change.visitId())
@@ -342,6 +394,9 @@ public class AbsenceReRosteringService {
 	 * offered the choice for the new time, under the same window and default plan as the first:
 	 * keep that person, pick another of the suggestions, move it again or skip it. Nobody free
 	 * means the family is asked for another time; nothing changes.
+	 *
+	 * <p>Decided here, made by visit and settled in {@link #moved}: the search is filed under the visit
+	 * as it is, and under the visit that replaces it once visit has made that one.
 	 */
 	private RosterChange reschedule(RosterChange change, LocalDateTime newStart, Long familyUserId) {
 		LocalDateTime now = now();
@@ -353,7 +408,8 @@ public class AbsenceReRosteringService {
 					"Pick a time at least %d minutes from now, so whoever takes it can get there"
 							.formatted(window.lead().toMinutes()));
 		}
-		VacatedSlot moved = openSlot(change).movedTo(newStart);
+		VacatedSlot current = openSlot(change);
+		VacatedSlot moved = current.movedTo(newStart);
 		RosterSnapshot snapshot = snapshots.load(List.of(moved));
 		snapshot.elderClash(moved.elderId(), moved.start(), moved.effectiveEnd(), moved.visitId())
 				.ifPresent(other -> {
@@ -369,18 +425,15 @@ public class AbsenceReRosteringService {
 
 		RosteringRun run = runs.save(RosteringRun.forAbsence(change.absenceId(), finder.objective().objective(),
 				familyUserId, now));
-		Long newVisitId = visits.moveTo(change.visitId(), newStart, best.caregiverId(),
-				new VisitReassignment.Change(change.absenceId(), familyUserId, null,
-						"Moved at the family's request while the caregiver is absent (absence %d); the family chooses who comes"
-								.formatted(change.absenceId())));
-		search.record(run.id(), newVisitId, shortlist, rules);
+		search.record(run.id(), shortlist, rules);
 		runs.save(run.committed(1, 1, snapshot.elder(moved.elderId()).priorVisitsBy(best.caregiverId()) > 0 ? 1 : 0, now));
-
-		RosterChange settled = changes.save(change.rescheduled(newVisitId, best.caregiverId(), run.id(), familyUserId,
-				"Moved to %s at the family's request".formatted(newStart.format(WHEN)), now));
-		alert.settled(settled, notice(settled, best.name(), best.caregiverId(), newStart, null));
-		offerTheNewTime(settled, newVisitId, run.id(), best, now);
-		return settled;
+		saga.record(change.absenceId(), change.id(), current,
+				VisitChangeStep.Request.move(newStart, best.caregiverId(), familyUserId,
+						"Moved at the family's request while the caregiver is absent (absence %d); the family chooses who comes"
+								.formatted(change.absenceId())),
+				new VisitChangeStep.Decision(run.id(), RosterChange.DecidedBy.FAMILY, familyUserId, best.name(),
+						"Moved to %s at the family's request".formatted(newStart.format(WHEN))));
+		return change;
 	}
 
 	/**
@@ -388,29 +441,36 @@ public class AbsenceReRosteringService {
 	 * just made, with the pencilled-in person as the default. The offer is a change of its own, on
 	 * the new visit, so it is answered, defaulted and confirmed like every other.
 	 */
-	private void offerTheNewTime(RosterChange moved, Long newVisitId, Long runId, Shortlist.Verdict best,
-			LocalDateTime now) {
+	private void offerTheNewTime(RosterChange moved, Long newVisitId, Long runId, Long caregiverId,
+			String caregiverName, LocalDateTime now) {
 		VacatedSlot slot = toSlot(visits.find(newVisitId).orElseThrow(), moved.originalCaregiverId());
 		Optional<LocalDateTime> respondBy = window.respondBy(now, slot.start());
-		RosterChange offer = changes.save(RosterChange.offered(moved.absenceId(), slot, runId, best.caregiverId(),
+		RosterChange offer = changes.save(RosterChange.offered(moved.absenceId(), slot, runId, caregiverId,
 				respondBy.orElse(now), now));
 		if (respondBy.isPresent()) {
-			alert.offered(offer, notice(offer, best.name(), best.caregiverId(), null, null));
+			alert.offered(offer, notice(offer, caregiverName, caregiverId, null, null));
 		}
 		else {
-			settleWithRecheck(offer, best.caregiverId(), RosterChange.DecidedBy.DEFAULT_PLAN, null,
+			// A step of its own, which the saga makes after this one
+			settleWithRecheck(offer, caregiverId, RosterChange.DecidedBy.DEFAULT_PLAN, null,
 					"The new time is too soon to ask the family again, so the best replacement keeps the visit");
 		}
 	}
 
-	/** Alternative 4c: skip this visit. Called off, recorded as the family's own cancellation. */
+	/**
+	 * Alternative 4c: skip this visit. Called off, recorded as the family's own cancellation once visit
+	 * has called it off ({@link #skipped}).
+	 */
 	private RosterChange skip(RosterChange change, Long familyUserId) {
-		openSlot(change);
-		visits.callOff(change.visitId(), new VisitReassignment.Change(change.absenceId(), familyUserId, null,
-				"Skipped at the family's request while the caregiver is absent (absence " + change.absenceId() + ")"));
-		RosterChange settled = changes.save(change.skipped(familyUserId, "Skipped at the family's request", now()));
-		alert.settled(settled, notice(settled, null, null, null, null));
-		return settled;
+		VacatedSlot slot = openSlot(change);
+		String why = "Skipped at the family's request";
+		// May be skipped: the check, before visit is asked
+		change.skipped(familyUserId, why, now());
+		saga.record(change.absenceId(), change.id(), slot, VisitChangeStep.Request.callOff(familyUserId,
+				"Skipped at the family's request while the caregiver is absent (absence " + change.absenceId() + ")"),
+				new VisitChangeStep.Decision(change.rosteringRunId(), RosterChange.DecidedBy.FAMILY, familyUserId, null,
+						why));
+		return change;
 	}
 
 	// ------------------------------------------------------------------ settling ---
@@ -447,7 +507,7 @@ public class AbsenceReRosteringService {
 				now));
 		if (chosen.isEmpty()) {
 			return uncover(change.absenceId(), slot, run.id(), change,
-					"%s, but nobody was free any more, so the visit is uncovered".formatted(why));
+					"%s, but nobody was free any more, so the visit is uncovered".formatted(why), userId);
 		}
 		String note = chosen.get().caregiverId().equals(wanted)
 				? why
@@ -455,54 +515,139 @@ public class AbsenceReRosteringService {
 		return replace(change, slot, chosen.get(), run.id(), candidateIds, by, userId, note);
 	}
 
-	/** The visit goes to {@code verdict}'s caregiver; everybody is told; a default plan is audited. */
+	/**
+	 * The visit goes to {@code verdict}'s caregiver: decided here, made by visit, and settled in
+	 * {@link #replaced}, where everybody is told and a default plan is audited.
+	 */
 	private RosterChange replace(RosterChange change, VacatedSlot slot, Shortlist.Verdict verdict, Long runId,
 			Map<Long, Long> candidateIds, RosterChange.DecidedBy by, Long userId, String why) {
 		Long candidateId = candidateIds.get(verdict.caregiverId());
-		visits.reassign(slot.visitId(), verdict.caregiverId(), new VisitReassignment.Change(change.absenceId(), userId,
-				candidateId, "%s (absence %d): %s".formatted(byWhom(by), change.absenceId(), why)));
-		search.select(candidateId);
-		RosterChange settled = changes.save(change.replacedBy(verdict.caregiverId(), runId, by, userId, why, now()));
-		String forFamily = by == RosterChange.DecidedBy.FAMILY ? null : why;
-		alert.settled(settled, notice(settled, verdict.name(), verdict.caregiverId(), null, forFamily));
-		if (by == RosterChange.DecidedBy.DEFAULT_PLAN) {
-			audit.defaultPlanApplied(settled, "%s; caregiver %d assigned to visit %d"
-					.formatted(why, verdict.caregiverId(), slot.visitId()));
-		}
-		return settled;
+		// May be given to them: the check, before visit is asked
+		change.replacedBy(verdict.caregiverId(), runId, by, userId, why, now());
+		saga.record(change.absenceId(), change.id(), slot, VisitChangeStep.Request.reassign(verdict.caregiverId(),
+				userId, candidateId, "%s (absence %d): %s".formatted(byWhom(by), change.absenceId(), why)),
+				new VisitChangeStep.Decision(runId, by, userId, verdict.name(), why));
+		return change;
 	}
 
 	/**
-	 * Exception 3a: nobody can take the visit. It becomes an exception, an incident gives it a
-	 * named responder, and the family hears the institution is on it.
+	 * Exception 3a: nobody can take the visit. Decided here; once visit has made it an exception,
+	 * {@link #leftUncovered} gives it an incident with a named responder, and the family hears the
+	 * institution is on it.
+	 *
+	 * @param existing the change the visit already has; null for a visit re-rostered for the first time,
+	 *     whose change is recorded once visit has made the visit an exception
+	 * @param userId who decided; null when the system did
 	 */
-	private RosterChange uncover(Long absenceId, VacatedSlot slot, Long runId, RosterChange existing, String why) {
-		visits.markUncovered(slot.visitId(), new VisitReassignment.Change(absenceId, null, null, why));
+	private RosterChange uncover(Long absenceId, VacatedSlot slot, Long runId, RosterChange existing, String why,
+			Long userId) {
+		saga.record(absenceId, existing == null ? null : existing.id(), slot,
+				VisitChangeStep.Request.markUncovered(why), new VisitChangeStep.Decision(runId, null, userId, null, why));
+		return existing;
+	}
+
+	// ------------------------------------------------------------------ settling, once visit has made the change ---
+
+	/**
+	 * The saga's third part: visit has made the step's change, so the roster change is settled the way
+	 * the decision said, and everybody is told. Runs once per step, in the transaction that marks it done
+	 * ({@link VisitChangeSaga}); a cover carrying on ({@link LeaveCoverService}) is settled here too.
+	 *
+	 * @return the roster change the step settled
+	 */
+	Long settle(VisitChangeStep made) {
+		return switch (made.request().kind()) {
+			case REASSIGN -> replaced(made);
+			case MARK_UNCOVERED -> leftUncovered(made);
+			case CALL_OFF -> skipped(made);
+			case MOVE -> moved(made);
+		};
+	}
+
+	/** The visit went to another caregiver: everybody is told; a default plan is audited. */
+	private Long replaced(VisitChangeStep made) {
+		LocalDateTime now = now();
+		VisitChangeStep.Decision decision = made.decision();
+		Long caregiverId = made.request().toCaregiverId();
+		RosterChange change = made.rosterChangeId() == null
+				// A cover carrying on: its change is recorded once the visit is theirs
+				? RosterChange.offered(made.absenceId(), made.visit(), decision.runId(), caregiverId, now, now)
+				: lock(made.rosterChangeId());
+		search.select(made.request().rosteringCandidateId());
+		RosterChange settled = changes.save(change.replacedBy(caregiverId, decision.runId(), decision.decidedBy(),
+				decision.decidedByUserId(), decision.note(), now));
+		String forFamily = decision.decidedBy() == RosterChange.DecidedBy.FAMILY ? null : decision.note();
+		alert.settled(settled, notice(settled, decision.caregiverName(), caregiverId, null, forFamily));
+		if (decision.decidedBy() == RosterChange.DecidedBy.DEFAULT_PLAN) {
+			audit.defaultPlanApplied(settled, "%s; caregiver %d assigned to visit %d"
+					.formatted(decision.note(), caregiverId, made.visit().visitId()));
+		}
+		return settled.id();
+	}
+
+	/** The visit is an exception with nobody on it: an incident gives it a responder, and the family hears of it. */
+	private Long leftUncovered(VisitChangeStep made) {
+		VacatedSlot slot = made.visit();
+		VisitChangeStep.Decision decision = made.decision();
 		Long incidentId = incidents.raiseForUnfilledAbsence(slot.elderId(), slot.visitId(),
 				"%s visit at %s: the caregiver is absent and nobody is free to replace them".formatted(
 						slot.serviceType() == null ? "A" : slot.serviceType(), slot.start().format(WHEN))).id();
-		RosterChange change = existing == null
-				? RosterChange.uncovered(absenceId, slot, runId, incidentId, now())
-				: existing.leftUncovered(incidentId, runId, why, now());
+		RosterChange change = made.rosterChangeId() == null
+				? RosterChange.uncovered(made.absenceId(), slot, decision.runId(), incidentId, now())
+				: lock(made.rosterChangeId()).leftUncovered(incidentId, decision.runId(), decision.note(), now());
 		RosterChange saved = changes.save(change);
 		alert.coordinating(saved, notice(saved, null, null, null, null));
-		return saved;
+		return saved.id();
+	}
+
+	/** The visit is called off: the family's own cancellation. */
+	private Long skipped(VisitChangeStep made) {
+		VisitChangeStep.Decision decision = made.decision();
+		RosterChange settled = changes.save(lock(made.rosterChangeId()).skipped(decision.decidedByUserId(),
+				decision.note(), now()));
+		alert.settled(settled, notice(settled, null, null, null, null));
+		return settled.id();
+	}
+
+	/**
+	 * The visit has moved: the search is filed under the visit that replaced it, everybody is told, and
+	 * the family is offered the choice for the new time.
+	 */
+	private Long moved(VisitChangeStep made) {
+		LocalDateTime now = now();
+		VisitChangeStep.Decision decision = made.decision();
+		VisitChangeStep.Request request = made.request();
+		Long newVisitId = made.resultVisitId();
+		candidates.moveToVisit(decision.runId(), made.visit().visitId(), newVisitId);
+		RosterChange settled = changes.save(lock(made.rosterChangeId()).rescheduled(newVisitId,
+				request.toCaregiverId(), decision.runId(), decision.decidedByUserId(), decision.note(), now));
+		alert.settled(settled, notice(settled, decision.caregiverName(), request.toCaregiverId(), request.newStart(),
+				null));
+		offerTheNewTime(settled, newVisitId, decision.runId(), request.toCaregiverId(), decision.caregiverName(), now);
+		return settled.id();
 	}
 
 	// ------------------------------------------------------------------ helpers ---
 
-	/** Visits the absence vacates that have no change yet: still with the absent caregiver, not started, still ahead. */
-	private List<VacatedSlot> unhandled(AbsenceReport absence, Map<Long, RosterChange> byVisit, LocalDateTime now) {
-		return Vacancies.notYetRerostered(visits, absence, byVisit.keySet(), now).stream()
+	/**
+	 * Visits the absence vacates that have no change yet: still with the absent caregiver, not started, still
+	 * ahead, and not held by a change to them that visit has not made yet.
+	 */
+	private List<VacatedSlot> unhandled(AbsenceReport absence, Map<Long, RosterChange> byVisit, Set<Long> held,
+			LocalDateTime now) {
+		Set<Long> handled = new HashSet<>(byVisit.keySet());
+		handled.addAll(held);
+		return Vacancies.notYetRerostered(visits, absence, handled, now).stream()
 				.map(visit -> toSlot(visit, absence.caregiverId()))
 				.toList();
 	}
 
-	/** Visits an earlier run left uncovered that are still ahead and still uncovered. */
+	/** Visits an earlier run left uncovered that are still ahead, still uncovered, and not being changed. */
 	private List<VacatedSlot> uncoveredToRetry(AbsenceReport absence, Collection<RosterChange> existing,
-			LocalDateTime now) {
+			Set<Long> held, LocalDateTime now) {
 		return existing.stream()
 				.filter(RosterChange::isUncovered)
+				.filter(change -> !held.contains(change.visitId()))
 				.map(change -> visits.find(change.visitId()))
 				.flatMap(Optional::stream)
 				.filter(visit -> "EXCEPTION".equals(visit.status()) && visit.caregiverId() == null)
@@ -518,6 +663,38 @@ public class AbsenceReRosteringService {
 				.orElseThrow(() -> new BusinessRuleViolation("VISIT_NOT_OPEN",
 						"The visit has been started or called off since the change was offered"));
 		return toSlot(visit, change.originalCaregiverId());
+	}
+
+	/**
+	 * The saga's semantic lock: nothing is decided for a visit while a change to it is still being made,
+	 * or has been given up and waits for a manager.
+	 */
+	private void requireNoChangeUnderWay(RosterChange change) {
+		List<VisitChangeStep> held = saga.holding(change.absenceId()).stream()
+				.filter(step -> step.visit().visitId().equals(change.visitId()))
+				.toList();
+		if (!held.isEmpty()) {
+			throw changesUnderWay(held);
+		}
+	}
+
+	private static BusinessRuleViolation changesUnderWay(List<VisitChangeStep> held) {
+		long abandoned = held.stream().filter(VisitChangeStep::isAbandoned).count();
+		if (abandoned > 0) {
+			return new BusinessRuleViolation("CHANGE_IN_PROGRESS",
+					"%d change%s to visits could not reach the visit service; a manager's re-roster sends %s again"
+							.formatted(abandoned, abandoned == 1 ? "" : "s", abandoned == 1 ? "it" : "them"));
+		}
+		return new BusinessRuleViolation("CHANGE_IN_PROGRESS", "%d change%s to visits %s still being made"
+				.formatted(held.size(), held.size() == 1 ? "" : "s", held.size() == 1 ? "is" : "are"));
+	}
+
+	private RosterChange lock(Long changeId) {
+		return changes.lock(changeId).orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
+	}
+
+	private RosterChange current(Long changeId) {
+		return changes.findById(changeId).orElseThrow(() -> new ResourceNotFound("RosterChange", changeId));
 	}
 
 	private Map<Long, RosterChange> changesByVisit(Long absenceId) {

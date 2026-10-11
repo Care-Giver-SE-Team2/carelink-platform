@@ -66,6 +66,7 @@ class AbsenceReRosteringServiceTest {
 	private final ReRosteringFakes.Family family = new ReRosteringFakes.Family();
 	private final ReRosteringFakes.Alerts alerts = new ReRosteringFakes.Alerts();
 	private final ReRosteringFakes.Audit audit = new ReRosteringFakes.Audit();
+	private final ReRosteringFakes.Steps steps = new ReRosteringFakes.Steps();
 	private final IncidentService incidents = mock(IncidentService.class);
 	private final UserDirectory users = mock(UserDirectory.class);
 	private final List<CredentialRegister.Cover> covers = new ArrayList<>();
@@ -91,7 +92,8 @@ class AbsenceReRosteringServiceTest {
 		RosterSnapshotLoader loader = new RosterSnapshotLoader(profiles, () -> covers,
 				planIds -> Map.of(4L, Set.of(2L)), absences, visits, since -> Map.of(), RosterLookbacks.DEFAULT, clock);
 		service = new AbsenceReRosteringService(absences, changes, runs, candidates, checks, constraints, loader, visits,
-				profiles, incidents, family, users, alerts, audit, FamilyResponseWindow.DEFAULT, clock);
+				profiles, incidents, family, users, alerts, audit, FamilyResponseWindow.DEFAULT,
+				ReRosteringFakes.saga(steps, visits, incidents, alerts, profiles, clock), clock);
 		scan = new RosterChangeScanService(changes, service, clock);
 
 		absenceId = absences.save(AbsenceReport.recordedByManager(5L, AbsenceReport.Type.SICK, FIRST_DAY,

@@ -47,7 +47,9 @@ class SchedulerLocksIT {
 			"rostering.leave-reminders",
 			new String[] {"sg.nus.carelink.rostering.infrastructure.schedule.RosterScheduler", "remindOfLeaveVisits"},
 			"rostering.nightly-refresh",
-			new String[] {"sg.nus.carelink.rostering.infrastructure.schedule.RosterScheduler", "refreshNightly"});
+			new String[] {"sg.nus.carelink.rostering.infrastructure.schedule.RosterScheduler", "refreshNightly"},
+			"rostering.visit-change-steps",
+			new String[] {"sg.nus.carelink.rostering.infrastructure.schedule.VisitChangeStepScheduler", "sweep"});
 
 	@Autowired
 	private JdbcTemplate jdbc;

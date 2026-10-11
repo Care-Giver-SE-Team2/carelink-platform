@@ -76,9 +76,11 @@ class AbsenceQueryServiceTest {
 
 		RosterSnapshotLoader loader = new RosterSnapshotLoader(profiles, () -> covers,
 				planIds -> Map.of(4L, Set.of(2L)), absences, visits, since -> Map.of(), RosterLookbacks.DEFAULT, clock);
+		ReRosteringFakes.Alerts alerts = new ReRosteringFakes.Alerts();
 		reRostering = new AbsenceReRosteringService(absences, changes, runs, candidates, checks, constraints, loader,
-				visits, profiles, incidents, family, users, new ReRosteringFakes.Alerts(), new ReRosteringFakes.Audit(),
-				FamilyResponseWindow.DEFAULT, clock);
+				visits, profiles, incidents, family, users, alerts, new ReRosteringFakes.Audit(),
+				FamilyResponseWindow.DEFAULT,
+				ReRosteringFakes.saga(new ReRosteringFakes.Steps(), visits, incidents, alerts, profiles, clock), clock);
 		queries = new AbsenceQueryService(absences, changes, runs, candidates, checks, constraints, visits, profiles,
 				family, clock);
 		absenceId = absences.save(AbsenceReport.recordedByManager(5L, AbsenceReport.Type.SICK, EIGHTH.toLocalDate(),

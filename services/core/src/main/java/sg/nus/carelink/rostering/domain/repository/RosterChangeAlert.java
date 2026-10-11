@@ -3,6 +3,7 @@ package sg.nus.carelink.rostering.domain.repository;
 import java.time.LocalDateTime;
 
 import sg.nus.carelink.rostering.domain.model.RosterChange;
+import sg.nus.carelink.rostering.domain.model.VisitChangeStep;
 
 /**
  * Telling people about a change to a visit an absence vacated (UC-MG04).
@@ -25,6 +26,15 @@ public interface RosterChangeAlert {
 	 * it was taken from, the elder and the family are all told.
 	 */
 	void settled(RosterChange change, Notice notice);
+
+	/**
+	 * visit refused a change somebody decided, after their request had been answered: the visit had
+	 * started, been called off or moved in the meantime. The person who decided - the family member or
+	 * the manager - is told it did not happen; nobody else heard of it.
+	 *
+	 * @param notice the elder's name, and visit's reason as {@code why}
+	 */
+	void notMade(VisitChangeStep step, Notice notice);
 
 	/**
 	 * The words a message needs that the change itself does not hold.

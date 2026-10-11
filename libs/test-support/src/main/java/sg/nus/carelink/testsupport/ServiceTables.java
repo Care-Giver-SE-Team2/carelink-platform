@@ -32,7 +32,7 @@ public final class ServiceTables {
 			"spot_check", "care_service_application", "caregiver", "credential", "credential_type", "elder",
 			"elder_family_binding", "elder_primary_caregiver", "family_member", "intake_application", "absence_report",
 			"caregiver_availability", "caregiver_preference", "roster_change", "rostering_candidate",
-			"rostering_candidate_check", "rostering_constraint", "rostering_run");
+			"rostering_candidate_check", "rostering_constraint", "rostering_run", "visit_change_step");
 
 	/** Every table a service's code could name. */
 	public static final Set<String> KNOWN = union(ALL, CORE);
