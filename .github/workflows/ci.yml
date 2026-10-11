@@ -52,7 +52,7 @@ jobs:
           else
             changed=$(git diff --name-only "$BASE" HEAD)
           fi
-          shared='^(pom\.xml|mvnw|\.mvn/|build/|charts/|libs/|docs/api/|scripts/build\.sh|\.github/workflows/(ci|service)\.yml)'
+          shared='^(pom\.xml|mvnw|\.mvn/|build/|charts/|libs/|docs/api/|scripts/(build|push-image)\.sh|\.github/workflows/(ci|service)\.yml)'
           if grep -qE "$shared" <<<"$changed"; then
             picked=$all
           else
@@ -174,3 +174,72 @@ jobs:
       - name: Fail if anything that ran failed
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
+
+  publish:
+    name: Publish to ECR
+    needs: [changes, gate]
+    if: needs.gate.result == 'success' && needs.changes.outputs.services != '[]' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SERVICE: ${{ matrix.service }}
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_REGISTRY: ${{ vars.ECR_REGISTRY }}
+      PUBLISH_ROLE: ${{ vars.AWS_ECR_PUBLISH_ROLE_ARN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check repository variables
+        id: config
+        run: |
+          : "${IMAGE_REGISTRY:?Set the ECR_REGISTRY repository variable.}"
+          : "${PUBLISH_ROLE:?Set the AWS_ECR_PUBLISH_ROLE_ARN repository variable.}"
+          account=${IMAGE_REGISTRY%%.*}
+          [[ "$account" =~ ^[0-9]{12}$ ]]
+          [[ "$IMAGE_REGISTRY" == "$account.dkr.ecr.ap-southeast-1.amazonaws.com" ]]
+          echo "account=$account" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image-${{ matrix.service }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ecr-image
+
+      - name: Load the image that passed the quality gate
+        run: docker load -i "$RUNNER_TEMP/ecr-image/image.tar"
+
+      - name: Request temporary AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ env.PUBLISH_ROLE }}
+          aws-region: ap-southeast-1
+          role-duration-seconds: 900
+          role-session-name: carelink-${{ github.run_id }}-${{ github.run_attempt }}
+          allowed-account-ids: ${{ steps.config.outputs.account }}
+
+      - name: Publish the verified image and record its digest
+        env:
+          IMAGE_RECORD: ${{ runner.temp }}/image-record.json
+        run: |
+          scripts/push-image.sh "$SERVICE"
+          {
+            echo "### $SERVICE image"
+            jq -r '"Image: `\(.image)@\(.digest)`"' "$IMAGE_RECORD"
+            echo ""
+            echo "Publication succeeded; runtime deployment and image vulnerability gating are separate steps."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the image reference for deployment
+        uses: actions/upload-artifact@v7
+        with:
+          name: ecr-reference-${{ matrix.service }}-${{ github.sha }}
+          path: ${{ runner.temp }}/image-record.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: true
