@@ -61,7 +61,8 @@ Each event is listed with its publisher, its trigger, its handler, and when it g
 | **draft** | Fields still to be agreed. |
 | **reserved** | No code produces this fact yet. |
 
-**Visit's events.** visit publishes these. Until visit moves out of core, visit's code inside core publishes them.
+**Visit's events.** visit publishes these. visit runs on its own now; its events are the next step, before the
+schema split.
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|

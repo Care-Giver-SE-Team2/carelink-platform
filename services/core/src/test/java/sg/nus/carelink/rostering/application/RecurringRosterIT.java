@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,11 +25,13 @@ import sg.nus.carelink.careplan.domain.model.CarePlan;
 import sg.nus.carelink.careplan.domain.model.CarePlanNode;
 import sg.nus.carelink.profile.application.PrimaryCaregiverService;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitStandIn;
+import sg.nus.carelink.testsupport.VisitStandIn.Held;
 
 /**
  * UC-MG03 end to end on real MySQL: publishing a plan fills the elder's next two weeks with
  * visits once the publish commits, naming a primary caregiver covers them, and stopping the
- * plan calls off the ones from the stop date.
+ * plan calls off the ones from the stop date. The visits are visit's, here its stand-in's.
  */
 @SpringBootTest
 class RecurringRosterIT {
@@ -50,6 +53,8 @@ class RecurringRosterIT {
 	private Clock clock;
 	@Autowired
 	private JdbcTemplate jdbc;
+	@Autowired
+	private VisitStandIn visits;
 
 	@Test
 	void publishingNamingACaregiverAndStoppingKeepTheVisitsInStep() {
@@ -62,18 +67,21 @@ class RecurringRosterIT {
 				CarePlanNode.EvidenceType.CHECKLIST)));
 
 		// Tomorrow through the last day of the 14-day window, one visit a day, nobody named yet.
-		assertThat(count(elderId, "status = 'SCHEDULED' AND caregiver_id IS NULL")).isEqualTo(13);
-		assertThat(count(elderId, "care_plan_id = " + draft.id() + " AND care_plan_node_id IS NOT NULL")).isEqualTo(13);
+		assertThat(count(elderId, visit -> visit.status().equals("SCHEDULED") && visit.caregiverId() == null))
+				.isEqualTo(13);
+		assertThat(count(elderId, visit -> draft.id().equals(visit.carePlanId()) && visit.carePlanNodeId() != null))
+				.isEqualTo(13);
 
 		Long caregiverId = caregiver();
 		primaryCaregivers.assign(elderId, caregiverId);
 
-		assertThat(count(elderId, "status = 'SCHEDULED' AND caregiver_id = " + caregiverId)).isEqualTo(13);
+		assertThat(count(elderId, visit -> visit.status().equals("SCHEDULED") && caregiverId.equals(visit.caregiverId())))
+				.isEqualTo(13);
 
 		carePlans.stop(draft.id(), tomorrow.plusDays(6), "Moving in with family", null);
 
-		assertThat(count(elderId, "status = 'SCHEDULED'")).isEqualTo(6);
-		assertThat(count(elderId, "status = 'CANCELLED'")).isEqualTo(7);
+		assertThat(count(elderId, visit -> visit.status().equals("SCHEDULED"))).isEqualTo(6);
+		assertThat(count(elderId, visit -> visit.status().equals("CANCELLED"))).isEqualTo(7);
 
 		assertThat(roster.refreshElder(elderId)).isEqualTo(new RecurringRosterService.RosterRefresh(elderId, 0, 0, 0));
 	}
@@ -81,23 +89,21 @@ class RecurringRosterIT {
 	@Test
 	void aVisitStillUnassignedAtItsStartBecomesAnExceptionWithAnIncident() {
 		Long elderId = elder();
-		jdbc.update("INSERT INTO visit (elder_id, service_type, scheduled_start, scheduled_end, status) VALUES (?, 'Companionship', ?, ?, 'SCHEDULED')",
-				elderId, LocalDateTime.now(clock).minusMinutes(5), LocalDateTime.now(clock).plusMinutes(55));
-		Long visitId = jdbc.queryForObject("SELECT MAX(id) FROM visit", Long.class);
+		Long visitId = visits.add(Held.scheduled(elderId, null, LocalDateTime.now(clock).minusMinutes(5),
+				LocalDateTime.now(clock).plusMinutes(55)).withService("Companionship"));
 
 		uncovered.startedUncovered().stream()
 				.filter(visit -> visit.visitId().equals(visitId))
 				.forEach(uncovered::escalate);
 
-		assertThat(count(elderId, "status = 'EXCEPTION'")).isEqualTo(1);
+		assertThat(visits.current(visitId).status()).isEqualTo("EXCEPTION");
 		assertThat(jdbc.queryForObject(
 				"SELECT COUNT(*) FROM incident WHERE visit_id = ? AND source = 'SYSTEM_MISSED_CHECKIN'",
 				Integer.class, visitId)).isEqualTo(1);
 	}
 
-	private int count(Long elderId, String condition) {
-		return jdbc.queryForObject("SELECT COUNT(*) FROM visit WHERE elder_id = ? AND " + condition,
-				Integer.class, elderId);
+	private long count(Long elderId, Predicate<Held> condition) {
+		return visits.ofElder(elderId).stream().filter(condition).count();
 	}
 
 	private Long elder() {

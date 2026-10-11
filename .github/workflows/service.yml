@@ -66,7 +66,19 @@ jobs:
           if-no-files-found: ignore
 
       # Static analysis shares this job with the build: a separate job would repeat it.
-      # One SonarCloud project per service, keyed <SONAR_PROJECT_PREFIX>_<service>.
+      # One SonarCloud project per service, keyed <SONAR_PROJECT_PREFIX>_<service>. It is made, or
+      # kept, public with main as its main branch first: one created by its first analysis would be
+      # private, and main's analysis would then fail (scripts/sonar-project.sh). A failure here only
+      # warns, so a pull request's analysis still runs.
+      - name: 3. SonarCloud project is public, main branch main
+        if: env.SONAR_TOKEN != ''
+        continue-on-error: true
+        env:
+          SONAR_ORG: ${{ vars.SONAR_ORG }}
+          PROJECT: ${{ vars.SONAR_PROJECT_PREFIX }}_${{ inputs.service }}
+          NAME: ${{ inputs.service }}
+        run: scripts/sonar-project.sh
+
       - name: 3. SonarCloud analysis and quality gate
         if: env.SONAR_TOKEN != ''
         run: >

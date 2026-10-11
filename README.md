@@ -15,7 +15,8 @@ providers' own systems, build on.
 
 | Part | State |
 |---|---|
-| `services/core` | The care domain as one modular service: identity, profile, care plan, rostering, visit, incident. visit moves out into a service of its own next |
+| `services/core` | The care domain as one modular service: identity, profile, care plan, rostering, incident. It asks visit through visit's internal API |
+| `services/visit` | Visits and their execution: the caregiver's work, check-in to check-out, health records, missed check-ins, the elder's confirmation and the family's view of visits and caregivers. It asks core through core's internal API |
 | `services/report` | Weekly reports, value-added services and caregiver reviews. It asks core and visit through their internal APIs |
 | `services/notification` | The in-app inbox, the first module moved out of core and the worked example for the next ones |
 | Build, image, local run | One way for every service: the parent `pom.xml`, `build/Dockerfile`, `build/entrypoint.sh`, `scripts/build.sh`, `scripts/run.sh` |
@@ -43,13 +44,14 @@ providers' own systems, build on.
 carelink-platform/
 ├─ services/
 │  ├─ core/                       pom.xml, src/, deploy/values.yaml: every service has this shape
+│  ├─ visit/                      visits, their execution and the family's view of them
 │  ├─ report/                     weekly reports, value-added services, caregiver reviews
 │  └─ notification/               the in-app inbox: the first service moved out of core
 ├─ libs/
 │  ├─ shared/                     core's shared package for every service: errors, request context, access audit, roles
 │  ├─ platform-security/          who is signed in, read from the session core wrote; the security chain of every service but core
 │  ├─ core-api/                   core's internal API (/internal/v1) as a Java interface, and its client
-│  ├─ visit-api/                  visit's internal API and its client; core serves it until visit moves out
+│  ├─ visit-api/                  visit's internal API (/internal/v1) as a Java interface, and its client
 │  ├─ events/                     events between services: the outbox, its relay to SNS, the SQS consumer
 │  ├─ event-types/                the events in docs/platform/event-catalogue.md as records, shared by publishers and handlers
 │  └─ test-support/               shared test helpers: MySQL and Redis containers, the platform's tables, the exception handler
@@ -148,7 +150,7 @@ change, and the pipeline rebuilds every service when one is touched.
 |---|---|---|
 | 1. Build | compile and package | `scripts/build.sh <service> compile` |
 | 2. Tests | unit tests, ArchUnit layering rules, MySQL integration tests (Testcontainers), JaCoCo with at least 80% line coverage in domain packages | `scripts/build.sh <service> test` |
-| 3. SonarCloud | static analysis and the quality gate | one project per service |
+| 3. SonarCloud | static analysis and the quality gate | one public project per service, with `main` as its main branch (`scripts/sonar-project.sh`) |
 | 4. Dependency scan | Trivy; a HIGH or CRITICAL finding with a fix available fails the run | findings in the Security tab |
 | 5. Image | `build/Dockerfile`, tagged with the commit | `scripts/build.sh <service> image` |
 | 6 to 10 | push to ECR (scanned on push), deploy to staging, smoke test and ZAP baseline scan, approval, deploy the same image to demo | added with the cloud environment |

@@ -4,8 +4,8 @@
 	<modelVersion>4.0.0</modelVersion>
 	<!--
 	  visit's internal API, written once for both sides: the HTTP interface and its records. visit
-	  implements it under /internal/v1 (core serves it while visit is still inside core); a caller
-	  that depends on this library gets a ready client (set carelink.visit-api.base-url).
+	  implements it under /internal/v1; a caller that depends on this library gets a ready client
+	  (set carelink.visit-api.base-url).
 	-->
 	<parent>
 		<groupId>sg.nus</groupId>

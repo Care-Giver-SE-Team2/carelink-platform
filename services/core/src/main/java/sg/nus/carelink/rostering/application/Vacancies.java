@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * Which visits an absence vacates that nobody has re-rostered yet: the absent caregiver's

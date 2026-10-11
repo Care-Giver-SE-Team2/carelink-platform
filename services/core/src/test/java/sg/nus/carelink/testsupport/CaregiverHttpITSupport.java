@@ -8,7 +8,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -21,11 +20,17 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.web.client.RestClient;
+import sg.nus.carelink.coreapi.CoreApi;
+import sg.nus.carelink.coreapi.CoreApiClients;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Real browser sessions for caregiver handoff acceptance; SQL prepares synthetic people and visits only. */
+/**
+ * Real browser sessions for caregiver handoff acceptance. SQL prepares synthetic people only; the
+ * caregiver's visit is visit's, held by its stand-in.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "carelink.report.schedule-cron=-", "carelink.caregiver.expiry-scan-cron=-",
         "carelink.rerostering.scan-initial-delay=PT1H", "carelink.escalation.scan-initial-delay=PT1H",
@@ -34,6 +39,7 @@ import tools.jackson.databind.json.JsonMapper;
 public abstract class CaregiverHttpITSupport {
     @LocalServerPort private int port;
     @Autowired protected JdbcTemplate jdbc;
+    @Autowired protected VisitStandIn visits;
     protected final JsonMapper json = JsonMapper.builder().build();
     protected String managerName, familyName, caregiverName, otherName;
     protected long manager, family, caregiverUser, caregiver, otherCaregiver, elder, visit;
@@ -55,9 +61,13 @@ public abstract class CaregiverHttpITSupport {
         jdbc.update("insert into elder_family_binding(elder_id,family_member_id,relationship,access_scope,status) "
                 + "values (?,?,'DAUGHTER','FULL','ACTIVE')", elder, familyProfile);
         day = LocalDate.now(ZoneId.of("Asia/Singapore")).plusDays(3);
-        visit = insert("insert into visit(elder_id,caregiver_id,service_type,scheduled_start,scheduled_end,status) "
-                + "values (?,?,'PERSONAL_CARE',?,?,'SCHEDULED')", elder, caregiver,
-                Timestamp.valueOf(day.atTime(9, 0)), Timestamp.valueOf(day.atTime(10, 0)));
+        visit = visits.add(VisitStandIn.Held.scheduled(elder, caregiver, day.atTime(9, 0), day.atTime(10, 0))
+                .withService("PERSONAL_CARE"));
+    }
+
+    /** core's internal API in the running application, called the way the other services call it. */
+    protected CoreApi internalApi() {
+        return CoreApiClients.create(RestClient.builder().baseUrl("http://127.0.0.1:" + port));
     }
 
     protected long insert(String sql, Object... args) {

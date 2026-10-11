@@ -28,6 +28,8 @@ import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.model.VacatedSlot;
 import sg.nus.carelink.rostering.domain.repository.RosterChangeRepository;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitStandIn;
+import sg.nus.carelink.testsupport.VisitStandIn.Held;
 
 /**
  * The events core publishes for report (docs/platform/event-catalogue.md), against MySQL and with
@@ -58,6 +60,9 @@ class CoreEventsIT {
 
 	@Autowired
 	private JdbcTemplate jdbc;
+
+	@Autowired
+	private VisitStandIn visits;
 
 	@Autowired
 	private PlatformTransactionManager transactionManager;
@@ -182,12 +187,9 @@ class CoreEventsIT {
 		return wallClock.atZone(SINGAPORE).toOffsetDateTime().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
 	}
 
-	/** Written the way JPA writes visit times, as a Timestamp. */
+	/** The visit is visit's, held by its stand-in; core keeps its id and its times. */
 	private long visit(long caregiver, LocalDateTime start) {
-		jdbc.update("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)"
-				+ " values (?, ?, 'BATHING', ?, ?, 'SCHEDULED')", elder, caregiver, Timestamp.valueOf(start),
-				Timestamp.valueOf(start.plusHours(1)));
-		return jdbc.queryForObject("select last_insert_id()", Long.class);
+		return visits.add(Held.scheduled(elder, caregiver, start, start.plusHours(1)).withService("BATHING"));
 	}
 
 	private long absence(long caregiver, LocalDateTime day) {

@@ -22,3 +22,7 @@ carelink:
     # The name core's events carry as their source, and core's name as a consumer
     # (spring.application.name in application.yml is the application's, "carelink")
     service: core
+  visit-api:
+    # visit runs on its own; rostering and incident call its internal API. For a run outside
+    # Docker; overridden by CARELINK_VISITAPI_BASEURL
+    base-url: http://localhost:8081

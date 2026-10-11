@@ -36,7 +36,7 @@ and a `CoreApi` double (`@MockitoBean`).
 | Errors, request context, audit | dependency on `libs/shared` | core's `shared` package: error types and the exception handler, request id and access log, `audit_log` writes, roles |
 | Signed-in user | dependency on `libs/platform-security` | the security chain and `SignedInUsers` |
 | Calls to core | dependency on `libs/core-api` | the `CoreApi` client |
-| Calls to visit | dependency on `libs/visit-api` | the `VisitApi` client; core serves it until visit moves out |
+| Calls to visit | dependency on `libs/visit-api` | the `VisitApi` client |
 | Events | dependency on `libs/events` | the outbox and its relay to SNS, the SQS consumer that handles each event once |
 
 ## 2. Step by step
@@ -234,7 +234,12 @@ management.health.redis.enabled=false
 - `GlobalExceptionHandlerTestSupport`: the real exception handler, for standalone MockMvc controller tests.
 - `PlatformTablesForTests`: after core's migrations, the platform's migrations, so the database is the one core
   leaves in production: the platform's tables (`outbox_event`, `consumed_message`, the scheduler locks), and no
-  foreign key between two services' tables. Import it on the service's integration test classes.
+  foreign key between two services' tables. Import it on the service's integration test classes, or once, on a
+  configuration class under `testsupport` that every test picks up, as visit does.
+
+Signing in happens in core. A service's tests that sign in through MockMvc build the session core would leave
+(report's `SignedInSessions`); tests that sign in as a browser does, over HTTP, need core's sign-in paths, which
+visit's tests get from `testsupport/SignInAsCore`, a filter in front of the service's chain.
 
 ### 2.6 Deployment: `deploy/values.yaml`
 
@@ -346,35 +351,31 @@ it is safe. For example, the missed check-in scan tries again on its next run.
 visit's internal API is built the same way: `VisitApi` in `libs/visit-api`, set up by
 `carelink.visit-api.base-url`, with the same timeouts. Its errors come back as `VisitNotFound` and
 `VisitRuleViolation`, and the lookups that may find nothing have `find…` methods (`findVisit`,
-`findVisitState`, `findLatestCaregiverId`).
-
-Until visit moves out, core serves this API (`InternalVisit*Controller`, checked by `VisitApiContractTest`).
-A service that leaves core before visit does, such as report, points `carelink.visit-api.base-url` at core;
-once visit runs on its own, the setting points at visit and nothing else changes. Rostering and incident stay in
-core: they call visit in-process until it moves, and then their adapters switch to `VisitApi`.
-[service-boundaries.md](service-boundaries.md), section 4, lists which call replaces which.
+`findVisitState`, `findLatestCaregiverId`). visit serves it (`InternalVisit*Controller`, checked by
+`VisitApiContractTest`), at `http://visit` in the cluster and `http://localhost:8081` outside Docker.
+[service-boundaries.md](service-boundaries.md), section 4, lists which call replaced which.
 
 **Worked example: rostering's `BookedVisits`.** UC-MG06 counts the booked visits that a lapsing certificate puts
-at risk, and the bookings belong to visit. Rostering now asks for them through a port of its own, which can be
-answered either way. Copy it for rostering's other calls and for incident's:
+at risk, and the bookings belong to visit. Rostering asks for them through a port of its own:
 
 - **The port** belongs to rostering: `rostering/domain/repository/BookedVisits`, in rostering's own terms.
   `CredentialRiskService` calls it and imports nothing from visit.
-- **Two adapters** live in `rostering/infrastructure/visit`:
-  - `InProcessBookedVisits` calls visit's `UpcomingAssignments` in the same process. It carries `@VisitInCore`.
-  - `VisitApiBookedVisits` calls `VisitApi.unstartedBetween`. It carries `@VisitOutsideCore`.
-- **The switch** is `carelink.visit-api.base-url`. While it is not set, as today, the `@VisitInCore` adapters are
-  active. Once it is set, the `VisitApi` client exists and the `@VisitOutsideCore` adapters are active instead.
-  Both annotations are in core's `platform` package.
-- **Tests.** `BookedVisitsAdaptersTest` checks that exactly one adapter is active either way, and that both give
-  the same bookings. `VisitsAtRiskWithVisitOutsideCoreIT` runs MG06 with the setting on and
-  `@MockitoBean VisitApi visit`: core's database holds no visit, and the answer is the same as in
-  `CredentialReviewIT`. Once visit has moved, a core test that needs visit is written this way.
-- **When visit moves out:** delete every `@VisitInCore` class, and set `carelink.visit-api.base-url` for core
-  (compose and `deploy/values.yaml`). Core tests that seed visit rows change to the double.
+- **The adapter**, `VisitApiBookedVisits` in `rostering/infrastructure/visit`, calls `VisitApi.unstartedBetween`
+  and turns visit's answer into rostering's records. `VisitApiBookedVisitsTest` checks that with a mocked
+  `VisitApi`.
+- **Tests that start core** meet visit's stand-in, `testsupport/VisitStandIn`. It keeps visits in memory and
+  answers the way visit's services do. A test lays out the visits it needs
+  (`visits.add(Held.scheduled(elder, caregiver, start, end))`) and reads what core asked visit to do
+  (`visits.current(id)`, `visits.askedOf(id)`). `CredentialReviewIT` runs MG06 this way.
 
-**Testing.** In the service's own tests, replace the client with `@MockitoBean CoreApi core`. The contract
-itself is tested in core.
+**Testing.** In the service's own tests, the client gives way to a double. For a few answers, a mock with stubs:
+report's tests use `@MockitoBean CoreApi core`. For many, a stand-in that answers the way the other service does:
+core's tests meet `VisitStandIn`, and visit's tests meet `CoreStandIn`, which reads the people and plans the tests
+lay out in core's tables and keeps the incidents visit raises. A stand-in is a bean in a configuration class under
+`testsupport`, which component scanning finds, so it replaces the client in every test that starts the
+application; a `TestExecutionListener` registered in `src/test/resources/META-INF/spring.factories` empties it
+before each test. The contract itself is tested where the API is served (`CoreApiContractTest`,
+`VisitApiContractTest`).
 
 **A new endpoint** is one change in core: the method in `CoreApi`, the controller method in core, and a case in
 `CoreApiContractTest`. Ask the owner of core, or open the pull request and ask them to review it.
@@ -522,11 +523,13 @@ The jobs that still need a lock when they move are `MissedCheckInScheduler` (vis
 - [ ] Signed in through core in the browser, a page that calls the service works without signing in again.
 - [ ] The SonarCloud project `<prefix>_<name>` exists. The repository admin creates it, and the pipeline
       analyses one project per service.
-- [ ] The paths the service takes over are listed for the Ingress.
+- [ ] The paths the service takes over are listed for the Ingress ([service-boundaries.md](service-boundaries.md),
+  section 8).
 
 ## 9. Still to come
 
 - **The writes and reads across services.** The writes to the `notification` table and the SQL reads of other
-  services' tables ([service-boundaries.md](service-boundaries.md), section 5) become events. Each owner moves
-  theirs, behind the port the business code already calls.
+  services' tables ([service-boundaries.md](service-boundaries.md), section 5) become events, one by one,
+  behind the port the business code already calls. The commands visit and core share move to events with them
+  (section 7 there).
 - **The schema split** comes last, after the reads across schemas are gone.

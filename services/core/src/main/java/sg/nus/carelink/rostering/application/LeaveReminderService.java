@@ -21,7 +21,7 @@ import sg.nus.carelink.rostering.domain.model.AbsenceReport;
 import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
 import sg.nus.carelink.rostering.domain.repository.RosterChangeRepository;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * The last safety net for leave: a visit on a caregiver's approved leave that is due within

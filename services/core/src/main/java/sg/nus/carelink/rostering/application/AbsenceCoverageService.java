@@ -17,7 +17,7 @@ import sg.nus.carelink.rostering.domain.repository.AbsenceAlert;
 import sg.nus.carelink.rostering.domain.repository.AbsenceReportRepository;
 import sg.nus.carelink.rostering.domain.repository.RosterChangeRepository;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * Keeps UC-MG04 step 7 true after the nightly roster has run. Visits are only laid out a

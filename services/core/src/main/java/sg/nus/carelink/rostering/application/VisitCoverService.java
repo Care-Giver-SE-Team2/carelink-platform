@@ -15,7 +15,7 @@ import sg.nus.carelink.rostering.domain.service.ScoringObjective;
 import sg.nus.carelink.rostering.domain.service.Shortlist;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * Runs the replacement search for one visit nobody holds and, at the manager's word, puts the

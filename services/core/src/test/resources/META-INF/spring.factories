@@ -1,0 +1,2 @@
+# Empties the visit stand-in before each test (sg.nus.carelink.testsupport.VisitStandIn)
+org.springframework.test.context.TestExecutionListener=sg.nus.carelink.testsupport.VisitStandInReset

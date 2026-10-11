@@ -32,7 +32,7 @@ import sg.nus.carelink.rostering.domain.repository.RosteringCandidateRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringConstraintRepository;
 import sg.nus.carelink.rostering.domain.repository.RosteringRunRepository;
 import sg.nus.carelink.shared.error.ResourceNotFound;
-import sg.nus.carelink.visit.application.VisitReassignment;
+import sg.nus.carelink.rostering.domain.repository.VisitReassignment;
 
 /**
  * What UC-MG04 looks like from each side. The manager sees every absence, every visit it

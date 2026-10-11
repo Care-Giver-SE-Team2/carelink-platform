@@ -25,11 +25,14 @@ import org.springframework.test.context.TestPropertySource;
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
 import sg.nus.carelink.rostering.domain.model.RosterChange;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitStandIn;
+import sg.nus.carelink.testsupport.VisitStandIn.Held;
 
 /**
- * UC-MG04 end to end on real MySQL: V12's tables and seeded rules, the lock on a change, the
- * visit and its assignment history, the notifications to all three ends, the audit of a default
- * plan, and an uncovered visit's incident - everything the in-memory test cannot see.
+ * UC-MG04 end to end on real MySQL: V12's tables and seeded rules, the lock on a change, what
+ * visit is asked to do with each visit, the notifications to all three ends, the audit of a
+ * default plan, and an uncovered visit's incident - everything the in-memory test cannot see.
+ * visit itself is its stand-in, which answers the way the visit service does.
  *
  * <p>Aisha is off sick tomorrow. She had two visits with Mdm Tan; Farah knows Mdm Tan, speaks her
  * dialect and works in her sector; Siti does not. It is 09:00 in Singapore.
@@ -64,6 +67,8 @@ class AbsenceReRosteringIT {
 	private MovableClock clock;
 	@Autowired
 	private JdbcTemplate jdbc;
+	@Autowired
+	private VisitStandIn visits;
 
 	private Long manager;
 	private Long elder;
@@ -128,13 +133,15 @@ class AbsenceReRosteringIT {
 		RosterChange kept = reRostering.decide(morningChange, familyUsername, FamilyChoice.keepSuggestion());
 
 		assertThat(kept.decidedBy()).isEqualTo(RosterChange.DecidedBy.FAMILY);
-		assertThat(jdbc.queryForObject("select caregiver_id from visit where id = ?", Long.class, morning)).isEqualTo(farah);
-		assertThat(jdbc.queryForObject("select absence_id from visit where id = ?", Long.class, morning))
-				.isEqualTo(absence.id());
-		assertThat(jdbc.queryForList("select status from visit_assignment where visit_id = ? order by id", String.class,
-				morning)).containsExactly("REPLACED", "ACTIVE");
-		assertThat(count("select count(*) from visit_assignment where visit_id = ? and status = 'ACTIVE'"
-				+ " and rostering_candidate_id is not null", morning)).isEqualTo(1);
+		assertThat(visits.current(morning).caregiverId()).isEqualTo(farah);
+		assertThat(visits.current(morning).absenceId()).isEqualTo(absence.id());
+		// Handed over once, for the absence, with the candidate the family kept for visit's history
+		assertThat(visits.askedOf(morning)).singleElement().satisfies(asked -> {
+			assertThat(asked.what()).isEqualTo("REASSIGN");
+			assertThat(asked.toCaregiverId()).isEqualTo(farah);
+			assertThat(asked.why().absenceId()).isEqualTo(absence.id());
+			assertThat(asked.why().rosteringCandidateId()).isNotNull();
+		});
 		assertThat(notifications(userOf(farah), "VISIT_ASSIGNED")).isEqualTo(1);
 		assertThat(notifications(userOf(aisha), "VISIT_RELEASED")).isEqualTo(1);
 		assertThat(notifications(elderAccount, "VISIT_CHANGED")).isEqualTo(1);
@@ -146,8 +153,7 @@ class AbsenceReRosteringIT {
 
 		assertThat(jdbc.queryForObject("select decided_by from roster_change where visit_id = ?", String.class, afternoon))
 				.isEqualTo("DEFAULT_PLAN");
-		assertThat(jdbc.queryForObject("select caregiver_id from visit where id = ?", Long.class, afternoon))
-				.isIn(farah, siti);
+		assertThat(visits.current(afternoon).caregiverId()).isIn(farah, siti);
 		assertThat(count("select count(*) from audit_log where action = 'DEFAULT_PLAN_APPLIED' and resource_type ="
 				+ " 'roster_change' and resource_id = (select id from roster_change where visit_id = ?)", afternoon))
 				.isEqualTo(1);
@@ -172,8 +178,7 @@ class AbsenceReRosteringIT {
 
 		assertThat(outcome.uncovered()).as("Aisha and Siti are away, Farah is with Mr Ong at ten").isEqualTo(1);
 		assertThat(outcome.offered()).isEqualTo(1);
-		assertThat(jdbc.queryForObject("select status from visit where id = ?", String.class, uncoveredVisit))
-				.isEqualTo("EXCEPTION");
+		assertThat(visits.current(uncoveredVisit).status()).isEqualTo("EXCEPTION");
 		Long incident = jdbc.queryForObject("select incident_id from roster_change where visit_id = ?", Long.class,
 				uncoveredVisit);
 		assertThat(count("select count(*) from incident where id = ? and visit_id = ? and source = 'SYSTEM_MISSED_CHECKIN'"
@@ -185,10 +190,8 @@ class AbsenceReRosteringIT {
 		RosterChange moved = reRostering.decide(change, familyUsername, FamilyChoice.moveTo(later));
 
 		assertThat(moved.outcome()).isEqualTo(RosterChange.Outcome.RESCHEDULED);
-		assertThat(jdbc.queryForObject("select status from visit where id = ?", String.class, movedVisit))
-				.isEqualTo("CANCELLED");
-		assertThat(jdbc.queryForObject("select caregiver_id from visit where id = ?", Long.class,
-				moved.rescheduledVisitId())).isEqualTo(moved.assignedCaregiverId());
+		assertThat(visits.current(movedVisit).status()).isEqualTo("CANCELLED");
+		assertThat(visits.current(moved.rescheduledVisitId()).caregiverId()).isEqualTo(moved.assignedCaregiverId());
 		assertThat(queries.forFamily(familyUsername, change).rescheduledStart()).isEqualTo(later);
 
 		// Back to step 3 for the new time: a change of its own, with the suggestions filed under the new visit.
@@ -234,9 +237,7 @@ class AbsenceReRosteringIT {
 	}
 
 	private Long visit(Long elderId, Long caregiverId, LocalDateTime start, String status) {
-		jdbc.update("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)"
-				+ " values (?, ?, 'Personal care', ?, ?, ?)", elderId, caregiverId, start, start.plusMinutes(45), status);
-		return lastId();
+		return visits.add(Held.scheduled(elderId, caregiverId, start, start.plusMinutes(45)).withStatus(status));
 	}
 
 	private Long userOf(Long caregiverId) {

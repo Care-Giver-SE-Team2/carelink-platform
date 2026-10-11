@@ -8,8 +8,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /**
  * Where visit is and how long a call may take.
  *
- * @param baseUrl visit inside the cluster, {@code http://visit}; while visit is still inside core,
- * core's address
+ * @param baseUrl visit inside the cluster, {@code http://visit}
  * @param connectTimeout how long to wait for a connection
  * @param readTimeout how long to wait for visit's answer
  */

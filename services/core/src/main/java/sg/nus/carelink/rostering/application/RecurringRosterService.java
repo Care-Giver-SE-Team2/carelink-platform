@@ -15,8 +15,8 @@ import sg.nus.carelink.profile.application.PrimaryCaregiverLookup;
 import sg.nus.carelink.rostering.domain.model.RecurringSchedule;
 import sg.nus.carelink.rostering.domain.model.RecurringSchedule.RecurringTask;
 import sg.nus.carelink.rostering.domain.model.RecurringSchedule.WeeklySlot;
-import sg.nus.carelink.visit.application.VisitScheduling;
-import sg.nus.carelink.visit.application.VisitScheduling.PlannedVisit;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling;
+import sg.nus.carelink.rostering.domain.repository.VisitScheduling.PlannedVisit;
 
 /**
  * UC-MG03: keeps an elder's visits in step with their care plan. Publishing a plan sets the

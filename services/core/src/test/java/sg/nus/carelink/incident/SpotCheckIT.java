@@ -21,11 +21,13 @@ import sg.nus.carelink.incident.application.SpotCheckHistory;
 import sg.nus.carelink.incident.application.SpotCheckService;
 import sg.nus.carelink.incident.domain.model.SpotCheck;
 import sg.nus.carelink.testsupport.SharedMySql;
+import sg.nus.carelink.testsupport.VisitStandIn;
+import sg.nus.carelink.testsupport.VisitStandIn.Held;
 
 /**
  * UC-MG08 end to end on real MySQL: V13's columns, the visit and family-member lookups, the
  * notifications to the family, the manager and the caregiver, the incident a no-show raises,
- * and the conclusions rostering reads.
+ * and the conclusions rostering reads. The visits are visit's stand-in's.
  *
  * <p>Aisha has Mdm Tan's visit tomorrow at ten, Ben the one the day after. Alex is Mdm Tan's son.
  */
@@ -50,6 +52,8 @@ class SpotCheckIT {
 	private Clock clock;
 	@Autowired
 	private JdbcTemplate jdbc;
+	@Autowired
+	private VisitStandIn visits;
 
 	private Long manager;
 	private Long elder;
@@ -168,10 +172,7 @@ class SpotCheckIT {
 	}
 
 	private Long visit(Long caregiverId, LocalDateTime start) {
-		jdbc.update("insert into visit (elder_id, caregiver_id, service_type, scheduled_start, scheduled_end, status)"
-				+ " values (?, ?, 'Personal care', ?, ?, 'SCHEDULED')", elder, caregiverId, Timestamp.valueOf(start),
-				Timestamp.valueOf(start.plusMinutes(45)));
-		return lastId();
+		return visits.add(Held.scheduled(elder, caregiverId, start, start.plusMinutes(45)));
 	}
 
 	private Long userOf(Long caregiverId) {

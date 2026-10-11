@@ -7,10 +7,13 @@ SQL still reads another service's tables.
 Generated from the code at `c124099` (Flyway migrations V1–V25, 50 tables). Owner: core and shared parts. Each
 service owner refines their own section when they split the service.
 
-**Where the move stands.** notification and report run as services of their own. report reaches core and visit
-only through ports of its own (`report/application`), whose adapters call `CoreApi` and `VisitApi`
-(`report/infrastructure/core`, `…/visit`); its calls in sections 3 and 4 are done. visit is still in core. The SQL
-and writes in section 5 still run until their owners replace them, which comes before the schema split.
+**Where the move stands.** visit, report and notification run as services of their own. visit and report reach
+core only through ports of their own (`visit/application`, `report/application`), whose adapters call `CoreApi`
+(`…/infrastructure/core`); report reaches visit through `VisitApi`. Rostering and incident, which stay in core,
+reach visit through ports of theirs whose adapters call `VisitApi`. The calls in sections 3 and 4 are all done. The
+SQL and writes in section 5 still run until they are replaced, which comes before the schema split. Section 7 lists
+what the move changes for the commands visit and core take part in together, and section 8 the paths the Ingress
+sends to each service.
 
 ---
 
@@ -61,8 +64,7 @@ upstream sync brings in; drop it in the next platform migration.
 
 ## 3. What core offers visit and report
 
-visit calls core's Java types directly; report, which has moved, already calls the replacements below. After the
-split, every call is one of them. Internal endpoints live under `/internal/v1/`. The Ingress routes only the public paths (`/api/**`), never
+visit and report call the replacements below; the first column is the call they replaced. Internal endpoints live under `/internal/v1/`. The Ingress routes only the public paths (`/api/**`), never
 `/internal`, so they are reachable only inside the cluster. Responses carry only the fields the callers use today.
 
 The contract is written once, as the Java interface `CoreApi` in `libs/core-api`: core implements it (the
@@ -101,11 +103,10 @@ a `POST` is repeated only by a caller that knows it is safe (the missed check-in
 
 ## 4. What visit offers core and report
 
-Rostering and incident stay in core, and report moves out, but all three call visit today. Their calls are written
-down the same way as core's: the Java interface `VisitApi` in `libs/visit-api`. Until visit moves out, core serves it
-(the `InternalVisit*Controller` classes in `visit/controller`, checked against the interface by
-`VisitApiContractTest`; `VisitApiIT` runs the reads incident needs against MySQL). When visit moves, those
-controllers move with it, and a caller that has switched to the client changes nothing.
+Rostering and incident, in core, and report call visit. Their calls are written down the same way as core's: the
+Java interface `VisitApi` in `libs/visit-api`. visit serves it (the `InternalVisit*Controller` classes in
+`visit/controller`, checked against the interface by `VisitApiContractTest`; `VisitApiIT` runs the reads incident
+needs against MySQL).
 
 | Call today | Called from | Replacement |
 |---|---|---|
@@ -125,12 +126,17 @@ controllers move with it, and a caller that has switched to the client changes n
 | SQL on `visit` in `JdbcValueAddedVisitAssignment` (does the caregiver have a visit at that time) | report | `GET /internal/v1/visits/caregiver-busy?caregiverId=&from=&until=` → `{ busy }`. Its times are bound the way JPA writes them, which the SQL it replaces did not do |
 | SQL on `visit` in `NotificationTableAlert` (the elder's latest caregiver) | incident | `GET /internal/v1/visits/latest-caregiver?elderId=` → `{ caregiverId }`, or 404 |
 
-Times are ISO date-times on Singapore's wall clock, as visit stores them. A caller switches by keeping its port and
-replacing the adapter with one that calls `VisitApi`, as in section 3. Until visit moves, a caller in core keeps
-both adapters, switched by `carelink.visit-api.base-url`. Rostering's `BookedVisits` is the worked example
-([building-a-service.md](building-a-service.md), section 4). The [event catalogue](event-catalogue.md) decides
-which facts travel as events instead: report's reads of the visit table become visit's events there, and
-`AbsenceReported` is not built.
+Times are ISO date-times on Singapore's wall clock, as visit stores them. Each caller keeps a port of its own and
+an adapter that calls `VisitApi`: rostering's `BookedVisits`, `VisitReassignment` and `VisitScheduling`
+(`rostering/domain/repository`, adapters in `rostering/infrastructure/visit`), and incident's spot-check visits and
+latest caregiver (`SpotCheckVisits` in `incident/infrastructure/lookup`, `LatestCaregivers` in `…/notify`).
+Rostering's `BookedVisits` is the worked example ([building-a-service.md](building-a-service.md), section 4). The
+[event catalogue](event-catalogue.md) decides which facts travel as events instead: report's reads of the visit
+table become visit's events there, and `AbsenceReported` is not built.
+
+In core's tests visit is a stand-in (`testsupport/VisitStandIn`), which keeps the visits in memory and answers the
+way visit's services do; in visit's tests core is one (`testsupport/CoreStandIn`), which reads the people and plans
+the tests lay out in core's tables. Each is in place of the client for every test that starts the application.
 
 ## 5. SQL and writes that reach another service's tables
 
@@ -161,7 +167,7 @@ notification's `NotificationRequestedHandler` keeps the message. Eight classes a
 | report `NotificationTableValueAddedNotifier` | `caregiver` | Recipients go in the event |
 | notification `JdbcNotificationInbox` | `care_plan`, `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification; the family rule asks `CoreApi.readableElders` |
 | notification `JdbcRecipientDirectory` | `app_user`, `user_role` | `CoreApi.account` |
-| incident `JdbcSpotCheckLookups` | `visit`, `notification` | Calls to visit (section 4); the reminder time kept in core |
+| incident `JdbcSpotCheckLookups` | `notification` | The reminder time kept in core; its reads of `visit` are calls to visit now (section 4) |
 
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
 service keeps its own `audit_log` in its own schema.
@@ -184,5 +190,45 @@ platform migration takes the next free version, listed here.
 | V2 | `consumed_message` | every service that handles events | `libs/events` | Ignores a message it has already handled |
 | V3 | none: drops the 17 foreign keys of section 2 | the shared schema | core | No foreign key joins two services' tables |
 
-The next platform migration is V3. Until the schema split, the services share one schema, so the two events
+The next platform migration is V4. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
+
+## 7. What the move changes: commands visit and core share
+
+Three of visit's commands ask core to raise an incident inside visit's own transaction: a caregiver's report
+(CG04: the incident, then the visit's pause and the command's receipt), the missed check-in scan (SYS03: the
+incident, then the scan's ledger entry), and an elder's dispute (EL01: the confirmation, then the incident). In
+core they shared one transaction, so a failure anywhere undid the incident too. Now core commits the incident when
+visit asks; if visit's transaction then fails, visit's facts roll back and core keeps the incident, and a retry
+raises a second one. For CG04 and SYS03 a failed write after the call is enough; for EL01 only a failed commit.
+Nothing is lost, but staff may see the same report twice.
+
+visit's tests show this as it is: `CaregiverVisitExecutionWorkflowIT` (a failed receipt) and
+`MissedCheckInWorkflowIT` (a failed ledger entry; a failed visit update, which comes before visit asks core, leaves
+nothing behind). The way out is the same for all three: visit stops calling core inside its transaction, records
+the fact and an event in one transaction instead, and core raises the incident from the event, once per event
+(`consumed_message`); visit learns the incident's id from core's `IncidentRaised`. The event catalogue decided the
+other way for the missed check-in (`VisitMissed`, section 3.1), because visit stores the incident's id; this
+reopens that decision, to be settled with visit's events before the schema split.
+
+## 8. Which service takes which public path
+
+Every public path is under `/api`. These go to visit; everything else under `/api` goes to core, except the paths
+report and notification take (their own sections of [building-a-service.md](building-a-service.md)). Two of core's
+paths sit under `/api/caregivers` beside visit's, so the rules are listed in the order they must be tried: the
+first that matches wins. The front end's development server routes the same way (`frontend/vite.config.ts`).
+
+| Order | Path | Match | Service |
+|---|---|---|---|
+| 1 | `/api/caregivers/me/absences` | prefix | core |
+| 2 | `/api/caregivers/{id}/spot-checks` | exact, `{id}` a number | core |
+| 3 | `/api/caregivers/me` | exact | visit |
+| 4 | `/api/caregivers/me/schedule` | exact | visit |
+| 5 | `/api/caregivers/me/incidents` | prefix | visit |
+| 6 | `/api/caregivers/{id}`, `/api/caregivers/{id}/credentials` | exact, `{id}` a number | visit |
+| 7 | `/api/visits` | prefix | visit |
+| 8 | `/api/elders/me/visits` | prefix | visit |
+
+A caregiver's own incident reports moved with visit to `/api/caregivers/me/incidents` (they were `POST /api/incidents`
+and `GET /api/caregivers/me/incidents`), so that `/api/incidents`, the managers' and families' incidents, stays
+core's whole.

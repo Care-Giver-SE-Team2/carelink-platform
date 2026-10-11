@@ -12,3 +12,8 @@ resources:
     memory: 512Mi
   limits:
     memory: 768Mi
+
+# core's and visit's internal APIs, at the Services the chart creates for their releases
+env:
+  CARELINK_COREAPI_BASEURL: http://core
+  CARELINK_VISITAPI_BASEURL: http://visit

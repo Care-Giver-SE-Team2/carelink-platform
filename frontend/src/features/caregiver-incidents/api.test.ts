@@ -10,5 +10,5 @@ it('uses only caregiver safe reads and bootstraps CSRF before a single write', a
   const input={visitId:3,category:'SERVICE',severity:'LOW',description:'facts',expectedVersion:0,clientRequestId:'uuid'}
   await reportIncident(input,signal)
   expect(api).toHaveBeenNthCalledWith(3,'/auth/csrf',{signal})
-  expect(api).toHaveBeenNthCalledWith(4,'/incidents',{method:'POST',body:JSON.stringify(input),signal})
+  expect(api).toHaveBeenNthCalledWith(4,'/caregivers/me/incidents',{method:'POST',body:JSON.stringify(input),signal})
 })
