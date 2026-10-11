@@ -36,17 +36,20 @@ public class VisitService {
     private final VisitRepository visits;
     private final ElderConfirmationRepository confirmations;
     private final ElderServiceDisputes incidents;
+    private final VisitEvents events;
     private final Clock clock;
 
     public VisitService(
             VisitRepository visits,
             ElderConfirmationRepository confirmations,
             ElderServiceDisputes incidents,
+            VisitEvents events,
             Clock clock) {
 
         this.visits = visits;
         this.confirmations = confirmations;
         this.incidents = incidents;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -203,6 +206,7 @@ public class VisitService {
          * The care team must investigate it, so it enters the existing
          * incident workflow.
          */
+        Long incidentId = null;
         if (status
                 == ElderConfirmation
                         .ConfirmationStatus
@@ -213,7 +217,7 @@ public class VisitService {
                             ? "Elder disputed completion of the visit."
                             : saved.comment();
 
-            incidents
+            incidentId = incidents
                     .createElderServiceDispute(
                             elderId,
                             visitId,
@@ -222,6 +226,7 @@ public class VisitService {
                     );
         }
 
+        events.elderConfirmationSubmitted(saved, visit, incidentId);
         return saved;
     }
 }

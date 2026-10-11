@@ -46,6 +46,7 @@ class CaregiverVisitExecutionServiceTest {
     private final VisitCommandRepository visits = mock(VisitCommandRepository.class);
     private final VisitTaskRepository tasks = mock(VisitTaskRepository.class);
     private final VisitPlanReader plans = mock(VisitPlanReader.class);
+    private final RecordingVisitEvents events = new RecordingVisitEvents();
     private CaregiverVisitExecutionService service;
     private Visit visit;
 
@@ -54,7 +55,8 @@ class CaregiverVisitExecutionServiceTest {
     void setUp() {
         service = new CaregiverVisitExecutionService(executor, receipts, visits, tasks,
                 mock(VisitStateTransitionRepository.class), mock(VisitCheckInRepository.class), plans,
-                new VisitExecutionPolicy(Duration.ofMinutes(30), Duration.ofMinutes(10)), mock(MissedCheckInResumeService.class));
+                new VisitExecutionPolicy(Duration.ofMinutes(30), Duration.ofMinutes(10)), mock(MissedCheckInResumeService.class),
+                events);
         visit = new Visit(1L, 3L, 2L, null, null, "Hospital escort", START, null, null, null,
                 Visit.Status.SCHEDULED, null, null, 0, null, null);
         when(executor.now()).thenReturn(START.plusMinutes(2));
@@ -76,6 +78,9 @@ class CaregiverVisitExecutionServiceTest {
         assertThat(task.getValue().carePlanNodeId()).isNull();
         assertThat(result.savedState()).isEqualTo("IN_PROGRESS");
         verifyNoInteractions(plans);
+        assertThat(events.published()).singleElement()
+                .extracting(RecordingVisitEvents.Published::event, RecordingVisitEvents.Published::why)
+                .containsExactly("VisitCheckedIn", "on time");
     }
 
     @Test

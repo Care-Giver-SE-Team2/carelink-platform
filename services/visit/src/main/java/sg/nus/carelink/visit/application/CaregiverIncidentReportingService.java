@@ -21,9 +21,12 @@ public class CaregiverIncidentReportingService {
     private final VisitStateTransitionRepository transitions;
     private final CaregiverIncidentGateway incidents;
     private final CaregiverWorkDirectory directory;
+    private final VisitEvents events;
     public CaregiverIncidentReportingService(CaregiverCommandExecutor executor, CaregiverCommandStore receipts, VisitCommandRepository visits,
-            VisitStateTransitionRepository transitions, CaregiverIncidentGateway incidents, CaregiverWorkDirectory directory) {
+            VisitStateTransitionRepository transitions, CaregiverIncidentGateway incidents, CaregiverWorkDirectory directory,
+            VisitEvents events) {
         this.executor = executor; this.receipts = receipts; this.visits = visits; this.transitions = transitions; this.incidents = incidents; this.directory = directory;
+        this.events = events;
     }
     public Result report(String username, Long visitId, String category, String severity, String description, Integer version, UUID key) {
         String text = description.strip();
@@ -39,8 +42,11 @@ public class CaregiverIncidentReportingService {
             var paused = visit.reportedException(now);
             var report = incidents.report(visit.elderId(), visitId, actor.userId(), category, severity, text, key);
             var saved = visits.save(paused);
-            if (visit.status() != paused.status()) transitions.save(new VisitStateTransition(null, visitId, visit.status().name(), paused.status().name(),
-                    actor.userId(), VisitStateTransition.Result.APPLIED, null, now));
+            if (visit.status() != paused.status()) {
+                transitions.save(new VisitStateTransition(null, visitId, visit.status().name(), paused.status().name(),
+                        actor.userId(), VisitStateTransition.Result.APPLIED, null, now));
+                events.exceptionRaised(saved, "CAREGIVER_REPORT", report.id());
+            }
             receipts.audit(actor.userId(), visitId, ACTION, "OK", "SAVED");
             receipts.save(new CaregiverCommandReceipt(actor.userId(), key, ACTION, visitId, hash, report.id(), saved.version(), now));
             return new Result(report, key, saved.version(), false);

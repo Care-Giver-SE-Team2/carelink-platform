@@ -108,11 +108,11 @@ class InMemoryVisitRepository
                                 visit.status(),
                                 visit.stateDeadline(),
                                 visit.carePlanId(),
-                                visit.version(),
+                                visit.version() == null ? 0 : visit.version(),
                                 visit.createdAt(),
                                 visit.updatedAt()
                         )
-                        : visit;
+                        : nextVersion(visit);
 
         rows.put(
                 stored.id(),
@@ -124,5 +124,14 @@ class InMemoryVisitRepository
         }
 
         return stored;
+    }
+
+    /** One more than the stored version, as the database counts a change. */
+    private static Visit nextVersion(Visit visit) {
+        int version = visit.version() == null ? 0 : visit.version() + 1;
+        return new Visit(visit.id(), visit.elderId(), visit.caregiverId(), visit.carePlanNodeId(), visit.absenceId(),
+                visit.serviceType(), visit.scheduledStart(), visit.scheduledEnd(), visit.checkedInAt(),
+                visit.checkedOutAt(), visit.status(), visit.stateDeadline(), visit.carePlanId(), version,
+                visit.createdAt(), visit.updatedAt(), visit.healthFlag(), visit.healthNote());
     }
 }

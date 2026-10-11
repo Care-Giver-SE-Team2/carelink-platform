@@ -26,7 +26,8 @@ class StandaloneVisitsServiceTest {
 
     private final VisitRepository visits = mock(VisitRepository.class);
     private final VisitInstructionRepository instructions = mock(VisitInstructionRepository.class);
-    private final StandaloneVisitsService service = new StandaloneVisitsService(visits, instructions);
+    private final RecordingVisitEvents events = new RecordingVisitEvents();
+    private final StandaloneVisitsService service = new StandaloneVisitsService(visits, instructions, events);
 
     @Test
     void schedulesAPlanlessVisitAndKeepsItsInstructions() {
@@ -43,6 +44,11 @@ class StandaloneVisitsServiceTest {
         assertThat(saved.getValue().scheduledEnd()).isEqualTo(START.plusHours(3));
         assertThat(saved.getValue().status()).isEqualTo(Visit.Status.SCHEDULED);
         verify(instructions).save(77L, "Bring the wheelchair");
+        assertThat(events.published()).singleElement().satisfies(published -> {
+            assertThat(published.event()).isEqualTo("VisitScheduled");
+            assertThat(published.visitId()).isEqualTo(77L);
+            assertThat(published.why()).isEqualTo("STANDALONE");
+        });
     }
 
     @Test

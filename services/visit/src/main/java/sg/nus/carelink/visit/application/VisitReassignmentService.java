@@ -42,11 +42,14 @@ class VisitReassignmentService implements VisitReassignment {
 
 	private final VisitRepository visits;
 	private final VisitAssignmentRepository assignments;
+	private final VisitEvents events;
 	private final Clock clock;
 
-	VisitReassignmentService(VisitRepository visits, VisitAssignmentRepository assignments, Clock clock) {
+	VisitReassignmentService(VisitRepository visits, VisitAssignmentRepository assignments, VisitEvents events,
+			Clock clock) {
 		this.visits = visits;
 		this.assignments = assignments;
+		this.events = events;
 		this.clock = clock;
 	}
 
@@ -89,7 +92,8 @@ class VisitReassignmentService implements VisitReassignment {
 		Visit visit = requireOpen(visitId, "change hands");
 		LocalDateTime now = LocalDateTime.now(clock);
 		endCurrent(visit, VisitAssignment.Status.REPLACED, "handed to caregiver #" + toCaregiverId, now);
-		visits.save(visit.reassignedForAbsence(toCaregiverId, why.absenceId()));
+		events.caregiverChanged(visits.save(visit.reassignedForAbsence(toCaregiverId, why.absenceId())),
+				visit.caregiverId());
 		assignments.save(VisitAssignment.active(visitId, toCaregiverId, why.byUserId(), why.reason(),
 				why.rosteringCandidateId(), now));
 	}
@@ -101,14 +105,14 @@ class VisitReassignmentService implements VisitReassignment {
 			throw notOpen(visit, "be left uncovered");
 		}
 		endCurrent(visit, VisitAssignment.Status.CANCELLED, "nobody free to cover it", LocalDateTime.now(clock));
-		visits.save(visit.uncoveredForAbsence(why.absenceId()));
+		events.exceptionRaised(visits.save(visit.uncoveredForAbsence(why.absenceId())), "ABSENCE_UNCOVERED", null);
 	}
 
 	@Override
 	public void callOff(Long visitId, Change why) {
 		Visit visit = requireOpen(visitId, "be called off");
 		endCurrent(visit, VisitAssignment.Status.CANCELLED, why.reason(), LocalDateTime.now(clock));
-		visits.save(visit.calledOffForAbsence(why.absenceId()));
+		events.cancelled(visits.save(visit.calledOffForAbsence(why.absenceId())), cancelReason(why), why.reason());
 	}
 
 	@Override
@@ -116,8 +120,9 @@ class VisitReassignmentService implements VisitReassignment {
 		Visit visit = requireOpen(visitId, "be moved");
 		LocalDateTime now = LocalDateTime.now(clock);
 		endCurrent(visit, VisitAssignment.Status.CANCELLED, "visit moved to " + newStart, now);
-		visits.save(visit.calledOffForAbsence(why.absenceId()));
+		events.cancelled(visits.save(visit.calledOffForAbsence(why.absenceId())), cancelReason(why), why.reason());
 		Visit moved = visits.save(visit.movedTo(newStart, toCaregiverId, why.absenceId()));
+		events.scheduled(moved, "MOVED", visit.id());
 		assignments.save(VisitAssignment.active(moved.id(), toCaregiverId, why.byUserId(), why.reason(),
 				why.rosteringCandidateId(), now));
 		return moved.id();
@@ -139,6 +144,11 @@ class VisitReassignmentService implements VisitReassignment {
 			assignments.save(VisitAssignment.earlier(visit.id(), visit.caregiverId(), how,
 					"rostered from the care plan; ended: " + why, visit.createdAt(), now));
 		}
+	}
+
+	/** {@code ABSENCE} when an absence called the visit off, {@code CALLED_OFF} otherwise (a withdrawn extra service). */
+	private static String cancelReason(Change why) {
+		return why.absenceId() == null ? "CALLED_OFF" : "ABSENCE";
 	}
 
 	private Visit requireOpen(Long visitId, String verb) {

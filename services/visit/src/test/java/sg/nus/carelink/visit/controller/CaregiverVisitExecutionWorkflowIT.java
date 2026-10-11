@@ -56,6 +56,19 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
             assertThat(a.read("/api/visits/"+id+"/work-pack").path("visit").path("status").asString()).isEqualTo("EXCEPTION");
             assertThat(a.post("/api/visits/"+id+"/tasks/"+taskId+"/complete",task(3,"DONE")).statusCode()).isEqualTo(409);
             assertThat(familyBrowser.read("/api/visits/"+id+"/timeline").size()).isEqualTo(3);
+            // What report learns: one event per change that committed, none for a replay or a refusal
+            assertThat(eventsOf(id)).containsExactly("VisitScheduled v0","VisitCheckedIn v1","VisitTaskRecorded","VisitExceptionRaised v3");
+            assertThat(lastEvent(id,"VisitScheduled").path("origin").asString()).isEqualTo("PLAN");
+            var recorded=lastEvent(id,"VisitTaskRecorded");
+            assertThat(recorded.path("taskId").asLong()).isEqualTo(taskId);
+            assertThat(recorded.path("status").asString()).isEqualTo("DONE");
+            assertThat(recorded.path("caregiverNote").asString()).isEqualTo("Internal factual reason");
+            assertThat(recorded.path("elderId").asLong()).isEqualTo(elder);
+            var paused=lastEvent(id,"VisitExceptionRaised");
+            assertThat(paused.path("cause").asString()).isEqualTo("CAREGIVER_REPORT");
+            assertThat(paused.path("incidentId").asLong()).isEqualTo(report.path("report").path("id").asLong());
+            assertThat(paused.path("checkedIn").asBoolean()).isTrue();
+            assertThat(paused.path("caregiverId").asLong()).isEqualTo(caregiver);
         }
     }
     @Test void skippedAndRefusedRequireReasonsAndNeverCountAsDone() throws Exception {
@@ -111,6 +124,7 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
         assertThat(jdbc.queryForObject("select count(*) from visit_task where visit_id=?",Long.class,id)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from visit_state_transition where visit_id=? and result='APPLIED'",Long.class,id)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from caregiver_command_receipt where visit_id=?",Long.class,id)).isZero();
+        assertThat(eventsOf(id)).containsExactly("VisitScheduled v0");
     }
     /**
      * The receipt fails after core has raised the incident: visit's pause rolls back and core keeps the
@@ -133,6 +147,7 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
             doCallRealMethod().when(receipts).save(any());
             long reported=body(a.post("/api/caregivers/me/incidents",request),201).path("report").path("id").asLong();
             assertThat(core.incidentsOf(id)).singleElement().extracting(CoreStandIn.Raised::id).isEqualTo(reported);
+            assertThat(eventsOf(id)).containsExactly("VisitScheduled v0","VisitCheckedIn v1","VisitExceptionRaised v2");
         }
     }
 }

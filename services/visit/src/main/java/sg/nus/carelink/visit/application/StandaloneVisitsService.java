@@ -18,16 +18,19 @@ class StandaloneVisitsService implements StandaloneVisits {
 
 	private final VisitRepository visits;
 	private final VisitInstructionRepository instructions;
+	private final VisitEvents events;
 
-	StandaloneVisitsService(VisitRepository visits, VisitInstructionRepository instructions) {
+	StandaloneVisitsService(VisitRepository visits, VisitInstructionRepository instructions, VisitEvents events) {
 		this.visits = visits;
 		this.instructions = instructions;
+		this.events = events;
 	}
 
 	@Override
 	public Long schedule(NewVisit visit) {
 		Visit saved = visits.save(Visit.scheduled(visit.elderId(), visit.caregiverId(), null, null,
 				visit.serviceType(), visit.start(), visit.end()));
+		events.scheduled(saved, "STANDALONE", null);
 		String text = visit.instructions() == null ? null : visit.instructions().strip();
 		if (text != null && !text.isEmpty()) {
 			instructions.save(saved.id(), text.length() > INSTRUCTIONS_MAX ? text.substring(0, INSTRUCTIONS_MAX) : text);

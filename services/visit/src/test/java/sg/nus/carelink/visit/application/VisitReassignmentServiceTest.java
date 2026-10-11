@@ -1,6 +1,7 @@
 package sg.nus.carelink.visit.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Clock;
@@ -34,7 +35,8 @@ class VisitReassignmentServiceTest {
 	private final Assignments assignments = new Assignments();
 	private final Clock clock = Clock.fixed(NOW.atZone(ZoneId.of("Asia/Singapore")).toInstant(),
 			ZoneId.of("Asia/Singapore"));
-	private final VisitReassignmentService service = new VisitReassignmentService(visits, assignments, clock);
+	private final RecordingVisitEvents events = new RecordingVisitEvents();
+	private final VisitReassignmentService service = new VisitReassignmentService(visits, assignments, events, clock);
 
 	private Long morning;
 	private Long afternoon;
@@ -85,6 +87,11 @@ class VisitReassignmentServiceTest {
 		service.reassign(morning, 10L, new VisitReassignment.Change(12L, null, null, "default plan"));
 		assertThat(assignments.rows).extracting(VisitAssignment::status).containsExactly(
 				VisitAssignment.Status.REPLACED, VisitAssignment.Status.REPLACED, VisitAssignment.Status.ACTIVE);
+		assertThat(events.published()).extracting(RecordingVisitEvents.Published::event,
+				RecordingVisitEvents.Published::version, RecordingVisitEvents.Published::caregiverId,
+				RecordingVisitEvents.Published::why)
+				.containsExactly(tuple("VisitCaregiverChanged", 1, 9L, "from 5"),
+						tuple("VisitCaregiverChanged", 2, 10L, "from 9"));
 	}
 
 	@Test
@@ -99,6 +106,12 @@ class VisitReassignmentServiceTest {
 		service.reassign(morning, 9L, new VisitReassignment.Change(12L, 11L, null, "a manager found somebody"));
 		assertThat(visits.findById(morning).orElseThrow().status()).isEqualTo(Visit.Status.SCHEDULED);
 		assertThat(assignments.findActiveByVisitId(morning)).get().extracting(VisitAssignment::caregiverId).isEqualTo(9L);
+		// One change, one event: the visit left with nobody is the exception alone
+		assertThat(events.published()).extracting(RecordingVisitEvents.Published::event,
+				RecordingVisitEvents.Published::version, RecordingVisitEvents.Published::caregiverId,
+				RecordingVisitEvents.Published::why)
+				.containsExactly(tuple("VisitExceptionRaised", 1, null, "ABSENCE_UNCOVERED"),
+						tuple("VisitCaregiverChanged", 2, 9L, "from null"));
 	}
 
 	@Test
@@ -115,6 +128,20 @@ class VisitReassignmentServiceTest {
 		assertThat(copy.caregiverId()).isEqualTo(5L);
 		assertThat(assignments.rows).filteredOn(a -> a.visitId().equals(moved)).singleElement()
 				.extracting(VisitAssignment::rosteringCandidateId).isEqualTo(78L);
+		assertThat(events.published()).extracting(RecordingVisitEvents.Published::event,
+				RecordingVisitEvents.Published::visitId, RecordingVisitEvents.Published::version,
+				RecordingVisitEvents.Published::why)
+				.containsExactly(tuple("VisitCancelled", afternoon, 1, "ABSENCE: skipped"),
+						tuple("VisitCancelled", morning, 1, "ABSENCE: moved"),
+						tuple("VisitScheduled", moved, 0, "MOVED from " + morning));
+	}
+
+	@Test
+	void aVisitCalledOffWithoutAnAbsenceIsCalledOffNotSkipped() {
+		service.callOff(afternoon, new VisitReassignment.Change(null, 41L, null, "Extra service withdrawn"));
+
+		assertThat(events.published()).singleElement().extracting(RecordingVisitEvents.Published::why)
+				.isEqualTo("CALLED_OFF: Extra service withdrawn");
 	}
 
 	@Test
@@ -134,6 +161,7 @@ class VisitReassignmentServiceTest {
 				.isInstanceOf(BusinessRuleViolation.class);
 		assertThatThrownBy(() -> service.reassign(404L, 9L, why)).isInstanceOf(ResourceNotFound.class);
 		assertThat(service.find(404L)).isEmpty();
+		assertThat(events.published()).isEmpty();
 	}
 
 	private static Visit withStatus(Visit visit, Visit.Status status) {

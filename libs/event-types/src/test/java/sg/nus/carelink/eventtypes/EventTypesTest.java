@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -82,6 +86,65 @@ class EventTypesTest {
 		assertThat(IncidentUpdated.TYPE).isEqualTo("IncidentUpdated");
 		assertThat(SpotCheckUpdated.TYPE).isEqualTo("SpotCheckUpdated");
 		assertThat(RosterChangeUpdated.TYPE).isEqualTo("RosterChangeUpdated");
+	}
+
+	/** Visit's events, field by field as the catalogue lists them (section 3.2), and back. */
+	@Test
+	void visitsEventsAreWrittenWithTheCataloguesFields() {
+		OffsetDateTime start = SingaporeTime.of(HALF_NINE);
+		OffsetDateTime later = SingaporeTime.of(HALF_NINE.plusMinutes(40));
+		Map<Object, List<String>> fields = new LinkedHashMap<>();
+		fields.put(new VisitScheduled(812L, 101L, 7L, 21L, 40L, "BATHING", start, later, "PLAN", null, 0),
+				List.of("visitId", "elderId", "caregiverId", "carePlanId", "carePlanNodeId", "serviceType",
+						"scheduledStart", "scheduledEnd", "origin", "movedFromVisitId", "version"));
+		fields.put(new VisitCaregiverChanged(812L, 101L, start, 9L, 7L, 33L, 1, later),
+				List.of("visitId", "elderId", "scheduledStart", "caregiverId", "previousCaregiverId", "absenceId",
+						"version", "changedAt"));
+		fields.put(new VisitCancelled(812L, 101L, start, 9L, "ABSENCE", 33L, "Family skipped the visit", 2, later),
+				List.of("visitId", "elderId", "scheduledStart", "caregiverId", "reason", "absenceId", "note", "version",
+						"cancelledAt"));
+		fields.put(new VisitCheckedIn(812L, 101L, start, 9L, later, false, 3),
+				List.of("visitId", "elderId", "scheduledStart", "caregiverId", "checkedInAt", "resumedAfterMissedCheckIn",
+						"version"));
+		fields.put(new VisitCompleted(812L, 101L, start, 9L, start, later, 4),
+				List.of("visitId", "elderId", "scheduledStart", "caregiverId", "checkedInAt", "checkedOutAt", "version"));
+		fields.put(new VisitExceptionRaised(812L, 101L, start, 9L, "CAREGIVER_REPORT", null, 601L, true, 5),
+				List.of("visitId", "elderId", "scheduledStart", "caregiverId", "cause", "absenceId", "incidentId",
+						"checkedIn", "version"));
+		fields.put(new VisitTaskRecorded(3051L, 812L, 101L, start, "Bathing", "DONE", null, "Enjoyed the bath", later),
+				List.of("taskId", "visitId", "elderId", "visitScheduledStart", "name", "status", "outcome", "caregiverNote",
+						"recordedAt"));
+		fields.put(new VitalsRecorded(77L, 812L, 101L, start, later, "ATTENTION", "Slightly warm",
+				List.of(new VitalsRecorded.Reading("temperature", "37.80", "°C", false))),
+				List.of("healthRecordId", "visitId", "elderId", "visitScheduledStart", "recordedAt", "healthFlag",
+						"healthNote", "readings"));
+		fields.put(new ElderConfirmationSubmitted(812L, 101L, start, "CONFIRMED", 5, "Very kind", later, null),
+				List.of("visitId", "elderId", "visitScheduledStart", "status", "rating", "comment", "confirmedAt",
+						"incidentId"));
+
+		fields.forEach((event, names) -> {
+			JsonNode written = json.readTree(json.writeValueAsString(event));
+			assertThat(written.propertyNames()).as(event.getClass().getSimpleName()).containsExactlyElementsOf(names);
+			// The same moments come back, in whatever offset the reader hands them (UTC here)
+			assertThat(json.readValue(json.writeValueAsString(event), event.getClass())).usingRecursiveComparison()
+					.withComparatorForType(Comparator.comparing(OffsetDateTime::toInstant), OffsetDateTime.class)
+					.isEqualTo(event);
+		});
+		JsonNode vitals = json.readTree(json.writeValueAsString(fields.keySet().stream()
+				.filter(VitalsRecorded.class::isInstance).findFirst().orElseThrow()));
+		assertThat(vitals.get("readings").get(0).get("value").asString()).isEqualTo("37.80");
+		assertThat(vitals.get("visitScheduledStart").asString()).isEqualTo("2026-10-12T09:35:00+08:00");
+		assertThat(List.of(VisitScheduled.TYPE, VisitCaregiverChanged.TYPE, VisitCancelled.TYPE, VisitCheckedIn.TYPE,
+				VisitCompleted.TYPE, VisitExceptionRaised.TYPE, VisitTaskRecorded.TYPE, VitalsRecorded.TYPE,
+				ElderConfirmationSubmitted.TYPE))
+				.containsExactly("VisitScheduled", "VisitCaregiverChanged", "VisitCancelled", "VisitCheckedIn",
+						"VisitCompleted", "VisitExceptionRaised", "VisitTaskRecorded", "VitalsRecorded",
+						"ElderConfirmationSubmitted");
+	}
+
+	@Test
+	void aSetOfReadingsIsNeverNull() {
+		assertThat(new VitalsRecorded(77L, 812L, 101L, null, null, null, null, null).readings()).isEmpty();
 	}
 
 	@Test

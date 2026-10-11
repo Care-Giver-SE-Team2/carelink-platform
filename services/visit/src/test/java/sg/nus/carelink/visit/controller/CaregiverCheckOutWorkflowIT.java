@@ -63,6 +63,12 @@ class CaregiverCheckOutWorkflowIT extends MissedCheckInITSupport {
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM vital_sign WHERE visit_id=?",Long.class,id)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM elder_confirmation WHERE visit_id=?",Long.class,id)).isZero();
             assertThat(version(id)).isEqualTo(3);
+            // The missed check-in advanced the version without an event: report hears of it from core's incident
+            assertThat(eventsOf(id)).containsExactly("VisitScheduled v0","VisitCheckedIn v2","VisitCompleted v3");
+            var completed=lastEvent(id,"VisitCompleted");
+            assertThat(completed.path("checkedInAt").asString()).isEqualTo("2026-10-08T10:15:01+08:00");
+            assertThat(completed.path("checkedOutAt").asString()).isEqualTo("2026-10-08T12:00:00+08:00");
+            assertThat(lastEvent(id,"VisitCheckedIn").path("resumedAfterMissedCheckIn").asBoolean()).isFalse();
         }
         try(var fresh=browser(caregiverName)) {
             assertThat(fresh.read("/api/visits/"+id+"/work-pack").path("execution").path("checkedOutAt").asString()).isEqualTo("2026-10-08T12:00:00");

@@ -19,10 +19,12 @@ class VisitSchedulingService implements VisitScheduling {
 
 	private final VisitRepository visits;
 	private final VisitCommandRepository commands;
+	private final VisitEvents events;
 
-	VisitSchedulingService(VisitRepository visits, VisitCommandRepository commands) {
+	VisitSchedulingService(VisitRepository visits, VisitCommandRepository commands, VisitEvents events) {
 		this.visits = visits;
 		this.commands = commands;
+		this.events = events;
 	}
 
 	@Override
@@ -40,11 +42,12 @@ class VisitSchedulingService implements VisitScheduling {
 			for (PlannedVisit wanted : entry.getValue()) {
 				Visit visit = existing.get(new Key(wanted.carePlanNodeId(), wanted.start()));
 				if (visit == null) {
-					visits.save(Visit.scheduled(wanted.elderId(), wanted.caregiverId(), wanted.carePlanId(),
-							wanted.carePlanNodeId(), wanted.serviceType(), wanted.start(), wanted.end()));
+					events.scheduled(visits.save(Visit.scheduled(wanted.elderId(), wanted.caregiverId(),
+							wanted.carePlanId(), wanted.carePlanNodeId(), wanted.serviceType(), wanted.start(),
+							wanted.end())), "PLAN", null);
 					created++;
 				} else if (wanted.caregiverId() != null && visit.caregiverId() == null && visit.hasNotStarted()) {
-					visits.save(visit.coveredBy(wanted.caregiverId()));
+					events.caregiverChanged(visits.save(visit.coveredBy(wanted.caregiverId())), null);
 					covered++;
 				}
 			}
@@ -64,7 +67,7 @@ class VisitSchedulingService implements VisitScheduling {
 		for (Visit candidate : untouched) {
 			var current = commands.lock(candidate.id()).filter(Visit::hasNotStarted);
 			if (current.isPresent()) {
-				commands.save(current.get().cancelled());
+				events.cancelled(commands.save(current.get().cancelled()), "PLAN_CHANGED", null);
 				cancelled++;
 			}
 		}
@@ -83,7 +86,10 @@ class VisitSchedulingService implements VisitScheduling {
 	public boolean markUncoveredAsException(Long visitId) {
 		return visits.findById(visitId)
 				.filter(visit -> visit.caregiverId() == null && visit.hasNotStarted())
-				.map(visit -> visits.save(visit.uncoveredAtStart()) != null)
+				.map(visit -> {
+					events.exceptionRaised(visits.save(visit.uncoveredAtStart()), "UNCOVERED_AT_START", null);
+					return true;
+				})
 				.orElse(false);
 	}
 
