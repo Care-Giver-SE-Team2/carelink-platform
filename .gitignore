@@ -32,3 +32,13 @@ Thumbs.db
 zap-out/
 /reports/
 dependency-check-report.html
+
+# Terraform local state, provider cache and account-specific inputs
+.terraform/
+*.tfstate*
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.backend.hcl
+/infra/local-notes.md
+/infra/.local/

@@ -6,9 +6,8 @@ name: Service pipeline
 #
 #   1 Build  2 Tests  3 SonarCloud  4 Dependency scan  5 Image
 #
-# Steps 6 to 10 (push to ECR, which scans the image; deploy to staging; smoke test and ZAP
-# baseline scan; manual approval; deploy the same image to demo) are added here once the AWS
-# account and the cluster exist.
+# ci.yml publishes the saved image after the repository-wide Quality gate passes.
+# Staging, smoke tests, approval and demo deployment are added once the cluster exists.
 
 on:
   workflow_call:
@@ -120,3 +119,18 @@ jobs:
 
       - name: 5. Image
         run: scripts/build.sh "$SERVICE" image
+
+      - name: Save the image for publication after the quality gate
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: docker save "carelink/$SERVICE:$IMAGE_TAG" -o "$RUNNER_TEMP/image.tar"
+
+      - name: Keep the image for the publication job
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ inputs.service }}-${{ github.sha }}
+          path: ${{ runner.temp }}/image.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
