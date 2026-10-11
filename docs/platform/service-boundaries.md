@@ -12,8 +12,8 @@ core only through ports of their own (`visit/application`, `report/application`)
 (`…/infrastructure/core`); report reaches visit through `VisitApi`. Rostering and incident, which stay in core,
 reach visit through ports of theirs whose adapters call `VisitApi`. The calls in sections 3 and 4 are all done, the
 SQL and writes in section 5 are all replaced, and each service has a database of its own (section 9). Section 7
-lists what the move changes for the commands visit and core take part in together, and section 8 the paths the
-Ingress sends to each service.
+lists what the move changes for the commands visit and core take part in together - visit's incidents, and
+re-rostering's changes to visits, which are a saga - and section 8 the paths the Ingress sends to each service.
 
 ---
 
@@ -118,8 +118,8 @@ needs against MySQL).
 | `VisitReassignment.unstartedFor` | rostering | `GET /internal/v1/visits/unstarted?caregiverId=&from=&until=` |
 | `VisitReassignment.bookingsBetween` | rostering | `GET /internal/v1/visits/bookings?from=&until=` |
 | `VisitReassignment.finishedVisitsWith` | rostering | `GET /internal/v1/visits/finished-with?elderId=&since=&until=` → `{ caregiverId: count }` |
-| `VisitReassignment.reassign`, `markUncovered`, `callOff` | rostering; report (`callOff`) | `POST /internal/v1/visits/{visitId}/reassignment`, `…/uncovered`, `…/call-off` → 204 |
-| `VisitReassignment.moveTo` | rostering | `POST /internal/v1/visits/{visitId}/move` → `{ visitId }` of the new visit |
+| `VisitReassignment.reassign`, `markUncovered`, `callOff` | rostering; report (`callOff`) | `POST /internal/v1/visits/{visitId}/reassignment`, `…/uncovered`, `…/call-off` → 204. Optional header `Idempotency-Key`: made once per key (section 7.2) |
+| `VisitReassignment.moveTo` | rostering | `POST /internal/v1/visits/{visitId}/move` → `{ visitId }` of the new visit; the same one again for the same `Idempotency-Key` |
 | `VisitScheduling.schedule` | rostering | `POST /internal/v1/visits/schedule` → `{ created, covered }` |
 | `VisitScheduling.cancelUntouchedFrom` | rostering | `POST /internal/v1/visits/cancel-untouched` → `{ count }` |
 | `VisitScheduling.findUncoveredStarted`, `markUncoveredAsException` | rostering | `GET /internal/v1/visits/uncovered-started?since=&now=`; `POST /internal/v1/visits/{visitId}/uncovered-exception` → `{ marked }` |
@@ -208,12 +208,19 @@ platform migration takes the next free version, listed here.
 | V11 | none: drops `notification` and `notification_subscription` | core | core | notification has a database of its own (section 9) |
 | V12 | none: drops visit's eleven tables | core | core | visit has a database of its own (section 9) |
 | V13 | none: drops report's six tables and V9's | core | core | report has a database of its own (section 9) |
+| V14 | `visit_change_step` | core | core | Each change re-rostering asks visit to make, with its request key, until visit has made it (section 7.2) |
 
-The next platform migration is V14. With the split done, core's platform migrations are core's own: each service
+The next platform migration is V15. With the split done, core's platform migrations are core's own: each service
 keeps its tables in its own `db/migration`. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
 
 ## 7. What the move changes: commands visit and core share
+
+In core, a command that touched visits and core's records ran in one transaction. Across two services it cannot,
+so each command that reaches the other side says what happens when a call fails half-way: visit's incidents
+(7.1) and re-rostering's changes to visits (7.2).
+
+### 7.1 visit asks core to raise an incident
 
 Three of visit's commands ask core to raise an incident inside visit's own transaction: a caregiver's report
 (CG04: the incident, then the visit's pause and the command's receipt), the missed check-in scan (SYS03: the
@@ -236,6 +243,66 @@ A request without a key raises an incident every time. visit's tests show both s
 scan; a failed visit update, which comes before visit asks core, leaves nothing behind). The same calls also run in
 a transaction in core now: the missed check-in gateway requires one, and the internal controller called it
 without.
+
+### 7.2 core asks visit to change a visit: the re-rostering saga (UC-MG04)
+
+Re-rostering decides in core's database and changes visits in visit's: it hands a visit to another caregiver,
+leaves it uncovered, calls it off or moves it (`reassign`, `markUncovered`, `callOff`, `moveTo`), several times in
+one re-roster. In core that was one transaction. Across the two services a call can fail half-way: visit cannot be
+reached, visit makes the change and its answer is lost (a read timeout), or visit refuses (the visit has started,
+been called off or moved). Re-rostering is therefore a saga, with core as the orchestrator
+(`rostering/application/VisitChangeSaga`):
+
+| Part | Where | What | When it fails |
+|---|---|---|---|
+| Decide (compensable) | core, one transaction | Who takes the visit, the search behind it, the roster change created or locked, and a step for each change visit is to make, with a request key (`visit_change_step`, platform V14). Nothing in it says the change is made | Nothing to undo |
+| Make the change (pivot) | visit, its own transaction | The change, sent after the decision has committed, outside any transaction of core's, with the header `Idempotency-Key`. visit makes a change once per key (`visit_request`, visit's V2): the same key gets the first answer again, a move's new visit included; a refusal is not remembered | 409 or 404: compensate. No connection, a timeout, a 5xx, a 403: send again, with the same key |
+| Settle (retriable) | core, one transaction | The roster change gets its outcome, everybody is told, a default plan is audited; a move is offered to the family again at its new time | Retried until done: only core's data takes part |
+
+**Steps.** A step is PENDING until visit answers, then DONE (made and settled), REJECTED (refused) or, when the
+retries run out, ABANDONED. The step moves on with one conditional update, so when the request and the sweep finish
+the same step together, only one of them settles it; visit has made the change once either way.
+
+**The request still answers as it did.** The manager's re-roster, the family's answer, the manager's own pick, the
+default plan and a cover carrying on (`LeaveCoverService`) each decide, commit, and make their changes before they
+return, so when visit is well every screen and API answer is what it was before the saga. A change visit cannot
+be reached for is left to the sweep, with the changes after it in the same request.
+
+**Nobody is told before visit has made the change.** Notifications to the family, the caregivers and the elder,
+the roster change's outcome, the incident of a visit nobody can cover and the default plan's audit entry are all
+in the settling part.
+
+**Semantic lock.** While a step is PENDING or ABANDONED it holds its visit: the family's answer and the manager's
+pick are refused with 409 `CHANGE_IN_PROGRESS`, the default plan's sweep skips the visit, a re-roster and a cover
+carrying on leave it alone, and the absence's coverage cannot be confirmed. The family's own choice needs no lock of
+this kind and no compensation: the family is asked first and the visit changed after (`AWAITING_FAMILY` holds the
+visit while they decide), so a family that says no has changed nothing.
+
+**Retries.** The sweep (`VisitChangeStepScanService`, every minute, ShedLock `rostering.visit-change-steps`, with
+the default plan's sweep settings) sends a step again after 1, 2, 5, 10 and 20 minutes (`VisitChangeRetries`), so
+a visit service that is down for good reaches a manager in under forty minutes. It gives up earlier when the next
+try would come within an hour of the visit.
+
+| Outcome | Step | Roster change | Who hears |
+|---|---|---|---|
+| visit made it | DONE | Settled as decided | Everybody the use case tells |
+| visit refused (409, 404) | REJECTED, with visit's reason; not tried again | As it was, and free for the next decision | The person who decided: as the answer to their request (409 or 404, as before), or, if the refusal comes from a retry, as a `ROSTER_CHANGE_NOT_MADE` notification |
+| retries ran out | ABANDONED, still holding the visit | As it was | A manager, through an incident on the visit (`raiseForUnrosteredLeaveVisit`, routed like any incident). Raising one asks visit who last visited the elder, so while visit is still down the sweep raises it once visit answers. The absence cannot be confirmed until a manager re-rosters it, which sends the step again with its key |
+
+**Known limits.**
+- A retry made minutes later carries the decision made then: the caregiver chosen may no longer be free. The
+  decision is not taken again; a manager can still hand-pick another.
+- The screens do not show a step yet. A visit whose first change waits for visit (a visit left uncovered, a cover
+  carrying on) has no roster change until it is made, so the absence screen counts it among the visits not yet
+  re-rostered; re-rostering leaves it alone.
+- The decision's reads of visit (the visit, the bookings behind the search) still run inside the deciding
+  transaction; only the changes are outside.
+- Laying out a care plan's visits (`VisitApi.schedule`) and a manager's single cover (UC-MG03, `VisitCoverService`)
+  still call visit once, without a key or a saga.
+
+`VisitChangeSagaIT` runs each failure against a run without it - the same people, visits, absence, decisions and
+clock - and compares the end states once the sweep has caught up; `VisitApiIT` (visit) shows a key making a change
+once against MySQL.
 
 ## 8. Which service takes which public path
 
