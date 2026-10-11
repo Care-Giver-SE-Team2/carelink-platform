@@ -196,12 +196,19 @@ class FamilyIncidentInboxIT {
 		assertThat(state(visible)).isEqualTo("READ");
 	}
 
-	@Test void otherRecipientsNoticeAndOrphanIncidentCannotBeOpened() throws Exception {
+	/**
+	 * A message keeps the elder it is about, as the event named it, so it no longer depends on the
+	 * incident row. One without an elder - an old message whose record was gone when V7 filled the
+	 * column in - is shown to no family member.
+	 */
+	@Test void otherRecipientsNoticeAndOneWithoutAnElderCannotBeOpened() throws Exception {
 		publish(601);
 		Browser a=login("family-a");
 		long own=notification(7,601), other=notification(9,601);
 		mvc.perform(write(a,"/api/notifications/"+other+"/read")).andExpect(status().isNotFound());
 		jdbc.update("DELETE FROM incident WHERE id=601");
+		assertThat(ids(fetch(a,"/api/notifications/me"))).containsExactly(own);
+		jdbc.update("UPDATE notification SET elder_id=NULL WHERE id=?", own);
 		assertThat(ids(fetch(a,"/api/notifications/me"))).isEmpty();
 		assertThat(fetch(a,"/api/notifications/me/unread-count").path("unread").asLong()).isZero();
 		mvc.perform(write(a,"/api/notifications/"+own+"/read")).andExpect(status().isNotFound());
