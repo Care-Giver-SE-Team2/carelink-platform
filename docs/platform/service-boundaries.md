@@ -199,8 +199,9 @@ platform migration takes the next free version, listed here.
 | V5 | `spot_check.family_asked_at` | core | core | When the family was last asked, for the reminders; it was read from `notification` |
 | V6 | `value_added_service_request.family_reminded_at` | report | core | A request's one reminder, noted on the request; it was read from `notification` |
 | V7 | `notification.elder_id` | notification | core | The elder a message is about, as its event names it, for the family rule; filled once for the messages kept before |
+| V8 | `incident_request` | core | core | Which incident each keyed request from visit raised, so a retry gets the same one (section 7) |
 
-The next platform migration is V8. Until the schema split, the services share one schema, so the two events
+The next platform migration is V9. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
 
 ## 7. What the move changes: commands visit and core share
@@ -209,17 +210,23 @@ Three of visit's commands ask core to raise an incident inside visit's own trans
 (CG04: the incident, then the visit's pause and the command's receipt), the missed check-in scan (SYS03: the
 incident, then the scan's ledger entry), and an elder's dispute (EL01: the confirmation, then the incident). In
 core they shared one transaction, so a failure anywhere undid the incident too. Now core commits the incident when
-visit asks; if visit's transaction then fails, visit's facts roll back and core keeps the incident, and a retry
-raises a second one. For CG04 and SYS03 a failed write after the call is enough; for EL01 only a failed commit.
-Nothing is lost, but staff may see the same report twice.
+visit asks, and if visit's transaction then fails, visit's facts roll back while core keeps the incident.
 
-visit's tests show this as it is: `CaregiverVisitExecutionWorkflowIT` (a failed receipt) and
-`MissedCheckInWorkflowIT` (a failed ledger entry; a failed visit update, which comes before visit asks core, leaves
-nothing behind). The way out is the same for all three: visit stops calling core inside its transaction, records
-the fact and an event in one transaction instead, and core raises the incident from the event, once per event
-(`consumed_message`); visit learns the incident's id from core's `IncidentRaised`. The event catalogue decided the
-other way for the missed check-in (`VisitMissed`, section 3.1), because visit stores the incident's id; this
-reopens that decision, to be settled with visit's events before the schema split.
+So that a retry does not raise a second incident, each request carries a key, and core raises one incident per
+key (`IncidentRequests`, table `incident_request`, platform migration V8): the key and the incident commit
+together, and a request whose key core already has gets that incident back. The keys:
+
+| Command | Key | A retry is |
+|---|---|---|
+| CG04 | `caregiver-report:{actor}:{clientRequestId}` | the caregiver sending the same report again, which their app does with the same request id |
+| SYS03 | `missed-check-in:{visitId}:{dueAt}` | the next scan finding the visit still without its ledger entry |
+| EL01 | `service-dispute:{visitId}` | the elder answering again; a visit is answered once |
+
+A request without a key raises an incident every time. visit's tests show both sides: `CaregiverVisitExecutionWorkflowIT`
+(a failed receipt, then the caregiver's retry) and `MissedCheckInWorkflowIT` (a failed ledger entry, then the next
+scan; a failed visit update, which comes before visit asks core, leaves nothing behind). The same calls also run in
+a transaction in core now: the missed check-in gateway requires one, and the internal controller called it
+without.
 
 ## 8. Which service takes which public path
 

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import sg.nus.carelink.coreapi.CoreApi;
 import sg.nus.carelink.incident.application.CaregiverIncidentGateway;
+import sg.nus.carelink.incident.application.IncidentRequests;
 import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
 import sg.nus.carelink.incident.application.MissedCheckInPauseEvidence;
@@ -30,19 +31,24 @@ public class InternalIncidentController {
 
 	private final MissedCheckInPauseEvidence pauseEvidence;
 
+	private final IncidentRequests once;
+
 	InternalIncidentController(CaregiverIncidentGateway caregiverIncidents,
 			MissedCheckInIncidentGateway missedCheckIns, IncidentService incidents,
-			MissedCheckInPauseEvidence pauseEvidence) {
+			MissedCheckInPauseEvidence pauseEvidence, IncidentRequests once) {
 		this.caregiverIncidents = caregiverIncidents;
 		this.missedCheckIns = missedCheckIns;
 		this.incidents = incidents;
 		this.pauseEvidence = pauseEvidence;
+		this.once = once;
 	}
 
+	/** A retry with the request's key gets the report the first try made. */
 	@PostMapping("/incidents/caregiver-reports")
 	public CoreApi.IncidentReport reportIncident(@RequestBody CoreApi.CaregiverIncidentRequest request) {
-		return report(caregiverIncidents.report(request.elderId(), request.visitId(), request.actor(),
-				request.category(), request.severity(), request.description()));
+		Long incidentId = once.once(request.requestKey(), () -> caregiverIncidents.report(request.elderId(),
+				request.visitId(), request.actor(), request.category(), request.severity(), request.description()).id());
+		return report(caregiverIncidents.own(request.actor(), incidentId));
 	}
 
 	@GetMapping("/incidents/{incidentId}")
@@ -60,14 +66,14 @@ public class InternalIncidentController {
 
 	@PostMapping("/incidents/missed-check-ins")
 	public CoreApi.IncidentRef raiseMissedCheckIn(@RequestBody CoreApi.MissedCheckInRequest request) {
-		return new CoreApi.IncidentRef(
-				missedCheckIns.raise(request.elderId(), request.visitId(), request.dueAt(), request.observedAt()));
+		return new CoreApi.IncidentRef(once.once(request.requestKey(), () -> missedCheckIns.raise(request.elderId(),
+				request.visitId(), request.dueAt(), request.observedAt())));
 	}
 
 	@PostMapping("/incidents/service-disputes")
 	public CoreApi.IncidentRef raiseServiceDispute(@RequestBody CoreApi.ServiceDisputeRequest request) {
-		return new CoreApi.IncidentRef(incidents.createElderServiceDispute(
-				request.elderId(), request.visitId(), request.reportedByUserId(), request.description()).id());
+		return new CoreApi.IncidentRef(once.once(request.requestKey(), () -> incidents.createElderServiceDispute(
+				request.elderId(), request.visitId(), request.reportedByUserId(), request.description()).id()));
 	}
 
 	@GetMapping("/incidents/{incidentId}/sole-missed-check-in")

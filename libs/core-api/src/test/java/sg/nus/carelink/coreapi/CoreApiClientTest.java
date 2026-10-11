@@ -68,7 +68,7 @@ class CoreApiClientTest {
 				.andRespond(withSuccess("{\"incidentId\":5}", MediaType.APPLICATION_JSON));
 
 		CoreApi.IncidentRef incident = api.raiseMissedCheckIn(new CoreApi.MissedCheckInRequest(1L, 2L,
-				LocalDateTime.of(2026, 10, 10, 9, 0), LocalDateTime.of(2026, 10, 10, 9, 20)));
+				LocalDateTime.of(2026, 10, 10, 9, 0), LocalDateTime.of(2026, 10, 10, 9, 20), "missed-check-in:2:2026-10-10T09:00"));
 
 		assertThat(incident.incidentId()).isEqualTo(5L);
 	}

@@ -85,11 +85,11 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         assertThat(scan.trigger(id)).isTrue();assertThat(count("incident",id)).isEqualTo(1);assertSystemTransition(id);
     }
     /**
-     * The ledger entry fails after core has raised the incident. visit's facts roll back and the next
-     * scan tries again, but core keeps the incident it raised, because the two services share no
-     * transaction, so the retry raises a second one (docs/service-boundaries.md).
+     * The ledger entry fails after core has raised the incident. visit's facts roll back and core keeps
+     * the incident, since the two services share no transaction; the next scan asks again with the same
+     * request key (the visit and its due time) and gets that incident back (docs/service-boundaries.md).
      */
-    @Test void failedLedgerEntryRollsBackVisitButNotTheIncidentCoreRaised() throws Exception {
+    @Test void failedLedgerEntryRollsBackVisitAndTheRetryGetsTheSameIncident() throws Exception {
         long id=plannedVisit(); overdue();
         jdbc.execute("CREATE TRIGGER sys03_source_fault BEFORE INSERT ON visit_missed_check_in_trigger FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic source failure'");
         try {
@@ -99,8 +99,8 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
             assertThat(count("incident",id)).isEqualTo(1);
         } finally { jdbc.execute("DROP TRIGGER sys03_source_fault"); }
         assertThat(scan.trigger(id)).isTrue();
-        assertThat(count("incident",id)).isEqualTo(2);
-        assertThat(incident(id)).isEqualTo(core.incidentsOf(id).getLast().id());
+        assertThat(count("incident",id)).isEqualTo(1);
+        assertThat(incident(id)).isEqualTo(core.incidentsOf(id).getFirst().id());
         assertSystemTransition(id);
     }
     private void assertRolledBack(long id) {
@@ -114,7 +114,7 @@ class MissedCheckInWorkflowIT extends MissedCheckInITSupport {
         long id=plannedVisit();
         // An older, resolved missed check-in on the same visit: the ledger, not "any Incident", is the key.
         var at=LocalDateTime.ofInstant(START,SGT);
-        long old=core.raiseMissedCheckIn(new CoreApi.MissedCheckInRequest(elder,id,at.minusDays(7),at.minusDays(7))).incidentId();
+        long old=core.raiseMissedCheckIn(new CoreApi.MissedCheckInRequest(elder,id,at.minusDays(7),at.minusDays(7),null)).incidentId();
         core.resolve(old);
         overdue(); assertThat(scan.trigger(id)).isTrue(); assertThat(count("incident",id)).isEqualTo(2);
         long event=incident(id);

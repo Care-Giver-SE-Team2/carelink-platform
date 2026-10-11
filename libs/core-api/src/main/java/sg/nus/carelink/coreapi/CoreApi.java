@@ -269,8 +269,12 @@ public interface CoreApi {
 	record CarePlanSnapshot(Long id, Integer version, List<CarePlanTask> tasks) {
 	}
 
+	/**
+	 * @param requestKey the same for every try of one report, so a retry gets the incident the first try
+	 *     raised; null raises one every time
+	 */
 	record CaregiverIncidentRequest(Long elderId, Long visitId, Long actor, String category, String severity,
-			String description) {
+			String description, String requestKey) {
 	}
 
 	record IncidentReport(Long id, Long visitId, String category, String severity, String description, String status,
@@ -280,10 +284,14 @@ public interface CoreApi {
 	record IncidentReports(List<IncidentReport> items, int page, int size, long totalElements) {
 	}
 
-	record MissedCheckInRequest(Long elderId, Long visitId, LocalDateTime dueAt, LocalDateTime observedAt) {
+	/** @param requestKey as in {@link CaregiverIncidentRequest} */
+	record MissedCheckInRequest(Long elderId, Long visitId, LocalDateTime dueAt, LocalDateTime observedAt,
+			String requestKey) {
 	}
 
-	record ServiceDisputeRequest(Long elderId, Long visitId, Long reportedByUserId, String description) {
+	/** @param requestKey as in {@link CaregiverIncidentRequest} */
+	record ServiceDisputeRequest(Long elderId, Long visitId, Long reportedByUserId, String description,
+			String requestKey) {
 	}
 
 	record IncidentRef(Long incidentId) {

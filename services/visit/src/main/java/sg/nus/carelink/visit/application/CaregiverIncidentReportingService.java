@@ -37,7 +37,7 @@ public class CaregiverIncidentReportingService {
             CaregiverCommandExecutor.version(visit, version);
             var now = executor.now();
             var paused = visit.reportedException(now);
-            var report = incidents.report(visit.elderId(), visitId, actor.userId(), category, severity, text);
+            var report = incidents.report(visit.elderId(), visitId, actor.userId(), category, severity, text, key);
             var saved = visits.save(paused);
             if (visit.status() != paused.status()) transitions.save(new VisitStateTransition(null, visitId, visit.status().name(), paused.status().name(),
                     actor.userId(), VisitStateTransition.Result.APPLIED, null, now));

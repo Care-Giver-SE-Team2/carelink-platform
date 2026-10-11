@@ -55,6 +55,9 @@ public class CoreStandIn implements CoreApi {
 
 	private final Map<Long, Raised> incidents = new HashMap<>();
 
+	/** Which incident each request key raised: a request that comes again gets the same one, as in core. */
+	private final Map<String, Long> raisedByKey = new HashMap<>();
+
 	private final Map<Long, CredentialAlerts> alerts = new HashMap<>();
 
 	/** Ids well clear of MySQL's, so an incident id that visit took from somewhere else stands out. */
@@ -108,6 +111,7 @@ public class CoreStandIn implements CoreApi {
 	/** Forgets every incident and alert: each test starts with none. */
 	public synchronized void clear() {
 		incidents.clear();
+		raisedByKey.clear();
 		alerts.clear();
 	}
 
@@ -302,7 +306,7 @@ public class CoreStandIn implements CoreApi {
 	@Override
 	public synchronized IncidentReport reportIncident(CaregiverIncidentRequest request) {
 		return raise(request.elderId(), request.visitId(), "CAREGIVER", request.actor(), request.category(),
-				request.severity(), request.description()).report();
+				request.severity(), request.description(), request.requestKey()).report();
 	}
 
 	@Override
@@ -329,13 +333,13 @@ public class CoreStandIn implements CoreApi {
 	@Override
 	public synchronized IncidentRef raiseMissedCheckIn(MissedCheckInRequest request) {
 		return new IncidentRef(raise(request.elderId(), request.visitId(), "SYSTEM_MISSED_CHECKIN", null, "SERVICE",
-				"MEDIUM", "Caregiver has not checked in; the visit was due at " + request.dueAt()).id());
+				"MEDIUM", "Caregiver has not checked in; the visit was due at " + request.dueAt(), request.requestKey()).id());
 	}
 
 	@Override
 	public synchronized IncidentRef raiseServiceDispute(ServiceDisputeRequest request) {
 		return new IncidentRef(raise(request.elderId(), request.visitId(), "ELDER_SERVICE_DISPUTE",
-				request.reportedByUserId(), "SERVICE", "MEDIUM", request.description()).id());
+				request.reportedByUserId(), "SERVICE", "MEDIUM", request.description(), request.requestKey()).id());
 	}
 
 	/** core's MissedCheckInPauseEvidence: the visit's one incident, the missed check-in the system raised. */
@@ -369,11 +373,17 @@ public class CoreStandIn implements CoreApi {
 	// ---------- How core answers ----------
 
 	private Raised raise(Long elderId, Long visitId, String source, Long reportedBy, String category, String severity,
-			String description) {
+			String description, String requestKey) {
+		if (requestKey != null && raisedByKey.containsKey(requestKey)) {
+			return incidents.get(raisedByKey.get(requestKey));
+		}
 		LocalDateTime at = now();
 		Raised incident = new Raised(++lastIncidentId, elderId, visitId, source, reportedBy, category, severity,
 				description, "OPEN", at, at.plusMinutes(RESPOND_WITHIN_MINUTES), null);
 		incidents.put(incident.id(), incident);
+		if (requestKey != null) {
+			raisedByKey.put(requestKey, incident.id());
+		}
 		return incident;
 	}
 

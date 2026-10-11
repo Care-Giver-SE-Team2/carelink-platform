@@ -11,6 +11,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import sg.nus.carelink.testsupport.CaregiverHttpITSupport;
+import sg.nus.carelink.testsupport.CoreStandIn;
 import sg.nus.carelink.testsupport.SharedMySql;
 import sg.nus.carelink.visit.domain.repository.CaregiverCommandStore;
 
@@ -112,21 +113,26 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
         assertThat(jdbc.queryForObject("select count(*) from caregiver_command_receipt where visit_id=?",Long.class,id)).isZero();
     }
     /**
-     * The receipt fails after core has raised the incident: visit's pause rolls back, but core keeps the
-     * incident it raised, because the two services share no transaction (docs/service-boundaries.md).
+     * The receipt fails after core has raised the incident: visit's pause rolls back and core keeps the
+     * incident, since the two services share no transaction. The caregiver's retry carries the same
+     * request id, so core answers with that incident instead of raising a second (docs/service-boundaries.md).
      */
-    @Test void receiptFailureRollsBackVisitPauseButNotTheIncidentCoreRaised() throws Exception {
+    @Test void receiptFailureRollsBackVisitPauseAndTheRetryGetsTheSameIncident() throws Exception {
         long id=plannedVisit();
+        Map<String,Object> request=Map.of("visitId",id,"expectedVersion",1,"clientRequestId",UUID.randomUUID().toString(),
+                "category","SERVICE","severity","LOW","description","Atomic rollback fixture");
         try(var a=browser(caregiverName)) {
             body(a.post("/api/visits/"+id+"/check-in",check(0)),200);
             doThrow(new IllegalStateException("simulated receipt fault")).when(receipts).save(any());
-            assertThat(a.post("/api/caregivers/me/incidents",Map.of("visitId",id,"expectedVersion",1,"clientRequestId",UUID.randomUUID().toString(),
-                    "category","SERVICE","severity","LOW","description","Atomic rollback fixture")).statusCode()).isEqualTo(503);
+            assertThat(a.post("/api/caregivers/me/incidents",request).statusCode()).isEqualTo(503);
+            assertThat(jdbc.queryForObject("select status from visit where id=?",String.class,id)).isEqualTo("IN_PROGRESS");
+            assertThat(jdbc.queryForObject("select version from visit where id=?",Integer.class,id)).isEqualTo(1);
+            assertThat(core.incidentsOf(id)).hasSize(1);
+            assertThat(jdbc.queryForObject("select count(*) from visit_state_transition where visit_id=? and result='APPLIED'",Long.class,id)).isEqualTo(2);
+            assertThat(jdbc.queryForObject("select count(*) from caregiver_command_receipt where visit_id=?",Long.class,id)).isEqualTo(1);
+            doCallRealMethod().when(receipts).save(any());
+            long reported=body(a.post("/api/caregivers/me/incidents",request),201).path("report").path("id").asLong();
+            assertThat(core.incidentsOf(id)).singleElement().extracting(CoreStandIn.Raised::id).isEqualTo(reported);
         }
-        assertThat(jdbc.queryForObject("select status from visit where id=?",String.class,id)).isEqualTo("IN_PROGRESS");
-        assertThat(jdbc.queryForObject("select version from visit where id=?",Integer.class,id)).isEqualTo(1);
-        assertThat(core.incidentsOf(id)).hasSize(1);
-        assertThat(jdbc.queryForObject("select count(*) from visit_state_transition where visit_id=? and result='APPLIED'",Long.class,id)).isEqualTo(2);
-        assertThat(jdbc.queryForObject("select count(*) from caregiver_command_receipt where visit_id=?",Long.class,id)).isEqualTo(1);
     }
 }
