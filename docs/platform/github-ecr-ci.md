@@ -47,8 +47,8 @@ GitHub 发布不需要设置 AWS Access Key 或 Secret Key。`id-token: write`
 2026-10-12 已创建这三个 AWS 资源；真实计划为 `3 to add, 0 to change,
 0 to destroy`，apply 后再次 plan 为 `No changes`。已从 AWS 读取实际角色，
 确认信任规则与四个仓库的权限范围。已通过 Safari 在 GitHub 仓库保存并
-核对两个 Repository variables。本地工作流代码尚未推送；首次端到端运行
-仍待完成。
+核对两个 Repository variables。发布角色创建不代表流水线已验证；代码发布
+后还需要运行 PR 检查，并在 main 上完成首次端到端验证。
 
 `infra/github-oidc.tf` 创建身份提供商、发布角色和角色内联策略。管理权限
 由账号管理员一次性为开发用户配置，不由 GitHub 发布角色授予自己。
