@@ -178,7 +178,7 @@ public class CoreStandIn implements CoreApi {
 				select c.id, c.caregiver_id, c.credential_type_id, t.name, c.issuing_body, c.valid_from, c.expiry_date,
 				       c.status
 				from credential c join credential_type t on t.id = c.credential_type_id
-				where c.caregiver_id = ? order by c.id
+				where c.caregiver_id = ? order by c.credential_type_id, c.id
 				""", (ResultSet row) -> {
 			LocalDate expiry = row.getDate("expiry_date").toLocalDate();
 			String status = publicStatus(row.getString("status"), expiry, today);

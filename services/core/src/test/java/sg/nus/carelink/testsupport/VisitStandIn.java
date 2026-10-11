@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -43,6 +44,9 @@ public class VisitStandIn implements VisitApi {
 
 	/** States in which the caregiver is booked for the visit or at it. */
 	private static final Set<String> UNDER_WAY = Set.of("SCHEDULED", "ARRIVED", "IN_PROGRESS");
+
+	/** Visit times are wall-clock times in Singapore. */
+	private static final ZoneId SINGAPORE = ZoneId.of("Asia/Singapore");
 
 	private static final Comparator<Held> EARLIEST_FIRST = Comparator.comparing(Held::start).thenComparing(Held::id);
 
@@ -227,9 +231,10 @@ public class VisitStandIn implements VisitApi {
 	public synchronized VisitRef moveTo(Long visitId, Move move) {
 		Held visit = requireOpen(visitId, "be moved");
 		keep(visit.forAbsence(visit.caregiverId(), "CANCELLED", move.why().absenceId()));
+		// The same length as a Singapore clock shows it, as Visit.movedTo keeps it
 		LocalDateTime newEnd = visit.end() == null
 				? null
-				: move.newStart().plus(Duration.between(visit.start(), visit.end()));
+				: move.newStart().plus(Duration.between(visit.start().atZone(SINGAPORE), visit.end().atZone(SINGAPORE)));
 		Long moved = add(new Held(null, visit.elderId(), move.toCaregiverId(), visit.carePlanId(),
 				visit.carePlanNodeId(), visit.serviceType(), move.newStart(), newEnd, "SCHEDULED",
 				move.why().absenceId(), false));

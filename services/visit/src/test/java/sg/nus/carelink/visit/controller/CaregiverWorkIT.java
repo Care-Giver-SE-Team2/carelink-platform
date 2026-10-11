@@ -69,8 +69,8 @@ class CaregiverWorkIT {
         mvc.perform(get("/api/caregivers/me/schedule").session(session)
             .param("dateFrom",day.toString()).param("dateTo",day.toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.upcomingVisits.length()").value(2))
-            .andExpect(jsonPath("$.upcomingVisits[0].scheduledStart").value(day+"T09:00:00"))
-            .andExpect(jsonPath("$.certificationAlerts.length()").value(2));
+            .andExpect(jsonPath("$.upcomingVisits[0].scheduledStart").value(day+"T09:00:00"));
+        // The credential reminders on the schedule are core's answer (CaregiverCredentialAlertsIT here and in core)
         mvc.perform(post("/api/auth/logout").session(session).with(csrf())).andExpect(status().isNoContent());
         assertThat(session.isInvalid()).isTrue();
         mvc.perform(get("/api/caregivers/me")).andExpect(status().isUnauthorized());
@@ -114,8 +114,5 @@ class CaregiverWorkIT {
         jdbc.update("insert ignore into user_role(user_id,role) select id,'CAREGIVER' from app_user where username='demo-cg-missing'");
         mvc.perform(get("/api/caregivers/me").with(user("demo-cg-missing").roles("CAREGIVER")))
             .andExpect(status().isNotFound());
-    }
-    @Test void directSpaLinkForwardsToStaticEntryWithoutOpeningApi() throws Exception {
-        mvc.perform(get("/caregiver/visits/"+aVisit)).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
     }
 }

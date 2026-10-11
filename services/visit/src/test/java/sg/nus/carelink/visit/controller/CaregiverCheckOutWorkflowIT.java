@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import sg.nus.carelink.coreapi.CoreApi;
 import sg.nus.carelink.testsupport.CoreStandIn;
 import sg.nus.carelink.testsupport.MissedCheckInITSupport;
 import sg.nus.carelink.testsupport.SharedMySql;
@@ -184,7 +185,8 @@ class CaregiverCheckOutWorkflowIT extends MissedCheckInITSupport {
     void ambiguousLegacyPauseNeverOpensOtherExceptions(String reason) throws Exception {
         long id=plannedVisit();legacyPause(id);
         switch(reason) {
-            case "OTHER_INCIDENT" -> jdbc.update("INSERT INTO incident(elder_id,visit_id,source,category,severity,status,description) VALUES (?,?,'CAREGIVER','SERVICE','LOW','RESOLVED','Synthetic independent pause')",elder,id);
+            case "OTHER_INCIDENT" -> core.resolve(core.reportIncident(new CoreApi.CaregiverIncidentRequest(elder,id,caregiverUser,
+                    "SERVICE","LOW","Synthetic independent pause")).id());
             case "VERSION" -> jdbc.update("UPDATE visit SET version=version+1 WHERE id=?",id);
             case "ASSIGNMENT" -> jdbc.update("UPDATE visit_missed_check_in_trigger SET triggered_caregiver_id=? WHERE visit_id=?",otherCaregiver,id);
             case "ABSENCE" -> {
