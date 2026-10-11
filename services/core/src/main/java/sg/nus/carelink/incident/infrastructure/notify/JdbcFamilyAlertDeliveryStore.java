@@ -1,26 +1,31 @@
 package sg.nus.carelink.incident.infrastructure.notify;
 
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.NotificationRequested;
 import sg.nus.carelink.incident.domain.model.FamilyAlertEvent;
 import sg.nus.carelink.incident.domain.model.FamilyUrgentNotice;
 import sg.nus.carelink.incident.domain.repository.FamilyAlertDeliveryStore;
 
-/** FM05-owned writes alongside the existing inbox, without altering its delivery implementation. @author Wang Zhili */
+/**
+ * FM05's outcomes and windows, and each family member's message as a {@code NotificationRequested}
+ * event in the same transaction, which the notification service keeps for the member's inbox.
+ * @author Wang Zhili
+ */
 @Repository
 @Transactional(propagation = Propagation.MANDATORY)
 class JdbcFamilyAlertDeliveryStore implements FamilyAlertDeliveryStore {
 	private final JdbcTemplate jdbc;
-	JdbcFamilyAlertDeliveryStore(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+	private final Events events;
+	JdbcFamilyAlertDeliveryStore(JdbcTemplate jdbc, Events events) { this.jdbc = jdbc; this.events = events; }
 
 	@Override public void register(FamilyAlertEvent event, LocalDateTime now) {
 		jdbc.update("""
@@ -52,27 +57,18 @@ class JdbcFamilyAlertDeliveryStore implements FamilyAlertDeliveryStore {
 				""", accountId, reason, time(now), eventId.toString(), familyId);
 	}
 
+	/** The message is written to the outbox with the window and the outcome, so all three commit together or not at all. */
 	@Override public void create(FamilyAlertEvent event, Long familyId, Long accountId, FamilyUrgentNotice notice) {
-		var keys = new GeneratedKeyHolder();
-		jdbc.update(connection -> {
-			var statement = connection.prepareStatement("""
-					INSERT INTO notification (recipient_user_id, event_type, channel, title, body, resource_type, resource_id, status, created_at)
-					VALUES (?, ?, 'IN_APP', ?, ?, 'INCIDENT', ?, 'PENDING', ?)
-					""", Statement.RETURN_GENERATED_KEYS);
-			statement.setLong(1, accountId); statement.setString(2, event.type().name());
-			statement.setString(3, notice.title()); statement.setString(4, notice.body());
-			statement.setLong(5, event.incidentId()); statement.setTimestamp(6, time(notice.createdAt()));
-			return statement;
-		}, keys);
-		long notificationId = keys.getKey().longValue();
+		events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(accountId, event.type().name(), notice.title(),
+				notice.body(), "INCIDENT", event.incidentId(), event.elderId(), notice.createdAt()));
 		jdbc.update("""
-				INSERT INTO family_alert_window (incident_id, family_member_id, first_notification_id, opened_at, acknowledge_by)
-				VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE incident_id = incident_id
-				""", event.incidentId(), familyId, notificationId, time(notice.createdAt()), time(notice.acknowledgeBy()));
+				INSERT INTO family_alert_window (incident_id, family_member_id, opened_at, acknowledge_by)
+				VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE incident_id = incident_id
+				""", event.incidentId(), familyId, time(notice.createdAt()), time(notice.acknowledgeBy()));
 		jdbc.update("""
-				UPDATE family_alert_delivery SET recipient_user_id = ?, notification_id = ?, status = 'CREATED', reason = NULL, attempted_at = ?
+				UPDATE family_alert_delivery SET recipient_user_id = ?, status = 'CREATED', reason = NULL, attempted_at = ?
 				WHERE event_id = ? AND family_member_id = ?
-				""", accountId, notificationId, time(notice.createdAt()), event.eventId().toString(), familyId);
+				""", accountId, time(notice.createdAt()), event.eventId().toString(), familyId);
 	}
 
 	@Override public void failed(UUID eventId, Long familyId, LocalDateTime now) {

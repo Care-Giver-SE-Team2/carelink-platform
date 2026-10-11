@@ -34,8 +34,7 @@ import sg.nus.carelink.report.domain.repository.ReportFactsSource;
  * The report module may not depend on them (the slice rule in {@code LayerDependencyTest}),
  * and none offers "everything for one elder between two moments". Reading is not owning:
  * these statements take an id and two moments, write nothing, and return the report's own
- * records, never another module's classes - the same arrangement as the incident module's
- * {@code NotificationTableAlert}.
+ * records, never another module's classes.
  *
  * <p>Deliberately thin. Which visits count as not closed, how readings become ranges and what
  * an incident's conclusion was are all decided in the domain on the rows this returns, where

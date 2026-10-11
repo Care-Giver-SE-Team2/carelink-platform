@@ -1,6 +1,5 @@
 package sg.nus.carelink.rostering.infrastructure.notify;
 
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,35 +11,34 @@ import java.util.Locale;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.NotificationRequested;
 import sg.nus.carelink.rostering.domain.model.AbsenceReport;
 import sg.nus.carelink.rostering.domain.repository.AbsenceAlert;
 
 /**
- * Writes UC-MG04's absence notice as rows in {@code notification}, the in-app inbox every
- * manager's bell reads. The managers are found the way the incident notifier finds them: every
- * enabled account with the MANAGER role.
+ * Sends UC-MG04's absence notice to every manager as a {@code NotificationRequested} event, which
+ * the notification service keeps for the manager's in-app inbox. The managers are found the way the
+ * incident notifier finds them: every enabled account with the MANAGER role. An absence is not about
+ * one elder, so the messages carry none.
  */
 @Component
-class NotificationTableAbsenceAlert implements AbsenceAlert {
+class NotificationRequestedAbsenceAlert implements AbsenceAlert {
 
 	private static final String MANAGERS = """
 			select u.id from app_user u join user_role r on r.user_id = u.id
 			where r.role = 'MANAGER' and u.enabled = true
 			""";
 
-	private static final String INSERT = """
-			insert into notification
-			    (recipient_user_id, event_type, channel, title, body, resource_type, resource_id, status, created_at)
-			values (:userId, :eventType, 'IN_APP', :title, :body, 'ABSENCE', :absenceId, 'PENDING', :createdAt)
-			""";
-
 	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH);
 
 	private final JdbcClient jdbc;
+	private final Events events;
 	private final Clock clock;
 
-	NotificationTableAbsenceAlert(JdbcClient jdbc, Clock clock) {
+	NotificationRequestedAbsenceAlert(JdbcClient jdbc, Events events, Clock clock) {
 		this.jdbc = jdbc;
+		this.events = events;
 		this.clock = clock;
 	}
 
@@ -79,16 +77,10 @@ class NotificationTableAbsenceAlert implements AbsenceAlert {
 
 	private void tellManagers(String eventType, AbsenceReport absence, String title, String body) {
 		List<Long> managers = jdbc.sql(MANAGERS).query(Long.class).list();
-		Timestamp now = Timestamp.valueOf(LocalDateTime.now(clock));
+		LocalDateTime now = LocalDateTime.now(clock);
 		for (Long manager : managers) {
-			jdbc.sql(INSERT)
-					.param("userId", manager)
-					.param("eventType", eventType)
-					.param("title", trim(title, 150))
-					.param("body", trim(body, 1000))
-					.param("absenceId", absence.id())
-					.param("createdAt", now)
-					.update();
+			events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(manager, eventType, title, body,
+					"ABSENCE", absence.id(), null, now));
 		}
 	}
 
@@ -103,9 +95,5 @@ class NotificationTableAbsenceAlert implements AbsenceAlert {
 			case EMERGENCY -> "Emergency";
 			case OTHER -> "Other";
 		};
-	}
-
-	private static String trim(String text, int max) {
-		return text.length() <= max ? text : text.substring(0, max - 3) + "...";
 	}
 }

@@ -84,4 +84,18 @@ class EventTypesTest {
 		assertThat(RosterChangeUpdated.TYPE).isEqualTo("RosterChangeUpdated");
 	}
 
+	@Test
+	void anInAppMessageIsCutToWhatTheInboxKeeps() {
+		var message = NotificationRequested.inApp(7L, "INCIDENT_RAISED", "t".repeat(200), "b".repeat(1200), "INCIDENT",
+				42L, 101L, HALF_NINE);
+
+		assertThat(message.channel()).isEqualTo("IN_APP");
+		assertThat(message.title()).hasSize(150).endsWith("...");
+		assertThat(message.body()).hasSize(1000).endsWith("...");
+		assertThat(message.elderId()).isEqualTo(101L);
+		assertThat(message.requestedAt()).isEqualTo(SingaporeTime.of(HALF_NINE));
+		assertThat(NotificationRequested.inApp(7L, "K", "Short", null, null, null, null, HALF_NINE))
+				.extracting(NotificationRequested::title, NotificationRequested::body).containsExactly("Short", null);
+	}
+
 }

@@ -211,6 +211,11 @@ public class CoreStandIn implements CoreApi {
 	}
 
 	@Override
+	public AccountRef caregiverAccount(Long caregiverId) {
+		throw notAskedByVisit();
+	}
+
+	@Override
 	public synchronized CredentialAlerts credentialAlerts(Long caregiverId, LocalDate today) {
 		return alerts.getOrDefault(caregiverId,
 				new CredentialAlerts(List.of(), new CredentialAlertContext(today, 30, false)));

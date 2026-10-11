@@ -67,6 +67,17 @@
 			<artifactId>visit-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<!-- Events between services: report's messages go out as NotificationRequested -->
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>event-types</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>sg.nus</groupId>
+			<artifactId>events</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 		<!-- Each scheduled job runs on one replica at a time (report/infrastructure/config/SchedulerLocks) -->
 		<dependency>
 			<groupId>net.javacrumbs.shedlock</groupId>

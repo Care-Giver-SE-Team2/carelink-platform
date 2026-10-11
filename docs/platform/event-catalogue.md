@@ -94,7 +94,7 @@ transaction, so every method listed publishes it.
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
-| `NotificationRequested` | core: the credential expiry alert (`NotificationRequestedCredentialAlert`) today. The six other core classes that insert into `notification` (incident 3, profile 1, rostering 2), and report's two, change to it | A message should reach someone | notification | published |
+| `NotificationRequested` | core: the credential expiry alert, incident's staff, spot check and family alerts, rostering's absence and roster change messages, the care plan notice; report: the value-added messages. Each sends one event per recipient | A message should reach someone | notification | published |
 | `ReportRequested` | EventBridge Scheduler, straight into report's queue | Once a week | the report worker | with the report move |
 
 **Not built.**

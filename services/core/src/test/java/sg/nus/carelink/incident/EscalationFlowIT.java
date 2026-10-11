@@ -208,7 +208,7 @@ class EscalationFlowIT {
 
 	private long alertsAddressedTo(Long userId, Long incidentId) {
 		Long rows = jdbc.queryForObject(
-				"select count(*) from notification where recipient_user_id = ?"
+				"select count(*) from requested_notification where recipient_user_id = ?"
 						+ " and resource_type = 'INCIDENT' and resource_id = ?",
 				Long.class, userId, incidentId);
 		return rows == null ? 0L : rows;
@@ -228,7 +228,7 @@ class EscalationFlowIT {
 				elder, null, null, Incident.Category.MEDICAL, Incident.Severity.LOW, account);
 
 		assertThat(repository.findById(raised.id()).orElseThrow().description()).isEqualTo(account).hasSize(2000);
-		assertThat(jdbc.queryForList("select char_length(body) from notification where resource_type = 'INCIDENT'"
+		assertThat(jdbc.queryForList("select char_length(body) from requested_notification where resource_type = 'INCIDENT'"
 				+ " and resource_id = ?", Integer.class, raised.id())).isNotEmpty().allMatch(length -> length <= 1000);
 		closeSoTheSweepDoesNotFindIt(raised);
 	}
@@ -316,7 +316,7 @@ class EscalationFlowIT {
 		Incident raised = raiseFor(elder, "SOS pressed");
 
 		List<String> told = jdbc.queryForList(
-				"select u.username from notification n"
+				"select u.username from requested_notification n"
 						+ " join app_user u on u.id = n.recipient_user_id"
 						+ " where n.resource_type = 'INCIDENT' and n.resource_id = ?"
 						+ "   and n.event_type = 'INCIDENT_RAISED'"
@@ -338,10 +338,10 @@ class EscalationFlowIT {
 		scan.sweep();
 
 		Integer broadcasts = jdbc.queryForObject(
-				"select count(*) from notification where resource_id = ? and event_type = 'INCIDENT_RAISED'",
+				"select count(*) from requested_notification where resource_id = ? and event_type = 'INCIDENT_RAISED'",
 				Integer.class, raised.id());
 		Integer handOvers = jdbc.queryForObject(
-				"select count(*) from notification where resource_id = ? and event_type = 'INCIDENT_ASSIGNED'",
+				"select count(*) from requested_notification where resource_id = ? and event_type = 'INCIDENT_ASSIGNED'",
 				Integer.class, raised.id());
 
 		assertThat(broadcasts).as("the broadcast happened once, when it was raised").isEqualTo(3);
@@ -381,7 +381,7 @@ class EscalationFlowIT {
 		assertThat(raised.responderUserId()).isNotNull();
 		assertThat(raised.respondBy()).isNotNull();
 		Integer told = jdbc.queryForObject(
-				"select count(*) from notification where resource_id = ? and event_type = 'INCIDENT_RAISED'",
+				"select count(*) from requested_notification where resource_id = ? and event_type = 'INCIDENT_RAISED'",
 				Integer.class, raised.id());
 		assertThat(told).as("every manager is told at once").isGreaterThanOrEqualTo(3);
 		assertThat(incidents.timelineOf(raised.id()).stream().map(IncidentLog::action))

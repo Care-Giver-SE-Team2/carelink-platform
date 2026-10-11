@@ -92,6 +92,7 @@ call it through the same interface. [building-a-service.md](building-a-service.m
 | `MissedCheckInPauseEvidence.isSoleIncident(elderId, visitId, incidentId)` | visit (`MissedCheckInResumeService`) | `GET /internal/v1/incidents/{incidentId}/sole-missed-check-in?elderId=&visitId=` → `{ sole }`: is this incident the visit's only one, raised by the missed check-in scan? |
 | SQL on `app_user`, `user_role` in `JdbcRecipientDirectory` (is the account behind a session still allowed, and with which roles) | notification | `GET /internal/v1/accounts/{username}` → `{ userId, username, displayName, enabled, roles }`, or 404 |
 | SQL on `app_user`, `user_role` in `NotificationTableValueAddedManagerAlert` (every enabled manager) | report | `GET /internal/v1/accounts/with-role/{role}` → `{ userIds }` |
+| SQL on `caregiver` in `NotificationTableValueAddedNotifier` (the caregiver's account, which a message is addressed to) | report | `GET /internal/v1/caregivers/{caregiverId}/account` → `{ userId }`, or 404 |
 | SQL on `elder`, `elder_primary_caregiver`, `caregiver`, `care_plan` in `ReportFactsJdbcSource` (the elder a report describes) | report | `GET /internal/v1/elders/{elderId}/report-profile` → the profile, the primary caregiver and the latest published plan, or 404 |
 | SQL on `absence_report` in `JdbcValueAddedVisitAssignment` (is the caregiver away that day) | report | `GET /internal/v1/caregivers/{caregiverId}/on-leave?day=` → `{ onLeave }` |
 | `VisitCover.options(visitId)`, `cover(…)` | report (2) | `GET /internal/v1/visits/{visitId}/cover-options`; `POST /internal/v1/visits/{visitId}/cover`. Rostering stays in core and calls visit in turn |
@@ -142,20 +143,25 @@ the tests lay out in core's tables. Each is in place of the client for every tes
 
 ### 5.1 Writes to the notification table → `NotificationRequested` event
 
-Nine classes wrote into `notification` directly. Eight implement a port, so only the adapter changes, and
-the business code that raises the alert stays as it is. The ninth, `CarePlanPublishedFamilyNotifier`, listens
-for careplan's `CarePlanPublished` event and changes in the same way.
+Done. Nine classes wrote into `notification` directly; each now publishes one `NotificationRequested` event per
+recipient, in the transaction that decided to send it, and notification's `NotificationRequestedHandler` keeps
+the message. Eight implement a port, so only the adapter changed and the business code that raises the alert
+stayed as it was; the ninth listens for careplan's `CarePlanPublished` after the publish commits, and writes its
+events in a transaction of its own. `NotificationRequested.inApp` cuts titles and bodies to what the inbox keeps.
 
-The credential expiry alert has changed already and is the worked example: it is now
-`NotificationRequestedCredentialAlert`, which publishes one event per recipient instead of inserting a row, and
-notification's `NotificationRequestedHandler` keeps the message. Eight classes are left:
-
-| Module | Classes |
+| Module | Class |
 |---|---|
-| incident | `NotificationTableAlert`, `NotificationTableSpotCheckAlert`, `JdbcFamilyAlertDeliveryStore` |
-| profile | `CarePlanPublishedFamilyNotifier` |
-| rostering | `NotificationTableAbsenceAlert`, `NotificationTableRosterAlert` |
-| report | `NotificationTableValueAddedManagerAlert`, `NotificationTableValueAddedNotifier` |
+| profile | `NotificationRequestedCredentialAlert` (the worked example), `CarePlanPublishedFamilyNotifier` |
+| incident | `NotificationRequestedIncidentAlert`, `NotificationRequestedSpotCheckAlert`, `JdbcFamilyAlertDeliveryStore` |
+| rostering | `NotificationRequestedAbsenceAlert`, `NotificationRequestedRosterAlert` |
+| report | `NotificationRequestedValueAddedManagerAlert`, `NotificationRequestedValueAddedNotifier` |
+
+Two of them used to look in `notification` to see what they had already sent; each now notes it on its own
+record. The spot check alert notes when it asked the family (`spot_check.family_asked_at`, which the reminders
+read), and report notes a request's one reminder (`value_added_service_request.family_reminded_at`).
+FM05's alert window no longer points at a notification row: its message is an event, written with the window
+and the delivery outcome. core's tests read the messages core asked for through a test-only view over the
+outbox, `requested_notification` (`src/test/resources/db/platform`).
 
 ### 5.2 Reads of another service's tables
 
@@ -163,11 +169,11 @@ notification's `NotificationRequestedHandler` keeps the message. Eight classes a
 |---|---|---|
 | report `ReportFactsJdbcSource` | `care_plan`, `caregiver`, `elder`, `elder_confirmation`, `elder_primary_caregiver`, `incident`, `incident_log`, `roster_change`, `spot_check`, `visit`, `visit_evidence`, `visit_task`, `vital_sign` | A read model in report's schema, filled from events; the elder through `CoreApi.elderReportProfile` |
 | report `JdbcValueAddedVisitAssignment` | `absence_report`, `visit` | `CoreApi.onLeave` and `VisitApi.caregiverBusy` |
-| report `NotificationTableValueAddedManagerAlert` | `app_user`, `user_role` | `CoreApi.enabledAccountsWithRole`; recipients go in the event |
-| report `NotificationTableValueAddedNotifier` | `caregiver` | Recipients go in the event |
+| report `NotificationRequestedValueAddedManagerAlert` | none now; it reads `app_user`, `user_role`, `elder` and `caregiver` through `CoreApi` | Done |
+| report `NotificationRequestedValueAddedNotifier` | none now; the caregiver's account through `CoreApi.caregiverAccount`, the names through `CoreApi` | Done |
 | notification `JdbcNotificationInbox` | `care_plan`, `elder_family_binding`, `family_member`, `incident`, `roster_change`, `spot_check`, `value_added_service_request` | The event carries what the inbox shows, stored with the notification; the family rule asks `CoreApi.readableElders` |
 | notification `JdbcRecipientDirectory` | `app_user`, `user_role` | `CoreApi.account` |
-| incident `JdbcSpotCheckLookups` | `notification` | The reminder time kept in core; its reads of `visit` are calls to visit now (section 4) |
+| incident `JdbcSpotCheckLookups` | none now | Done: the time of the last ask is on the spot check, and the visits are calls to visit (section 4) |
 
 visit's `CaregiverCommandStoreAdapter` writes `audit_log` through the shared audit classes. After the split, each
 service keeps its own `audit_log` in its own schema.
@@ -189,8 +195,11 @@ platform migration takes the next free version, listed here.
 | V2 | `outbox_event` | every service that publishes events | `libs/events` | Events written in the same transaction as the business data, then published |
 | V2 | `consumed_message` | every service that handles events | `libs/events` | Ignores a message it has already handled |
 | V3 | none: drops the 17 foreign keys of section 2 | the shared schema | core | No foreign key joins two services' tables |
+| V4 | `family_alert_window.first_notification_id` may be empty | core | core | A family member's FM05 message is an event, so core has no row id to keep |
+| V5 | `spot_check.family_asked_at` | core | core | When the family was last asked, for the reminders; it was read from `notification` |
+| V6 | `value_added_service_request.family_reminded_at` | report | core | A request's one reminder, noted on the request; it was read from `notification` |
 
-The next platform migration is V4. Until the schema split, the services share one schema, so the two events
+The next platform migration is V7. Until the schema split, the services share one schema, so the two events
 tables are shared too: `outbox_event.source` and `consumed_message.consumer` keep each service's rows apart.
 
 ## 7. What the move changes: commands visit and core share

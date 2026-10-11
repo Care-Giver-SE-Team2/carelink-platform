@@ -521,8 +521,10 @@ The jobs that still need a lock when they move are `MissedCheckInScheduler` (vis
       MySQL integration tests, and at least 80% line coverage in the domain packages.
 - [ ] `scripts/run.sh all` starts the service, and `curl localhost:808x/actuator/health/readiness` answers `UP`.
 - [ ] Signed in through core in the browser, a page that calls the service works without signing in again.
-- [ ] The SonarCloud project `<prefix>_<name>` exists. The repository admin creates it, and the pipeline
-      analyses one project per service.
+- [ ] The SonarCloud project `<prefix>_<name>`: the pipeline creates it, public, with `main` as its main branch
+      (`scripts/sonar-project.sh`). The first analysis of `main` after the service's first pull request has
+      nothing to compare with, so SonarCloud gives it no quality gate and the step fails once: re-run the
+      job, and the second analysis has one.
 - [ ] The paths the service takes over are listed for the Ingress ([service-boundaries.md](service-boundaries.md),
   section 8).
 

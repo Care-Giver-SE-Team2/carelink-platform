@@ -83,6 +83,20 @@ public interface CoreApi {
 	CredentialAlerts credentialAlerts(@PathVariable Long caregiverId,
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate today);
 
+	/** The account a caregiver signs in with, which a message to them is addressed to; 404 for no such caregiver. */
+	@GetExchange("/caregivers/{caregiverId}/account")
+	AccountRef caregiverAccount(@PathVariable Long caregiverId);
+
+	/** {@link #caregiverAccount}'s user id, with no such caregiver as empty. */
+	default Optional<Long> findCaregiverUserId(Long caregiverId) {
+		try {
+			return Optional.ofNullable(caregiverAccount(caregiverId).userId());
+		}
+		catch (CoreNotFound notFound) {
+			return Optional.empty();
+		}
+	}
+
 	// ---------- Elders and families (profile) ----------
 
 	/** What a caregiver needs to know about an elder before a visit. */
@@ -186,6 +200,9 @@ public interface CoreApi {
 	}
 
 	record AccountIds(List<Long> userIds) {
+	}
+
+	record AccountRef(Long userId) {
 	}
 
 	/**

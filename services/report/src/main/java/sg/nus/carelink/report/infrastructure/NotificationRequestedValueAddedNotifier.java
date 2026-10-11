@@ -1,5 +1,7 @@
 package sg.nus.carelink.report.infrastructure;
 
+import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -10,19 +12,22 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 import sg.nus.carelink.coreapi.CoreApi;
+import sg.nus.carelink.events.Events;
+import sg.nus.carelink.eventtypes.NotificationRequested;
 import sg.nus.carelink.report.application.ValueAddedNotifier;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 
 /**
- * Writes the in-app messages into {@code notification} as PENDING, in the caller's transaction,
- * the way every other notifier does. A family message links to the request
+ * Sends the in-app messages as {@code NotificationRequested} events, one per recipient, in the
+ * caller's transaction, the way every other notifier does; the notification service keeps them for
+ * the recipients' inboxes. A family message links to the request
  * (VALUE_ADDED_REQUEST), which the inbox resolves to its elder for the family access rule; a
  * caregiver message links to the visit. Family recipients are those whose binding to the elder
  * is active right now; the family member who made or answered the request is told too, since
  * a bell entry is also their record of it.
  */
 @Component
-public class NotificationTableValueAddedNotifier implements ValueAddedNotifier {
+public class NotificationRequestedValueAddedNotifier implements ValueAddedNotifier {
 
     static final String REQUEST = "VALUE_ADDED_REQUEST";
     static final String VISIT = "VISIT";
@@ -30,12 +35,24 @@ public class NotificationTableValueAddedNotifier implements ValueAddedNotifier {
     /** English month names whatever the server's locale. */
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ENGLISH);
 
+    /** Notes the reminder on the request, unless one is noted already: then it has been sent. */
+    private static final String REMIND_ONCE = """
+            update value_added_service_request set family_reminded_at = :now
+            where id = :id and family_reminded_at is null
+            """;
+
     private final JdbcClient jdbc;
     private final CoreApi core;
+    private final CoreNames names;
+    private final Events events;
+    private final Clock clock;
 
-    public NotificationTableValueAddedNotifier(JdbcClient jdbc, CoreApi core) {
+    NotificationRequestedValueAddedNotifier(JdbcClient jdbc, CoreApi core, CoreNames names, Events events, Clock clock) {
         this.jdbc = jdbc;
         this.core = core;
+        this.names = names;
+        this.events = events;
+        this.clock = clock;
     }
 
     @Override
@@ -44,14 +61,12 @@ public class NotificationTableValueAddedNotifier implements ValueAddedNotifier {
                 serviceName + " on " + when(request) + ". Approve or decline it in Extra services.");
     }
 
-    /** Once per request: a reminder already written for it is not written again. */
+    /** Once per request: the request notes its reminder, and one that has a reminder noted gets no other. */
     @Override
     public void reminder(ValueAddedServiceRequest request, String serviceName) {
-        Long sent = jdbc.sql("""
-                select count(*) from notification
-                where event_type = 'VALUE_ADDED_REMINDER' and resource_type = :type and resource_id = :id
-                """).param("type", REQUEST).param("id", request.id()).query(Long.class).single();
-        if (sent > 0) {
+        int noted = jdbc.sql(REMIND_ONCE).param("now", Timestamp.valueOf(LocalDateTime.now(clock)))
+                .param("id", request.id()).update();
+        if (noted == 0) {
             return;
         }
         toFamily(request, "VALUE_ADDED_REMINDER", "Still waiting: " + serviceName + " for " + elder(request),
@@ -60,7 +75,7 @@ public class NotificationTableValueAddedNotifier implements ValueAddedNotifier {
 
     @Override
     public void caregiverAssigned(ValueAddedServiceRequest request, String serviceName, Long caregiverId) {
-        String caregiver = caregiver(caregiverId);
+        String caregiver = names.caregiver(caregiverId);
         toFamily(request, "VALUE_ADDED_ASSIGNED", serviceName + " for " + elder(request) + " is booked",
                 caregiver + " will come on " + when(request) + ".");
         toCaregiver(caregiverId, request, "VALUE_ADDED_ASSIGNED", "New visit: " + serviceName,
@@ -92,40 +107,26 @@ public class NotificationTableValueAddedNotifier implements ValueAddedNotifier {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        users.forEach(user -> insert(user, event, title, body, REQUEST, request.id()));
+        users.forEach(user -> send(user, event, title, body, REQUEST, request.id(), request));
     }
 
     private void toCaregiver(Long caregiverId, ValueAddedServiceRequest request, String event, String title, String body) {
-        jdbc.sql("select user_id from caregiver where id = :id").param("id", caregiverId).query(Long.class).optional()
-                .ifPresent(user -> insert(user, event, title, body, VISIT, request.visitId()));
+        core.findCaregiverUserId(caregiverId)
+                .ifPresent(user -> send(user, event, title, body, VISIT, request.visitId(), request));
     }
 
-    private void insert(Long recipient, String event, String title, String body, String resourceType, Long resourceId) {
-        jdbc.sql("""
-                insert into notification
-                (recipient_user_id,event_type,channel,title,body,resource_type,resource_id,status,created_at)
-                values (:recipient,:event,'IN_APP',:title,:body,:type,:resource,'PENDING',CURRENT_TIMESTAMP)
-                """).param("recipient", recipient).param("event", event)
-                .param("title", clip(title, 150)).param("body", clip(body, 1000))
-                .param("type", resourceType).param("resource", resourceId).update();
+    private void send(Long recipient, String event, String title, String body, String resourceType, Long resourceId,
+            ValueAddedServiceRequest request) {
+        events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(recipient, event, title, body,
+                resourceType, resourceId, request.elderId(), LocalDateTime.now(clock)));
     }
 
     private String elder(ValueAddedServiceRequest request) {
-        return jdbc.sql("select full_name from elder where id = :id").param("id", request.elderId())
-                .query(String.class).optional().orElse("Elder #" + request.elderId());
-    }
-
-    private String caregiver(Long caregiverId) {
-        return jdbc.sql("select full_name from caregiver where id = :id").param("id", caregiverId)
-                .query(String.class).optional().orElse("Caregiver #" + caregiverId);
+        return names.elder(request.elderId());
     }
 
     private static String when(ValueAddedServiceRequest request) {
         LocalDateTime at = request.requestedSchedule();
         return at == null ? "an unspecified time" : at.format(WHEN);
-    }
-
-    private static String clip(String text, int max) {
-        return text.length() > max ? text.substring(0, max) : text;
     }
 }

@@ -56,8 +56,10 @@ import sg.nus.carelink.profile.application.PrimaryCaregiverLookup;
 import sg.nus.carelink.profile.application.ProfileService;
 import sg.nus.carelink.profile.controller.InternalElderReportController;
 import sg.nus.carelink.profile.controller.InternalProfileController;
+import sg.nus.carelink.profile.domain.model.Caregiver;
 import sg.nus.carelink.profile.domain.model.Elder;
 import sg.nus.carelink.profile.domain.model.FamilyMember;
+import sg.nus.carelink.profile.domain.repository.CaregiverRepository;
 import sg.nus.carelink.profile.domain.repository.FamilyMemberRepository;
 import sg.nus.carelink.rostering.application.LeaveCalendar;
 import sg.nus.carelink.rostering.application.VisitCover;
@@ -97,6 +99,9 @@ class CoreApiContractTest {
 
 	@MockitoBean
 	private FamilyMemberRepository familyMembers;
+
+	@MockitoBean
+	private CaregiverRepository caregiverRecords;
 
 	@MockitoBean
 	private FamilyAlertRecipients alertRecipients;
@@ -224,6 +229,18 @@ class CoreApiContractTest {
 				.hasMessage("Elder for user [31] does not exist");
 		assertThat(core.findFamilyMemberIdByUser(40L)).contains(12L);
 		assertThat(core.findFamilyMemberIdByUser(41L)).isEmpty();
+	}
+
+	@Test
+	void aCaregiversAccount() {
+		Caregiver caregiver = mock(Caregiver.class);
+		when(caregiver.userId()).thenReturn(70L);
+		when(caregiverRecords.findById(7L)).thenReturn(Optional.of(caregiver));
+		when(caregiverRecords.findById(8L)).thenReturn(Optional.empty());
+
+		assertThat(core.caregiverAccount(7L)).isEqualTo(new CoreApi.AccountRef(70L));
+		assertThat(core.findCaregiverUserId(7L)).contains(70L);
+		assertThat(core.findCaregiverUserId(8L)).isEmpty();
 	}
 
 	@Test

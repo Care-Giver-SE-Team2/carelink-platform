@@ -96,7 +96,7 @@ class FamilyElderSosWorkflowIT {
             assertEmptyReceipt(detailA); assertEmptyReceipt(detailB);
             assertThat(detailA.path("acknowledgement").path("familyMemberId").asLong()).isEqualTo(familyA);
             assertThat(detailB.path("acknowledgement").path("familyMemberId").asLong()).isEqualTo(familyB);
-            var read = open(noticeA); assertEmptyReceipt(detail(a, id));
+            var read = noticeA; assertEmptyReceipt(detail(a, id));
             var viewed = body(a.command("POST", "/api/incidents/" + id + "/view", null), 200);
             assertThat(viewed.path("viewedAt").isNull()).isFalse();
             assertThat(viewed.path("acknowledgedAt").isNull()).isTrue();
@@ -123,16 +123,18 @@ class FamilyElderSosWorkflowIT {
             assertThat(source.command("POST", SOS, Map.of()).statusCode()).isEqualTo(500);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident WHERE elder_id=?", Long.class, elder)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE elder_id=?", Long.class, elder)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id IN (?,?)", Long.class, familyAUser, familyBUser)).isZero();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id=(SELECT id FROM app_user WHERE username=?)", Long.class, managerName)).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE recipient_user_id IN (?,?)", Long.class, familyAUser, familyBUser)).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE recipient_user_id=(SELECT id FROM app_user WHERE username=?)", Long.class, managerName)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE family_member_id IN (?,?)", Long.class, familyA, familyB)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_delivery WHERE family_member_id IN (?,?)", Long.class, familyA, familyB)).isZero();
         } finally { jdbc.execute("DROP TRIGGER fm05_sos_source_fault"); }
     }
 
     @Test void oneFamilyNotificationFailureKeepsCommittedSosAndDeliversToTheOtherFamily() throws Exception {
-        jdbc.execute("CREATE TRIGGER fm05_sos_notice_fault BEFORE INSERT ON notification FOR EACH ROW BEGIN IF NEW.recipient_user_id="
-                + familyAUser + " AND NEW.resource_type='INCIDENT' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic SOS recipient failure'; END IF; END");
+        // Family A's message cannot be written: its event fails in the outbox
+        jdbc.execute("CREATE TRIGGER fm05_sos_notice_fault BEFORE INSERT ON outbox_event FOR EACH ROW BEGIN IF NEW.type='NotificationRequested'"
+                + " AND JSON_VALUE(NEW.payload, '$.recipientUserId' RETURNING SIGNED)=" + familyAUser
+                + " AND JSON_VALUE(NEW.payload, '$.resourceType')='INCIDENT' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic SOS recipient failure'; END IF; END");
         try {
             long id = report(Map.of());
             try (var a = browser(familyAName); var b = browser(familyBName); var manager = browser(managerName)) {
@@ -167,10 +169,10 @@ class FamilyElderSosWorkflowIT {
             assertThat(a.command("POST", "/api/incidents/" + id + "/view", null).statusCode()).isEqualTo(403);
             assertThat(a.command("POST", "/api/incidents/" + id + "/acknowledge", Map.of("responseNote", "Denied" )).statusCode()).isEqualTo(403);
             if (afterSos) {
-                assertThat(jdbc.queryForObject("SELECT status FROM notification WHERE id=?", String.class, noticeId)).isEqualTo("PENDING");
+                assertThat(jdbc.queryForObject("SELECT status FROM requested_notification WHERE id=?", String.class, noticeId)).isEqualTo("PENDING");
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE incident_id=? AND family_member_id=?", Long.class, id, familyA)).isEqualTo(1);
             } else {
-                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id=?", Long.class, familyAUser)).isZero();
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE recipient_user_id=?", Long.class, familyAUser)).isZero();
                 assertThat(jdbc.queryForObject("SELECT reason FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, familyA, id)).isEqualTo("BINDING_REVOKED");
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE incident_id=? AND family_member_id=?", Long.class, id, familyA)).isZero();
             }
@@ -210,7 +212,7 @@ class FamilyElderSosWorkflowIT {
         assertThat(second).isNotEqualTo(first);
         try (var a = browser(familyAName); var b = browser(familyBName)) {
             for (long user : List.of(familyAUser, familyBUser)) {
-                assertThat(jdbc.queryForList("SELECT resource_id FROM notification WHERE recipient_user_id=? AND resource_type='INCIDENT'", Long.class, user))
+                assertThat(jdbc.queryForList("SELECT resource_id FROM requested_notification WHERE recipient_user_id=? AND resource_type='INCIDENT'", Long.class, user))
                         .containsExactlyInAnyOrder(first, second);
             }
             for (var reader : List.of(a, b)) {
@@ -235,7 +237,7 @@ class FamilyElderSosWorkflowIT {
                     .timeout(Duration.ofSeconds(15)).header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{}")).build();
             assertThat(source.client.send(missingCsrf, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(403);
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE recipient_user_id=?", Long.class, familyAUser)).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM requested_notification WHERE recipient_user_id=?", Long.class, familyAUser)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incident WHERE elder_id=?", Long.class, elder)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_event WHERE elder_id=?", Long.class, elder)).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM family_alert_window WHERE family_member_id IN (?,?)", Long.class, familyA, familyB)).isZero();
@@ -253,13 +255,7 @@ class FamilyElderSosWorkflowIT {
         return messages.getFirst();
     }
     private List<Map<String, Object>> notices(long user, long id) {
-        return jdbc.queryForList("SELECT * FROM notification WHERE recipient_user_id=? AND resource_type='INCIDENT' AND resource_id=? ORDER BY id", user, id);
-    }
-    /** Opens the message the way the inbox does, so incident's own facts can be shown not to follow it. */
-    private Map<String, Object> open(Map<String, Object> notice) {
-        var now = java.sql.Timestamp.valueOf(LocalDateTime.now(SINGAPORE));
-        jdbc.update("UPDATE notification SET status='READ', sent_at=?, read_at=? WHERE id=?", now, now, notice.get("id"));
-        return jdbc.queryForMap("SELECT * FROM notification WHERE id=?", notice.get("id"));
+        return jdbc.queryForList("SELECT * FROM requested_notification WHERE recipient_user_id=? AND resource_type='INCIDENT' AND resource_id=? ORDER BY id", user, id);
     }
     private void assertEmptyReceipt(JsonNode detail) {
         var receipt = detail.path("acknowledgement");
