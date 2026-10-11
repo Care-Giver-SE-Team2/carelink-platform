@@ -40,6 +40,7 @@ public class VisitRequests {
 	 *     in the transaction that remembers the key
 	 * @return the visit the change created (a move's new visit), or null
 	 */
+	@SuppressWarnings("java:S4276") // a change that creates no visit answers null, which a LongSupplier cannot
 	public Long once(String requestKey, Long visitId, Supplier<Long> change) {
 		if (requestKey == null || requestKey.isBlank()) {
 			return transaction.execute(status -> change.get());
@@ -58,11 +59,8 @@ public class VisitRequests {
 		catch (DuplicateKeyException | OptimisticLockingFailureException sameRequestAtTheSameTime) {
 			// The same request, sent twice at once: the other one's change and key committed, and this one
 			// lost on the key or on the visit's version and rolled back
-			VisitRequestKeys.Made made = transaction.execute(status -> keys.find(requestKey).orElse(null));
-			if (made == null) {
-				throw sameRequestAtTheSameTime;
-			}
-			return made.answerFor(visitId);
+			Optional<VisitRequestKeys.Made> made = transaction.execute(status -> keys.find(requestKey));
+			return made.orElseThrow(() -> sameRequestAtTheSameTime).answerFor(visitId);
 		}
 	}
 }
