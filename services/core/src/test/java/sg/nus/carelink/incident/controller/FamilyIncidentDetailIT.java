@@ -68,7 +68,7 @@ class FamilyIncidentDetailIT {
 
 	@BeforeEach
 	void prepare() {
-		for (String table : List.of("audit_log", "notification", "requested_notification", "incident_acknowledgement", "incident_log",
+		for (String table : List.of("audit_log", "requested_notification", "incident_acknowledgement", "incident_log",
 				"incident", "elder_family_binding", "elder", "family_member", "user_role", "app_user")) {
 			jdbc.update("DELETE FROM " + table);
 		}

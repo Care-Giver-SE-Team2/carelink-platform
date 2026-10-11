@@ -15,7 +15,6 @@ import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -31,7 +30,6 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 import sg.nus.carelink.eventtypes.NotificationRequested;
-import sg.nus.carelink.testsupport.PlatformTablesForTests;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
@@ -43,7 +41,6 @@ import sg.nus.carelink.testsupport.SharedMySql;
  * EventsIT.)
  */
 @SpringBootTest(properties = "carelink.events.receive-wait=1s")
-@Import(PlatformTablesForTests.class)
 class NotificationRequestedIT {
 
 	private static final LocalStackContainer AWS = new LocalStackContainer("localstack/localstack:4.14.0")
