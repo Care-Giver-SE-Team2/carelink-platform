@@ -5,6 +5,7 @@
 image:
   repository: ""   # <ECR registry>/carelink/<service>, set by scripts/deploy.sh
   tag: ""          # the commit the image was built from, set by scripts/deploy.sh
+  digest: ""       # optional sha256 digest from the release manifest; takes precedence over tag
   pullPolicy: IfNotPresent
 
 # Two replicas, spread over the two availability zones (topologySpreadConstraints in
@@ -29,6 +30,9 @@ resources:
 # envFromSecret names a Kubernetes Secret whose keys become environment variables.
 env: {}
 envFromSecret: ""
+
+# Optional public RDS CA truststore; used by DB_URL's Connector/J truststore settings.
+rdsTruststoreConfigMap: ""
 
 containerPort: 8080
 

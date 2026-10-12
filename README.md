@@ -131,6 +131,9 @@ once; a service supplies only its code and one values file.
 | Deployment | `charts/carelink-service` and `scripts/deploy.sh` | `deploy/values.yaml`: replicas, resources, scaling |
 | Pipeline | `.github/workflows/service.yml`, called by `ci.yml` | its name (its directory) |
 
+Environment values, runtime Secrets and offline Helm checks are described in
+[the runtime setup guide](docs/platform/helm-runtime-setup.md).
+
 **Adding a service:** create `services/<name>/` with a `pom.xml` whose parent is the root
 `pom.xml`, its `src/`, and `deploy/values.yaml`; add it to `<modules>` in the root `pom.xml`
 and to `docker-compose.yml`. The pipeline finds it by its directory, and the scripts take its
