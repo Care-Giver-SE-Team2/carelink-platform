@@ -10,9 +10,9 @@ const MESSAGE_MAX = 255
 
 /**
  * The right-hand panel of the Providers screen for an application: who the provider is, what it
- * offers and where, the webhook it wants jobs sent to, an optional message to it, and Approve /
+ * offers, the webhook it wants jobs sent to, an optional message to it, and Approve /
  * Decline. Approving creates its Open API client; the provider collects the credentials from the
- * workbench, so there is nothing here for the manager to pass on. Declining needs a message so
+ * portal, so there is nothing here for the manager to pass on. Declining needs a message so
  * the provider knows why. `onApprove`/`onDecline` do the request and reject with the error to
  * show. Key it by application id so the message resets between rows.
  */
@@ -55,10 +55,10 @@ export function ProviderApplicationPanel({
   return (
     <aside className={styles.panel} aria-label="Application detail">
       <header className={styles.header}>
-        <Eyebrow wide>Provider application · #{application.id}</Eyebrow>
+        <Eyebrow wide>Provider application · {application.reference}</Eyebrow>
         <h2 className={styles.title}>{name}</h2>
         <MetaText className={styles.meta}>
-          submitted {formatReceived(application.submittedAt)} from the provider workbench
+          submitted {formatReceived(application.submittedAt)} from the Partner Portal
         </MetaText>
       </header>
 
@@ -66,9 +66,6 @@ export function ProviderApplicationPanel({
         <Eyebrow wide>Organisation</Eyebrow>
         <dl className={styles.fields}>
           <Detail label="Name">{name}</Detail>
-          <Detail label="UEN" mono>
-            {application.uen}
-          </Detail>
           <Detail label="Contact">{application.contactName}</Detail>
           <Detail label="Email" mono>
             {application.contactEmail}
@@ -81,9 +78,6 @@ export function ProviderApplicationPanel({
         <Eyebrow wide>Services</Eyebrow>
         <dl className={styles.fields}>
           <Detail label="Offers">{services ?? <NotGiven />}</Detail>
-          <Detail label="Area" mono>
-            {listLabel(application.serviceArea) ?? <NotGiven />}
-          </Detail>
         </dl>
       </section>
 
@@ -114,7 +108,7 @@ export function ProviderApplicationPanel({
           aria-describedby={messageMissing ? 'provider-application-message-error' : undefined}
           maxLength={MESSAGE_MAX}
           disabled={busy}
-          placeholder={`Shown to ${name} with the decision when they check their status in the workbench.`}
+          placeholder={`Shown to ${name} with the decision when they check their status in the Partner Portal.`}
         />
         {messageMissing && (
           <MetaText id="provider-application-message-error" tone="danger" className={styles.messageError}>
@@ -125,7 +119,7 @@ export function ProviderApplicationPanel({
 
       <footer className={styles.footer}>
         <MetaText className={styles.effect}>
-          {`Approving gives ${name} access to the Open API. They collect their credentials once from the workbench, and can then be dispatched ${services ?? 'jobs'}.`}
+          {`Approving gives ${name} access to the Open API. They collect their credentials once from the Partner Portal, and can then be dispatched ${services ?? 'jobs'}.`}
         </MetaText>
         {error && (
           <Callout tone="danger" role="alert">

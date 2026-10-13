@@ -1,0 +1,78 @@
+.mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  margin-bottom: 14px;
+  padding: 0;
+  font: 600 14px/1.3 var(--font);
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+/* The round dot is the one curve the Partner Portal allows. */
+.radio input {
+  appearance: none;
+  box-sizing: border-box;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  border: 1px solid var(--text);
+  border-radius: 50%;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.radio input:checked {
+  border: 5px solid var(--accent);
+}
+
+.radio input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.note {
+  min-height: 72px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 599px) {
+  .times {
+    grid-template-columns: 1fr;
+  }
+}

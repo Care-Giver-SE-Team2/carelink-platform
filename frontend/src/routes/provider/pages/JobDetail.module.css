@@ -1,0 +1,279 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.crumbs {
+  font-size: 14px;
+}
+
+.crumbLink {
+  color: var(--link);
+  text-decoration: none;
+}
+
+.crumbLink:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.crumbBack {
+  display: none;
+}
+
+.crumbSep {
+  color: var(--text-muted);
+}
+
+.crumbId {
+  font-family: var(--font-mono);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font: 600 22px/1.25 var(--font);
+}
+
+.sub {
+  font: 400 13px/1 var(--font-mono);
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  gap: 10px;
+}
+
+.actions button {
+  height: 40px;
+}
+
+.primaryAction {
+  padding: 0 24px;
+}
+
+.readOnly {
+  flex: none;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.offline {
+  margin: -16px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.requestId {
+  font: 400 12.5px/1 var(--font-mono);
+  color: var(--text-muted);
+}
+
+.loading {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 64px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.facts {
+  max-width: 760px;
+}
+
+.instructions {
+  max-width: 620px;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.withheld {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+
+.withheld svg {
+  flex: none;
+  width: 14px;
+  height: 15px;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.address {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+}
+
+.addressText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.addressLine {
+  font-weight: 600;
+}
+
+.addressSub {
+  color: var(--text-secondary);
+}
+
+.address a,
+.page [role='alert'] a {
+  flex: none;
+  font-size: 14px;
+  color: var(--link);
+  text-decoration: none;
+}
+
+.address a:hover,
+.page [role='alert'] a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+@media (max-width: 1099px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+}
+
+@media (max-width: 899px) {
+  .page {
+    gap: 20px;
+    padding-bottom: 72px;
+  }
+
+  .crumbSep,
+  .crumbId {
+    display: none;
+  }
+
+  .crumbBack {
+    display: inline;
+  }
+
+  .head {
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .titleRow {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .sub {
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  /* The actions stick to the bottom of the screen, Decline a third and the main action two. */
+  .actions {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 8px;
+    padding: 12px 16px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .single {
+    grid-template-columns: 1fr;
+  }
+
+  .actions button {
+    height: 48px;
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+    border-top: 1px solid var(--border);
+  }
+
+  .facts dt {
+    padding-bottom: 0;
+    border-bottom: 0;
+    font-size: 13px;
+  }
+
+  .facts dd {
+    padding-top: 2px;
+  }
+
+  .withheld {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .withheld svg {
+    display: none;
+  }
+
+  .address {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

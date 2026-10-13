@@ -504,6 +504,22 @@
   margin-top: 8px;
 }
 
+.providerLine {
+  margin: 16px 0 0;
+  font: 400 13px/1.5 'Instrument Sans', sans-serif;
+  color: #6d6d6d;
+}
+
+.providerLink {
+  font-weight: 600;
+  color: #5b5fa8;
+  text-decoration: none;
+}
+
+.providerLink:hover {
+  text-decoration: underline;
+}
+
 .elderNote {
   margin-top: 16px;
   font: 400 12px/1.6 'Instrument Sans', sans-serif;
