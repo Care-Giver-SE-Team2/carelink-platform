@@ -93,10 +93,19 @@ else:
         env = dict(os.environ, PATH=f"{self.directory}:{os.environ['PATH']}", FIXTURE=str(self.directory),
                    RELEASE_MANIFEST="release.json", IMAGE_REGISTRY=REGISTRY, KUBE_CONTEXT="runtime",
                    IMAGE_TAG="", DRY_RUN="0", AWS_PROFILE="carelink")
-        result = subprocess.run(["bash", "scripts/deploy-release.sh", "staging"], cwd=ROOT,
-                                env=env, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 42)
-        self.assertIn("--profile carelink", (self.directory / "preflight").read_text())
+        for profile in ("carelink", None):
+            with self.subTest(profile=profile):
+                if profile is None:
+                    env.pop("AWS_PROFILE", None)
+                    env.pop("AWS_DEFAULT_PROFILE", None)
+                result = subprocess.run(["/bin/bash", "scripts/deploy-release.sh", "staging"], cwd=ROOT,
+                                        env=env, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 42, result.stderr)
+                command = (self.directory / "preflight").read_text()
+                if profile:
+                    self.assertIn("--profile carelink", command)
+                else:
+                    self.assertNotIn("--profile", command)
 
 
 if __name__ == "__main__":

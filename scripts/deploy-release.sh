@@ -14,8 +14,8 @@ if [ -n "${IMAGE_TAG:-}" ] || [ "${DRY_RUN:-0}" != 0 ]; then
   echo "For offline rendering use DRY_RUN=1 scripts/deploy.sh; deploy-release.sh requires a release manifest" >&2
   exit 2
 fi
-profile=()
-if [ -n "${AWS_PROFILE:-}" ]; then profile=(--profile "$AWS_PROFILE"); fi
-python3 scripts/check-deployment.py "$1" --manifest "$RELEASE_MANIFEST" \
-  --registry "$IMAGE_REGISTRY" --context "$KUBE_CONTEXT" "${profile[@]}"
+check=(python3 scripts/check-deployment.py "$1" --manifest "$RELEASE_MANIFEST"
+  --registry "$IMAGE_REGISTRY" --context "$KUBE_CONTEXT")
+if [ -n "${AWS_PROFILE:-}" ]; then check+=(--profile "$AWS_PROFILE"); fi
+"${check[@]}"
 exec bash scripts/deploy.sh all "$1"
