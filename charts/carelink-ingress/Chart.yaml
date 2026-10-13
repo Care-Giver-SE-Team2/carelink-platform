@@ -1,0 +1,5 @@
+apiVersion: v2
+name: carelink-ingress
+description: Private ALB routing for the four CareLink API services
+type: application
+version: 0.1.0

@@ -1,0 +1,5 @@
+# Only enable with the reviewed CloudFront -> private ALB ingress.
+# CloudFront replaces Forwarded with proto=https; the ALB is not publicly reachable.
+env:
+  SERVER_FORWARD_HEADERS_STRATEGY: framework
+  SERVER_SERVLET_SESSION_COOKIE_SECURE: "true"

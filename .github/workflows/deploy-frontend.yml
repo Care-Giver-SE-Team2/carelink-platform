@@ -1,0 +1,55 @@
+name: Deploy static frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_run_id:
+        description: Successful main CI run containing the static frontend artifact (an earlier run rolls back)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: carelink-staging-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && vars.CARELINK_FRONTEND_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      AWS_EC2_METADATA_DISABLED: 'true'
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      FRONTEND_BUCKET: ${{ vars.CARELINK_FRONTEND_BUCKET }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CARELINK_CLOUDFRONT_DISTRIBUTION_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download and verify the selected frontend
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FRONTEND_RUN_ID: ${{ inputs.frontend_run_id }}
+        run: bash scripts/prepare-frontend-release.sh "$RUNNER_TEMP/frontend-release"
+
+      - name: Obtain temporary frontend publication credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_FRONTEND_DEPLOY_ROLE_ARN }}
+          aws-region: ap-southeast-1
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-duration-seconds: 1800
+          role-session-name: carelink-frontend-${{ github.run_id }}
+          unset-current-credentials: true
+
+      - name: Publish static files and refresh CloudFront
+        run: python3 scripts/publish-frontend.py "$RUNNER_TEMP/frontend-release"

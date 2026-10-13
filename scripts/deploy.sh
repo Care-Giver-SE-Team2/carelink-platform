@@ -122,6 +122,11 @@ for service in $selected; do
     --set-string "image.tag=$tag"
     --set-string "image.digest=$digest"
   )
+  case ${PUBLIC_HTTPS:-false} in
+    true) release+=(-f deploy/environments/public-https.yaml) ;;
+    false) ;;
+    *) echo "PUBLIC_HTTPS must be true or false" >&2; exit 2 ;;
+  esac
   if [ "${DRY_RUN:-0}" = 1 ]; then
     helm template "${release[@]}"
   else

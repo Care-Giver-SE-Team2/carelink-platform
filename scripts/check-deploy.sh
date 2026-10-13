@@ -16,3 +16,11 @@ for environment in staging demo; do
   DRY_RUN=1 IMAGE_REGISTRY=registry.invalid IMAGE_TAG=check scripts/deploy.sh all "$environment" >/dev/null
   echo "Rendered all services for $environment"
 done
+
+# Synthetic IDs for offline rendering only; never apply these values.
+helm lint charts/carelink-ingress --strict \
+  --set-json 'privateSubnetIds=["subnet-00000000000000001","subnet-00000000000000002"]' \
+  --set cloudFrontPrefixListId=pl-00000000000000001
+PUBLIC_HTTPS=true DRY_RUN=1 IMAGE_REGISTRY=registry.invalid IMAGE_TAG=check \
+  scripts/deploy.sh all staging >/dev/null
+echo "Rendered the private ALB routes and public HTTPS service configuration"

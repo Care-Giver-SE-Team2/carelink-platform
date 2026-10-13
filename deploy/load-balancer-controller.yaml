@@ -1,0 +1,27 @@
+# Use chart 1.14.0 with the reviewed v2.14.1 image; supply vpcId after runtime creation.
+clusterName: carelink-runtime
+region: ap-southeast-1
+replicaCount: 2
+image:
+  tag: v2.14.1
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+enableShield: false
+enableWaf: false
+enableWafv2: false
+enableServiceMutatorWebhook: false
+# This preview uses Ingress, not Gateway API.
+controllerConfig:
+  featureGates:
+    ALBGatewayAPI: false
+    NLBGatewayAPI: false
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+defaultTags:
+  Project: CareLink
+  Component: PublicIngress

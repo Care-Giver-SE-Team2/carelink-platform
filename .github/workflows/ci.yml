@@ -59,7 +59,7 @@ jobs:
             picked=$(for s in $all; do grep -q "^services/$s/" <<<"$changed" && echo "$s"; done || true)
           fi
           services=$(printf '%s\n' "$picked" | jq -Rsc 'split("\n") | map(select(length > 0))')
-          frontend=$(grep -qE '^(frontend/|\.github/workflows/ci\.yml)' <<<"$changed" && echo true || echo false)
+          frontend=$(grep -qE '^(frontend/|scripts/frontend-release\.py|\.github/workflows/ci\.yml)' <<<"$changed" && echo true || echo false)
           echo "services=$services" >> "$GITHUB_OUTPUT"
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
           echo "services: $services  front end: $frontend"
@@ -120,6 +120,21 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Record the static frontend release
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/frontend-release/site"
+          cp -R frontend/dist/. "$RUNNER_TEMP/frontend-release/site/"
+          python3 scripts/frontend-release.py build --directory "$RUNNER_TEMP/frontend-release" --sha "$RELEASE_SHA"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist-${{ github.sha }}
+          path: ${{ runner.temp }}/frontend-release/
+          retention-days: 7
+          if-no-files-found: error
+
   secret-scan:
     name: Secret scanning
     runs-on: ubuntu-latest
@@ -157,6 +172,10 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v4.3.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
 
       - name: Lint and render all services in both environments
         run: scripts/check-deploy.sh

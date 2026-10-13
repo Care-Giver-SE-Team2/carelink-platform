@@ -1,0 +1,18 @@
+# Supply the two reviewed private app subnets and the CloudFront managed prefix list.
+privateSubnetIds: []
+cloudFrontPrefixListId: ""
+# ImplementationSpecific rules stay in this order; the first match owns the route.
+routes:
+  - {path: "/^/api/notifications(/.*)?$", service: notification}
+  - {path: "/^/api/reports(/.*)?$", service: report}
+  - {path: "/^/api/value-added-service-requests(/.*)?$", service: report}
+  - {path: "/^/api/family/caregiver-reviews(/.*)?$", service: report}
+  - {path: "/^/api/family/value-added-service[^/]*(/.*)?$", service: report}
+  - {path: "/^/api/elders/me/value-added-service[^/]*(/.*)?$", service: report}
+  - {path: "/^/api/elders/[^/]+/weekly-summary(/.*)?$", service: report}
+  - {path: "/^/api/visits(/.*)?$", service: visit}
+  - {path: "/^/api/elders/me/visits(/.*)?$", service: visit}
+  - {path: "/^/api/caregivers/me$", service: visit}
+  - {path: "/^/api/caregivers/me/(schedule|incidents)(/.*)?$", service: visit}
+  - {path: "/^/api/caregivers/[0-9]+(/credentials)?$", service: visit}
+  - {path: "/^/api(/.*)?$", service: core}
