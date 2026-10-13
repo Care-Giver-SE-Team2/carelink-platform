@@ -77,6 +77,7 @@ jobs:
       AWS_DEFAULT_PROFILE: ''
       IMAGE_TAG: ''
       DRY_RUN: '0'
+      PUBLIC_HTTPS: ${{ vars.CARELINK_PUBLIC_HTTPS_ENABLED || 'false' }}
     defaults:
       run:
         shell: bash
