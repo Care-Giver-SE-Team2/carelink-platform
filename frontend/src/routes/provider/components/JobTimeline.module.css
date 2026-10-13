@@ -1,0 +1,139 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 22px;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+/* The rule down to the next step: solid between steps that happened, light before one to come. */
+.step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  bottom: 2px;
+  left: 5px;
+  width: 1px;
+  background: var(--text);
+}
+
+.beforePending::after,
+.pending::after {
+  background: var(--border) !important;
+}
+
+.marker {
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  background: var(--text);
+}
+
+.latest .marker {
+  background: var(--success);
+}
+
+.stopped .marker {
+  background: var(--danger);
+}
+
+.pending .marker {
+  border: 1px solid #a0a0a0;
+  background: transparent;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.stopped .label {
+  color: var(--danger);
+}
+
+.pending .label {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.atLong,
+.atShort {
+  font: 400 12.5px/1.4 var(--font-mono);
+  color: var(--text-muted);
+}
+
+.atShort {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .card {
+    gap: 8px;
+    padding: 0;
+    border: 0;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(var(--steps), minmax(0, 1fr));
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .step {
+    display: block;
+    padding: 6px 0 0;
+    border-top: 3px solid var(--text);
+  }
+
+  .step::after,
+  .marker {
+    display: none;
+  }
+
+  .latest {
+    border-top-color: var(--success);
+  }
+
+  .stopped {
+    border-top-color: var(--danger);
+  }
+
+  .pending {
+    border-top-color: var(--border);
+  }
+
+  .atLong {
+    display: none;
+  }
+
+  .atShort {
+    display: inline;
+    font-size: 12px;
+  }
+}

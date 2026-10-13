@@ -7,7 +7,7 @@ import styles from './ProviderApplicationTable.module.css'
 
 /**
  * Provider applications waiting for an answer: the organisation and who to contact, the
- * services it offers, where it works and when it came in. A row opens in the application panel.
+ * services it offers and when it came in. A row opens in the application panel.
  */
 export function ProviderApplicationTable({
   rows,
@@ -37,12 +37,6 @@ export function ProviderApplicationTable({
       render: (row) => <span className={styles.services}>{listLabel(row.services) ?? '—'}</span>,
     },
     {
-      key: 'area',
-      label: 'Area',
-      width: '88px',
-      render: (row) => <span className={styles.mono}>{listLabel(row.serviceArea) ?? '—'}</span>,
-    },
-    {
       key: 'received',
       label: 'Received',
       width: '88px',
@@ -59,7 +53,7 @@ export function ProviderApplicationTable({
       rowKey={(row) => String(row.id)}
       onRowClick={onSelect}
       selectedKey={selectedId === null ? null : String(selectedId)}
-      empty="No applications waiting. New ones from the provider workbench appear here."
+      empty="No applications waiting. New ones from the Partner Portal appear here."
     />
   )
 }

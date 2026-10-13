@@ -1,31 +1,46 @@
+import {
+  approveApplication,
+  listApplicationsForReview,
+  listApprovedProviders,
+  rejectApplication,
+  reinstateProvider as reinstate,
+  suspendProvider as suspend,
+} from '../../../features/provider-platform/mockPlatform'
+import type { ReviewApplication } from '../../../features/provider-platform/mockPlatform'
+import type { IntegrationHealth, JobTab } from '../../../features/provider-platform/types'
+
 /**
- * Provider applications (PT01): an in-memory store standing in for the provider onboarding
- * endpoints, which don't exist yet. A third-party provider applies from the provider workbench
- * through the public Open API; the manager approves or declines here. The internal endpoints
- * this mimics (path and owning service still to be settled with the Open API contract):
+ * Provider applications (PT01), served by the mock Open Platform in
+ * features/provider-platform/mockPlatform.ts until the onboarding endpoints exist. A third-party
+ * provider applies from the Partner Portal (/provider) through the public Open API; the
+ * manager approves or declines here, and the Partner Portal sees the decision. The internal
+ * endpoints this stands for (path and owning service still to be settled with the Open API
+ * contract):
  *
  *   GET  /api/provider-applications              pending applications, newest first
  *   POST /api/provider-applications/{id}/approve { message }  → { providerId }
  *        registers the provider, creates its OAuth2 client for the Open API and its webhook
- *        signing secret; the provider collects both once from the workbench
+ *        signing secret; the provider collects both once from the Partner Portal
  *   POST /api/provider-applications/{id}/decline { message }  (message required)
- *   GET  /api/providers                          approved providers, newest first
+ *   GET  /api/providers                          approved providers, newest first, with the
+ *        last seven days' webhook deliveries and their jobs by state
+ *   POST /api/providers/{id}/suspend             tokens refused, no jobs or webhooks
+ *   POST /api/providers/{id}/reinstate
  *
  * The manager never sees the client secret or the webhook secret, only the client id.
  * `services` are names from report's value-added catalogue, so a provider can be dispatched the
- * jobs it offers; `serviceArea` uses the same sector codes as caregivers.
+ * jobs it offers.
  */
 
 export type ProviderApplication = {
   id: number
+  /** "APP-2026-00412": what the provider quotes. */
+  reference: string
   organisationName: string
-  /** Singapore business registration number. */
-  uen: string
   contactName: string
   contactEmail: string
   contactPhone: string | null
   services: string[]
-  serviceArea: string[]
   /** Where job webhooks are sent once approved. */
   webhookUrl: string
   submittedAt: string
@@ -36,96 +51,60 @@ export type Provider = ProviderApplication & {
   /** The OAuth2 client id for the Open API. Not secret; the secret is shown only to the provider. */
   clientId: string
   approvedAt: string
+  suspended: boolean
+  health: IntegrationHealth
+  /** Jobs dispatched to it, by state; `closed` is declined and cancelled. */
+  jobs: Record<JobTab, number>
 }
 
-/** Mock provider ids start here so they never collide with application ids. */
-const MOCK_PROVIDER_ID_BASE = 100
-
-const HOUR_MS = 60 * 60 * 1000
-
-function hoursAgo(hours: number): string {
-  return new Date(Date.now() - hours * HOUR_MS).toISOString()
-}
-
-let pending: ProviderApplication[] = [
-  {
-    id: 14,
-    organisationName: 'Kampung Care Escorts Pte Ltd',
-    uen: '202312345K',
-    contactName: 'Siti Aminah',
-    contactEmail: 'ops@kampungcare.sg',
-    contactPhone: '+65 6123 4501',
-    services: ['Hospital escort', 'Companionship'],
-    serviceArea: ['AMK', 'BSH'],
-    webhookUrl: 'https://api.kampungcare.sg/carelink/webhooks',
-    submittedAt: hoursAgo(2),
-  },
-  {
-    id: 13,
-    organisationName: 'FreshCart Errands',
-    uen: '53412987C',
-    contactName: 'Daniel Goh',
-    contactEmail: 'daniel@freshcart.com.sg',
-    contactPhone: null,
-    services: ['Grocery assistance'],
-    serviceArea: ['TPY'],
-    webhookUrl: 'https://hooks.freshcart.com.sg/carelink',
-    submittedAt: hoursAgo(30),
-  },
-]
-
-let approved: Provider[] = [
-  {
-    id: 9,
-    providerId: MOCK_PROVIDER_ID_BASE + 9,
-    organisationName: 'BrightHome Services',
-    uen: '201998765M',
-    contactName: 'Ravi Kumar',
-    contactEmail: 'partners@brighthome.sg',
-    contactPhone: '+65 6789 2210',
-    services: ['Light housekeeping'],
-    serviceArea: ['AMK', 'TPY'],
-    webhookUrl: 'https://brighthome.sg/api/carelink-jobs',
-    submittedAt: hoursAgo(24 * 9),
-    clientId: mockClientId(9),
-    approvedAt: hoursAgo(24 * 8),
-  },
-]
-
-/** A stand-in for the client id Cognito would issue. */
-function mockClientId(applicationId: number): string {
-  return `mock-client-${String(applicationId).padStart(4, '0')}`
-}
-
-function take(id: number): ProviderApplication {
-  const application = pending.find((a) => a.id === id)
-  if (!application) throw new Error('This application has already been answered.')
-  pending = pending.filter((a) => a.id !== id)
-  return application
+function toApplication(app: ReviewApplication): ProviderApplication {
+  return {
+    id: app.seq,
+    reference: app.id,
+    organisationName: app.organisationName,
+    contactName: app.contactName,
+    contactEmail: app.contactEmail,
+    contactPhone: app.contactPhone || null,
+    services: app.services,
+    webhookUrl: app.webhookUrl,
+    submittedAt: app.submittedAt,
+  }
 }
 
 /** Applications waiting for an answer, newest first. */
 export async function fetchProviderApplications(): Promise<ProviderApplication[]> {
-  return [...pending].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+  return listApplicationsForReview().map(toApplication)
 }
 
 /** Approved providers, most recently approved first. */
 export async function fetchProviders(): Promise<Provider[]> {
-  return [...approved].sort((a, b) => b.approvedAt.localeCompare(a.approvedAt))
+  return listApprovedProviders().map((p) => ({
+    ...toApplication(p),
+    providerId: p.providerId,
+    clientId: p.clientId,
+    approvedAt: p.approvedAt,
+    suspended: p.suspended,
+    health: p.health,
+    jobs: p.jobs,
+  }))
+}
+
+/** Suspends the provider: its tokens stop working, so it can't see or act on jobs. */
+export async function suspendProvider(id: number): Promise<void> {
+  suspend(id)
+}
+
+/** Lifts a suspension. */
+export async function reinstateProvider(id: number): Promise<void> {
+  reinstate(id)
 }
 
 /** Approves the application: the provider is registered and its Open API client created. */
-export async function approveProviderApplication(id: number, _message: string | null): Promise<{ providerId: number }> {
-  const application = take(id)
-  const providerId = MOCK_PROVIDER_ID_BASE + application.id
-  approved = [
-    ...approved,
-    { ...application, providerId, clientId: mockClientId(application.id), approvedAt: new Date().toISOString() },
-  ]
-  return { providerId }
+export async function approveProviderApplication(id: number, message: string | null): Promise<{ providerId: number }> {
+  return approveApplication(id, message)
 }
 
 /** Declines the application; `message` tells the provider why when they check their status. */
-export async function declineProviderApplication(id: number, _message: string): Promise<void> {
-  take(id)
+export async function declineProviderApplication(id: number, message: string): Promise<void> {
+  rejectApplication(id, message)
 }

@@ -7,17 +7,23 @@ import { ProviderApplicationPanel } from '../components/ProviderApplicationPanel
 import { ProviderApplicationTable } from '../components/ProviderApplicationTable'
 import { ProviderPanel } from '../components/ProviderPanel'
 import { ProviderTable } from '../components/ProviderTable'
-import { approveProviderApplication, declineProviderApplication } from '../data/providerApplications'
+import {
+  approveProviderApplication,
+  declineProviderApplication,
+  reinstateProvider,
+  suspendProvider,
+} from '../data/providerApplications'
 import type { ProviderApplication } from '../data/providerApplications'
 import { nextApplicationId } from '../lib/caregivers'
 import { useProviderApplications, useProviders } from '../lib/useProviderApplications'
 import styles from './Providers.module.css'
 
 /**
- * Providers — PT01. Third-party providers apply from the provider workbench with their
+ * Providers — PT01. Third-party providers apply from the Partner Portal with their
  * organisation, the services they offer and their webhook; the applications wait at the top
  * until the manager approves (which gives the provider access to the Open API) or declines with
- * a reason. Below is every approved provider. Either kind of row opens in the panel on the right.
+ * a reason. Below is every approved provider and how its integration is doing; one can be
+ * suspended and reinstated. Either kind of row opens in the panel on the right.
  * The open row lives in the URL (?application=14, ?provider=109).
  */
 export default function Providers() {
@@ -136,7 +142,7 @@ export default function Providers() {
               decide(
                 selectedApplication,
                 async () => (await approveProviderApplication(selectedApplication.id, message)).providerId,
-                `${selectedApplication.organisationName} approved. They can now collect their Open API credentials from the workbench.`,
+                `${selectedApplication.organisationName} approved. They can now collect their Open API credentials from the Partner Portal.`,
               )
             }
             onDecline={(message) =>
@@ -146,12 +152,25 @@ export default function Providers() {
                   await declineProviderApplication(selectedApplication.id, message)
                   return null
                 },
-                `${selectedApplication.organisationName}'s application declined. They'll see your reason in the workbench.`,
+                `${selectedApplication.organisationName}'s application declined. They'll see your reason in the Partner Portal.`,
               )
             }
           />
         ) : selectedProvider ? (
-          <ProviderPanel key={`provider-${selectedProvider.providerId}`} provider={selectedProvider} />
+          <ProviderPanel
+            key={`provider-${selectedProvider.providerId}`}
+            provider={selectedProvider}
+            onSuspend={async () => {
+              await suspendProvider(selectedProvider.id)
+              await queryClient.invalidateQueries({ queryKey: ['providers'] })
+              setNotice(`${selectedProvider.organisationName} suspended. Its tokens no longer work.`)
+            }}
+            onReinstate={async () => {
+              await reinstateProvider(selectedProvider.id)
+              await queryClient.invalidateQueries({ queryKey: ['providers'] })
+              setNotice(`${selectedProvider.organisationName} reinstated.`)
+            }}
+          />
         ) : (
           <aside className={styles.emptyPanel} aria-label="Provider detail">
             {providers.isSuccess && applications.isSuccess && <MetaText tone="faint">Nothing to show yet.</MetaText>}

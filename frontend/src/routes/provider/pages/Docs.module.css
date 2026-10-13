@@ -1,0 +1,130 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 820px;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font: 600 22px/1.25 var(--font);
+}
+
+.sub {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.section p {
+  margin: 0;
+}
+
+.section code {
+  font: 400 13.5px/1 var(--font-mono);
+}
+
+.heading {
+  margin: 0;
+  font: 600 18px/1.25 var(--font);
+}
+
+.code {
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  font: 400 12.5px/1.6 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Weight and alignment set outright: a family stylesheet styles every dl/dt/dd. */
+.headersList {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
+}
+
+.headersList dt,
+.headersList dd {
+  margin: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+  font-weight: 400;
+  text-align: left;
+}
+
+.headersList dt {
+  font: 500 13px/1.5 var(--font-mono);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table td {
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.method {
+  width: 56px;
+  font: 500 12.5px/1.5 var(--font-mono);
+  color: var(--accent);
+}
+
+.path {
+  width: 42%;
+  font: 400 13px/1.5 var(--font-mono);
+}
+
+@media (max-width: 599px) {
+  .headersList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .headersList dt {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .table tr {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .table td:nth-child(3) {
+    grid-column: 1 / -1;
+    padding-top: 2px;
+    color: var(--text-secondary);
+  }
+
+  .path {
+    width: auto;
+  }
+}

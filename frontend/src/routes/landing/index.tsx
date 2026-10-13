@@ -351,6 +351,12 @@ export default function LandingHome() {
               </div>
               <div className={styles.applyCardCaption}>Create a login with a username and password.</div>
             </Link>
+            <p className={styles.providerLine}>
+              Are you a service provider?{' '}
+              <Link to="/provider" className={styles.providerLink}>
+                Join the CareLink Open Platform →
+              </Link>
+            </p>
           </div>
         </form>
       </div>
