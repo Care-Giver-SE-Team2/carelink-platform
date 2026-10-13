@@ -42,3 +42,6 @@ dependency-check-report.html
 *.backend.hcl
 /infra/local-notes.md
 /infra/.local/
+
+# Python helper bytecode
+__pycache__/

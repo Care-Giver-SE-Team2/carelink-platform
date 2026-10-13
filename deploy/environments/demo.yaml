@@ -1,0 +1,6 @@
+# Shared by all four services in demo; endpoints and credentials are in Secrets.
+rdsTruststoreConfigMap: rds-ca
+env:
+  SPRING_SESSION_DATA_REDIS_NAMESPACE: carelink:demo:session
+  CARELINK_EVENTS_REGION: ap-southeast-1
+  AWS_EC2_METADATA_DISABLED: "true"

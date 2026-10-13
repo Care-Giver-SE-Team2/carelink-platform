@@ -147,9 +147,26 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  deployment-config:
+    name: Helm deployment configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v4.3.0
+
+      - name: Lint and render all services in both environments
+        run: scripts/check-deploy.sh
+
+      - name: Check release manifests and runtime configuration injection offline
+        run: python3 -m unittest discover -s scripts/tests -v
+
   gate:
     name: Quality gate
-    needs: [changes, service, frontend, secret-scan]
+    needs: [changes, service, frontend, secret-scan, deployment-config]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -160,6 +177,7 @@ jobs:
           SERVICE_RESULT: ${{ needs.service.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           SECRETS_RESULT: ${{ needs.secret-scan.result }}
+          DEPLOYMENT_RESULT: ${{ needs.deployment-config.result }}
         run: |
           {
             echo "### Quality gate"
@@ -169,6 +187,7 @@ jobs:
             echo "| Services $SERVICES | $SERVICE_RESULT |"
             echo "| Front end | $FRONTEND_RESULT |"
             echo "| Secret scanning | $SECRETS_RESULT |"
+            echo "| Helm deployment configuration | $DEPLOYMENT_RESULT |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if anything that ran failed
