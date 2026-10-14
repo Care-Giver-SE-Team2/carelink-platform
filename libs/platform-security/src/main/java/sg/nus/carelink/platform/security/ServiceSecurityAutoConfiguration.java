@@ -4,9 +4,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.web.OAuth2ResourceServerWebSecurityAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderNotFoundException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -26,11 +29,16 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  *
  * <p>Applies only when the application has no {@link SecurityFilterChain} of its own, so core, which
  * signs people in, keeps its own configuration. It runs before Spring Boot's default web security,
- * which would otherwise define a chain first.
+ * and its OAuth2 resource server's, which would otherwise define a chain first.
+ *
+ * <p>A service that serves the Open Platform also gets {@link OpenPlatformSecurityConfiguration}'s
+ * chain for {@code /api/open/**}, ahead of this one, once it sets {@code carelink.open-platform.jwk-set-uri}.
  */
-@AutoConfiguration(before = {ManagementWebSecurityAutoConfiguration.class, ServletWebSecurityAutoConfiguration.class})
+@AutoConfiguration(before = {ManagementWebSecurityAutoConfiguration.class, ServletWebSecurityAutoConfiguration.class,
+		OAuth2ResourceServerAutoConfiguration.class, OAuth2ResourceServerWebSecurityAutoConfiguration.class})
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnMissingBean(SecurityFilterChain.class)
+@Import(OpenPlatformSecurityConfiguration.class)
 public class ServiceSecurityAutoConfiguration {
 
 	@Bean
@@ -75,6 +83,13 @@ public class ServiceSecurityAutoConfiguration {
 	@ConditionalOnMissingBean
 	SignedInUsers signedInUsers() {
 		return new SignedInUsers();
+	}
+
+	/** Who calls an {@code /api/open} path; without the Open Platform's chain, nobody ever is. */
+	@Bean
+	@ConditionalOnMissingBean
+	OpenPlatformCallers openPlatformCallers() {
+		return new OpenPlatformCallers();
 	}
 
 	/** {@link SignedInUsers#require()} answers 401, whatever exception handlers the service has. */

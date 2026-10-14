@@ -38,6 +38,26 @@ public record WebhookEndpoint(
 		return new WebhookEndpoint(providerId, url, events, signingSecret, null, null, true);
 	}
 
+	/** The endpoint moved or its events changed: the deliveries created from now on follow it. */
+	public WebhookEndpoint withSettings(URI newUrl, Set<WebhookEvent> newEvents) {
+		return new WebhookEndpoint(providerId, newUrl, newEvents, signingSecret, previousSigningSecret,
+				previousSecretUntil, enabled);
+	}
+
+	/**
+	 * A new signing secret, sealed. The one it replaces is signed with too until {@code overlapUntil},
+	 * so that the provider can deploy the new one first (docs/api/webhooks.md, section 5).
+	 */
+	public WebhookEndpoint rotated(String newSealedSecret, Instant overlapUntil) {
+		return new WebhookEndpoint(providerId, url, events, newSealedSecret, signingSecret, overlapUntil, enabled);
+	}
+
+	/** Sent to, or not: a suspended provider's endpoint is disabled until it is reinstated. */
+	public WebhookEndpoint withEnabled(boolean sending) {
+		return new WebhookEndpoint(providerId, url, events, signingSecret, previousSigningSecret, previousSecretUntil,
+				sending);
+	}
+
 	/** Whether {@code event} is sent here: anything subscribed to, and every ping, while enabled. */
 	public boolean receives(WebhookEvent event) {
 		return enabled && (event == WebhookEvent.PING || events.contains(event));

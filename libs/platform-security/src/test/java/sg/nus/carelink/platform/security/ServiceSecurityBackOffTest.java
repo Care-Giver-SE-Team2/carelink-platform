@@ -8,7 +8,9 @@ import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
 import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -40,6 +42,42 @@ class ServiceSecurityBackOffTest {
 			assertThat(context).hasBean("ownChain");
 			assertThat(context).doesNotHaveBean(SignedInUsers.class);
 		});
+	}
+
+	@Test
+	void anApplicationWithItsOwnChainGetsNoOpenPlatformChainEither() {
+		runner.withUserConfiguration(OwnSecurity.class)
+				.withPropertyValues("carelink.open-platform.jwk-set-uri=http://keys.invalid/jwks.json")
+				.run(context -> {
+					assertThat(context).hasSingleBean(SecurityFilterChain.class);
+					assertThat(context).doesNotHaveBean("openPlatformSecurityFilterChain");
+				});
+	}
+
+	@Test
+	void aServiceThatScansThisPackageStillGetsBothChains() {
+		runner.withUserConfiguration(ScansTheLibrary.class)
+				.withPropertyValues("carelink.open-platform.jwk-set-uri=http://keys.invalid/jwks.json")
+				.run(context -> {
+					assertThat(context.getBeanNamesForType(SecurityFilterChain.class))
+							.containsExactlyInAnyOrder("openPlatformSecurityFilterChain", "serviceSecurityFilterChain");
+					assertThat(context).hasSingleBean(SignedInUsers.class);
+				});
+	}
+
+	@Test
+	void aServiceThatServesNoOpenPathGetsNoOpenPlatformChain() {
+		runner.run(context -> {
+			assertThat(context).doesNotHaveBean("openPlatformSecurityFilterChain");
+			assertThat(context.getBean(OpenPlatformCallers.class).current()).isEmpty();
+		});
+	}
+
+	/** As every service is: its application class in sg.nus.carelink, scanning this package too (not its tests). */
+	@Configuration(proxyBeanMethods = false)
+	@ComponentScan(basePackageClasses = ServiceSecurityAutoConfiguration.class,
+			excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*Test(\\$.*)?"))
+	static class ScansTheLibrary {
 	}
 
 	@Configuration(proxyBeanMethods = false)

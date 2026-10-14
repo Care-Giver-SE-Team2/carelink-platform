@@ -138,15 +138,7 @@ public class WebhookDeliveryService {
 			return;
 		}
 		Instant at = clock.instant();
-		long timestamp = at.getEpochSecond();
-		List<String> keys = endpoint.get().sealedSigningSecrets(at).stream().map(secrets::reveal).toList();
-		Map<String, String> headers = new LinkedHashMap<>();
-		headers.put("Content-Type", "application/json");
-		headers.put("User-Agent", USER_AGENT);
-		headers.put("X-CareLink-Delivery", delivery.id());
-		headers.put("X-CareLink-Event", delivery.event().wireName());
-		headers.put("X-CareLink-Timestamp", Long.toString(timestamp));
-		headers.put("X-CareLink-Signature", WebhookSignature.header(keys, timestamp, delivery.body()));
+		Map<String, String> headers = signedHeaders(delivery, endpoint.get(), at);
 
 		WebhookTransport.Outcome outcome = transport.post(delivery.url(), headers, delivery.body());
 		DeliveryAttempt attempt = new DeliveryAttempt(delivery.id(), delivery.nextAttemptNo(), at, outcome.status(),
@@ -159,6 +151,23 @@ public class WebhookDeliveryService {
 		else if (after.status() == Delivery.Status.FAILED) {
 			log.info("Webhook delivery {} failed after {} attempts", delivery.id(), after.attemptCount());
 		}
+	}
+
+	/**
+	 * The headers an attempt at {@code at} sends (docs/api/webhooks.md, section 3), signed with the
+	 * endpoint's secrets as they stand at {@code at}. The portal's delivery log shows them too.
+	 */
+	public Map<String, String> signedHeaders(Delivery delivery, WebhookEndpoint endpoint, Instant at) {
+		long timestamp = at.getEpochSecond();
+		List<String> keys = endpoint.sealedSigningSecrets(at).stream().map(secrets::reveal).toList();
+		Map<String, String> headers = new LinkedHashMap<>();
+		headers.put("Content-Type", "application/json");
+		headers.put("User-Agent", USER_AGENT);
+		headers.put("X-CareLink-Delivery", delivery.id());
+		headers.put("X-CareLink-Event", delivery.event().wireName());
+		headers.put("X-CareLink-Timestamp", Long.toString(timestamp));
+		headers.put("X-CareLink-Signature", WebhookSignature.header(keys, timestamp, delivery.body()));
+		return headers;
 	}
 
 	/** The envelope every event has (webhooks.md, section 4), in that order. */

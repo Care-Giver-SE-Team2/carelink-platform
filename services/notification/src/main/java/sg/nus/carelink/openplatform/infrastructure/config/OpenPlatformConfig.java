@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import sg.nus.carelink.openplatform.application.SigningSecrets;
+import sg.nus.carelink.openplatform.application.WebhookUrlRule;
 import sg.nus.carelink.openplatform.infrastructure.secrets.EncryptedSigningSecrets;
 
 /**
@@ -13,6 +14,8 @@ import sg.nus.carelink.openplatform.infrastructure.secrets.EncryptedSigningSecre
  * attempts need, and how signing secrets are kept: encrypted in notification's own database, with
  * the key from {@code carelink.webhooks.encryption-key}. A missing or malformed key stops the
  * service at start-up, not at the first webhook.
+ *
+ * <p>Providers' identities and tokens are {@code identity.IdentityConfig}'s.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
@@ -22,5 +25,10 @@ class OpenPlatformConfig {
 	@Bean
 	SigningSecrets signingSecrets(WebhookProperties properties) {
 		return new EncryptedSigningSecrets(properties.encryptionKey());
+	}
+
+	@Bean
+	WebhookUrlRule webhookUrlRule(WebhookProperties properties) {
+		return new WebhookUrlRule(properties.allowLocalEndpoints());
 	}
 }

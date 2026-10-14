@@ -75,7 +75,13 @@ export function ProviderPanel({
             {health.lastDeliveredAt ? formatReceived(health.lastDeliveredAt) : <NotGiven text="never" />}
           </Detail>
           <Detail label="Jobs">
-            {jobs.new} new · {jobs.accepted} accepted · {jobs.completed} completed · {jobs.closed} declined or cancelled
+            {jobs ? (
+              <>
+                {jobs.new} new · {jobs.accepted} accepted · {jobs.completed} completed · {jobs.closed} declined or cancelled
+              </>
+            ) : (
+              <NotGiven text="shown once report serves the job API" />
+            )}
           </Detail>
         </dl>
       </section>

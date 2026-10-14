@@ -21,6 +21,13 @@ class WebMvcConfig implements WebMvcConfigurer {
 	/** Family sign-up happens before there is an account. Mirrors the permitAll in SecurityConfig. */
 	static final String FAMILY_REGISTRATION_PATH = "/api/family-registrations";
 	static final String ELDER_REGISTRATION_PATH = "/api/elder-registrations";
+	/**
+	 * The Open Platform's calls made before there is a token: applying, signing in to the Partner Portal,
+	 * the client-credentials grant and the key set. Mirrors the permitAll in platform-security's
+	 * OpenPlatformSecurityConfiguration; every other /api/open path is called with a token.
+	 */
+	static final String[] OPEN_PLATFORM_PUBLIC_PATHS = { "/api/open/v1/applications", "/api/open/v1/portal/sessions",
+			"/api/open/v1/oauth2/token", "/api/open/v1/.well-known/jwks.json" };
 
 	private final RequestContextInterceptor requestContext;
 
@@ -29,7 +36,8 @@ class WebMvcConfig implements WebMvcConfigurer {
 	}
 
 	/**
-	 * Register API request context handling, excluding login, CSRF initialization and family sign-up.
+	 * Register API request context handling, excluding login, CSRF initialization, family sign-up and the
+	 * Open Platform's public calls.
 	 *
 	 * @param registry Spring MVC interceptor registry
 	 *
@@ -39,6 +47,7 @@ class WebMvcConfig implements WebMvcConfigurer {
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(requestContext)
 				.addPathPatterns(API_PATHS)
-				.excludePathPatterns(LOGIN_PATH, CSRF_PATH, FAMILY_REGISTRATION_PATH, ELDER_REGISTRATION_PATH);
+				.excludePathPatterns(LOGIN_PATH, CSRF_PATH, FAMILY_REGISTRATION_PATH, ELDER_REGISTRATION_PATH)
+				.excludePathPatterns(OPEN_PLATFORM_PUBLIC_PATHS);
 	}
 }

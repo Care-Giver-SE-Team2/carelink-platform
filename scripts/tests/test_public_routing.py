@@ -15,7 +15,7 @@ class PublicRoutingTest(unittest.TestCase):
             "--set-json", 'privateSubnetIds=["subnet-00000000000000001","subnet-00000000000000002"]',
             "--set", "cloudFrontPrefixListId=pl-00000000000000001"], cwd=ROOT, text=True)
         entries = re.findall(r'- path: "([^"\n]+)"\s+pathType: ImplementationSpecific\s+backend:\s+service:\s+name: (\w+)', rendered)
-        self.assertEqual(len(entries), 13)
+        self.assertEqual(len(entries), 16)
         cases = {
             "/api/auth/login": "core", "/api/caregivers/me/absences": "core",
             "/api/caregivers/42/spot-checks": "core", "/api/family/elders": "core",
@@ -26,6 +26,10 @@ class PublicRoutingTest(unittest.TestCase):
             "/api/elders/7/weekly-summary": "report", "/api/family/caregiver-reviews": "report",
             "/api/family/value-added-services": "report", "/api/elders/me/value-added-service": "report",
             "/api/value-added-service-requests": "report", "/api/notifications": "notification",
+            "/api/provider-applications/417/approve": "notification", "/api/providers": "notification",
+            "/api/providers/509/suspend": "notification",
+            "/api/open/v1/applications": "notification", "/api/open/v1/portal/sessions": "notification",
+            "/api/open/v1/oauth2/token": "notification",
             "/actuator/health": None, "/internal/v1/users": None,
         }
         for path, expected in cases.items():

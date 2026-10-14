@@ -20,3 +20,10 @@ carelink:
     # Who reads the inbox and which elders a family member may read. For a run outside Docker;
     # overridden by CARELINK_COREAPI_BASEURL
     base-url: http://localhost:8080
+  open-platform:
+    # notification issues the Open Platform's tokens and checks them on /api/open/** (docs/section5/decisions.md,
+    # D15), the same locally and in the cloud. Setting the key set turns the check on (libs/platform-security);
+    # notification checks with its own key, and report will fetch this URL, at notification's in-cluster address
+    jwk-set-uri: http://localhost:8080/api/open/v1/.well-known/jwks.json
+    # The tokens' iss, which every service checks: a name, as no client discovers anything from it
+    issuer: carelink-open-platform

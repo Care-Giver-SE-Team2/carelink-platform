@@ -64,4 +64,36 @@ class WebhookEndpointTest {
 		assertThat(DeliveryIds.next(RandomGenerator.of("L64X128MixRandom")))
 				.matches("dlv_[0-9A-Za-z]{16}");
 	}
+
+	@Test
+	void movingTheEndpointKeepsItsSecrets() {
+		WebhookEndpoint endpoint = WebhookEndpoint.of(509, URL, Set.of(WebhookEvent.JOB_DISPATCHED), "ref-1");
+		URI moved = URI.create("https://new.example.sg/hooks");
+
+		WebhookEndpoint after = endpoint.withSettings(moved, Set.of(WebhookEvent.JOB_CANCELLED));
+
+		assertThat(after.url()).isEqualTo(moved);
+		assertThat(after.events()).containsExactly(WebhookEvent.JOB_CANCELLED);
+		assertThat(after.signingSecret()).isEqualTo("ref-1");
+		assertThat(after.enabled()).isTrue();
+	}
+
+	@Test
+	void aRotatedSecretKeepsTheOldOneUntilTheOverlapEnds() {
+		WebhookEndpoint rotated = WebhookEndpoint.of(509, URL, Set.of(), "ref-1")
+				.rotated("ref-2", NOW.plusSeconds(3600));
+
+		assertThat(rotated.sealedSigningSecrets(NOW)).containsExactly("ref-2", "ref-1");
+		assertThat(rotated.sealedSigningSecrets(NOW.plusSeconds(3600))).containsExactly("ref-2");
+	}
+
+	@Test
+	void disablingAndEnablingKeepEverythingElse() {
+		WebhookEndpoint endpoint = WebhookEndpoint.of(509, URL, Set.of(WebhookEvent.JOB_DISPATCHED), "ref-1");
+
+		WebhookEndpoint disabled = endpoint.withEnabled(false);
+
+		assertThat(disabled.enabled()).isFalse();
+		assertThat(disabled.withEnabled(true)).isEqualTo(endpoint);
+	}
 }
