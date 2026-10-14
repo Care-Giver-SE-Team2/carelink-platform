@@ -53,13 +53,13 @@ jobs:
             changed=$(git diff --name-only "$BASE" HEAD)
           fi
           shared='^(pom\.xml|mvnw|\.mvn/|build/|charts/|libs/|docs/api/|scripts/(build|push-image)\.sh|\.github/workflows/(ci|service)\.yml)'
-          if grep -qE "$shared" <<<"$changed"; then
+          if [ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ] || grep -qE "$shared" <<<"$changed"; then
             picked=$all
           else
             picked=$(for s in $all; do grep -q "^services/$s/" <<<"$changed" && echo "$s"; done || true)
           fi
           services=$(printf '%s\n' "$picked" | jq -Rsc 'split("\n") | map(select(length > 0))')
-          frontend=$(grep -qE '^(frontend/|scripts/frontend-release\.py|\.github/workflows/ci\.yml)' <<<"$changed" && echo true || echo false)
+          frontend=$([ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ] || grep -qE '^(frontend/|scripts/frontend-release\.py|\.github/workflows/ci\.yml)' <<<"$changed" && echo true || echo false)
           echo "services=$services" >> "$GITHUB_OUTPUT"
           echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
           echo "services: $services  front end: $frontend"

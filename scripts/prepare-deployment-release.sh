@@ -29,6 +29,10 @@ for service in core visit report notification; do
   fi
   sha=$(jq -r '.head_sha' <<<"$metadata")
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+  if [ -n "${RELEASE_SHA:-}" ] && [ "$sha" != "$RELEASE_SHA" ]; then
+    echo "$service: CI commit differs from the selected release" >&2
+    exit 1
+  fi
   gh run download "$run_id" --repo "$GH_REPO" \
     --name "ecr-reference-$service-$sha" --dir "$records/$service"
   record="$records/$service/image-record.json"

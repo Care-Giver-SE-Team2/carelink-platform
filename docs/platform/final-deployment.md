@@ -43,12 +43,16 @@ ALB 通过 AWS Load Balancer Controller 根据 Ingress 创建。后端 Service �
 | 可部署产物 | `dist` 静态文件，提交号与文件 SHA-256 清单 | ECR 镜像，提交号与 image digest |
 | 发布目标 | 私有 S3 前端桶 | 四个 ECR 仓库 |
 | CD | 验证成功 main CI 的产物，上传 S3，刷新 CloudFront | 验证发布清单，Helm 部署四个服务 |
-| runner | GitHub 托管 runner 即可 | 当前私有 EKS API 的演示部署使用临时 Mac runner |
+| runner | GitHub 托管 runner 即可 | GitHub 托管 runner 触发 VPC 内的 AWS CodeBuild 部署任务 |
 | 回滚 | 选择之前成功 CI 的前端产物，再发布 | 选择之前的四服务镜像发布清单 |
 
 此前前端并非没有 CI：原流水线已有 lint、单元测试和 build，缺的是产物保存与云端 CD。这次补的是这两部分。前端和后端允许分别发布；必须共同验收 API 兼容性。
 
-暂时保留手动触发 staging 发布及部署开关，适合有限预算的演示窗口。这里的 CI/CD 不代表每次提交都会自动创建整套收费环境；Terraform 的基础设施创建与应用发布是不同操作。
+main 的 CI 成功后自动触发 Deploy staging：核对来源仓库及提交，部署同一次 CI 的四个后端镜像，更新 API 路由，再发布该提交的前端产物并刷新 CloudFront。main CI 每次生成完整的前后端发布产物，PR 继续按变更范围检查。部署开关 `CARELINK_AUTO_DEPLOY_ENABLED` 控制现有环境的自动发布；不创建整套基础设施、不修改公网域名、不安排定时清理。清理环境前必须先关闭开关。
+
+后端发布任务由 GitHub 托管 runner 使用 OIDC 触发 CodeBuild；CodeBuild 使用现有 VPC 的私有子网访问 EKS，不依赖 Mac 或开放集群公网 IP 范围。源码包只存放在私有状态桶的 `carelink/deployment-inputs/` 前缀，部署角色无权读取 Terraform 状态。任务结束后 CodeBuild 计算实例退出。
+
+前端 `/version.json` 显示实际部署提交号；四服务 digest 记录在 Deploy staging 的 `staging-release` artifact 中。旧 CI 或其他仓库的产物不能触发自动发布，手动发布保留用于回滚。
 
 前端发布脚本先验证整个产物，再上传资源文件，最后上传 `index.html`。不删除旧的带哈希资源，以保留旧页面和回滚的资源依赖；上传失败则停止。文件清单不上传到公开页面桶。产物在 GitHub 保留 7 天，超过期限不能直接用该 CI run 回滚，需要另行保留发布产物。
 

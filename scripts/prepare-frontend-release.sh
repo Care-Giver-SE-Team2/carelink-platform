@@ -16,5 +16,9 @@ jq -e '
 ' <<<"$metadata" >/dev/null
 sha=$(jq -r '.head_sha' <<<"$metadata")
 [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+if [ -n "${RELEASE_SHA:-}" ] && [ "$sha" != "$RELEASE_SHA" ]; then
+  echo "Frontend CI commit differs from the selected release" >&2
+  exit 1
+fi
 gh run download "$FRONTEND_RUN_ID" --repo "$GH_REPO" --name "frontend-dist-$sha" --dir "$1"
 python3 scripts/frontend-release.py verify --directory "$1" --sha "$sha"

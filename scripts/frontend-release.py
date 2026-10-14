@@ -45,6 +45,7 @@ def main():
     if not re.fullmatch(r"[0-9a-f]{40}", args.sha):
         parser.error("Invalid commit SHA")
     if args.command == "build":
+        (Path(args.directory) / "site/version.json").write_text(json.dumps({"commit": args.sha}) + "\n")
         record = {"commit": args.sha, "files": files(args.directory)}
         (Path(args.directory) / "release.json").write_text(json.dumps(record, indent=2) + "\n")
     verify(args.directory, args.sha)

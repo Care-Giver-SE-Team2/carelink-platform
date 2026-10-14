@@ -1,8 +1,11 @@
 name: Deploy staging
 
-# Manual during the short-lived demonstration window. The organization runner
-# group must restrict workflow access to this file on refs/heads/main.
+# Deploy the exact successful main CI release; retain manual dispatch for rollback.
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       core_run_id:
@@ -28,7 +31,16 @@ concurrency:
 
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (vars.CARELINK_AUTO_DEPLOY_ENABLED == 'true' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.id == github.event.repository.id &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+      run_id: ${{ steps.source.outputs.run_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -39,15 +51,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Verify the CI source and reject superseded automatic releases
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id || inputs.core_run_id }}
+          AUTOMATIC_DEPLOY: ${{ github.event_name == 'workflow_run' }}
+        run: python3 scripts/select-ci-release.py >> "$GITHUB_OUTPUT"
+
       - name: Download verified publication records and assemble the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           IMAGE_REGISTRY: ${{ vars.ECR_REGISTRY }}
-          CORE_RUN_ID: ${{ inputs.core_run_id }}
-          VISIT_RUN_ID: ${{ inputs.visit_run_id || inputs.core_run_id }}
-          REPORT_RUN_ID: ${{ inputs.report_run_id || inputs.core_run_id }}
-          NOTIFICATION_RUN_ID: ${{ inputs.notification_run_id || inputs.core_run_id }}
+          RELEASE_SHA: ${{ github.event_name == 'workflow_run' && steps.source.outputs.sha || '' }}
+          CORE_RUN_ID: ${{ github.event.workflow_run.id || inputs.core_run_id }}
+          VISIT_RUN_ID: ${{ github.event.workflow_run.id || inputs.visit_run_id || inputs.core_run_id }}
+          REPORT_RUN_ID: ${{ github.event.workflow_run.id || inputs.report_run_id || inputs.core_run_id }}
+          NOTIFICATION_RUN_ID: ${{ github.event.workflow_run.id || inputs.notification_run_id || inputs.core_run_id }}
         run: bash scripts/prepare-deployment-release.sh "$RUNNER_TEMP/release.json"
 
       - uses: actions/upload-artifact@v7
@@ -59,97 +81,81 @@ jobs:
 
   deploy:
     needs: release
-    if: github.ref == 'refs/heads/main' && vars.CARELINK_MAC_DEPLOY_ENABLED == 'true'
-    runs-on:
-      group: carelink-deployment
-      labels: [self-hosted, macOS, ARM64]
-    timeout-minutes: 50
+    if: github.ref == 'refs/heads/main' && vars.CARELINK_AUTO_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     permissions:
       contents: read
       actions: read
       id-token: write
     env:
-      IMAGE_REGISTRY: ${{ vars.ECR_REGISTRY }}
-      DEPLOY_ROLE: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
       AWS_EC2_METADATA_DISABLED: 'true'
-      KUBE_CONTEXT: carelink-staging-deploy
-      AWS_PROFILE: ''
-      AWS_DEFAULT_PROFILE: ''
-      IMAGE_TAG: ''
-      DRY_RUN: '0'
-      PUBLIC_HTTPS: ${{ vars.CARELINK_PUBLIC_HTTPS_ENABLED || 'false' }}
-    defaults:
-      run:
-        shell: bash
+      IMAGE_REGISTRY: ${{ vars.ECR_REGISTRY }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      DEPLOY_INPUT_BUCKET: ${{ vars.CARELINK_DEPLOY_INPUT_BUCKET }}
+      CODEBUILD_PROJECT: ${{ vars.CARELINK_CODEBUILD_PROJECT }}
+      RELEASE_SHA: ${{ needs.release.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-
-      - name: Check the runner and prepare isolated configuration files
-        id: config
-        run: |
-          for tool in aws kubectl helm python3; do command -v "$tool"; done
-          : "${IMAGE_REGISTRY:?Set ECR_REGISTRY}"
-          : "${DEPLOY_ROLE:?Set AWS_STAGING_DEPLOY_ROLE_ARN}"
-          account=${IMAGE_REGISTRY%%.*}
-          [[ "$account" =~ ^[0-9]{12}$ ]]
-          [[ "$IMAGE_REGISTRY" == "$account.dkr.ecr.ap-southeast-1.amazonaws.com" ]]
-          [[ "$DEPLOY_ROLE" == "arn:aws:iam::$account:role/CareLinkGitHubStagingDeploy" ]]
-          AWS_CONFIG_FILE="$RUNNER_TEMP/carelink-deploy-aws-config"
-          AWS_SHARED_CREDENTIALS_FILE="$RUNNER_TEMP/carelink-deploy-aws-credentials"
-          KUBECONFIG="$RUNNER_TEMP/carelink-deploy-kubeconfig"
-          umask 077
-          : > "$AWS_CONFIG_FILE"
-          : > "$AWS_SHARED_CREDENTIALS_FILE"
-          : > "$KUBECONFIG"
-          {
-            echo "AWS_CONFIG_FILE=$AWS_CONFIG_FILE"
-            echo "AWS_SHARED_CREDENTIALS_FILE=$AWS_SHARED_CREDENTIALS_FILE"
-            echo "KUBECONFIG=$KUBECONFIG"
-            echo "RELEASE_MANIFEST=$RUNNER_TEMP/staging-release/release.json"
-          } >> "$GITHUB_ENV"
-          echo "account=$account" >> "$GITHUB_OUTPUT"
+          ref: ${{ needs.release.outputs.sha }}
 
       - uses: actions/download-artifact@v8
         with:
           name: staging-release
           path: ${{ runner.temp }}/staging-release
 
-      - name: Obtain temporary deployment credentials
+      - name: Reject a superseded automatic release before deployment
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CI_RUN_ID: ${{ needs.release.outputs.run_id }}
+          AUTOMATIC_DEPLOY: 'true'
+        run: python3 scripts/select-ci-release.py
+
+      - name: Obtain temporary deployment trigger credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ env.DEPLOY_ROLE }}
+          role-to-assume: ${{ vars.AWS_STAGING_DEPLOY_ROLE_ARN }}
           aws-region: ap-southeast-1
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
           role-duration-seconds: 3600
           role-session-name: carelink-deploy-${{ github.run_id }}
-          allowed-account-ids: ${{ steps.config.outputs.account }}
           unset-current-credentials: true
-          translate-env-variables: false
-          action-timeout-s: 120
 
-      - name: Configure access to the existing cluster
-        run: |
-          unset AWS_PROFILE AWS_DEFAULT_PROFILE
-          aws eks update-kubeconfig --region ap-southeast-1 --name carelink-runtime \
-            --alias "$KUBE_CONTEXT" --kubeconfig "$KUBECONFIG"
+      - name: Deploy the verified backend release inside the existing VPC
+        run: python3 scripts/run-codebuild-deployment.py "$RUNNER_TEMP/staging-release/release.json"
 
-      - name: Verify the release and deploy four services
-        run: |
-          unset AWS_PROFILE AWS_DEFAULT_PROFILE
-          bash scripts/deploy-release.sh staging
 
-      - name: Record the deployment result
-        if: always()
+  frontend:
+    needs: [release, deploy]
+    if: github.event_name == 'workflow_run'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    uses: ./.github/workflows/deploy-frontend.yml
+    with:
+      frontend_run_id: ${{ needs.release.outputs.run_id }}
+      release_sha: ${{ needs.release.outputs.sha }}
+
+  acceptance:
+    needs: [release, deploy, frontend]
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ needs.release.outputs.sha }}
+      - name: Verify the public commit, login and four-service reads
         env:
-          DEPLOY_RESULT: ${{ job.status }}
-        run: |
-          {
-            echo "### Staging deployment: $DEPLOY_RESULT"
-            echo "Release manifest: staging-release artifact in this workflow run."
-            echo "Helm readiness is not a business smoke test; record business acceptance separately."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Remove job configuration files
-        if: always()
-        run: rm -f "$RUNNER_TEMP/carelink-deploy-aws-config" "$RUNNER_TEMP/carelink-deploy-aws-credentials" "$RUNNER_TEMP/carelink-deploy-kubeconfig"
+          CARELINK_PUBLIC_URL: ${{ vars.CARELINK_PUBLIC_URL }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          CARELINK_SMOKE_PASSWORD: ${{ secrets.CARELINK_SMOKE_PASSWORD }}
+        run: python3 scripts/check-public-deployment.py
