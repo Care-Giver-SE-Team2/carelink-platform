@@ -52,7 +52,8 @@ class CarePlanSchedulesService implements CarePlanSchedules {
 				.toList();
 	}
 
-	private static Task taskOf(CarePlanNode node) {
+	/** One saved plan task as the contract shows it; publish checks a new version in this shape too. */
+	static Task taskOf(CarePlanNode node) {
 		return new Task(node.id(), node.groupName(), node.activityCode(), node.name(), node.visits().stream()
 				.map(visit -> new Slot(visit.day(), visit.startTime(), visit.minutes()))
 				.toList());

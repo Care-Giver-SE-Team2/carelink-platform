@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import sg.nus.carelink.profile.application.CaregiverEligibility;
 import sg.nus.carelink.profile.application.PrimaryCaregiverService;
 import sg.nus.carelink.profile.application.PrimaryCaregiverSummary;
 import sg.nus.carelink.profile.domain.model.Caregiver;
@@ -41,6 +42,23 @@ class PrimaryCaregiverControllerTest {
 				.andExpect(jsonPath("$[0].assignable").value(true))
 				.andExpect(jsonPath("$[1].status").value("ONBOARDING"))
 				.andExpect(jsonPath("$[1].assignable").value(false));
+	}
+
+	@Test
+	void listsCaregiversForOneElderWithWhatStopsThem() throws Exception {
+		Caregiver aisyah = new Caregiver(3L, 30L, "Aisyah N.", null, "S31", null, Caregiver.Status.AVAILABLE, null, null);
+		Caregiver devi = new Caregiver(5L, 50L, "Devi Raman", null, "S31", null, Caregiver.Status.BUSY, null, null);
+		when(service.eligibilityFor(1L)).thenReturn(List.of(
+				new CaregiverEligibility(aisyah, null, null),
+				new CaregiverEligibility(devi, "CAREGIVER_TIME_CLASH", "Devi Raman is already primary caregiver of …")));
+
+		mvc.perform(get("/api/caregivers").param("elderId", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].assignable").value(true))
+				.andExpect(jsonPath("$[0].refusalCode").doesNotExist())
+				.andExpect(jsonPath("$[1].assignable").value(false))
+				.andExpect(jsonPath("$[1].refusalCode").value("CAREGIVER_TIME_CLASH"))
+				.andExpect(jsonPath("$[1].refusal").value("Devi Raman is already primary caregiver of …"));
 	}
 
 	@Test

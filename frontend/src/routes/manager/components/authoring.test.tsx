@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -42,10 +42,52 @@ describe('DaySchedule', () => {
     const onChange = vi.fn()
     render(<Harness onChange={onChange} />)
     await userEvent.click(screen.getByRole('button', { name: 'Tuesday' }))
-    fireEvent.change(screen.getByLabelText('Tuesday minutes'), { target: { value: '45' } })
+    await userEvent.selectOptions(screen.getByLabelText('Tuesday minutes'), '1 h 30 min')
     const last = onChange.mock.lastCall![0] as DayScheduleValue
-    expect(last.tue).toEqual({ active: true, startTime: '8:00 AM', minutes: 45 })
+    expect(last.tue).toEqual({ active: true, startTime: '8:00 AM', minutes: 90 })
     expect(last.mon.active).toBe(false)
+  })
+
+  it('picks a start time from the half hours', async () => {
+    const onChange = vi.fn()
+    render(<Harness onChange={onChange} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Monday' }))
+
+    await userEvent.selectOptions(screen.getByLabelText('Monday start time'), '9:30 AM')
+
+    expect((onChange.mock.lastCall![0] as DayScheduleValue).mon.startTime).toBe('9:30 AM')
+    expect(screen.queryByRole('option', { name: '9:15 AM' })).not.toBeInTheDocument()
+  })
+
+  it('shows a time saved off the half hour until a half hour is picked', () => {
+    const value = { ...emptyDaySchedule(), mon: { active: true, startTime: '8:15 AM', minutes: 30 } }
+    render(<DaySchedule value={value} onChange={vi.fn()} />)
+
+    expect(screen.getByLabelText('Monday start time')).toHaveValue('8:15 AM')
+    expect(screen.getByRole('option', { name: '8:15 AM – pick :00 or :30' })).toBeInTheDocument()
+  })
+
+  it('offers only the lengths that end by midnight, and flags one left too long by a later start', () => {
+    const value = { ...emptyDaySchedule(), sat: { active: true, startTime: '10:00 PM', minutes: 240 } }
+    render(<DaySchedule value={value} onChange={vi.fn()} />)
+
+    const minutes = screen.getByLabelText('Saturday minutes') as HTMLSelectElement
+    expect(minutes).toHaveValue('240')
+    expect(Array.from(minutes.options).map((o) => o.text)).toEqual([
+      '4 h – runs past midnight', '30 min', '1 h', '1 h 30 min', '2 h',
+    ])
+  })
+
+  it('offers 30-minute blocks up to 4 hours, and shows a length saved outside them until one is picked', () => {
+    const value = { ...emptyDaySchedule(), mon: { active: true, startTime: '8:00 AM', minutes: 45 } }
+    render(<DaySchedule value={value} onChange={vi.fn()} />)
+
+    const minutes = screen.getByLabelText('Monday minutes')
+    expect(minutes).toHaveValue('45')
+    expect(screen.getByRole('option', { name: '45 min – pick 30 min steps' })).toBeInTheDocument()
+    expect(Array.from((minutes as HTMLSelectElement).options).slice(1).map((o) => o.text)).toEqual([
+      '30 min', '1 h', '1 h 30 min', '2 h', '2 h 30 min', '3 h', '3 h 30 min', '4 h',
+    ])
   })
 })
 
@@ -104,7 +146,7 @@ describe('PlanTreeEditor', () => {
 
   it('edits a task in place, pre-filled, and saves the new name and schedule', async () => {
     const schedule = emptyDaySchedule()
-    schedule.mon = { active: true, startTime: '8:00 AM', minutes: 15 }
+    schedule.mon = { active: true, startTime: '8:00 AM', minutes: 30 }
     const props = renderEditor({ editingTask: { id: 't1', name: 'Grooming', schedule } })
 
     expect(screen.queryByText('Mon 8:30–8:45 AM · 15 m')).not.toBeInTheDocument()
@@ -117,7 +159,7 @@ describe('PlanTreeEditor', () => {
     expect(props.onSaveTask).toHaveBeenCalledWith(
       't1',
       'Hair and nails',
-      expect.objectContaining({ mon: expect.objectContaining({ active: true, minutes: 15 }) }),
+      expect.objectContaining({ mon: expect.objectContaining({ active: true, minutes: 30 }) }),
     )
   })
 

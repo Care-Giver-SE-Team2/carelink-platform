@@ -35,6 +35,7 @@ public final class RosterSnapshot {
 	private final List<AbsenceReport> absences;
 	private final List<Booking> bookings;
 	private final Map<Long, SpotCheckRecord> spotChecks;
+	private final int travelBufferMinutes;
 
 	private RosterSnapshot(Builder builder) {
 		this.candidates = List.copyOf(builder.candidates);
@@ -45,6 +46,7 @@ public final class RosterSnapshot {
 		this.absences = List.copyOf(builder.absences);
 		this.bookings = new ArrayList<>(builder.bookings);
 		this.spotChecks = Map.copyOf(builder.spotChecks);
+		this.travelBufferMinutes = builder.travelBufferMinutes;
 	}
 
 	public static Builder builder() {
@@ -82,13 +84,23 @@ public final class RosterSnapshot {
 				.findFirst();
 	}
 
-	/** The caregiver's first booking overlapping [start, end), ignoring the visit being filled. */
-	public Optional<Booking> clash(Long caregiverId, LocalDateTime start, LocalDateTime end, Long excludingVisitId) {
+	/**
+	 * The caregiver's first booking overlapping [start, end), or at another elder's home less than
+	 * the travel buffer before or after it, ignoring the visit being filled.
+	 */
+	public Optional<Booking> clash(Long caregiverId, Long elderId, LocalDateTime start, LocalDateTime end,
+			Long excludingVisitId) {
 		return bookings.stream()
 				.filter(booking -> Objects.equals(booking.caregiverId(), caregiverId))
 				.filter(booking -> !Objects.equals(booking.visitId(), excludingVisitId))
-				.filter(booking -> booking.overlaps(start, end))
+				.filter(booking -> booking.overlaps(start, end) || (!Objects.equals(booking.elderId(), elderId)
+						&& booking.overlaps(start.minusMinutes(travelBufferMinutes), end.plusMinutes(travelBufferMinutes))))
 				.min(Comparator.comparing(Booking::start));
+	}
+
+	/** The least time between visits at two elders' homes, to travel; 0 allows back to back. */
+	public int travelBufferMinutes() {
+		return travelBufferMinutes;
 	}
 
 	/** The caregiver's bookings starting that day, ignoring the visit being filled. */
@@ -136,8 +148,15 @@ public final class RosterSnapshot {
 		private final List<AbsenceReport> absences = new ArrayList<>();
 		private final List<Booking> bookings = new ArrayList<>();
 		private final Map<Long, SpotCheckRecord> spotChecks = new HashMap<>();
+		private int travelBufferMinutes;
 
 		private Builder() {
+		}
+
+		/** The least time between visits at two elders' homes; none unless set. */
+		public Builder travelBuffer(int minutes) {
+			travelBufferMinutes = minutes;
+			return this;
 		}
 
 		public Builder candidate(CandidateCard card) {

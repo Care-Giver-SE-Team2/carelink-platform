@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,9 +31,16 @@ public class PrimaryCaregiverController {
 		this.service = service;
 	}
 
+	/**
+	 * Every caregiver, for the picker. With {@code elderId}, each says whether they may be named
+	 * that elder's primary caregiver and, if not, why - the checks naming them would make.
+	 */
 	@GetMapping("/api/caregivers")
-	public List<CaregiverOptionResponse> listCaregivers() {
-		return service.listCaregivers().stream().map(CaregiverOptionResponse::from).toList();
+	public List<CaregiverOptionResponse> listCaregivers(@RequestParam(required = false) Long elderId) {
+		if (elderId == null) {
+			return service.listCaregivers().stream().map(CaregiverOptionResponse::from).toList();
+		}
+		return service.eligibilityFor(elderId).stream().map(CaregiverOptionResponse::from).toList();
 	}
 
 	@PutMapping("/api/elders/{elderId}/primary-caregiver")

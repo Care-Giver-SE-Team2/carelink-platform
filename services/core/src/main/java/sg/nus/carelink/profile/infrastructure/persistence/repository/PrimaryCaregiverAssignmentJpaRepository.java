@@ -12,4 +12,6 @@ public interface PrimaryCaregiverAssignmentJpaRepository
 		extends JpaRepository<PrimaryCaregiverAssignmentJpaEntity, Long> {
 
 	List<PrimaryCaregiverAssignmentJpaEntity> findByElderIdIn(Set<Long> elderIds);
+
+	List<PrimaryCaregiverAssignmentJpaEntity> findByCaregiverId(Long caregiverId);
 }

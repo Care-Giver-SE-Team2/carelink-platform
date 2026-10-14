@@ -86,7 +86,7 @@ const caregivers: profileApi.CaregiverOption[] = [
 ]
 
 it('assigns a primary caregiver through the API and shows it from the refreshed elder list', async () => {
-  vi.spyOn(profileApi, 'fetchCaregivers').mockResolvedValue(caregivers)
+  const forElder = vi.spyOn(profileApi, 'fetchCaregiversForElder').mockResolvedValue(caregivers)
   const assign = vi
     .spyOn(profileApi, 'assignPrimaryCaregiver')
     .mockResolvedValue({ caregiverId: 3, fullName: 'Aisyah N.', assignedAt: '2026-09-26T10:30:00' })
@@ -104,9 +104,33 @@ it('assigns a primary caregiver through the API and shows it from the refreshed 
   expect(within(newHire).queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument()
   fireEvent.click(within(within(picker).getByRole('option', { name: /Aisyah N\./ })).getByRole('button', { name: 'Assign' }))
 
+  expect(forElder).toHaveBeenCalledWith('1')
   expect(assign).toHaveBeenCalledWith('1', 3)
   expect(await screen.findByText(/^since 26 Sept? 2026$/)).toBeInTheDocument()
   expect(screen.queryByRole('listbox', { name: 'Caregivers' })).not.toBeInTheDocument()
+})
+
+it('rules out, before any click, a caregiver whose certificates or timetable don’t fit this elder', async () => {
+  vi.spyOn(profileApi, 'fetchCaregiversForElder').mockResolvedValue([
+    caregivers[0],
+    {
+      id: 5, fullName: 'Devi Raman', sector: 'S31', status: 'AVAILABLE', assignable: false,
+      refusalCode: 'CAREGIVER_TIME_CLASH',
+      refusal: 'Devi Raman is already primary caregiver of Tan Ah Kow, whose Bathing on Mon 08:00–08:30 clashes with Meals on Mon 08:00–08:30',
+    },
+  ])
+  renderElders()
+
+  fireEvent.click(await screen.findByRole('option', { name: /Chan Bee Choo/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'Assign caregiver' }))
+
+  const picker = await screen.findByRole('listbox', { name: 'Caregivers' })
+  const devi = within(picker).getByRole('option', { name: /Devi Raman/ })
+  expect(within(devi).queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument()
+  expect(within(devi).getByText(/timetable clash/)).toBeInTheDocument()
+  expect(within(devi).getByText(/already primary caregiver of Tan Ah Kow/)).toBeInTheDocument()
+  expect(within(within(picker).getByRole('option', { name: /Aisyah N\./ })).getByRole('button', { name: 'Assign' }))
+    .toBeInTheDocument()
 })
 
 it('removes the primary caregiver through the API', async () => {

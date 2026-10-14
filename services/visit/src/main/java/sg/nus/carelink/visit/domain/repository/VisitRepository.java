@@ -25,6 +25,9 @@ public interface VisitRepository {
     /** Every visit generated from one care plan version that starts at or after {@code from}. */
     List<Visit> findByCarePlanIdStartingFrom(Long carePlanId, java.time.LocalDateTime from);
 
+    /** The elder's SCHEDULED visits held by the caregiver that start at or after {@code from}, by id. */
+    List<Visit> findScheduledForElderAndCaregiverFrom(Long elderId, Long caregiverId, java.time.LocalDateTime from);
+
     /** SCHEDULED visits with no caregiver that start in [from, until). */
     List<Visit> findUnassignedScheduledStartingBetween(java.time.LocalDateTime from, java.time.LocalDateTime until);
 

@@ -39,6 +39,14 @@ class PrimaryCaregiverAssignmentRepositoryAdapterTest {
 	}
 
 	@Test
+	void findByCaregiverIdMapsEveryRow() {
+		when(jpa.findByCaregiverId(2L)).thenReturn(List.of(entity(1L, 2L), entity(3L, 2L)));
+
+		assertThat(adapter.findByCaregiverId(2L)).extracting(PrimaryCaregiverAssignment::elderId)
+				.containsExactly(1L, 3L);
+	}
+
+	@Test
 	void saveGoesThroughSpringData() {
 		when(jpa.save(any(PrimaryCaregiverAssignmentJpaEntity.class))).thenReturn(entity(1L, 2L));
 

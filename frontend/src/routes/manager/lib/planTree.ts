@@ -76,6 +76,39 @@ export function toEditorTime(startTime: string): string {
   return `${time} ${meridiem}`
 }
 
+/** The start times a visit may take, as the editor shows them: every half hour, 12:00 AM to 11:30 PM. */
+export const HALF_HOUR_START_TIMES: string[] = Array.from({ length: 48 }, (_, i) =>
+  toEditorTime(`${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 === 0 ? '00' : '30'}`),
+)
+
+/** The lengths a visit may take, in minutes: 30-minute blocks up to 4 hours, matching the server's rule. */
+export const VISIT_DURATIONS: number[] = Array.from({ length: 8 }, (_, i) => (i + 1) * 30)
+
+/** True for a visit length a plan may publish. */
+export function isAllowedDuration(minutes: number | null): boolean {
+  return minutes !== null && VISIT_DURATIONS.includes(minutes)
+}
+
+/** True when a visit starting at this editor time is over by midnight; ending exactly at midnight is fine. */
+export function endsByMidnight(startTime: string, minutes: number): boolean {
+  const parsed = parseEditorTime(startTime)
+  return parsed !== null && minutesOfDay(parsed) + minutes <= 24 * 60
+}
+
+/** 30 -> "30 min", 60 -> "1 h", 90 -> "1 h 30 min". */
+export function durationLabel(minutes: number): string {
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours === 0) return `${rest} min`
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`
+}
+
+/** True when an editor start time is a time on the hour or half hour, the only ones a plan may publish. */
+export function isOnHalfHour(startTime: string): boolean {
+  const parsed = parseEditorTime(startTime)
+  return parsed !== null && (parsed.endsWith(':00') || parsed.endsWith(':30'))
+}
+
 /**
  * What a manager typed in a start-time field -> 24-hour "HH:mm", or null if it isn't a time.
  * Accepts "8:00 AM", "8:00am", "8 PM" and 24-hour "16:30".
@@ -238,11 +271,17 @@ export function visitsFromDaySchedule(schedule: DayScheduleValue): DayVisit[] {
   }))
 }
 
-/** A schedule can be saved once at least one day is on and every day that's on has a start time and a duration. */
+/**
+ * A schedule can be saved once at least one day is on and every day that's on starts on the hour
+ * or half hour and lasts one of the VISIT_DURATIONS, over by midnight.
+ */
 export function isScheduleComplete(schedule: DayScheduleValue): boolean {
   const active = WEEKDAYS.filter((d) => schedule[d.key].active)
   return (
     active.length > 0 &&
-    active.every((d) => (schedule[d.key].minutes ?? 0) > 0 && parseEditorTime(schedule[d.key].startTime) !== null)
+    active.every((d) => {
+      const { startTime, minutes } = schedule[d.key]
+      return isAllowedDuration(minutes) && isOnHalfHour(startTime) && endsByMidnight(startTime, minutes ?? 0)
+    })
   )
 }

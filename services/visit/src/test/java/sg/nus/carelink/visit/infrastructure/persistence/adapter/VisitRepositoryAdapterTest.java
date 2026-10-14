@@ -51,6 +51,18 @@ class VisitRepositoryAdapterTest {
     }
 
     @Test
+    void findScheduledForElderAndCaregiverFromAsksForScheduledVisitsOnly() {
+        java.time.LocalDateTime from = java.time.LocalDateTime.of(2026, 10, 8, 9, 0);
+        VisitJpaEntity entity = new VisitJpaEntity();
+        entity.setId(7L);
+        when(jpa.findByElderIdAndCaregiverIdAndStatusAndScheduledStartGreaterThanEqualOrderByIdAsc(
+                42L, 5L, VisitJpaEntity.Status.SCHEDULED, from)).thenReturn(List.of(entity));
+
+        assertThat(adapter.findScheduledForElderAndCaregiverFrom(42L, 5L, from))
+                .extracting(Visit::id).containsExactly(7L);
+    }
+
+    @Test
     void findByIdIsEmptyWhenThereIsNoRow() {
         when(
                 jpa.findById(any())

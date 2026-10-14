@@ -5,3 +5,9 @@
   border: 1px solid var(--border-light);
   border-bottom: none;
 }
+
+/* The full reason a caregiver is ruled out, on its own line under the row's meta. */
+.refusal {
+  display: block;
+  margin-top: 2px;
+}

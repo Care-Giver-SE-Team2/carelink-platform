@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ElderRow } from '../data/elders'
-import { useCaregivers } from '../lib/useCaregivers'
+import { useCaregivers, useCaregiversForElder } from '../lib/useCaregivers'
 import { formatDate } from '../lib/nextVisit'
 import { assignPrimaryCaregiver, removePrimaryCaregiver } from '../../../shared/api/profile'
 import type { CaregiverOption } from '../../../shared/api/profile'
@@ -32,17 +32,31 @@ const INELIGIBLE_REASON: Partial<Record<CaregiverOption['status'], string>> = {
   INACTIVE: 'inactive',
 }
 
+/** The short label for a rule that stops a caregiver; the full reason shows under it. */
+const REFUSAL_LABEL: Record<string, string> = {
+  CAREGIVER_MISSING_CREDENTIAL: 'missing certificate',
+  CAREGIVER_TIME_CLASH: 'timetable clash',
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong'
 }
 
-/** An onboarding or inactive caregiver can't be assigned; a sector mismatch is shown but doesn't block. */
+/**
+ * An onboarding or inactive caregiver can't be assigned; a sector mismatch is shown but doesn't block.
+ * Picking a primary caregiver, the list is asked for this elder, so a missing certificate or a clash
+ * with another elder's visits rules a caregiver out before the manager clicks, with the reason shown.
+ */
 export function CaregiverPickerModal({ elder, eyebrow = 'Assign caregiver', assign, onAssign, onRemove, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const { data: caregivers = [], isLoading, isError, error } = useCaregivers()
+  // Reused for something else (`assign`), the picker keeps the plain list: these rules are a primary caregiver's.
+  const forElder = !assign
+  const everyone = useCaregivers(!forElder)
+  const candidates = useCaregiversForElder(forElder ? elder.id : null)
+  const { data: caregivers = [], isLoading, isError, error } = forElder ? candidates : everyone
 
   const q = query.trim().toLowerCase()
   const visibleCaregivers = q ? caregivers.filter((c) => c.fullName.toLowerCase().includes(q)) : caregivers
@@ -88,8 +102,10 @@ export function CaregiverPickerModal({ elder, eyebrow = 'Assign caregiver', assi
           const metaParts = [
             c.sector,
             outsideSector ? 'outside sector' : null,
-            INELIGIBLE_REASON[c.status] ?? (c.status === 'BUSY' ? 'busy today' : null),
+            INELIGIBLE_REASON[c.status] ?? (c.refusalCode ? REFUSAL_LABEL[c.refusalCode] : null) ??
+              (c.status === 'BUSY' ? 'busy today' : null),
           ].filter(Boolean)
+          const why = !c.assignable && !isCurrent && c.refusalCode !== 'CAREGIVER_NOT_ASSIGNABLE' ? c.refusal : null
 
           return (
             <ListRow
@@ -98,7 +114,16 @@ export function CaregiverPickerModal({ elder, eyebrow = 'Assign caregiver', assi
               dimmed={!c.assignable && !isCurrent}
               leading={<Avatar size={32} />}
               title={c.fullName}
-              meta={metaParts.join(' · ')}
+              meta={
+                why ? (
+                  <>
+                    {metaParts.join(' · ')}
+                    <span className={styles.refusal}>{why}</span>
+                  </>
+                ) : (
+                  metaParts.join(' · ')
+                )
+              }
               trailing={
                 isCurrent ? (
                   <>

@@ -16,7 +16,7 @@ export type DayScheduleEntry = { active: boolean; startTime: string; minutes: nu
 export type DayScheduleValue = Record<DayKey, DayScheduleEntry>
 
 /** Every day off, pre-filled with the values a day gets when switched on. */
-export function emptyDaySchedule(defaults: { startTime: string; minutes: number } = { startTime: '8:00 AM', minutes: 15 }): DayScheduleValue {
+export function emptyDaySchedule(defaults: { startTime: string; minutes: number } = { startTime: '8:00 AM', minutes: 30 }): DayScheduleValue {
   return Object.fromEntries(
     WEEKDAYS.map((d) => [d.key, { active: false, startTime: defaults.startTime, minutes: defaults.minutes }]),
   ) as DayScheduleValue

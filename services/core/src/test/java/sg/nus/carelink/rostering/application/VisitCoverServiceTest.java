@@ -48,7 +48,7 @@ class VisitCoverServiceTest {
 		visits.add(40L, 7L, null, TENTH, 60).add(41L, 8L, 5L, TENTH, 60);
 
 		RosterSnapshotLoader loader = new RosterSnapshotLoader(profiles, () -> covers,
-				planIds -> Map.of(4L, Set.of(2L)), absences, visits, since -> Map.of(), RosterLookbacks.DEFAULT, clock);
+				planIds -> Map.of(4L, Set.of(2L)), absences, visits, since -> Map.of(), RosterLookbacks.DEFAULT, clock, 0);
 		service = new VisitCoverService(visits, loader, new ReRosteringFakes.Constraints(),
 				new ReRosteringFakes.Candidates(), new ReRosteringFakes.Checks());
 	}

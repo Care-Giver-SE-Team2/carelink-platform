@@ -426,6 +426,17 @@ public class VisitStandIn implements VisitApi {
 	}
 
 	@Override
+	public synchronized Released releaseUntouchedFrom(ReleaseUntouched request) {
+		reach();
+		List<Held> held = select(visit -> request.elderId().equals(visit.elderId())
+				&& request.caregiverId().equals(visit.caregiverId()) && !visit.start().isBefore(request.from())
+				&& visit.notStarted() && (visit.carePlanId() != null || visit.carePlanNodeId() != null)
+				&& visit.absenceId() == null).toList();
+		held.forEach(visit -> keep(visit.with(null, visit.status())));
+		return new Released(held.size());
+	}
+
+	@Override
 	public synchronized List<UncoveredVisit> findUncoveredStarted(LocalDateTime since, LocalDateTime now) {
 		reach();
 		return visits.values().stream()

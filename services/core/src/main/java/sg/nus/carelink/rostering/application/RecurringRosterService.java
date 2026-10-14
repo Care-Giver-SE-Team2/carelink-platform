@@ -24,7 +24,9 @@ import sg.nus.carelink.rostering.domain.repository.VisitScheduling.PlannedVisit;
  * given to the elder's primary caregiver, or left unassigned to be covered when there is none.
  *
  * <p>A refresh is safe to repeat. It runs when a plan is published or stopped, when a primary
- * caregiver is named, and nightly to roll the window forward. When a plan version ends
+ * caregiver is named or removed, and nightly to roll the window forward. A primary caregiver who
+ * can no longer take visits (gone inactive, however that happened) is taken off the ones nobody
+ * has started, so they are covered rather than missed; the nightly run catches any it missed. When a plan version ends
  * (stopped, or replaced from its successor's start date) its visits nobody has started are
  * cancelled from that date; visits under way or finished are kept.
  */
@@ -61,6 +63,10 @@ public class RecurringRosterService {
 				.map(RecurringRosterService::toDomain)
 				.toList();
 
+		int released = primaryCaregivers.findUnrosterableCaregiverId(elderId)
+				.map(caregiverId -> visits.releaseUntouchedFrom(elderId, caregiverId, now))
+				.orElse(0);
+
 		int cancelled = 0;
 		for (RecurringSchedule version : versions) {
 			cancelled += version.callOffFrom(now)
@@ -78,7 +84,20 @@ public class RecurringRosterService {
 				? new VisitScheduling.Outcome(0, 0)
 				: visits.schedule(wanted);
 
-		return new RosterRefresh(elderId, outcome.created(), outcome.covered(), cancelled);
+		return new RosterRefresh(elderId, outcome.created(), outcome.covered(), cancelled, released);
+	}
+
+	/**
+	 * Takes a caregiver who is no longer the elder's primary caregiver off the elder's plan visits
+	 * that nobody has started, from now on, so the next refresh can give them to whoever replaced
+	 * them, or leave them to be covered. Visits that should already have started are left for the
+	 * missed-check-in rule, as when a plan ends. Its own transaction, like refreshElder.
+	 *
+	 * @return how many visits were released
+	 */
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public int releaseFormerPrimary(Long elderId, Long caregiverId) {
+		return visits.releaseUntouchedFrom(elderId, caregiverId, LocalDateTime.now(clock));
 	}
 
 	/** Every elder whose plan has ever been published: the nightly run refreshes each in turn. */
@@ -97,6 +116,6 @@ public class RecurringRosterService {
 	}
 
 	/** What one refresh changed. */
-	public record RosterRefresh(Long elderId, int created, int covered, int cancelled) {
+	public record RosterRefresh(Long elderId, int created, int covered, int cancelled, int released) {
 	}
 }

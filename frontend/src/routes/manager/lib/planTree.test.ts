@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  HALF_HOUR_START_TIMES,
+  VISIT_DURATIONS,
+  durationLabel,
+  endsByMidnight,
+  isAllowedDuration,
+  isOnHalfHour,
   dayScheduleFromVisits,
   isScheduleComplete,
   parseEditorTime,
@@ -99,5 +105,67 @@ describe('the day-schedule editor round trip', () => {
     expect(isScheduleComplete(schedule)).toBe(true)
     schedule.mon = { ...schedule.mon, startTime: 'soon' }
     expect(isScheduleComplete(schedule)).toBe(false)
+  })
+
+  it('is incomplete while a day that’s on starts off the half hour', () => {
+    const schedule = dayScheduleFromVisits([{ day: 'Mon', startTime: '08:15', minutes: 30 }])
+    expect(schedule.mon.startTime).toBe('8:15 AM')
+    expect(isScheduleComplete(schedule)).toBe(false)
+    schedule.mon = { ...schedule.mon, startTime: '8:30 AM' }
+    expect(isScheduleComplete(schedule)).toBe(true)
+  })
+})
+
+describe('visit lengths', () => {
+  it('runs from 30 minutes to 4 hours in 30-minute blocks', () => {
+    expect(VISIT_DURATIONS).toEqual([30, 60, 90, 120, 150, 180, 210, 240])
+    expect(isAllowedDuration(240)).toBe(true)
+    expect(isAllowedDuration(15)).toBe(false)
+    expect(isAllowedDuration(270)).toBe(false)
+    expect(isAllowedDuration(null)).toBe(false)
+  })
+
+  it('reads as hours and minutes', () => {
+    expect(durationLabel(30)).toBe('30 min')
+    expect(durationLabel(60)).toBe('1 h')
+    expect(durationLabel(150)).toBe('2 h 30 min')
+  })
+
+  it('leaves a schedule incomplete while a day that’s on has a length outside them', () => {
+    const schedule = dayScheduleFromVisits([{ day: 'Mon', startTime: '08:00', minutes: 45 }])
+    expect(isScheduleComplete(schedule)).toBe(false)
+    schedule.mon = { ...schedule.mon, minutes: 60 }
+    expect(isScheduleComplete(schedule)).toBe(true)
+  })
+})
+
+describe('ending by midnight', () => {
+  it('allows a visit that ends exactly at midnight but not one that runs past it', () => {
+    expect(endsByMidnight('11:30 PM', 30)).toBe(true)
+    expect(endsByMidnight('8:00 PM', 240)).toBe(true)
+    expect(endsByMidnight('11:30 PM', 60)).toBe(false)
+    expect(endsByMidnight('soon', 30)).toBe(false)
+  })
+
+  it('leaves a schedule incomplete while a day that’s on runs past midnight', () => {
+    const schedule = dayScheduleFromVisits([{ day: 'Sat', startTime: '22:00', minutes: 180 }])
+    expect(isScheduleComplete(schedule)).toBe(false)
+    schedule.sat = { ...schedule.sat, minutes: 120 }
+    expect(isScheduleComplete(schedule)).toBe(true)
+  })
+})
+
+describe('half-hour start times', () => {
+  it('offers every half hour of the day, midnight first', () => {
+    expect(HALF_HOUR_START_TIMES).toHaveLength(48)
+    expect(HALF_HOUR_START_TIMES.slice(0, 3)).toEqual(['12:00 AM', '12:30 AM', '1:00 AM'])
+    expect(HALF_HOUR_START_TIMES.at(-1)).toBe('11:30 PM')
+    expect(HALF_HOUR_START_TIMES.every(isOnHalfHour)).toBe(true)
+  })
+
+  it('rejects other minutes and what isn’t a time', () => {
+    expect(isOnHalfHour('8:15 AM')).toBe(false)
+    expect(isOnHalfHour('16:31')).toBe(false)
+    expect(isOnHalfHour('soon')).toBe(false)
   })
 })

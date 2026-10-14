@@ -100,6 +100,9 @@ public interface VisitApi {
 	@PostExchange("/visits/cancel-untouched")
 	Cancelled cancelUntouchedFrom(@RequestBody CancelUntouched request);
 
+	@PostExchange("/visits/release-untouched")
+	Released releaseUntouchedFrom(@RequestBody ReleaseUntouched request);
+
 	@GetExchange("/visits/uncovered-started")
 	List<UncoveredVisit> findUncoveredStarted(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime since,
@@ -201,6 +204,12 @@ public interface VisitApi {
 	}
 
 	record Cancelled(int count) {
+	}
+
+	record ReleaseUntouched(Long elderId, Long caregiverId, LocalDateTime from) {
+	}
+
+	record Released(int count) {
 	}
 
 	record UncoveredVisit(Long visitId, Long elderId, LocalDateTime start, String serviceType) {
