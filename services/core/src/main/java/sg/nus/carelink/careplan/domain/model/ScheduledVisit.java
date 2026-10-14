@@ -61,7 +61,7 @@ public record ScheduledVisit(DayOfWeek day, LocalTime startTime, int minutes) {
 	public boolean overlaps(ScheduledVisit other) {
 		long start = startTime.toSecondOfDay();
 		long otherStart = other.startTime.toSecondOfDay();
-		return day == other.day && start < otherStart + other.minutes * 60L && otherStart < start + minutes * 60L;
+		return day.equals(other.day) && start < otherStart + other.minutes * 60L && otherStart < start + minutes * 60L;
 	}
 
 	/** The visit's end: start + minutes, wrapping past midnight for a row saved before that rule. */

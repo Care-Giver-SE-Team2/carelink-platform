@@ -109,7 +109,7 @@ public final class PrimaryCaregiverClash {
 			return true;
 		}
 		for (LocalDate date = start; date.isBefore(end); date = date.plusDays(1)) {
-			if (date.getDayOfWeek() == day) {
+			if (date.getDayOfWeek().equals(day)) {
 				return true;
 			}
 		}
