@@ -99,6 +99,17 @@ public record Visit(
 		return withAssignmentAndStatus(newCaregiverId, status);
 	}
 
+	/**
+	 * Takes the caregiver off a visit nobody has started, leaving it to be covered: its elder's
+	 * primary caregiver was removed or replaced, so the visit no longer belongs to them.
+	 */
+	public Visit released() {
+		if (!hasNotStarted() || caregiverId == null) {
+			throw new IllegalStateException("Visit " + id + " is " + (caregiverId == null ? "unassigned" : status));
+		}
+		return withAssignmentAndStatus(null, status);
+	}
+
 	/** Calls off a visit nobody has started, e.g. because its care plan changed or stopped. */
 	public Visit cancelled() {
 		if (!hasNotStarted()) {

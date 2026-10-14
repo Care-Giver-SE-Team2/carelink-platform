@@ -64,6 +64,14 @@ class VisitRepositoryAdapter
     }
 
     @Override
+    public List<Visit> findScheduledForElderAndCaregiverFrom(Long elderId, Long caregiverId,
+            java.time.LocalDateTime from) {
+        return jpa.findByElderIdAndCaregiverIdAndStatusAndScheduledStartGreaterThanEqualOrderByIdAsc(
+                elderId, caregiverId, VisitJpaEntity.Status.SCHEDULED, from)
+                .stream().map(VisitMapper::toDomain).toList();
+    }
+
+    @Override
     public List<Visit> findUnassignedScheduledStartingBetween(java.time.LocalDateTime from, java.time.LocalDateTime until) {
         return jpa.findByCaregiverIdIsNullAndStatusAndScheduledStartGreaterThanEqualAndScheduledStartLessThan(
                 VisitJpaEntity.Status.SCHEDULED, from, until).stream().map(VisitMapper::toDomain).toList();

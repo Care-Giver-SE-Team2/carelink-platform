@@ -16,6 +16,9 @@ public interface PrimaryCaregiverAssignmentRepository {
 
 	List<PrimaryCaregiverAssignment> findByElderIds(Set<Long> elderIds);
 
+	/** Every elder the caregiver is primary caregiver of. */
+	List<PrimaryCaregiverAssignment> findByCaregiverId(Long caregiverId);
+
 	/** Inserts, or replaces the elder's existing assignment. */
 	PrimaryCaregiverAssignment save(PrimaryCaregiverAssignment assignment);
 

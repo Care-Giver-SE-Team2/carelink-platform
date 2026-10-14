@@ -197,10 +197,15 @@ public final class ReplacementRules {
 		@Override
 		public RuleCheck check(CandidateContext candidate) {
 			var slot = candidate.slot();
-			return candidate.snapshot()
-					.clash(candidate.caregiverId(), slot.start(), slot.effectiveEnd(), slot.visitId())
-					.map(booking -> RuleCheck.fail(this, "Booked %s-%s with another elder"
-							.formatted(booking.start().format(TIME), booking.end().format(TIME))))
+			var snapshot = candidate.snapshot();
+			return snapshot
+					.clash(candidate.caregiverId(), slot.elderId(), slot.start(), slot.effectiveEnd(), slot.visitId())
+					.map(booking -> RuleCheck.fail(this, booking.overlaps(slot.start(), slot.effectiveEnd())
+							? "Booked %s-%s with another elder".formatted(booking.start().format(TIME),
+									booking.end().format(TIME))
+							: "Booked %s-%s with another elder, under %d min to travel".formatted(
+									booking.start().format(TIME), booking.end().format(TIME),
+									snapshot.travelBufferMinutes())))
 					.orElseGet(() -> RuleCheck.pass(this, "Free %s-%s"
 							.formatted(slot.start().format(TIME), slot.effectiveEnd().format(TIME))));
 		}

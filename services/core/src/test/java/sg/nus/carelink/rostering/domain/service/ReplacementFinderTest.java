@@ -262,9 +262,40 @@ class ReplacementFinderTest {
 		assertThat(snapshot.elderClash(7L, NINE.plusMinutes(30), NINE.plusHours(1), 30L)).isEmpty();
 
 		snapshot.reserve(Booking.of(SLOT, 9L));
-		assertThat(snapshot.clash(9L, NINE.plusMinutes(10), NINE.plusMinutes(20), 99L)).isPresent();
-		assertThat(snapshot.clash(5L, NINE, NINE.plusMinutes(20), 99L)).isEmpty();
+		assertThat(snapshot.clash(9L, 7L, NINE.plusMinutes(10), NINE.plusMinutes(20), 99L)).isPresent();
+		assertThat(snapshot.clash(5L, 7L, NINE, NINE.plusMinutes(20), 99L)).isEmpty();
+		assertThat(snapshot.travelBufferMinutes()).isZero();
 		assertThat(snapshot.bookingsOn(9L, DAY, null)).hasSize(1);
+	}
+
+	@Test
+	void aBookingAtAnotherElderTooCloseToTravelFromIsAClashButNotOneAtTheSameElder() {
+		RosterSnapshot snapshot = RosterSnapshot.builder()
+				.travelBuffer(30)
+				.bookings(List.of(
+						// Caregiver 9 at elder 8 until 08:45: 15 minutes before the 09:00 slot at elder 7.
+						new Booking(90L, 8L, 9L, NINE.minusMinutes(45), NINE.minusMinutes(15)),
+						// Caregiver 10 at elder 7 itself, straight after the slot.
+						new Booking(91L, 7L, 10L, NINE.plusMinutes(45), NINE.plusMinutes(75))))
+				.build();
+
+		assertThat(snapshot.clash(9L, 7L, NINE, NINE.plusMinutes(45), 30L)).isPresent();
+		assertThat(snapshot.clash(9L, 7L, NINE.plusMinutes(15), NINE.plusMinutes(45), 30L)).isEmpty();
+		assertThat(snapshot.clash(10L, 7L, NINE, NINE.plusMinutes(45), 30L)).isEmpty();
+	}
+
+	@Test
+	void theTimeClashRuleNamesAGapTooShortToTravel() {
+		RosterSnapshot snapshot = base(0, true)
+				.travelBuffer(30)
+				.bookings(List.of(new Booking(90L, 8L, 9L, NINE.minusMinutes(45), NINE.minusMinutes(15))))
+				.build();
+
+		Shortlist shortlist = finder(RosteringRun.Objective.CONTINUITY).shortlist(SLOT, snapshot);
+
+		assertThat(excludedBy(shortlist)).containsEntry(9L, ReplacementRules.NO_TIME_CLASH);
+		assertThat(reason(shortlist, 9L)).isEqualTo("Booked 08:15-08:45 with another elder, under 30 min to travel");
+		assertThat(reason(shortlist, 8L)).isEqualTo("Booked 09:30-10:30 with another elder");
 	}
 
 	@Test

@@ -43,14 +43,14 @@ class CarePlanScheduleIT {
 
 		service.publish(draft.id(), LocalDate.of(2026, 10, 1), List.of(new PlanNodeInput(
 				"Personal care", "BATHING", "Bathing assistance",
-				List.of(new VisitInput("Mon", LocalTime.of(8, 0), 30), new VisitInput("Wed", LocalTime.of(16, 30), 45)),
+				List.of(new VisitInput("Mon", LocalTime.of(8, 0), 30), new VisitInput("Wed", LocalTime.of(16, 30), 60)),
 				CarePlanNode.EvidenceType.CHECKLIST)));
 
 		CarePlanNode task = service.findNodes(draft.id()).getFirst();
 		assertThat(task.visits()).containsExactly(
 				new ScheduledVisit(DayOfWeek.MONDAY, LocalTime.of(8, 0), 30),
-				new ScheduledVisit(DayOfWeek.WEDNESDAY, LocalTime.of(16, 30), 45));
-		assertThat(task.weeklyHours()).isEqualByComparingTo("1.25");
+				new ScheduledVisit(DayOfWeek.WEDNESDAY, LocalTime.of(16, 30), 60));
+		assertThat(task.weeklyHours()).isEqualByComparingTo("1.50");
 		assertThat(jdbc.queryForObject(
 				"SELECT COUNT(*) FROM care_plan_node_visit WHERE care_plan_node_id = ?", Integer.class, task.id()))
 				.isEqualTo(2);
@@ -82,18 +82,18 @@ class CarePlanScheduleIT {
 		Long elderId = elder();
 		CarePlan first = service.createDraft(elderId, null);
 		service.publish(first.id(), LocalDate.of(2026, 10, 1), List.of(new PlanNodeInput(
-				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Tue", LocalTime.of(9, 0), 15)),
+				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Tue", LocalTime.of(9, 0), 30)),
 				CarePlanNode.EvidenceType.READING)));
 
 		CarePlan second = service.createDraft(elderId, null);
 		service.publish(second.id(), LocalDate.of(2026, 10, 8), List.of(new PlanNodeInput(
-				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Thu", LocalTime.of(10, 0), 20)),
+				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Thu", LocalTime.of(10, 0), 60)),
 				CarePlanNode.EvidenceType.READING)));
 
 		assertThat(service.findNodes(first.id()).getFirst().visits())
-				.containsExactly(new ScheduledVisit(DayOfWeek.TUESDAY, LocalTime.of(9, 0), 15));
+				.containsExactly(new ScheduledVisit(DayOfWeek.TUESDAY, LocalTime.of(9, 0), 30));
 		assertThat(service.findNodes(second.id()).getFirst().visits())
-				.containsExactly(new ScheduledVisit(DayOfWeek.THURSDAY, LocalTime.of(10, 0), 20));
+				.containsExactly(new ScheduledVisit(DayOfWeek.THURSDAY, LocalTime.of(10, 0), 60));
 	}
 
 	private Long elder() {

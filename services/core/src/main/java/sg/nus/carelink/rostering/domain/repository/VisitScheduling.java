@@ -30,6 +30,15 @@ public interface VisitScheduling {
 	int cancelUntouchedFrom(Long carePlanId, LocalDateTime from);
 
 	/**
+	 * Takes the caregiver off the elder's care plan visits that start at or after {@code from}
+	 * and that nobody has started, leaving them to be covered. Extra-service visits and visits
+	 * given to them for an absence stay theirs.
+	 *
+	 * @return how many visits were released
+	 */
+	int releaseUntouchedFrom(Long elderId, Long caregiverId, LocalDateTime from);
+
+	/**
 	 * Visits nobody is assigned to and nobody has started that began at or after
 	 * {@code since} and before {@code now}, earliest first.
 	 */

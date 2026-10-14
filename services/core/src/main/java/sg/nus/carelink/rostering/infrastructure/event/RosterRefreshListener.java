@@ -12,7 +12,9 @@ import sg.nus.carelink.rostering.application.RecurringRosterService;
 
 /**
  * Refreshes an elder's visits as soon as the change behind them is committed: a care plan
- * published or stopped, or a primary caregiver named.
+ * published or stopped, or a primary caregiver named, replaced or removed. A primary caregiver
+ * who was replaced or removed is first taken off the visits nobody has started, so the refresh
+ * gives those to the new one, or leaves them to be covered.
  *
  * <p>Runs after the change commits, and each refresh commits on its own (see
  * {@link RecurringRosterService#refreshElder}), so a roster failure never undoes or fails the
@@ -40,7 +42,23 @@ class RosterRefreshListener {
 
 	@TransactionalEventListener
 	void onPrimaryCaregiverChanged(PrimaryCaregiverChanged event) {
+		if (event.previousCaregiverId() != null) {
+			release(event.elderId(), event.previousCaregiverId());
+		}
 		refresh(event.elderId());
+	}
+
+	/**
+	 * Unlike a refresh, the nightly run cannot redo this: nothing left behind says the caregiver
+	 * was ever the primary. A failure is logged loudly so a manager can hand the visits over.
+	 */
+	private void release(Long elderId, Long caregiverId) {
+		try {
+			roster.releaseFormerPrimary(elderId, caregiverId);
+		} catch (RuntimeException failure) {
+			log.error("Could not take former primary caregiver {} off elder {}'s visits; they keep them until "
+					+ "reassigned by hand", caregiverId, elderId, failure);
+		}
 	}
 
 	private void refresh(Long elderId) {

@@ -115,12 +115,14 @@ class RosterScheduler {
 	private void refreshAllElders() {
 		int created = 0;
 		int cancelled = 0;
+		int released = 0;
 		int covered = 0;
 		for (Long elderId : roster.eldersToRefresh()) {
 			try {
 				var refresh = roster.refreshElder(elderId);
 				created += refresh.created();
 				cancelled += refresh.cancelled();
+				released += refresh.released();
 			} catch (RuntimeException failure) {
 				log.error("Roster refresh failed for elder {}", elderId, failure);
 				continue;
@@ -131,8 +133,8 @@ class RosterScheduler {
 				log.error("Could not give elder {}'s visits on leave days to their cover", elderId, failure);
 			}
 		}
-		log.info("Roster refresh: {} visits created, {} cancelled, {} given to a cover during leave", created, cancelled,
-				covered);
+		log.info("Roster refresh: {} visits created, {} cancelled, {} taken off a primary caregiver who can't take "
+				+ "them, {} given to a cover during leave", created, cancelled, released, covered);
 		recheckConfirmedAbsences();
 	}
 

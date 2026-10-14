@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import sg.nus.carelink.careplan.application.CarePlanRequirements;
@@ -47,10 +48,12 @@ class RosterSnapshotLoader {
 	private final SpotCheckHistory spotChecks;
 	private final RosterLookbacks lookbacks;
 	private final Clock clock;
+	private final int travelBufferMinutes;
 
 	RosterSnapshotLoader(RosteringProfiles profiles, CredentialRegister register, CarePlanRequirements requirements,
 			AbsenceReportRepository absences, VisitReassignment visits, SpotCheckHistory spotChecks,
-			RosterLookbacks lookbacks, Clock clock) {
+			RosterLookbacks lookbacks, Clock clock,
+			@Value("${carelink.roster.travel-buffer-minutes:30}") int travelBufferMinutes) {
 		this.profiles = profiles;
 		this.register = register;
 		this.requirements = requirements;
@@ -59,6 +62,7 @@ class RosterSnapshotLoader {
 		this.spotChecks = spotChecks;
 		this.lookbacks = lookbacks;
 		this.clock = clock;
+		this.travelBufferMinutes = travelBufferMinutes;
 	}
 
 	/** Everything the search needs to fill these visits; the days they fall on bound the reads. */
@@ -76,6 +80,7 @@ class RosterSnapshotLoader {
 		required.values().forEach(typeIds::addAll);
 
 		RosterSnapshot.Builder snapshot = RosterSnapshot.builder()
+				.travelBuffer(travelBufferMinutes)
 				.candidates(profiles.candidates().stream()
 						.map(c -> CandidateCard.of(c.caregiverId(), c.fullName(), c.sector(), c.dialects(), c.onboarding()))
 						.toList())

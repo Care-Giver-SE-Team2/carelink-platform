@@ -20,6 +20,7 @@ import sg.nus.carelink.careplan.application.CarePlanSchedules.PlanSchedule;
 import sg.nus.carelink.careplan.application.CarePlanSchedules.Slot;
 import sg.nus.carelink.careplan.application.CarePlanSchedules.Task;
 import sg.nus.carelink.rostering.application.RecurringRosterService.RosterRefresh;
+import sg.nus.carelink.profile.application.PrimaryCaregiverLookup;
 import sg.nus.carelink.rostering.domain.repository.VisitScheduling;
 import sg.nus.carelink.rostering.domain.repository.VisitScheduling.PlannedVisit;
 
@@ -32,6 +33,8 @@ class RecurringRosterServiceTest {
 
 	private final Map<Long, List<PlanSchedule>> plans = new java.util.HashMap<>();
 	private final Map<Long, Long> primaryCaregivers = new java.util.HashMap<>();
+	/** Primary caregivers named but unable to take visits now, by elder. */
+	private final Map<Long, Long> unrosterable = new java.util.HashMap<>();
 	private final RecordingVisitScheduling visits = new RecordingVisitScheduling();
 
 	private final RecurringRosterService roster = new RecurringRosterService(
@@ -46,7 +49,17 @@ class RecurringRosterServiceTest {
 					return List.copyOf(plans.keySet());
 				}
 			},
-			elderId -> Optional.ofNullable(primaryCaregivers.get(elderId)),
+			new PrimaryCaregiverLookup() {
+				@Override
+				public Optional<Long> findRosterableCaregiverId(Long elderId) {
+					return Optional.ofNullable(primaryCaregivers.get(elderId));
+				}
+
+				@Override
+				public Optional<Long> findUnrosterableCaregiverId(Long elderId) {
+					return Optional.ofNullable(unrosterable.get(elderId));
+				}
+			},
 			visits,
 			Clock.fixed(NOW.atZone(SINGAPORE).toInstant(), SINGAPORE),
 			14);
@@ -66,7 +79,8 @@ class RecurringRosterServiceTest {
 			assertThat(visit.carePlanNodeId()).isEqualTo(90L);
 			assertThat(visit.end()).isEqualTo(visit.start().plusMinutes(30));
 		});
-		assertThat(refresh).isEqualTo(new RosterRefresh(42L, 2, 0, 0));
+		assertThat(refresh).isEqualTo(new RosterRefresh(42L, 2, 0, 0, 0));
+		assertThat(visits.released).isEmpty();
 		assertThat(visits.cancelled).isEmpty();
 	}
 
@@ -114,6 +128,24 @@ class RecurringRosterServiceTest {
 		assertThat(roster.eldersToRefresh()).containsExactlyInAnyOrder(42L, 43L);
 	}
 
+	@Test
+	void takesAPrimaryCaregiverWhoCantTakeVisitsOffTheirsAndSchedulesNewOnesForNobody() {
+		plans.put(42L, List.of(plan(9L, THU_1, null, Map.of(DayOfWeek.MONDAY, LocalTime.of(8, 0)))));
+		unrosterable.put(42L, 5L);
+
+		RosterRefresh refresh = roster.refreshElder(42L);
+
+		assertThat(refresh.released()).isEqualTo(2);
+		assertThat(visits.released).containsExactly(List.of(42L, 5L, NOW));
+		assertThat(visits.scheduled).isNotEmpty().allSatisfy(visit -> assertThat(visit.caregiverId()).isNull());
+	}
+
+	@Test
+	void releasesTheFormerPrimaryCaregiversVisitsFromNow() {
+		assertThat(roster.releaseFormerPrimary(42L, 5L)).isEqualTo(2);
+		assertThat(visits.released).containsExactly(List.of(42L, 5L, NOW));
+	}
+
 	private static PlanSchedule plan(Long id, LocalDate from, LocalDate until, Map<DayOfWeek, LocalTime> days) {
 		List<Slot> slots = days.entrySet().stream().map(e -> new Slot(e.getKey(), e.getValue(), 30)).toList();
 		return new PlanSchedule(id, 42L, 1, from, until,
@@ -123,6 +155,7 @@ class RecurringRosterServiceTest {
 	private static final class RecordingVisitScheduling implements VisitScheduling {
 		final List<PlannedVisit> scheduled = new ArrayList<>();
 		final List<Map.Entry<Long, LocalDateTime>> cancelled = new ArrayList<>();
+		final List<List<Object>> released = new ArrayList<>();
 
 		@Override
 		public Outcome schedule(List<PlannedVisit> visits) {
@@ -134,6 +167,12 @@ class RecurringRosterServiceTest {
 		public int cancelUntouchedFrom(Long carePlanId, LocalDateTime from) {
 			cancelled.add(Map.entry(carePlanId, from));
 			return 1;
+		}
+
+		@Override
+		public int releaseUntouchedFrom(Long elderId, Long caregiverId, LocalDateTime from) {
+			released.add(List.of(elderId, caregiverId, from));
+			return 2;
 		}
 
 		@Override

@@ -25,6 +25,11 @@ class InMemoryPrimaryCaregiverAssignmentRepository implements PrimaryCaregiverAs
 	}
 
 	@Override
+	public List<PrimaryCaregiverAssignment> findByCaregiverId(Long caregiverId) {
+		return rows.values().stream().filter(row -> caregiverId.equals(row.caregiverId())).toList();
+	}
+
+	@Override
 	public PrimaryCaregiverAssignment save(PrimaryCaregiverAssignment assignment) {
 		rows.put(assignment.elderId(), assignment);
 		return assignment;

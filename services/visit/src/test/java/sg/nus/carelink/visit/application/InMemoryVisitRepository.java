@@ -47,6 +47,15 @@ class InMemoryVisitRepository
     }
 
     @Override
+    public List<Visit> findScheduledForElderAndCaregiverFrom(Long elderId, Long caregiverId,
+            java.time.LocalDateTime from) {
+        return rows.values().stream()
+                .filter(v -> elderId.equals(v.elderId()) && caregiverId.equals(v.caregiverId()))
+                .filter(v -> v.status() == Visit.Status.SCHEDULED && !v.scheduledStart().isBefore(from))
+                .sorted(Comparator.comparing(Visit::id)).toList();
+    }
+
+    @Override
     public List<Visit> findByCarePlanIdStartingFrom(Long carePlanId, java.time.LocalDateTime from) {
         return rows.values().stream()
                 .filter(v -> carePlanId.equals(v.carePlanId()) && !v.scheduledStart().isBefore(from))

@@ -34,6 +34,11 @@ class PrimaryCaregiverAssignmentRepositoryAdapter implements PrimaryCaregiverAss
 	}
 
 	@Override
+	public List<PrimaryCaregiverAssignment> findByCaregiverId(Long caregiverId) {
+		return jpa.findByCaregiverId(caregiverId).stream().map(PrimaryCaregiverAssignmentMapper::toDomain).toList();
+	}
+
+	@Override
 	public PrimaryCaregiverAssignment save(PrimaryCaregiverAssignment assignment) {
 		return PrimaryCaregiverAssignmentMapper.toDomain(
 				jpa.save(PrimaryCaregiverAssignmentMapper.toEntity(assignment)));

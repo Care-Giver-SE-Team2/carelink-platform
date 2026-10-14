@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +27,15 @@ class CarePlanServiceTest {
 	private final InMemoryCarePlanRepository repository = new InMemoryCarePlanRepository();
 	private final InMemoryCarePlanNodeRepository nodeRepository = new InMemoryCarePlanNodeRepository();
 	private final List<Object> events = new ArrayList<>();
-	private final CarePlanService service = new CarePlanService(repository, nodeRepository, events::add);
+	/** What publish asked the primary-caregiver clash check, and what it answers. */
+	private final List<List<Object>> clashQuestions = new ArrayList<>();
+	private Optional<String> clash = Optional.empty();
+	private final CarePlanService service = new CarePlanService(repository, nodeRepository,
+			(elderId, startDate, tasks) -> {
+				clashQuestions.add(List.of(elderId, startDate, tasks));
+				return clash;
+			},
+			events::add);
 
 	@Test
 	void findsWhatWasSaved() {
@@ -54,7 +63,7 @@ class CarePlanServiceTest {
 	void listsAnEldersVersionsNewestFirst() {
 		CarePlan first = service.createDraft(42L, 7L);
 		service.publish(first.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
-				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Mon", EIGHT, 15)), CarePlanNode.EvidenceType.READING)));
+				null, "VITALS", "Vital-sign check", List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.READING)));
 		service.createDraft(42L, 7L);
 		service.createDraft(43L, 7L);
 
@@ -275,15 +284,15 @@ class CarePlanServiceTest {
 		service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
 				"Personal care", "BATHING", "Bathing assistance",
 				List.of(new VisitInput("Fri", LocalTime.of(8, 0), 60), new VisitInput("Mon", LocalTime.of(8, 0), 30),
-						new VisitInput("Wed", LocalTime.of(16, 30), 45)),
+						new VisitInput("Wed", LocalTime.of(16, 30), 90)),
 				CarePlanNode.EvidenceType.CHECKLIST)));
 
 		CarePlanNode task = service.findNodes(draft.id()).getFirst();
 		assertThat(task.visits()).containsExactly(
 				new ScheduledVisit(DayOfWeek.MONDAY, LocalTime.of(8, 0), 30),
-				new ScheduledVisit(DayOfWeek.WEDNESDAY, LocalTime.of(16, 30), 45),
+				new ScheduledVisit(DayOfWeek.WEDNESDAY, LocalTime.of(16, 30), 90),
 				new ScheduledVisit(DayOfWeek.FRIDAY, LocalTime.of(8, 0), 60));
-		assertThat(task.weeklyHours()).isEqualByComparingTo("2.25");
+		assertThat(task.weeklyHours()).isEqualByComparingTo("3.00");
 		assertThat(task.scheduleDays()).isEqualTo("MON,WED,FRI");
 	}
 
@@ -312,6 +321,145 @@ class CarePlanServiceTest {
 				.isInstanceOf(BusinessRuleViolation.class)
 				.extracting(ex -> ((BusinessRuleViolation) ex).code())
 				.isEqualTo("CARE_PLAN_TASK_NO_START_TIME");
+	}
+
+	@Test
+	void publishingAVisitThatStartsOffTheHalfHourIsRejected() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		List<PlanNodeInput> tasks = List.of(new PlanNodeInput(
+				"Personal care", "BATHING", "Bathing assistance",
+				List.of(new VisitInput("Mon", EIGHT, 30), new VisitInput("Wed", LocalTime.of(8, 15), 30)),
+				CarePlanNode.EvidenceType.CHECKLIST));
+
+		assertThatThrownBy(() -> service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.hasMessage("Task [Bathing assistance] starts at 08:15 on Wed; visits start on the hour or half hour")
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_TASK_START_NOT_ON_HALF_HOUR");
+		assertThat(service.findCarePlan(draft.id())).get().extracting(CarePlan::status)
+				.isEqualTo(CarePlan.Status.DRAFT);
+	}
+
+	@Test
+	void publishingAVisitOutsideThirtyMinuteBlocksUpToFourHoursIsRejected() {
+		for (int minutes : new int[] {15, 45, 270}) {
+			CarePlan draft = service.createDraft(100L + minutes, 7L);
+			List<PlanNodeInput> tasks = List.of(new PlanNodeInput("Personal care", "BATHING", "Bathing assistance",
+					List.of(new VisitInput("Mon", EIGHT, 30), new VisitInput("Tue", EIGHT, minutes)),
+					CarePlanNode.EvidenceType.CHECKLIST));
+
+			assertThatThrownBy(() -> service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks))
+					.isInstanceOf(BusinessRuleViolation.class)
+					.hasMessage("Task [Bathing assistance] runs %d minutes on Tue; visits run 30 minutes to 4 hours, "
+							.formatted(minutes) + "in steps of 30 minutes")
+					.extracting(ex -> ((BusinessRuleViolation) ex).code())
+					.isEqualTo("CARE_PLAN_TASK_DURATION_NOT_ALLOWED");
+		}
+	}
+
+	@Test
+	void publishingAVisitThatRunsPastMidnightIsRejectedButOneEndingAtMidnightIsNot() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		List<PlanNodeInput> late = List.of(new PlanNodeInput("Medication support", null, "Night check",
+				List.of(new VisitInput("Sat", LocalTime.of(23, 30), 60)), CarePlanNode.EvidenceType.CHECKLIST));
+
+		assertThatThrownBy(() -> service.publish(draft.id(), LocalDate.of(2026, 4, 1), late))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.hasMessage("Task [Night check] starts at 23:30 on Sat and runs 60 minutes, past midnight; "
+						+ "visits end by midnight")
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_TASK_PAST_MIDNIGHT");
+
+		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
+				"Medication support", null, "Night check",
+				List.of(new VisitInput("Sat", LocalTime.of(23, 30), 30)), CarePlanNode.EvidenceType.CHECKLIST)));
+		assertThat(published.status()).isEqualTo(CarePlan.Status.PUBLISHED);
+	}
+
+	@Test
+	void asksWhetherThePrimaryCaregiverCanTakeTheNewVisitsAndRefusesWhenTheyClash() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		clash = Optional.of("Aisyah N. is already primary caregiver of Chan Bee Choo, whose Bathing on Mon "
+				+ "08:00–08:30 clashes with Meals on Mon 08:00–08:30");
+		List<PlanNodeInput> tasks = List.of(new PlanNodeInput("Personal care", "MEAL_SUPPORT", "Meals",
+				List.of(new VisitInput("Mon", EIGHT, 30)), CarePlanNode.EvidenceType.CHECKLIST));
+
+		assertThatThrownBy(() -> service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.hasMessage(clash.get())
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CAREGIVER_TIME_CLASH");
+
+		assertThat(clashQuestions).singleElement().satisfies(question -> {
+			assertThat(question.get(0)).isEqualTo(42L);
+			assertThat(question.get(1)).isEqualTo(LocalDate.of(2026, 4, 1));
+			assertThat((List<?>) question.get(2)).singleElement().isInstanceOfSatisfying(CarePlanSchedules.Task.class,
+					task -> {
+						assertThat(task.name()).isEqualTo("Meals");
+						assertThat(task.slots()).containsExactly(new CarePlanSchedules.Slot(DayOfWeek.MONDAY, EIGHT, 30));
+					});
+		});
+		assertThat(service.findCarePlan(draft.id())).get().extracting(CarePlan::status)
+				.isEqualTo(CarePlan.Status.DRAFT);
+		assertThat(events).isEmpty();
+	}
+
+	@Test
+	void publishingTwoTasksThatOverlapOnTheSameDayIsRejected() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		List<PlanNodeInput> tasks = List.of(
+				new PlanNodeInput("Personal care", "BATHING", "Bathing assistance",
+						List.of(new VisitInput("Mon", EIGHT, 60)), CarePlanNode.EvidenceType.CHECKLIST),
+				new PlanNodeInput("Personal care", "GROOMING", "Grooming",
+						List.of(new VisitInput("Tue", EIGHT, 30), new VisitInput("Mon", LocalTime.of(8, 30), 30)),
+						CarePlanNode.EvidenceType.CHECKLIST));
+
+		assertThatThrownBy(() -> service.publish(draft.id(), LocalDate.of(2026, 4, 1), tasks))
+				.isInstanceOf(BusinessRuleViolation.class)
+				.hasMessage("Tasks [Bathing assistance] (08:00–09:00) and [Grooming] (08:30–09:00) overlap on Mon; "
+						+ "one caregiver can't do both, so stagger them or make them one task")
+				.extracting(ex -> ((BusinessRuleViolation) ex).code())
+				.isEqualTo("CARE_PLAN_TASKS_OVERLAP");
+		assertThat(service.findCarePlan(draft.id())).get().extracting(CarePlan::status)
+				.isEqualTo(CarePlan.Status.DRAFT);
+	}
+
+	@Test
+	void tasksBackToBackOrOnOtherDaysPublish() {
+		CarePlan draft = service.createDraft(42L, 7L);
+
+		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(
+				new PlanNodeInput("Personal care", "BATHING", "Bathing assistance",
+						List.of(new VisitInput("Mon", EIGHT, 60)), CarePlanNode.EvidenceType.CHECKLIST),
+				new PlanNodeInput("Personal care", "GROOMING", "Grooming",
+						List.of(new VisitInput("Mon", LocalTime.of(9, 0), 30), new VisitInput("Tue", EIGHT, 30)),
+						CarePlanNode.EvidenceType.CHECKLIST)));
+
+		assertThat(published.status()).isEqualTo(CarePlan.Status.PUBLISHED);
+	}
+
+	@Test
+	void publishesAFourHourVisit() {
+		CarePlan draft = service.createDraft(42L, 7L);
+
+		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
+				"Social and mobility", "ERRAND_ACCOMPANIMENT", "Errand accompaniment",
+				List.of(new VisitInput("Sat", LocalTime.of(9, 0), 240)), CarePlanNode.EvidenceType.CHECKLIST)));
+
+		assertThat(published.totalHours()).isEqualByComparingTo("4.00");
+	}
+
+	@Test
+	void aDraftMayStillHoldATimeOffTheHalfHourAndPublishesOnceItIsMoved() {
+		CarePlan draft = service.createDraft(42L, 7L);
+		service.saveDraft(draft.id(), null, List.of(new PlanNodeInput("Personal care", "BATHING", "Bathing assistance",
+				List.of(new VisitInput("Mon", LocalTime.of(8, 15), 30)), CarePlanNode.EvidenceType.CHECKLIST)));
+
+		CarePlan published = service.publish(draft.id(), LocalDate.of(2026, 4, 1), List.of(new PlanNodeInput(
+				"Personal care", "BATHING", "Bathing assistance",
+				List.of(new VisitInput("Mon", LocalTime.of(8, 30), 30)), CarePlanNode.EvidenceType.CHECKLIST)));
+
+		assertThat(published.status()).isEqualTo(CarePlan.Status.PUBLISHED);
 	}
 
 	@Test

@@ -41,7 +41,7 @@ class RosterSnapshotLoaderTest {
 		};
 		RosterSnapshotLoader loader = new RosterSnapshotLoader(profiles, () -> List.<CredentialRegister.Cover>of(),
 				planIds -> Map.of(), new ReRosteringFakes.Absences(), visits, history, RosterLookbacks.DEFAULT,
-				new ReRosteringFakes.MutableClock(NOW, ZoneId.of("Asia/Singapore")));
+				new ReRosteringFakes.MutableClock(NOW, ZoneId.of("Asia/Singapore")), 30);
 		VacatedSlot slot = new VacatedSlot(30L, 7L, null, null, EIGHTH, EIGHTH.plusMinutes(45), 5L);
 
 		RosterSnapshot snapshot = loader.load(List.of(slot));
@@ -50,6 +50,7 @@ class RosterSnapshotLoaderTest {
 
 		assertThat(askedSince.get()).isEqualTo(NOW.minusDays(90));
 		assertThat(snapshot.spotChecks(10L).needsImprovement()).isEqualTo(2);
+		assertThat(snapshot.travelBufferMinutes()).isEqualTo(30);
 		assertThat(shortlist.ranked()).extracting(Shortlist.Verdict::caregiverId).containsExactly(9L, 10L);
 		assertThat(shortlist.excluded()).isEmpty();
 		assertThat(loader.load(List.of()).candidates()).isEmpty();

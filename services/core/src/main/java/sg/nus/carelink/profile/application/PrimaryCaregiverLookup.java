@@ -13,4 +13,11 @@ public interface PrimaryCaregiverLookup {
 	 * onboarding or inactive). Empty means new visits are left unassigned.
 	 */
 	Optional<Long> findRosterableCaregiverId(Long elderId);
+
+	/**
+	 * The elder's primary caregiver when one is named but can't take visits now (onboarding or
+	 * inactive), so the visits they already hold can be released to be covered. Empty when there
+	 * is none, or they can.
+	 */
+	Optional<Long> findUnrosterableCaregiverId(Long elderId);
 }

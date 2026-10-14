@@ -8,7 +8,7 @@ import sg.nus.carelink.rostering.domain.repository.VisitScheduling;
 import sg.nus.carelink.visitapi.VisitApi;
 
 /**
- * {@link VisitScheduling} from visit's internal API. Both changes are safe to repeat, so a call
+ * {@link VisitScheduling} from visit's internal API. Every change is safe to repeat, so a call
  * that failed half-way can simply be made again.
  */
 @Component
@@ -32,6 +32,11 @@ class VisitApiVisitScheduling implements VisitScheduling {
 	@Override
 	public int cancelUntouchedFrom(Long carePlanId, LocalDateTime from) {
 		return visit.cancelUntouchedFrom(new VisitApi.CancelUntouched(carePlanId, from)).count();
+	}
+
+	@Override
+	public int releaseUntouchedFrom(Long elderId, Long caregiverId, LocalDateTime from) {
+		return visit.releaseUntouchedFrom(new VisitApi.ReleaseUntouched(elderId, caregiverId, from)).count();
 	}
 
 	@Override

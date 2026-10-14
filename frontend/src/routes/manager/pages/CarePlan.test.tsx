@@ -181,8 +181,8 @@ it('adds a sub-plan from the grouped activity picker and a per-day schedule', as
 
   expect(screen.getByRole('button', { name: 'Social and mobility' })).toBeInTheDocument()
   const walk = screen.getByText('Companionship walk').parentElement!
-  expect(within(walk).getByText('Tue 8:00–8:15 AM · 15 m')).toBeInTheDocument()
-  expect(within(walk).getByText('Sat 8:00–8:15 AM · 15 m')).toBeInTheDocument()
+  expect(within(walk).getByText('Tue 8:00–8:30 AM · 30 m')).toBeInTheDocument()
+  expect(within(walk).getByText('Sat 8:00–8:30 AM · 30 m')).toBeInTheDocument()
 })
 
 it('shows the elder’s profile and bound family from the backend', async () => {

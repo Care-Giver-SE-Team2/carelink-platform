@@ -100,13 +100,25 @@ export type CaregiverOption = {
   /** Comma-separated languages and dialects, as stored ("Malay,English"). Optional so older fixtures still type-check. */
   dialects?: string | null
   status: 'ONBOARDING' | 'AVAILABLE' | 'BUSY' | 'INACTIVE'
-  /** Server-side Caregiver.isAssignable(): false for onboarding or inactive caregivers. */
+  /**
+   * Server-side Caregiver.isAssignable(): false for onboarding or inactive caregivers. Asked for one
+   * elder (fetchCaregiversForElder), also false when that elder's certificates or timetable rule them out.
+   */
   assignable: boolean
+  /** What rules them out, when they are: CAREGIVER_NOT_ASSIGNABLE, CAREGIVER_MISSING_CREDENTIAL or CAREGIVER_TIME_CLASH. */
+  refusalCode?: string | null
+  /** Why, ready to show; only when asked for one elder. */
+  refusal?: string | null
 }
 
 /** Every caregiver, by name, for the manager's picker (manager only). */
 export function fetchCaregivers(): Promise<CaregiverOption[]> {
   return api<CaregiverOption[]>('/caregivers')
+}
+
+/** Every caregiver, each saying whether they may be named this elder's primary caregiver and why not. */
+export function fetchCaregiversForElder(elderId: string): Promise<CaregiverOption[]> {
+  return api<CaregiverOption[]>(`/caregivers?elderId=${encodeURIComponent(elderId)}`)
 }
 
 /** PUT /api/elders/{elderId}/primary-caregiver response — profile.controller.dto.PrimaryCaregiverResponse. */

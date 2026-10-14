@@ -69,7 +69,7 @@ class LeaveCoverServiceTest {
 				.add(32L, 8L, 5L, EIGHTH.withHour(14), 60);
 
 		RosterSnapshotLoader loader = new RosterSnapshotLoader(profiles, () -> covers,
-				planIds -> Map.of(4L, Set.of(2L)), absences, visits, since -> Map.of(), RosterLookbacks.DEFAULT, clock);
+				planIds -> Map.of(4L, Set.of(2L)), absences, visits, since -> Map.of(), RosterLookbacks.DEFAULT, clock, 0);
 		VisitChangeSaga saga = ReRosteringFakes.saga(steps, visits, incidents, alerts, profiles, clock);
 		AbsenceReRosteringService settling = new AbsenceReRosteringService(absences, changes, runs, candidates, checks,
 				constraints, loader, visits, profiles, incidents, new ReRosteringFakes.Family(), mock(UserDirectory.class),

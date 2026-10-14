@@ -46,6 +46,10 @@ carelink:
   # run rolls that window forward (Spring cron, read in schedule-zone; "-" switches it off).
   roster:
     horizon-days: 14
+    # The least time between a caregiver's visits at two different elders' homes, to travel:
+    # naming a primary caregiver, publishing a plan and the cover search all hold to it.
+    # 0 allows back-to-back visits; visits at the same elder's home need no gap.
+    travel-buffer-minutes: 30
     schedule-cron: "0 0 0 * * *"
     schedule-zone: Asia/Singapore
     # How often a visit still unassigned at its start time is turned into an exception.

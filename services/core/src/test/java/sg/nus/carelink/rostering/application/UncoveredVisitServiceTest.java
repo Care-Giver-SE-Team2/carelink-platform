@@ -72,6 +72,11 @@ class UncoveredVisitServiceTest {
 		}
 
 		@Override
+		public int releaseUntouchedFrom(Long elderId, Long caregiverId, LocalDateTime from) {
+			return 0;
+		}
+
+		@Override
 		public List<UncoveredVisit> findUncoveredStarted(LocalDateTime since, LocalDateTime now) {
 			asked.add(since);
 			asked.add(now);

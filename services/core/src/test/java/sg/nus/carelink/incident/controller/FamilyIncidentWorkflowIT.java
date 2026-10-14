@@ -55,7 +55,7 @@ import sg.nus.carelink.testsupport.VisitStandIn;
 })
 @Import(FamilyIncidentWorkflowIT.TimeConfiguration.class)
 class FamilyIncidentWorkflowIT {
-    private static final Instant START = Instant.parse("2026-10-08T02:00:00Z");
+    private static final Instant START = Instant.parse("2026-10-08T01:25:00Z");
     private static final ZoneId SINGAPORE = ZoneId.of("Asia/Singapore");
     private static final String DESCRIPTION = "A fictional fall during care; assistance was provided.";
     @LocalServerPort private int port;
@@ -110,7 +110,7 @@ class FamilyIncidentWorkflowIT {
             var detailA = detail(a, reported.id()); var detailB = detail(b, reported.id());
             assertThat(detailA.path("description").asString()).isEqualTo(DESCRIPTION);
             assertThat(detailA.path("visitId").asLong()).isEqualTo(reported.visit());
-            assertThat(detailA.path("acknowledgeBy").asString()).isEqualTo("2026-10-08T12:05:00+08:00");
+            assertThat(detailA.path("acknowledgeBy").asString()).isEqualTo("2026-10-08T11:30:00+08:00");
             assertThat(detailA.path("acknowledgement").path("familyMemberId").asLong()).isEqualTo(familyA);
             assertThat(detailB.path("acknowledgement").path("familyMemberId").asLong()).isEqualTo(familyB);
             assertEmptyReceipt(detailA); assertEmptyReceipt(detailB);
@@ -118,11 +118,11 @@ class FamilyIncidentWorkflowIT {
             var read = noticeA; assertEmptyReceipt(detail(a, reported.id()));
             clock.at(START.plusSeconds(420));
             var viewed = body(a.command("POST", "/api/incidents/" + reported.id() + "/view", null), 200);
-            assertThat(viewed.path("viewedAt").asString()).isEqualTo("2026-10-08T10:07:00+08:00");
+            assertThat(viewed.path("viewedAt").asString()).isEqualTo("2026-10-08T09:32:00+08:00");
             assertThat(viewed.path("acknowledgedAt").isNull()).isTrue();
             clock.at(START.plusSeconds(480));
             var aware = body(a.command("POST", "/api/incidents/" + reported.id() + "/acknowledge", Map.of("responseNote", "Family A knows")), 200);
-            assertThat(aware.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T10:08:00+08:00");
+            assertThat(aware.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T09:33:00+08:00");
             assertThat(aware.path("viewedAt")).isEqualTo(viewed.path("viewedAt"));
             clock.at(START.plusSeconds(540));
             assertThat(body(a.command("POST", "/api/incidents/" + reported.id() + "/acknowledge", Map.of("responseNote", "Must not replace first note")), 200)).isEqualTo(aware);
@@ -175,7 +175,7 @@ class FamilyIncidentWorkflowIT {
             assertThat(afterDeadline.toString()).doesNotContain("Private manager handling", "responderUserId", "timeline");
             assertEmptyReceipt(afterDeadline);
             var receipt = body(family.command("POST", "/api/incidents/" + report.id() + "/acknowledge", Map.of("responseNote", "Late awareness")), 200);
-            assertThat(receipt.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T13:00:00+08:00");
+            assertThat(receipt.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T12:25:00+08:00");
             assertThat(receipt.path("viewedAt").isNull()).isTrue();
             assertThat(notice(familyBUser, report.id()).get("status")).isEqualTo("PENDING");
             assertThat(detail(family, report.id()).path("acknowledgeBy")).isEqualTo(original.path("acknowledgeBy"));
@@ -188,7 +188,7 @@ class FamilyIncidentWorkflowIT {
         var report = report();
         try (var a = browser(familyAName); var b = browser(familyBName); var elderBrowser = browser(elderName)) {
             if (change.equals("expire")) jdbc.update("UPDATE elder_family_binding SET expires_at=? WHERE elder_id=? AND family_member_id=?",
-                    java.sql.Timestamp.valueOf("2026-10-08 10:06:00"), elder, familyA);
+                    java.sql.Timestamp.valueOf("2026-10-08 09:31:00"), elder, familyA);
             var notice = notice(familyAUser, report.id()); var original = detail(a, report.id());
             var windows = jdbc.queryForList("SELECT * FROM family_alert_window WHERE incident_id=?", report.id());
             if (change.equals("revoke")) {
@@ -221,7 +221,7 @@ class FamilyIncidentWorkflowIT {
                 assertThat(notices(familyAUser, report.id())).isEmpty();
                 assertThat(detail(a, report.id()).path("acknowledgeBy").isNull()).isTrue();
                 assertThat(notice(familyBUser, report.id()).get("status")).isEqualTo("PENDING");
-                assertThat(detail(b, report.id()).path("acknowledgeBy").asString()).isEqualTo("2026-10-08T12:05:00+08:00");
+                assertThat(detail(b, report.id()).path("acknowledgeBy").asString()).isEqualTo("2026-10-08T11:30:00+08:00");
                 assertThat(jdbc.queryForObject("SELECT state FROM family_alert_event WHERE incident_id=?", String.class, report.id())).isEqualTo("FAILED");
                 assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, familyA, report.id())).isEqualTo("FAILED");
                 assertThat(jdbc.queryForObject("SELECT status FROM family_alert_delivery WHERE family_member_id=? AND event_id=(SELECT event_id FROM family_alert_event WHERE incident_id=?)", String.class, familyB, report.id())).isEqualTo("CREATED");
@@ -247,7 +247,7 @@ class FamilyIncidentWorkflowIT {
             } finally { jdbc.execute("DROP TRIGGER fm05_workflow_write_fault"); }
             clock.at(START.plusSeconds(360));
             var saved = body(family.command("POST", path, payload), 200);
-            assertThat(saved.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T10:06:00+08:00");
+            assertThat(saved.path("acknowledgedAt").asString()).isEqualTo("2026-10-08T09:31:00+08:00");
             assertThat(saved.path("viewedAt")).isEqualTo(viewed.path("viewedAt"));
             assertThat(notice(familyAUser, report.id())).isEqualTo(notice);
             clock.at(START.plusSeconds(420));
@@ -284,7 +284,7 @@ class FamilyIncidentWorkflowIT {
             body(manager.command("PUT", "/api/elders/" + elder + "/primary-caregiver", Map.of("caregiverId", caregiver)), 200);
             long plan = body(manager.command("POST", "/api/care-plans", Map.of("elderId", elder)), 201).path("id").asLong();
             body(manager.command("POST", "/api/care-plans/" + plan + "/publish", Map.of("startDate", start.toLocalDate().toString(), "nodes", List.of(Map.of(
-                    "groupName", "Personal care", "name", "FM05 workflow care", "evidenceType", "CHECKLIST", "visits", List.of(Map.of("day", "THURSDAY", "startTime", "10:05", "minutes", 60)))))), 200);
+                    "groupName", "Personal care", "name", "FM05 workflow care", "evidenceType", "CHECKLIST", "visits", List.of(Map.of("day", "THURSDAY", "startTime", "09:30", "minutes", 60)))))), 200);
             // Publishing also tells the family the plan is ready; these tests count incident messages only.
             jdbc.update("DELETE FROM requested_notification WHERE resource_type = 'CARE_PLAN'");
             var planned = visits.ofElder(elder).stream().filter(visit -> Long.valueOf(plan).equals(visit.carePlanId()))

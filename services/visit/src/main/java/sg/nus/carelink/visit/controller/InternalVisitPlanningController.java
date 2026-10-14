@@ -17,7 +17,8 @@ import sg.nus.carelink.visitapi.VisitApi;
 
 /**
  * The rostering part of visit's internal API ({@link VisitApi}): the visits a published care plan
- * calls for, calling off a superseded version's untouched visits, visits that started with nobody on
+ * calls for, calling off a superseded version's untouched visits, taking a removed primary caregiver
+ * off the elder's untouched visits, visits that started with nobody on
  * them, and the booked visits a lapsing certificate puts at risk. In front of {@link VisitScheduling}
  * and {@link UpcomingAssignments}.
  */
@@ -46,6 +47,12 @@ public class InternalVisitPlanningController {
 	@PostMapping("/visits/cancel-untouched")
 	public VisitApi.Cancelled cancelUntouchedFrom(@RequestBody VisitApi.CancelUntouched request) {
 		return new VisitApi.Cancelled(scheduling.cancelUntouchedFrom(request.carePlanId(), request.from()));
+	}
+
+	@PostMapping("/visits/release-untouched")
+	public VisitApi.Released releaseUntouchedFrom(@RequestBody VisitApi.ReleaseUntouched request) {
+		return new VisitApi.Released(
+				scheduling.releaseUntouchedFrom(request.elderId(), request.caregiverId(), request.from()));
 	}
 
 	@GetMapping("/visits/uncovered-started")
