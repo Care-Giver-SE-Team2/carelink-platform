@@ -61,7 +61,7 @@ else
   exit 2
 fi
 
-tag=${IMAGE_TAG:-$(git rev-parse HEAD)}
+tag=""
 image_rows=""
 if [ -n "${RELEASE_MANIFEST:-}" ]; then
   if [ -n "${IMAGE_TAG:-}" ]; then
@@ -71,6 +71,8 @@ if [ -n "${RELEASE_MANIFEST:-}" ]; then
   : "${IMAGE_REGISTRY:?set IMAGE_REGISTRY when using RELEASE_MANIFEST}"
   # Validate every record before any Kubernetes read/write or Helm release.
   image_rows=$(python3 scripts/release-manifest.py --registry "$IMAGE_REGISTRY" resolve "$RELEASE_MANIFEST")
+else
+  tag=${IMAGE_TAG:-$(git rev-parse HEAD)}
 fi
 if [ "${DRY_RUN:-0}" = 1 ]; then
   registry=${IMAGE_REGISTRY:-registry.invalid}
