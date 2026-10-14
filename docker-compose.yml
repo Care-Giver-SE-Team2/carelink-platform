@@ -197,6 +197,10 @@ services:
       # subscribes the queue to that event only). It publishes none, so it has no topic setting.
       CARELINK_EVENTS_QUEUEURL: http://localstack:4566/000000000000/carelink-notification
       CARELINK_EVENTS_ENDPOINT: http://localstack:4566
+      # Encrypts providers' webhook signing secrets in the database; scripts/run.sh writes it to .env
+      CARELINK_WEBHOOKS_ENCRYPTIONKEY: ${WEBHOOK_ENCRYPTION_KEY:?run scripts/run.sh, which writes .env}
+      # Locally a provider's endpoint may be http:// or on this machine; never in the cloud
+      CARELINK_WEBHOOKS_ALLOWLOCALENDPOINTS: "true"
       AWS_ACCESS_KEY_ID: test             # LocalStack takes any key
       AWS_SECRET_ACCESS_KEY: test
     ports:

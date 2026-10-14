@@ -105,7 +105,7 @@ class ReleaseManifestTest(unittest.TestCase):
     def test_selected_context_and_stop_after_failed_release(self):
         keys = ("DB_URL DB_USER DB_PASSWORD SPRING_DATA_REDIS_HOST SPRING_DATA_REDIS_PORT "
                 "SPRING_DATA_REDIS_PASSWORD SPRING_DATA_REDIS_SSL_ENABLED "
-                "CARELINK_EVENTS_TOPICARN CARELINK_EVENTS_QUEUEURL")
+                "CARELINK_EVENTS_TOPICARN CARELINK_EVENTS_QUEUEURL CARELINK_WEBHOOKS_ENCRYPTIONKEY")
         self.stub("kubectl", 'echo "kubectl $*" >> "$CALL_LOG"\n'
                   'if [[ "$*" == *"get configmap"* ]]; then echo public-ca; else\n'
                   f"printf '%s\\n' {keys}\nfi\n")
