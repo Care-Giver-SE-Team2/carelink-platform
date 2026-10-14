@@ -34,4 +34,16 @@ public interface WebhookDeliveries {
 
 	/** Every attempt at the delivery, the first first. */
 	List<DeliveryAttempt> attempts(String deliveryId);
+
+	/**
+	 * A page of the provider's deliveries created since {@code since}, newest first, in {@code status} or
+	 * any status when it is null.
+	 */
+	List<Delivery> page(long providerId, Delivery.Status status, Instant since, int page, int size);
+
+	/** How many deliveries {@link #page} pages through. */
+	long count(long providerId, Delivery.Status status, Instant since);
+
+	/** When the provider's endpoint last answered 2xx since {@code since}; empty if it has not. */
+	Optional<Instant> lastDelivered(long providerId, Instant since);
 }

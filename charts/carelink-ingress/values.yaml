@@ -4,6 +4,10 @@ cloudFrontPrefixListId: ""
 # ImplementationSpecific rules stay in this order; the first match owns the route.
 routes:
   - {path: "/^/api/notifications(/.*)?$", service: notification}
+  - {path: "/^/api/provider-applications(/.*)?$", service: notification}
+  - {path: "/^/api/providers(/.*)?$", service: notification}
+  # The Open Platform's public API; its job calls will go to report, listed before this, once report serves them
+  - {path: "/^/api/open(/.*)?$", service: notification}
   - {path: "/^/api/reports(/.*)?$", service: report}
   - {path: "/^/api/value-added-service-requests(/.*)?$", service: report}
   - {path: "/^/api/family/caregiver-reviews(/.*)?$", service: report}

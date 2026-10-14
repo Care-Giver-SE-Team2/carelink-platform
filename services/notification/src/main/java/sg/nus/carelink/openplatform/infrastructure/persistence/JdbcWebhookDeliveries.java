@@ -31,6 +31,9 @@ class JdbcWebhookDeliveries implements WebhookDeliveries {
 			id, provider_id, event_type, job_id, url, body, status, attempt_count, max_attempts, next_attempt_at,
 			created_at""";
 
+	/** One provider's deliveries created since a time, in one status or, for a null status, any. */
+	private static final String FOR_PROVIDER = " WHERE provider_id = ? AND created_at >= ? AND (? IS NULL OR status = ?)";
+
 	private final JdbcTemplate jdbc;
 	private final Clock clock;
 
@@ -125,6 +128,32 @@ class JdbcWebhookDeliveries implements WebhookDeliveries {
 						row.getLong("duration_ms"),
 						row.getString("error")),
 				deliveryId);
+	}
+
+	@Override
+	public List<Delivery> page(long providerId, Delivery.Status status, Instant since, int page, int size) {
+		String statusName = status == null ? null : status.name();
+		return jdbc.query("SELECT " + COLUMNS + " FROM webhook_delivery" + FOR_PROVIDER
+				+ " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?", JdbcWebhookDeliveries::delivery,
+				providerId, Timestamp.from(since), statusName, statusName, size, (long) page * size);
+	}
+
+	@Override
+	public long count(long providerId, Delivery.Status status, Instant since) {
+		String statusName = status == null ? null : status.name();
+		Long count = jdbc.queryForObject("SELECT COUNT(*) FROM webhook_delivery" + FOR_PROVIDER, Long.class,
+				providerId, Timestamp.from(since), statusName, statusName);
+		return count == null ? 0 : count;
+	}
+
+	@Override
+	public Optional<Instant> lastDelivered(long providerId, Instant since) {
+		Timestamp last = jdbc.queryForObject("""
+				SELECT MAX(a.attempted_at)
+				FROM webhook_delivery_attempt a JOIN webhook_delivery d ON d.id = a.delivery_id
+				WHERE d.provider_id = ? AND a.attempted_at >= ? AND a.response_status BETWEEN 200 AND 299""",
+				Timestamp.class, providerId, Timestamp.from(since));
+		return Optional.ofNullable(last).map(Timestamp::toInstant);
 	}
 
 	private Optional<Delivery> byDedupeKey(String dedupeKey) {

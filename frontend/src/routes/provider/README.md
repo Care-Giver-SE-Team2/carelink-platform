@@ -29,35 +29,43 @@ Design: the "provider workbench" handoff (v3, manager-console style), extended i
 language for the portal pages. The controls are in `components/ui.tsx`, because the shared
 components are sized for the manager console.
 
-## Until the Open API exists
+## What is real and what is mocked
 
-`features/provider-platform/mockPlatform.ts` stands in for the platform, in localStorage, so
-the manager console and the portal share it across tabs. Webhooks are not really sent: each
-delivery records the attempts CareLink would make on the retry schedule in `webhooks.ts`.
-Replace the bodies in `api.ts` with real calls once the Phase 1 contract is settled.
+`features/provider-platform/api.ts` is the portal's only way to CareLink. Run with the backend
+(`scripts/run.sh all`, then `npm run dev`), it calls the Open API that notification serves
+(`liveApi.ts`, docs/api/open-platform.yaml): applying, the portal, credentials and webhooks are
+real, and real webhooks are sent and logged. Signing in and getting tokens are notification's
+too: it issues the tokens itself, the same locally and in the cloud (docs/section5/decisions.md,
+D15). Every call is under `/api/open/v1`, which CloudFront sends to the services as it does all of
+`/api`; locally the Vite proxy sends `/api/open` to 8083.
 
-Providers sign in with the contact email and the password set when applying; everything after
-Apply needs a session (8 hours, kept in sessionStorage). The mock keeps a salted stand-in hash,
-never the password. Not built, and to settle with the contract: MFA, password reset, team
-members, and approval emails (which notification would send).
+The job calls (the Sandbox) stay on `mockPlatform.ts` until report serves the job API: a real
+token from the token endpoint is handed to the mock, which gives its client four demo jobs.
+Under Vitest, and with `VITE_OPEN_PLATFORM_MOCK=true`, every call is the mock's, in
+localStorage, with the seeded providers below.
+
+Providers sign in with the contact email and the password set when applying; notification keeps
+only a bcrypt hash of it, and five wrong passwords in a row lock the sign-in for 15 minutes. Not built, and to settle with the contract: MFA,
+password reset, team members, and approval emails (no email channel, docs/section5/decisions.md, D9).
 
 ## Demo
 
 1. `/provider/apply`: submit an application, setting a password. You're signed in to the
    portal; Status shows it pending.
-2. `/manager/providers` (signed in as a manager, in another tab): approve it. Approving also
-   dispatches four jobs to it, standing in for report's dispatch.
+2. `/manager/providers` (signed in as a manager, in another tab): approve it.
 3. `/provider/status`: **Check again**, then **View credentials →** (shown once) →
    **Continue**.
-4. `/provider/webhooks`: the deliveries those jobs sent. **Send test event**; open a delivery.
+4. `/provider/webhooks`: **Send test event**; open the delivery. With the endpoint the
+   provider gave, the attempts show what it answered; on the mock, the jobs' deliveries too.
 5. `/provider/sandbox`: **Get access token** (filled in from step 3), open a job, **Accept
    job**, then **Mark complete**. One new job is cancelled by the family as you accept it, to
-   show the 409 path.
-6. Back on `/manager/providers`: the provider's health, and **Suspend provider**; the Sandbox
-   then gets 403.
+   show the 409 path. The jobs are the mock's until report serves the job API.
+6. Back on `/manager/providers`: the provider's health, and **Suspend provider**: its
+   webhooks stop and Status shows it. On the mock the Sandbox then gets 403; with the backend,
+   that comes with report's job API, which refuses a suspended provider's token.
 
-A provider approved in the seed data, with a failed and a retrying webhook, for skipping steps
-1–3 (sign in on Status). These are mock values, valid only against the mock:
+On the mock, a provider approved in the seed data, with a failed and a retrying webhook, for
+skipping steps 1–3 (sign in on Status). These are mock values, valid only against the mock:
 
 | | |
 |---|---|

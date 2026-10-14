@@ -194,10 +194,12 @@ services:
       # Who reads the inbox, and which elders a family member may read
       CARELINK_COREAPI_BASEURL: http://core:8080
       # notification takes NotificationRequested from its queue (scripts/localstack/events.sh
-      # subscribes the queue to that event only). It publishes none, so it has no topic setting.
+      # subscribes the queue to that event only), and publishes ProviderUpdated to the topic
       CARELINK_EVENTS_QUEUEURL: http://localstack:4566/000000000000/carelink-notification
+      CARELINK_EVENTS_TOPICARN: arn:aws:sns:ap-southeast-1:000000000000:carelink-events
       CARELINK_EVENTS_ENDPOINT: http://localstack:4566
-      # Encrypts providers' webhook signing secrets in the database; scripts/run.sh writes it to .env
+      # Encrypts providers' webhook signing secrets and the Open Platform's token key in the database;
+      # scripts/run.sh writes it to .env
       CARELINK_WEBHOOKS_ENCRYPTIONKEY: ${WEBHOOK_ENCRYPTION_KEY:?run scripts/run.sh, which writes .env}
       # Locally a provider's endpoint may be http:// or on this machine; never in the cloud
       CARELINK_WEBHOOKS_ALLOWLOCALENDPOINTS: "true"

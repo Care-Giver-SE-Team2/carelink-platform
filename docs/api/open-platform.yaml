@@ -1,0 +1,1388 @@
+openapi: 3.1.0
+
+info:
+  title: CareLink Open Platform API
+  version: 0.1.0
+  description: |
+    The API third-party providers use to join CareLink and take on its value-added service jobs: apply (PT01),
+    manage their integration in the Partner Portal, and accept, decline and complete the jobs CareLink dispatches
+    to them (PT04). The webhooks CareLink sends are in `webhooks` below, and their rules in
+    [webhooks.md](webhooks.md).
+
+    **Status: draft** until Section 4 has agreed the job endpoints and events. Owner: Section 5 (notification).
+    The design decisions behind it are in `docs/section5/decisions.md`. This is not the CareLink app's own API
+    (`openapi.yaml`); it follows that API's conventions.
+
+    ## The flow
+
+    1. The provider applies (`POST /api/open/v1/applications`), which also creates its Partner Portal user.
+    2. A CareLink manager approves it (internal, not in this API).
+    3. The provider signs in to the portal and collects its credentials, once
+       (`POST /api/open/v1/portal/credentials/collect`): a client ID and secret, and a webhook signing secret.
+    4. Its server exchanges the client ID and secret for an access token (client credentials, below).
+    5. CareLink dispatches a job: the provider receives `job.dispatched` and reads the job.
+    6. The provider accepts it, does the work, and reports completion.
+
+    ## Authentication
+
+    | Paths | Who | How |
+    |---|---|---|
+    | `POST /api/open/v1/applications` | Anyone | None. Rate-limited |
+    | `POST /api/open/v1/portal/sessions` | A person at the provider, signing in | None: the contact email and the password set when applying. Five wrong passwords in a row lock it for 15 minutes |
+    | `/api/open/v1/portal/**` | A person at the provider, in the Partner Portal | `portalUser`: the access token from signing in |
+    | `/api/open/v1/jobs/**` | The provider's server | `clientCredentials`: an OAuth2 access token from the client ID and secret |
+
+    Both kinds of token are sent as `Authorization: Bearer <token>`. CareLink issues both itself (notification), as
+    RS256 JWTs whose public keys are at `GET /api/open/v1/.well-known/jwks.json`. Access tokens last 60 minutes; ask
+    for a new one when one runs out. There are no refresh tokens.
+
+    Every path is under `/api/open`, on the same address as the CareLink app.
+
+    ```
+    curl -X POST https://api.carelink.sg/api/open/v1/oauth2/token \
+      -u "$CARELINK_CLIENT_ID:$CARELINK_CLIENT_SECRET" \
+      -d "grant_type=client_credentials&scope=open-platform/jobs.read%20open-platform/jobs.write"
+    ```
+
+    ## Conventions
+
+    - **Fields** are camelCase; **enum values** are UPPER_CASE; **ids** are opaque strings (`JOB-24081`).
+    - **Times** are Singapore wall-clock time with its offset, to the second: `2026-10-17T10:00:00+08:00`.
+    - **Errors** are RFC 9457 problem details (`application/problem+json`) with a stable `code`. A request that
+      fails validation is 400 with `fields`; a request the job's state does not allow is 409.
+    - **Pages** start at `page=0`; `size` defaults to 20, at most 100. A page past the last has no items.
+    - **Idempotency.** Every POST under `/api/open/v1/jobs` needs an `Idempotency-Key` header: any unique string of up to
+      120 characters, such as a UUID, made once per action. Repeating a request with a key that succeeded does not
+      act again: it answers 200 with the job as it stands. A request that was refused is not remembered, so it can
+      be repeated with the same key. The same key for another job or another action is 422. Keys are kept for
+      24 hours.
+    - **Compatibility.** CareLink may add endpoints, fields and enum values; clients must ignore what they do not
+      know. Removing or renaming anything, or changing what it means, is a new version (`/api/open/v2`).
+    - **Limits.** Each provider may make 10 requests a second, bursting to 20, and 50,000 a day; past that, 429
+      with `Retry-After`.
+  license:
+    name: UNLICENSED
+
+servers:
+  - url: https://api.carelink.sg
+    description: Production.
+
+tags:
+  - name: Onboarding
+    description: Applying to join the Open Platform (PT01).
+  - name: Portal
+    description: The signed-in provider's application, credentials and integration health.
+  - name: Webhooks
+    description: The provider's webhook endpoint, signing secret and delivery log.
+  - name: Jobs
+    description: The jobs CareLink dispatches to the provider, and its answers to them (PT04).
+
+paths:
+
+  # ── Onboarding (notification) ─────────────────────────────────────────────────────────────
+
+  /api/open/v1/applications:
+    post:
+      tags: [Onboarding]
+      operationId: submitApplication
+      x-served-by: notification
+      summary: Apply to join the Open Platform
+      description: |
+        Creates the application and the provider's portal user, whose password is the one given here: CareLink
+        keeps only a hash of it. The provider is told the application ID, and a CareLink manager
+        reviews it, usually within 2 working days.
+
+        An email that already has a pending or approved application is refused with 409. A provider whose
+        application was rejected may apply again; the new application sets a new password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationCreate'
+      responses:
+        '201':
+          description: The application is received and pending.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [applicationId]
+                properties:
+                  applicationId:
+                    type: string
+                    examples: [APP-2026-00417]
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '409':
+          description: '`ACCOUNT_EXISTS`: this email already has a pending or approved application. Sign in instead.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ── Portal (notification) ─────────────────────────────────────────────────────────────────
+
+  /api/open/v1/portal/sessions:
+    post:
+      tags: [Portal]
+      operationId: signIn
+      x-served-by: notification
+      summary: Sign in to the Partner Portal
+      description: |
+        Exchanges the contact email and the password set when applying for a `portalUser` access token. A user
+        whose application was rejected can still sign in, to read why. Five wrong passwords in a row lock the
+        sign-in for 15 minutes, whatever the password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  writeOnly: true
+      responses:
+        '200':
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, expiresIn, tokenType]
+                properties:
+                  accessToken:
+                    type: string
+                  expiresIn:
+                    type: integer
+                    description: Seconds until the token runs out.
+                    examples: [3600]
+                  tokenType:
+                    type: string
+                    const: Bearer
+        '401':
+          description: '`INVALID_CREDENTIALS`: no such email, or the wrong password.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: '`TOO_MANY_ATTEMPTS`: five wrong passwords in a row; try again in 15 minutes.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /api/open/v1/portal/application:
+    get:
+      tags: [Portal]
+      operationId: getMyApplication
+      x-served-by: notification
+      summary: The signed-in provider's application
+      description: Its latest application, whatever its status.
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The application.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+
+  /api/open/v1/portal/credentials/collect:
+    post:
+      tags: [Portal]
+      operationId: collectCredentials
+      x-served-by: notification
+      summary: Collect the credentials, once
+      description: |
+        Hands an approved provider its client ID, client secret and webhook signing secret. This works once:
+        CareLink shows the secrets only here, and afterwards only their last four characters. A provider that lost
+        them rotates them.
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The credentials. Store them now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedCredentials'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '409':
+          description: '`NOT_APPROVED`: the application is not approved.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '410':
+          description: '`CREDENTIALS_COLLECTED`: they were already shown. Rotate the secrets to get new ones.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /api/open/v1/portal/credentials:
+    get:
+      tags: [Portal]
+      operationId: getCredentials
+      x-served-by: notification
+      summary: The client credentials, without the secret
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The client ID, a hint of the secret, and how to get a token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialsSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
+  /api/open/v1/portal/credentials/rotate:
+    post:
+      tags: [Portal]
+      operationId: rotateClientSecret
+      x-served-by: notification
+      summary: Rotate the client secret
+      description: |
+        Issues a new client secret, shown once in the answer. The old one stops working at once; access tokens
+        already issued keep working until they expire. The answer carries the client ID too: clients must use the
+        one it gives, as rotating may issue a new one.
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The new credentials. Store them now.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clientId, clientSecret]
+                properties:
+                  clientId:
+                    type: string
+                  clientSecret:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
+  /api/open/v1/portal/health:
+    get:
+      tags: [Portal]
+      operationId: getIntegrationHealth
+      x-served-by: notification
+      summary: How the integration is doing
+      description: The last seven days' webhook deliveries by outcome, and whether CareLink has suspended the provider.
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The integration's health.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationHealth'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
+  # ── Webhooks (notification) ───────────────────────────────────────────────────────────────
+
+  /api/open/v1/portal/webhook:
+    get:
+      tags: [Webhooks]
+      operationId: getWebhookSettings
+      x-served-by: notification
+      summary: The webhook endpoint and its events
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+    put:
+      tags: [Webhooks]
+      operationId: updateWebhookSettings
+      x-served-by: notification
+      summary: Change the webhook endpoint or its events
+      description: Deliveries created from now on go to the new URL; those already created keep theirs.
+      security:
+        - portalUser: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookSettingsUpdate'
+      responses:
+        '200':
+          description: The settings as saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSettings'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
+  /api/open/v1/portal/webhook/secret/rotate:
+    post:
+      tags: [Webhooks]
+      operationId: rotateWebhookSecret
+      x-served-by: notification
+      summary: Rotate the webhook signing secret
+      description: |
+        Issues a new signing secret, shown once in the answer. For 24 hours CareLink signs with both the new and
+        the old secret (webhooks.md, section 5), then with the new one only.
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The new signing secret. Store it now.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [webhookSecret]
+                properties:
+                  webhookSecret:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
+  /api/open/v1/portal/webhook/test:
+    post:
+      tags: [Webhooks]
+      operationId: sendTestEvent
+      x-served-by: notification
+      summary: Send a test event
+      description: Sends `ping` to the endpoint now, whatever the subscription, and answers with the delivery as it stands.
+      security:
+        - portalUser: []
+      responses:
+        '202':
+          description: The delivery is created; its first attempt may still be under way.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Delivery'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
+  /api/open/v1/portal/webhook/deliveries:
+    get:
+      tags: [Webhooks]
+      operationId: listDeliveries
+      x-served-by: notification
+      summary: The delivery log
+      description: The last 30 days' deliveries, newest first.
+      security:
+        - portalUser: []
+      parameters:
+        - name: status
+          in: query
+          description: Only deliveries in this state.
+          schema:
+            $ref: '#/components/schemas/DeliveryStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: A page of deliveries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, size, totalElements]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Delivery'
+                  page:
+                    type: integer
+                  size:
+                    type: integer
+                  totalElements:
+                    type: integer
+                    format: int64
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
+  /api/open/v1/portal/webhook/deliveries/{deliveryId}:
+    get:
+      tags: [Webhooks]
+      operationId: getDelivery
+      x-served-by: notification
+      summary: One delivery, with every attempt and the request it repeats
+      security:
+        - portalUser: []
+      parameters:
+        - $ref: '#/components/parameters/DeliveryId'
+      responses:
+        '200':
+          description: The delivery.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Delivery'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+        '404':
+          $ref: '#/components/responses/DeliveryNotFound'
+
+  /api/open/v1/portal/webhook/deliveries/{deliveryId}/resend:
+    post:
+      tags: [Webhooks]
+      operationId: resendDelivery
+      x-served-by: notification
+      summary: Send a failed delivery again
+      description: One more attempt, with the same delivery ID and body, signed afresh.
+      security:
+        - portalUser: []
+      parameters:
+        - $ref: '#/components/parameters/DeliveryId'
+      responses:
+        '202':
+          description: The attempt is under way; the delivery as it stands.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Delivery'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+        '404':
+          $ref: '#/components/responses/DeliveryNotFound'
+        '409':
+          description: '`DELIVERY_NOT_FAILED`: only a failed delivery can be resent.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  # ── Jobs (report) ─────────────────────────────────────────────────────────────────────────
+
+  /api/open/v1/jobs:
+    get:
+      tags: [Jobs]
+      operationId: listJobs
+      x-served-by: report
+      summary: The jobs dispatched to the provider
+      description: Newest first, by when they were dispatched. Each status's count comes with every page.
+      security:
+        - clientCredentials: [open-platform/jobs.read]
+      parameters:
+        - name: status
+          in: query
+          description: Only jobs in these states; repeat it for several (`status=DECLINED&status=CANCELLED`). All when absent.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/JobStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: A page of jobs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPage'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/JobsForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/open/v1/jobs/{jobId}:
+    get:
+      tags: [Jobs]
+      operationId: getJob
+      x-served-by: report
+      summary: One job
+      description: The job as it stands. The address is withheld until the provider accepts the job.
+      security:
+        - clientCredentials: [open-platform/jobs.read]
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/JobsForbidden'
+        '404':
+          $ref: '#/components/responses/JobNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/open/v1/jobs/{jobId}/accept:
+    post:
+      tags: [Jobs]
+      operationId: acceptJob
+      x-served-by: report
+      summary: Accept a job
+      description: |
+        The provider takes the job on: it becomes ACCEPTED, and the answer carries the address. Only a NEW job can
+        be accepted, and only until `respondBy`.
+
+        If the family cancelled the booking before the acceptance was recorded, the answer is 409 `JOB_CANCELLED`
+        with CareLink's reason, and the job is CANCELLED; `job.cancelled` is sent too.
+      security:
+        - clientCredentials: [open-platform/jobs.write]
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The job, accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyMissing'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/JobsForbidden'
+        '404':
+          $ref: '#/components/responses/JobNotFound'
+        '409':
+          description: |
+            `JOB_CANCELLED`: the job was cancelled; `detail` says why. `JOB_NOT_ACTIONABLE`: the job is not NEW.
+            `RESPONSE_DEADLINE_PASSED`: `respondBy` has passed; the job is CANCELLED and CareLink has made other
+            arrangements.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+
+  /api/open/v1/jobs/{jobId}/decline:
+    post:
+      tags: [Jobs]
+      operationId: declineJob
+      x-served-by: report
+      summary: Decline a job
+      description: The provider turns the job down; it becomes DECLINED and CareLink finds another way to serve it. Only a NEW job can be declined.
+      security:
+        - clientCredentials: [open-platform/jobs.write]
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobDecline'
+      responses:
+        '200':
+          description: The job, declined.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/JobsForbidden'
+        '404':
+          $ref: '#/components/responses/JobNotFound'
+        '409':
+          description: '`JOB_CANCELLED` or `JOB_NOT_ACTIONABLE`, as for accepting.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+
+  /api/open/v1/jobs/{jobId}/complete:
+    post:
+      tags: [Jobs]
+      operationId: completeJob
+      x-served-by: report
+      summary: Report a job done
+      description: The provider reports the work done, with when it really started and ended. Only an ACCEPTED job can be completed.
+      security:
+        - clientCredentials: [open-platform/jobs.write]
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCompletion'
+      responses:
+        '200':
+          description: The job, completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          description: |
+            Validation failed (`fields`), or `INVALID_TIMES`: `actualEnd` is not after `actualStart`, or either is in
+            the future.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/JobsForbidden'
+        '404':
+          $ref: '#/components/responses/JobNotFound'
+        '409':
+          description: '`JOB_CANCELLED` or `JOB_NOT_ACTIONABLE`: the job is not ACCEPTED.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+
+# ── What CareLink sends the provider (rules in webhooks.md) ─────────────────────────────────
+
+webhooks:
+  job.dispatched:
+    post:
+      operationId: onJobDispatched
+      security: []
+      summary: A new job for the provider
+      description: Signed with HMAC-SHA256 (webhooks.md, section 5) rather than a token. Read it with `GET /api/open/v1/jobs/{jobId}`, then accept or decline it before `respondBy`.
+      parameters:
+        - $ref: '#/components/parameters/WebhookDelivery'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookTimestamp'
+        - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobWebhook'
+      responses:
+        '2XX':
+          description: Received. Answer within 10 seconds; anything else is retried.
+  job.cancelled:
+    post:
+      operationId: onJobCancelled
+      security: []
+      summary: A job dispatched to the provider is called off
+      description: Stop any work on it. Nothing to answer beyond the 2xx.
+      parameters:
+        - $ref: '#/components/parameters/WebhookDelivery'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookTimestamp'
+        - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobWebhook'
+      responses:
+        '2XX':
+          description: Received.
+  ping:
+    post:
+      operationId: onPing
+      security: []
+      summary: The test event
+      parameters:
+        - $ref: '#/components/parameters/WebhookDelivery'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookTimestamp'
+        - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PingWebhook'
+      responses:
+        '2XX':
+          description: Received.
+
+components:
+
+  securitySchemes:
+    clientCredentials:
+      type: oauth2
+      description: The provider's server, with the client ID and secret collected from the portal.
+      flows:
+        clientCredentials:
+          tokenUrl: /api/open/v1/oauth2/token
+          scopes:
+            open-platform/jobs.read: Read the jobs dispatched to the provider.
+            open-platform/jobs.write: Accept, decline and complete them.
+    portalUser:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A person at the provider, signed in to the Partner Portal (`POST /api/open/v1/portal/sessions`).
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [JOB-24081]
+    DeliveryId:
+      name: deliveryId
+      in: path
+      required: true
+      schema:
+        type: string
+        examples: [dlv_8Fq2kZ71]
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Made once per action, and sent again unchanged when the request is repeated.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 120
+    WebhookDelivery:
+      name: X-CareLink-Delivery
+      in: header
+      required: true
+      description: The delivery ID; the same on every retry and resend. Deduplicate by it.
+      schema:
+        type: string
+    WebhookEvent:
+      name: X-CareLink-Event
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/WebhookEventType'
+    WebhookTimestamp:
+      name: X-CareLink-Timestamp
+      in: header
+      required: true
+      description: When this attempt was signed, in Unix seconds. Refuse it when more than 300 seconds from your clock.
+      schema:
+        type: string
+        pattern: '^[0-9]+$'
+    WebhookSignature:
+      name: X-CareLink-Signature
+      in: header
+      required: true
+      description: '`v1=` and hex HMAC-SHA256 of `timestamp.body`; two comma-separated values for 24 hours after a rotation.'
+      schema:
+        type: string
+        examples: ['v1=929d8bf95a92a264f468f1d6f0be8e2b88f07be25e4610b319fdb3e9987be1f8']
+
+  responses:
+    ValidationFailed:
+      description: The request failed validation; `fields` names each field and its problem.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            webhookNotHttps:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                detail: Request validation failed
+                code: VALIDATION_FAILED
+                fields:
+                  webhookUrl: Must be HTTPS.
+    Unauthorised:
+      description: '`INVALID_TOKEN`: the token is missing, malformed or expired.'
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotApproved:
+      description: '`NOT_APPROVED`: the provider''s application is not approved.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    JobsForbidden:
+      description: '`PROVIDER_SUSPENDED`: CareLink has suspended the provider. `INSUFFICIENT_SCOPE`: the token lacks the scope.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    JobNotFound:
+      description: '`JOB_NOT_FOUND`: no job with that ID was dispatched to this provider.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    DeliveryNotFound:
+      description: '`DELIVERY_NOT_FOUND`: no delivery with that ID was made to this provider.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyKeyMissing:
+      description: '`IDEMPOTENCY_KEY_REQUIRED`: the `Idempotency-Key` header is missing.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyKeyReused:
+      description: '`IDEMPOTENCY_KEY_REUSED`: this key was used for another job or another action.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: '`RATE_LIMITED`: over the provider''s limit. Wait for `Retry-After` seconds.'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+
+    Problem:
+      type: object
+      description: RFC 9457 problem details, as the CareLink app's API answers.
+      required: [status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: For a person to read; do not parse it.
+        code:
+          type: string
+          description: Stable, for code to branch on.
+          examples: [JOB_CANCELLED]
+        fields:
+          type: object
+          description: For VALIDATION_FAILED, each field's problem.
+          additionalProperties:
+            type: string
+
+    # ── Onboarding and portal ──
+
+    ProviderService:
+      type: string
+      description: |
+        A value-added service, as report's catalogue names it. The four below are the catalogue today; a service
+        CareLink adds can be offered too.
+      examples: [Hospital escort, Grocery assistance, Companionship, Light housekeeping]
+
+    ApplicationDetails:
+      type: object
+      required: [organisationName, contactName, contactEmail, contactPhone, services, webhookUrl]
+      properties:
+        organisationName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        contactName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        contactEmail:
+          type: string
+          format: email
+          maxLength: 254
+          description: Also the provider's portal sign-in.
+        contactPhone:
+          type: string
+          minLength: 1
+          maxLength: 30
+        services:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/ProviderService'
+        webhookUrl:
+          type: string
+          format: uri
+          pattern: '^https://'
+          maxLength: 2048
+          description: Where CareLink sends signed webhooks. HTTPS only.
+
+    ApplicationCreate:
+      allOf:
+        - $ref: '#/components/schemas/ApplicationDetails'
+        - type: object
+          required: [password, agreedToTerms]
+          properties:
+            password:
+              type: string
+              format: password
+              minLength: 8
+              maxLength: 256
+              writeOnly: true
+              description: For the portal user. CareLink keeps only a bcrypt hash of it.
+            agreedToTerms:
+              type: boolean
+              const: true
+              description: The provider accepts the Open Platform provider terms and the data-handling policy.
+
+    ApplicationStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+
+    Application:
+      allOf:
+        - $ref: '#/components/schemas/ApplicationDetails'
+        - type: object
+          required: [id, status, submittedAt, reviewedAt, reason, suspended]
+          properties:
+            id:
+              type: string
+              examples: [APP-2026-00417]
+            status:
+              $ref: '#/components/schemas/ApplicationStatus'
+            submittedAt:
+              type: string
+              format: date-time
+            reviewedAt:
+              type: [string, 'null']
+              format: date-time
+            reason:
+              type: [string, 'null']
+              description: Why CareLink rejected it; null otherwise.
+            suspended:
+              type: boolean
+              description: An approved provider CareLink has stopped. No tokens, jobs or webhooks until it is reinstated.
+
+    IssuedCredentials:
+      type: object
+      required: [clientId, clientSecret, webhookSecret]
+      properties:
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        webhookSecret:
+          type: string
+          description: Verifies `X-CareLink-Signature` on every webhook.
+
+    CredentialsSummary:
+      type: object
+      required: [clientId, secretHint, secretIssuedAt, scopes, tokenUrl]
+      properties:
+        clientId:
+          type: string
+        secretHint:
+          type: string
+          description: The client secret's last four characters.
+        secretIssuedAt:
+          type: string
+          format: date-time
+        scopes:
+          type: array
+          items:
+            type: string
+          examples: [[open-platform/jobs.read, open-platform/jobs.write]]
+        tokenUrl:
+          type: string
+          format: uri-reference
+          description: Where the provider's server gets tokens, on CareLink's address.
+          examples: [/api/open/v1/oauth2/token]
+
+    IntegrationHealth:
+      type: object
+      required: [delivered, retrying, failed, lastDeliveredAt, suspended]
+      description: The last seven days' webhook deliveries by outcome.
+      properties:
+        delivered:
+          type: integer
+        retrying:
+          type: integer
+        failed:
+          type: integer
+        lastDeliveredAt:
+          type: [string, 'null']
+          format: date-time
+        suspended:
+          type: boolean
+
+    # ── Webhook settings and deliveries ──
+
+    WebhookEventType:
+      type: string
+      enum: [job.dispatched, job.cancelled, ping]
+
+    WebhookSettingsUpdate:
+      type: object
+      required: [url, events]
+      properties:
+        url:
+          type: string
+          format: uri
+          pattern: '^https://'
+          maxLength: 2048
+        events:
+          type: array
+          uniqueItems: true
+          description: The events to receive. `ping` is always sent when asked for, and is not listed here.
+          items:
+            type: string
+            enum: [job.dispatched, job.cancelled]
+
+    WebhookSettings:
+      allOf:
+        - $ref: '#/components/schemas/WebhookSettingsUpdate'
+        - type: object
+          required: [secretHint, secretIssuedAt]
+          properties:
+            secretHint:
+              type: string
+              description: The signing secret's last four characters.
+            secretIssuedAt:
+              type: string
+              format: date-time
+
+    DeliveryStatus:
+      type: string
+      description: |
+        DELIVERED: an attempt got a 2xx. RETRYING: none has yet, and another is scheduled. FAILED: every attempt
+        the retry schedule allows failed, and CareLink gave up.
+      enum: [DELIVERED, RETRYING, FAILED]
+
+    DeliveryAttempt:
+      type: object
+      required: [at, responseStatus, durationMs]
+      properties:
+        at:
+          type: string
+          format: date-time
+        responseStatus:
+          type: [integer, 'null']
+          description: The HTTP status the endpoint answered; null when it did not answer in time or could not be reached.
+        durationMs:
+          type: integer
+
+    Delivery:
+      type: object
+      required: [id, event, createdAt, status, attempts, nextAttemptAt, request]
+      properties:
+        id:
+          type: string
+        event:
+          $ref: '#/components/schemas/WebhookEventType'
+        jobId:
+          type: [string, 'null']
+          description: The job the event is about; null for `ping`.
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/DeliveryStatus'
+        attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryAttempt'
+        nextAttemptAt:
+          type: [string, 'null']
+          format: date-time
+        request:
+          type: object
+          description: What every attempt sends. The signature header is shown as of the last attempt.
+          required: [url, headers, body]
+          properties:
+            url:
+              type: string
+              format: uri
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+            body:
+              type: string
+
+    # ── Jobs ──
+
+    JobStatus:
+      type: string
+      description: |
+        NEW: dispatched and waiting for the provider's answer. ACCEPTED: the provider took it on. DECLINED: the
+        provider turned it down. COMPLETED: the provider reported it done. CANCELLED: CareLink or the family called
+        it off, or `respondBy` passed without an answer; `cancelReason` says which.
+      enum: [NEW, ACCEPTED, DECLINED, COMPLETED, CANCELLED]
+
+    JobSummary:
+      type: object
+      required: [id, version, status, serviceName, district, areaName, scheduledStart, durationMinutes, respondBy, receivedAt, cancelReason]
+      properties:
+        id:
+          type: string
+          examples: [JOB-24081]
+        version:
+          type: integer
+          description: Increases with every change to the job. Ignore a webhook whose version is lower than one you hold.
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        serviceName:
+          $ref: '#/components/schemas/ProviderService'
+        district:
+          type: string
+          description: Singapore postal district, as two digits, from the elder's postal sector.
+          examples: ['19']
+        areaName:
+          type: string
+          examples: [Hougang]
+        scheduledStart:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        respondBy:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Until when a NEW job can be accepted or declined: 24 hours after dispatch, but no later than 4 hours
+            before `scheduledStart`. Null once the job is not NEW.
+        receivedAt:
+          type: string
+          format: date-time
+          description: When CareLink dispatched it to the provider.
+        cancelReason:
+          type: [string, 'null']
+          description: Why a cancelled job was cancelled, in CareLink's words.
+
+    Job:
+      allOf:
+        - $ref: '#/components/schemas/JobSummary'
+        - type: object
+          required: [elderSummary, languages, bookedBy, instructions, address, timeline, completion, decline]
+          properties:
+            elderSummary:
+              type: string
+              description: What the provider needs to decide, without identifying the elder.
+              examples: ['Mr L., 81 · uses a walking frame']
+            languages:
+              type: string
+              examples: ['Hokkien, English']
+            bookedBy:
+              type: string
+              description: Who booked it, by relationship, never by name.
+              examples: [Daughter]
+            instructions:
+              type: [string, 'null']
+            address:
+              description: Only once the provider has accepted the job; null before.
+              oneOf:
+                - type: 'null'
+                - $ref: '#/components/schemas/Address'
+            timeline:
+              type: array
+              items:
+                $ref: '#/components/schemas/JobTimelineStep'
+            completion:
+              description: Once completed; null before.
+              oneOf:
+                - type: 'null'
+                - $ref: '#/components/schemas/JobCompletion'
+            decline:
+              description: Once declined; null otherwise.
+              oneOf:
+                - type: 'null'
+                - $ref: '#/components/schemas/JobDecline'
+
+    Address:
+      type: object
+      description: Where the service is given, as CareLink holds it (core's elder service address).
+      required: [text, accessNotes]
+      properties:
+        text:
+          type: string
+          examples: ['Blk 123 Hougang Ave 1, #05-67, Singapore 530123']
+        accessNotes:
+          type: [string, 'null']
+          description: How to get in, for example where a key is kept.
+
+    JobTimelineStep:
+      type: object
+      required: [step, at]
+      properties:
+        step:
+          type: string
+          enum: [DISPATCHED, ACCEPTED, DECLINED, COMPLETED, CANCELLED]
+        at:
+          type: string
+          format: date-time
+
+    JobPage:
+      type: object
+      required: [items, page, size, totalElements, counts]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobSummary'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        counts:
+          type: object
+          description: Every status's count among the provider's jobs, whatever the filter.
+          required: [NEW, ACCEPTED, DECLINED, COMPLETED, CANCELLED]
+          properties:
+            NEW: {type: integer}
+            ACCEPTED: {type: integer}
+            DECLINED: {type: integer}
+            COMPLETED: {type: integer}
+            CANCELLED: {type: integer}
+
+    JobDecline:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [OUTSIDE_HOURS, NO_PRACTITIONER, OUTSIDE_AREA, OTHER]
+        note:
+          type: [string, 'null']
+          maxLength: 500
+          description: Required when the reason is OTHER.
+
+    JobCompletion:
+      type: object
+      required: [actualStart, actualEnd]
+      properties:
+        actualStart:
+          type: string
+          format: date-time
+        actualEnd:
+          type: string
+          format: date-time
+          description: After `actualStart`. Neither may be in the future.
+        note:
+          type: [string, 'null']
+          maxLength: 2000
+
+    # ── Webhook bodies ──
+
+    JobWebhook:
+      type: object
+      required: [id, type, createdAt, data]
+      properties:
+        id:
+          type: string
+          description: The delivery ID, as in `X-CareLink-Delivery`.
+        type:
+          type: string
+          enum: [job.dispatched, job.cancelled]
+        createdAt:
+          type: string
+          format: date-time
+        data:
+          type: object
+          required: [job]
+          properties:
+            job:
+              $ref: '#/components/schemas/JobSummary'
+
+    PingWebhook:
+      type: object
+      required: [id, type, createdAt, data]
+      properties:
+        id:
+          type: string
+        type:
+          const: ping
+        createdAt:
+          type: string
+          format: date-time
+        data:
+          type: object
+          maxProperties: 0

@@ -88,6 +88,24 @@ class EventTypesTest {
 		assertThat(RosterChangeUpdated.TYPE).isEqualTo("RosterChangeUpdated");
 	}
 
+	/** The Open Platform's provider, field by field as the catalogue lists it, and back. */
+	@Test
+	void providerUpdatedIsWrittenWithTheCataloguesFields() {
+		var updated = new ProviderUpdated(509L, "cl_prov_BrightHome9", "BrightHome Care", "ACTIVE",
+				List.of("Hospital escort", "Companionship"), 3, SingaporeTime.of(HALF_NINE));
+		JsonNode written = json.readTree(json.writeValueAsString(updated));
+
+		assertThat(written.propertyNames()).containsExactly("providerId", "clientId", "organisationName", "status",
+				"services", "version", "changedAt");
+		assertThat(written.get("changedAt").asString()).isEqualTo("2026-10-12T09:35:00+08:00");
+		ProviderUpdated read = json.readValue(json.writeValueAsString(updated), ProviderUpdated.class);
+		assertThat(read.services()).containsExactly("Hospital escort", "Companionship");
+		assertThat(read.clientId()).isEqualTo("cl_prov_BrightHome9");
+		assertThat(SingaporeTime.local(read.changedAt())).isEqualTo(HALF_NINE);
+		assertThat(new ProviderUpdated(509L, null, "BrightHome Care", "ACTIVE", null, 0, null).services()).isEmpty();
+		assertThat(ProviderUpdated.TYPE).isEqualTo("ProviderUpdated");
+	}
+
 	/** Visit's events, field by field as the catalogue lists them (section 3.2), and back. */
 	@Test
 	void visitsEventsAreWrittenWithTheCataloguesFields() {

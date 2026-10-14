@@ -6,6 +6,8 @@
 	  Who is signed in, for every service. Sign-in happens in core, which keeps the login in the
 	  shared Redis session; a service that depends on this library reads that session and gets the
 	  same security rules as core (CSRF cookie, 401 for anonymous calls) without writing its own.
+	  A service that serves the Open Platform's /api/open/** paths also gets the check of the partners'
+	  bearer tokens there.
 	-->
 	<parent>
 		<groupId>sg.nus</groupId>
@@ -25,6 +27,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<!-- The Open Platform's bearer tokens on /api/open/** (OpenPlatformSecurity), for a service that serves it -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 		</dependency>
 
 		<!-- Testing -->

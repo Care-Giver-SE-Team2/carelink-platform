@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import sg.nus.carelink.openplatform.domain.model.Delivery;
 import sg.nus.carelink.openplatform.domain.model.DeliveryAttempt;
@@ -67,5 +68,36 @@ class InMemoryWebhookDeliveries implements WebhookDeliveries {
 	@Override
 	public List<DeliveryAttempt> attempts(String deliveryId) {
 		return attempts.stream().filter(attempt -> attempt.deliveryId().equals(deliveryId)).toList();
+	}
+
+	@Override
+	public List<Delivery> page(long providerId, Delivery.Status status, Instant since, int page, int size) {
+		return matching(providerId, status, since)
+				.sorted(Comparator.comparing(Delivery::createdAt).reversed())
+				.skip((long) page * size)
+				.limit(size)
+				.toList();
+	}
+
+	@Override
+	public long count(long providerId, Delivery.Status status, Instant since) {
+		return matching(providerId, status, since).count();
+	}
+
+	@Override
+	public Optional<Instant> lastDelivered(long providerId, Instant since) {
+		return attempts.stream()
+				.filter(attempt -> byId.get(attempt.deliveryId()).providerId() == providerId)
+				.filter(DeliveryAttempt::delivered)
+				.map(DeliveryAttempt::at)
+				.filter(at -> !at.isBefore(since))
+				.max(Comparator.naturalOrder());
+	}
+
+	private Stream<Delivery> matching(long providerId, Delivery.Status status, Instant since) {
+		return byId.values().stream()
+				.filter(delivery -> delivery.providerId() == providerId)
+				.filter(delivery -> status == null || delivery.status() == status)
+				.filter(delivery -> !delivery.createdAt().isBefore(since));
 	}
 }

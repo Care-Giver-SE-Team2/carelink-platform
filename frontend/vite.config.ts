@@ -10,6 +10,11 @@ export default defineConfig({
       // The notification service (scripts/run.sh all starts it on 8083). Listed before /api: the
       // first matching entry wins.
       '/api/notifications': 'http://localhost:8083',
+      // The Open Platform (notification): the manager's provider screens, and the Partner Portal's
+      // public API with its sign-in and tokens
+      '/api/provider-applications': 'http://localhost:8083',
+      '/api/providers': 'http://localhost:8083',
+      '/api/open': 'http://localhost:8083',
       // The report service (8082): weekly reports, value-added services, caregiver reviews. The
       // weekly summary shares /api/elders/{id} with core, so it is matched by its full path.
       '/api/reports': 'http://localhost:8082',
