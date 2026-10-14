@@ -1,0 +1,12 @@
+# Read by the Secret scanning job in .github/workflows/ci.yml (gitleaks picks up
+# .gitleaks.toml from the root it scans). Keeps every default rule.
+[extend]
+useDefault = true
+
+# notification's test-only webhook encryption key: "test-only-key-never-use-for-real" in
+# base64, protecting nothing but test data. Matched by value, not path, so a real key added
+# beside it is still caught, and so the commits already in history stay allowed
+[[allowlists]]
+description = "notification test-only webhook encryption key"
+regexTarget = "match"
+regexes = ['''dGVzdC1vbmx5LWtleS1uZXZlci11c2UtZm9yLXJlYWw=''']
