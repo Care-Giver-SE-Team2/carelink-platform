@@ -18,7 +18,8 @@ public final class ServiceTables {
 			"report_vital_sign", "report_elder_confirmation", "report_incident", "report_incident_log",
 			"report_spot_check", "report_roster_change");
 
-	public static final Set<String> NOTIFICATION = Set.of("notification", "notification_subscription");
+	public static final Set<String> NOTIFICATION = Set.of("notification", "notification_subscription",
+			"provider_webhook_endpoint", "webhook_delivery", "webhook_delivery_attempt");
 
 	/** What every service keeps in its own database: the access audit, the scheduler locks, the events tables. */
 	public static final Set<String> EACH_SERVICE = Set.of("audit_log", "shedlock", "outbox_event", "consumed_message");

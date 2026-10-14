@@ -93,6 +93,8 @@ else
     required="DB_URL DB_USER DB_PASSWORD SPRING_DATA_REDIS_HOST SPRING_DATA_REDIS_PORT SPRING_DATA_REDIS_PASSWORD SPRING_DATA_REDIS_SSL_ENABLED"
     case $service in core | visit | report) required="$required CARELINK_EVENTS_TOPICARN" ;; esac
     case $service in report | notification) required="$required CARELINK_EVENTS_QUEUEURL" ;; esac
+    # notification will not start without the key its webhook signing secrets are encrypted with
+    case $service in notification) required="$required CARELINK_WEBHOOKS_ENCRYPTIONKEY" ;; esac
     for key in $required; do
       if ! grep -qx "$key" <<<"$keys"; then
         echo "$env/$service-runtime: missing or empty $key" >&2

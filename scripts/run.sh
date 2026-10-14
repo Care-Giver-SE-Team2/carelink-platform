@@ -5,9 +5,9 @@
 #                                  together with what they need (see docker-compose.yml)
 #   scripts/run.sh down            stop and remove the containers; the database volume stays
 #
-# The first run writes random local database passwords to .env, which git ignores, so no
-# password is ever committed. The front end runs on its own: cd frontend && npm run dev
-# (it proxies /api to http://localhost:8080).
+# The first run writes random local database passwords and the webhook encryption key to .env,
+# which git ignores, so no password or key is ever committed. The front end runs on its own:
+# cd frontend && npm run dev (it proxies /api to http://localhost:8080).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,6 +30,11 @@ if [ ! -f .env ]; then
     } >.env
   )
   echo "wrote .env with new local database passwords"
+fi
+# notification encrypts providers' webhook signing secrets with this key; added to a .env from before it
+if ! grep -q "^WEBHOOK_ENCRYPTION_KEY=" .env; then
+  echo "WEBHOOK_ENCRYPTION_KEY=$(openssl rand -base64 32)" >>.env
+  echo "added a local webhook encryption key to .env"
 fi
 
 IMAGE_TAG=${IMAGE_TAG:-$(git rev-parse HEAD)}
