@@ -6,7 +6,8 @@
 # Each service is a Helm release named after it, in the namespace named after the
 # environment, installed from charts/carelink-service with the service's own
 # services/<name>/deploy/values.yaml. "all" deploys core first, because the other services
-# call it. Each release is a rolling update; the script waits until the new pods are ready.
+# call it. The remaining services update at most two at a time. Each release is a rolling
+# update; unchanged manifests/images are skipped after verifying the live rollout.
 #
 # Environment:
 #   IMAGE_REGISTRY  the ECR registry, <account>.dkr.ecr.<region>.amazonaws.com (required)
@@ -106,8 +107,8 @@ else
   done
 fi
 
-for service in $selected; do
-  digest=""
+deploy_service() {
+  local service=$1 digest="" row tag=$tag expected desired current live
   if [ -n "$image_rows" ]; then
     row=$(awk -v service="$service" '$1 == service {print $2, $3}' <<<"$image_rows")
     if [ -z "$row" ]; then
@@ -134,9 +135,50 @@ for service in $selected; do
   if [ "${DRY_RUN:-0}" = 1 ]; then
     helm template "${release[@]}"
   else
+    expected="$registry/carelink/$service:$tag"
+    if [ -n "$digest" ]; then expected="$registry/carelink/$service@$digest"; fi
+    desired=$(helm template "${release[@]}")
+    current=$(helm get manifest "$service" --namespace "$env" --kube-context "$context" 2>/dev/null || true)
+    live=$(kubectl --context "$context" --namespace "$env" get deployment "$service" \
+      -o 'jsonpath={.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+    if [ "$desired" = "$current" ] && [ "$live" = "$expected" ]; then
+      echo "==> $service unchanged; verifying live rollout ($tag)"
+      kubectl --context "$context" --namespace "$env" rollout status "deployment/$service" --timeout=10m
+      return
+    fi
     echo "==> $service -> $env ($tag)"
     # Runtime configuration bootstrap already creates the namespace. The CD role
     # only has namespace-scoped access and must not need namespaces/create.
     helm upgrade --install "${release[@]}" --kube-context "$context" --wait --timeout 10m
+    live=$(kubectl --context "$context" --namespace "$env" get deployment "$service" \
+      -o 'jsonpath={.spec.template.spec.containers[0].image}')
+    if [ "$live" != "$expected" ]; then
+      echo "$service: deployed image differs from the complete release" >&2
+      exit 1
+    fi
+  fi
+}
+
+# Keep dry-run output deterministic. Core is ready before its callers; bound their surge
+# to two releases so the existing two-node environment is not flooded with new pods.
+pids=()
+failed=0
+wait_batch() {
+  if [ "${#pids[@]}" -gt 0 ]; then
+    for pid in "${pids[@]}"; do
+      if ! wait "$pid"; then failed=1; fi
+    done
+  fi
+  pids=()
+  [ "$failed" = 0 ]
+}
+for service in $selected; do
+  if [ "${DRY_RUN:-0}" = 1 ] || [ "$service" = core ] || [ "$target" != all ]; then
+    deploy_service "$service"
+  else
+    deploy_service "$service" &
+    pids+=("$!")
+    if [ "${#pids[@]}" -eq 2 ]; then wait_batch; fi
   fi
 done
+wait_batch

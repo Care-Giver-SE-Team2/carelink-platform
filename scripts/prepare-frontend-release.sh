@@ -20,5 +20,15 @@ if [ -n "${RELEASE_SHA:-}" ] && [ "$sha" != "$RELEASE_SHA" ]; then
   echo "Frontend CI commit differs from the selected release" >&2
   exit 1
 fi
-gh run download "$FRONTEND_RUN_ID" --repo "$GH_REPO" --name "frontend-dist-$sha" --dir "$1"
+artifacts=$(gh api "repos/$GH_REPO/actions/runs/$FRONTEND_RUN_ID/artifacts?per_page=100")
+if jq -e --arg name "verified-release-$sha" '.artifacts[] | select(.name == $name and .expired == false)' <<<"$artifacts" >/dev/null; then
+  bundle=$(mktemp -d)
+  trap 'rm -rf "$bundle"' EXIT
+  gh run download "$FRONTEND_RUN_ID" --repo "$GH_REPO" --name "verified-release-$sha" --dir "$bundle"
+  mkdir -p "$1"
+  cp -R "$bundle/frontend/." "$1/"
+else
+  # Existing successful releases remain usable for explicit manual rollback.
+  gh run download "$FRONTEND_RUN_ID" --repo "$GH_REPO" --name "frontend-dist-$sha" --dir "$1"
+fi
 python3 scripts/frontend-release.py verify --directory "$1" --sha "$sha"

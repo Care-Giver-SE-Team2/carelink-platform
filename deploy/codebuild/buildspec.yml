@@ -19,7 +19,7 @@ phases:
       - |
         set -eu
         cd "$CODEBUILD_SRC_DIR"
-        python3 -c 'import json,os,re; sha=os.environ["RELEASE_SHA"]; assert re.fullmatch(r"[0-9a-f]{40}",sha); r=json.load(open(".deployment/release.json")); assert all(v["tag"]==sha for v in r["services"].values())'
+        python3 scripts/ci-release.py verify-archive --directory .deployment --sha "$RELEASE_SHA"
         export KUBECONFIG=/tmp/carelink-deploy-kubeconfig
         aws eks update-kubeconfig --region ap-southeast-1 --name carelink-runtime --alias carelink-codebuild-deploy --kubeconfig "$KUBECONFIG"
   build:

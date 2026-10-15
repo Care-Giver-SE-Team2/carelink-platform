@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Upload the verified source/release to a private prefix and run VPC deployment."""
 import json
+import importlib.util
 import os
 from pathlib import Path
 import re
@@ -11,20 +12,26 @@ import tempfile
 import time
 import zipfile
 
+spec = importlib.util.spec_from_file_location("ci_release", Path(__file__).with_name("ci-release.py"))
+ci_release = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ci_release)
+
 
 def aws(*args):
     return subprocess.check_output(["aws", "--region", "ap-southeast-1", *args], text=True)
 
 
-def validate(manifest, sha, account, bucket, project):
+def validate(manifest, sha, account, bucket, project, proof=None):
     if (not re.fullmatch(r"[0-9a-f]{40}", sha) or not re.fullmatch(r"[0-9]{12}", account)
             or bucket != f"carelink-tfstate-{account}-ap-southeast-1"
             or project != "carelink-staging-deploy"):
         raise ValueError("Unexpected deployment target")
     if set(manifest["services"]) != {"core", "visit", "report", "notification"}:
         raise ValueError("A complete four-service release is required")
+    if proof is not None:
+        ci_release.validate_provenance(proof, sha, manifest["services"])
     for service, record in manifest["services"].items():
-        if (record["tag"] != sha or record["service"] != service
+        if ((proof is None and record["tag"] != sha) or record["service"] != service
                 or record["image"] != f"{account}.dkr.ecr.ap-southeast-1.amazonaws.com/carelink/{service}"
                 or not re.fullmatch(r"sha256:[0-9a-f]{64}", record["digest"])):
             raise ValueError("Backend image does not match this CI commit")
@@ -34,7 +41,9 @@ def main(path):
     manifest = json.loads(Path(path).read_text())
     sha, account = os.environ["RELEASE_SHA"], os.environ["AWS_ACCOUNT_ID"]
     bucket, project = os.environ["DEPLOY_INPUT_BUCKET"], os.environ["CODEBUILD_PROJECT"]
-    validate(manifest, sha, account, bucket, project)
+    proof_path = Path(path).with_name("inputs.json")
+    proof = ci_release.verify(Path(path).parent, sha, os.environ["IMAGE_REGISTRY"]) if proof_path.exists() else None
+    validate(manifest, sha, account, bucket, project, proof)
     if subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() != sha:
         raise ValueError("Source checkout does not match the CI release")
     if json.loads(aws("sts", "get-caller-identity"))["Account"] != account:
@@ -48,6 +57,8 @@ def main(path):
         subprocess.run(["git", "archive", "--format=zip", "--output", str(archive), sha], check=True)
         with zipfile.ZipFile(archive, "a", compression=zipfile.ZIP_DEFLATED) as bundle:
             bundle.writestr(".deployment/release.json", json.dumps(manifest))
+            if proof is not None:
+                bundle.writestr(".deployment/inputs.json", json.dumps(proof))
         aws("s3", "cp", str(archive), f"s3://{bucket}/{key}", "--sse", "AES256", "--only-show-errors")
     build = json.loads(aws("codebuild", "start-build", "--project-name", project,
                           "--source-location-override", bucket + "/" + key,

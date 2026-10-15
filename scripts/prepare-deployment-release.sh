@@ -9,6 +9,23 @@ cd "$(dirname "$0")/.."
 records=$(mktemp -d)
 trap 'rm -rf "$records"' EXIT
 arguments=()
+mkdir -p "$(dirname "$1")"
+if [ "${INCREMENTAL_RELEASE:-false}" = true ]; then
+  : "${CI_RUN_ID:?set CI_RUN_ID}"
+  : "${RELEASE_SHA:?set RELEASE_SHA}"
+  [[ "$CI_RUN_ID" =~ ^[0-9]+$ && "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+  metadata=$(gh api "repos/$GH_REPO/actions/runs/$CI_RUN_ID")
+  jq -e --arg sha "$RELEASE_SHA" '
+    .status == "completed" and .conclusion == "success" and .head_branch == "main"
+    and .path == ".github/workflows/ci.yml" and .head_sha == $sha
+    and (.event == "push" or .event == "workflow_dispatch")
+    and .repository.id == 1408273257 and .head_repository.id == 1408273257
+  ' <<<"$metadata" >/dev/null
+  gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name "verified-release-$RELEASE_SHA" --dir "$records/bundle"
+  python3 scripts/ci-release.py verify --directory "$records/bundle" --sha "$RELEASE_SHA"
+  cp -R "$records/bundle/." "$(dirname "$1")/"
+  exit 0
+fi
 for service in core visit report notification; do
   case $service in
     core) run_id=${CORE_RUN_ID:?set CORE_RUN_ID} ;;
