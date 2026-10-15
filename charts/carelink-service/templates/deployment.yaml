@@ -31,12 +31,16 @@ spec:
         runAsUser: 1001
         seccompProfile:
           type: RuntimeDefault
-      # One replica per availability zone where possible. ScheduleAnyway: while a zone is
-      # down, replacement pods still start in the zone that is left.
+      # Balance each revision across healthy zones. Failed, untolerated tainted
+      # nodes do not keep an unavailable zone eligible; minDomains defaults to 1.
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: ScheduleAnyway
+          whenUnsatisfiable: DoNotSchedule
+          nodeAffinityPolicy: Honor
+          nodeTaintsPolicy: Honor
+          matchLabelKeys:
+            - pod-template-hash
           labelSelector:
             matchLabels:
               {{- include "carelink-service.selectorLabels" . | nindent 14 }}
