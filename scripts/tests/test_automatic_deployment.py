@@ -1,4 +1,4 @@
-"""Reject stale/untrusted CI releases and source bundles with mixed image commits."""
+"""Reject stale/untrusted CI releases and image reuse without source provenance."""
 import copy
 import importlib.util
 from pathlib import Path
@@ -72,3 +72,12 @@ class CodeBuildBundleTest(unittest.TestCase):
                 manifest["services"]["core"]["digest"] = "latest"
             with self.subTest(change=change), self.assertRaises(ValueError):
                 self.validate(manifest=manifest)
+
+    def test_verified_image_sources_are_required_for_incremental_bundles(self):
+        self.manifest["services"]["visit"]["tag"] = "c" * 40
+        proof = {"commit": self.sha, "fingerprints": {s: "d" * 64 for s in (*self.manifest["services"], "frontend")},
+                 "image_commits": {s: r["tag"] for s, r in self.manifest["services"].items()}}
+        codebuild.validate(self.manifest, self.sha, self.account, self.bucket, "carelink-staging-deploy", proof)
+        proof["image_commits"]["visit"] = self.sha
+        with self.assertRaises(ValueError):
+            codebuild.validate(self.manifest, self.sha, self.account, self.bucket, "carelink-staging-deploy", proof)

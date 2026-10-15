@@ -102,23 +102,24 @@ class ReleaseManifestTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("not both", result.stderr)
 
-    def test_selected_context_and_stop_after_failed_release(self):
+    def test_selected_context_and_stop_before_callers_when_core_fails(self):
         keys = ("DB_URL DB_USER DB_PASSWORD SPRING_DATA_REDIS_HOST SPRING_DATA_REDIS_PORT "
                 "SPRING_DATA_REDIS_PASSWORD SPRING_DATA_REDIS_SSL_ENABLED "
                 "CARELINK_EVENTS_TOPICARN CARELINK_EVENTS_QUEUEURL CARELINK_WEBHOOKS_ENCRYPTIONKEY")
         self.stub("kubectl", 'echo "kubectl $*" >> "$CALL_LOG"\n'
                   'if [[ "$*" == *"get configmap"* ]]; then echo public-ca; else\n'
                   f"printf '%s\\n' {keys}\nfi\n")
-        self.stub("helm", 'echo "helm $*" >> "$CALL_LOG"\n[[ "$3" != visit ]]\n')
+        self.stub("helm", 'echo "helm $*" >> "$CALL_LOG"\n'
+                  'if [ "$1" = template ]; then echo desired; else exit 17; fi\n')
         log = self.directory / "calls"
         result = self.deploy(DRY_RUN="0", KUBE_CONTEXT="test-context", CALL_LOG=str(log),
                              PATH=f"{self.directory}:{os.environ['PATH']}")
         self.assertNotEqual(result.returncode, 0)
         calls = log.read_text().splitlines()
-        helm = [call for call in calls if call.startswith("helm")]
-        self.assertEqual(len(helm), 2)
+        helm = [call for call in calls if call.startswith("helm upgrade")]
+        self.assertEqual(len(helm), 1)
         self.assertTrue(all("--context test-context" in call for call in calls if call.startswith("kubectl")))
-        for service, call in zip(("core", "visit"), helm):
+        for service, call in zip(("core",), helm):
             self.assertIn(f"upgrade --install {service}", call)
             self.assertIn("--kube-context test-context", call)
             self.assertIn(f'image.digest={self.records[service]["digest"]}', call)

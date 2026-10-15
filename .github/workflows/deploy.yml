@@ -49,6 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Verify the CI source and reject superseded automatic releases
@@ -66,16 +67,18 @@ jobs:
           GH_REPO: ${{ github.repository }}
           IMAGE_REGISTRY: ${{ vars.ECR_REGISTRY }}
           RELEASE_SHA: ${{ github.event_name == 'workflow_run' && steps.source.outputs.sha || '' }}
+          INCREMENTAL_RELEASE: ${{ github.event_name == 'workflow_run' }}
+          CI_RUN_ID: ${{ steps.source.outputs.run_id }}
           CORE_RUN_ID: ${{ github.event.workflow_run.id || inputs.core_run_id }}
           VISIT_RUN_ID: ${{ github.event.workflow_run.id || inputs.visit_run_id || inputs.core_run_id }}
           REPORT_RUN_ID: ${{ github.event.workflow_run.id || inputs.report_run_id || inputs.core_run_id }}
           NOTIFICATION_RUN_ID: ${{ github.event.workflow_run.id || inputs.notification_run_id || inputs.core_run_id }}
-        run: bash scripts/prepare-deployment-release.sh "$RUNNER_TEMP/release.json"
+        run: bash scripts/prepare-deployment-release.sh "$RUNNER_TEMP/staging-release/release.json"
 
       - uses: actions/upload-artifact@v7
         with:
           name: staging-release
-          path: ${{ runner.temp }}/release.json
+          path: ${{ runner.temp }}/staging-release/
           retention-days: 7
           if-no-files-found: error
 
@@ -98,6 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.release.outputs.sha }}
 

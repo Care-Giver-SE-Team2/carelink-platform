@@ -1,10 +1,8 @@
 name: CI
 
-# The entry point of the pipeline. It works out which services a commit touched and runs the
-# shared service pipeline (service.yml) once for each of them. A change to anything the
-# services share (the parent pom, build/, charts/, libs/, docs/api/, the build script, these
-# two workflows) runs it for every service. The front end and the secret scan cover the whole
-# repository and run alongside.
+# Compare build inputs against a complete successful main release, rather than the last
+# push (which might have failed). Shared build inputs invalidate all backend images.
+# Every successful main CI assembles a complete release, including source-identical reuse.
 #
 # "Quality gate" is the one check branch protection requires: it passes when nothing that
 # ran has failed, however many services ran.
@@ -30,6 +28,9 @@ jobs:
     name: What changed
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
       services: ${{ steps.pick.outputs.services }}
       frontend: ${{ steps.pick.outputs.frontend }}
@@ -43,26 +44,17 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          all=$(for pom in services/*/pom.xml; do basename "$(dirname "$pom")"; done)
-          # No usable base commit (manual or nightly run, first push, force push): everything
-          if [ "$EVENT" = workflow_dispatch ] || [ "$EVENT" = schedule ] \
-             || ! git cat-file -e "${BASE:-none}^{commit}" 2>/dev/null; then
-            changed=$(git ls-files)
-          else
-            changed=$(git diff --name-only "$BASE" HEAD)
-          fi
-          shared='^(pom\.xml|mvnw|\.mvn/|build/|charts/|libs/|docs/api/|scripts/(build|push-image)\.sh|\.github/workflows/(ci|service)\.yml)'
-          if [ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ] || grep -qE "$shared" <<<"$changed"; then
-            picked=$all
-          else
-            picked=$(for s in $all; do grep -q "^services/$s/" <<<"$changed" && echo "$s"; done || true)
-          fi
-          services=$(printf '%s\n' "$picked" | jq -Rsc 'split("\n") | map(select(length > 0))')
-          frontend=$([ "$EVENT" = push ] && [ "$GITHUB_REF" = refs/heads/main ] || grep -qE '^(frontend/|scripts/frontend-release\.py|\.github/workflows/ci\.yml)' <<<"$changed" && echo true || echo false)
-          echo "services=$services" >> "$GITHUB_OUTPUT"
-          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
-          echo "services: $services  front end: $frontend"
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REGISTRY: ${{ vars.ECR_REGISTRY }}
+        run: python3 scripts/ci-release.py plan --directory "$RUNNER_TEMP/release-inputs"
+
+      - uses: actions/upload-artifact@v7
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        with:
+          name: release-inputs-${{ github.sha }}
+          path: ${{ runner.temp }}/release-inputs/
+          retention-days: 7
+          if-no-files-found: error
 
   service:
     name: Service
@@ -281,3 +273,36 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           overwrite: true
+
+  release:
+    name: Complete verified release
+    needs: [changes, gate, publish]
+    if: >-
+      always() && needs.gate.result == 'success' &&
+      (needs.publish.result == 'success' || needs.publish.result == 'skipped') &&
+      github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-inputs-${{ github.sha }}
+          path: ${{ runner.temp }}/release-inputs
+      - name: Verify all image sources and assemble the complete frontend/backend release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REGISTRY: ${{ vars.ECR_REGISTRY }}
+        run: python3 scripts/ci-release.py assemble --inputs "$RUNNER_TEMP/release-inputs" --directory "$RUNNER_TEMP/verified-release"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verified-release-${{ github.sha }}
+          path: ${{ runner.temp }}/verified-release/
+          retention-days: 7
+          if-no-files-found: error
