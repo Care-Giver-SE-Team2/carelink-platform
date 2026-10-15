@@ -8,8 +8,8 @@ image:
   digest: ""       # optional sha256 digest from the release manifest; takes precedence over tag
   pullPolicy: IfNotPresent
 
-# Two replicas, spread over the two availability zones (topologySpreadConstraints in
-# templates/deployment.yaml), so losing one node or one zone leaves the service running.
+# Two replicas, balanced across eligible availability zones per rollout revision.
+# Readiness and failure recovery must be verified after changing topology or capacity.
 replicaCount: 2
 
 # Horizontal Pod Autoscaler on CPU. While it is on, it owns the replica count.
