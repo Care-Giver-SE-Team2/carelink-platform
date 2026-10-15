@@ -31,7 +31,8 @@ root = pathlib.Path(os.environ["FIXTURE"])
 args = sys.argv[1:]
 with (root / "calls").open("a") as log: log.write(json.dumps(args) + "\\n")
 if args[0] == "api":
-    print((root / "metadata.json").read_text())
+    if "/artifacts?" in args[1]: print('{"artifacts":[]}')
+    else: print((root / "metadata.json").read_text())
 elif args[:2] == ["run", "download"]:
     name = args[args.index("--name") + 1]
     service = next(s for s in ("core", "visit", "report", "notification") if name.startswith("ecr-reference-" + s + "-"))
@@ -85,6 +86,18 @@ else:
         result = self.run_prepare(CORE_RUN_ID="$(touch unexpected-file)")
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.directory / "calls").exists())
+
+    def test_automatic_release_without_complete_artifact_stops_before_download(self):
+        result = self.run_prepare(INCREMENTAL_RELEASE="true", CI_RUN_ID="1", RELEASE_SHA="a" * 40)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires a complete verified release", result.stderr)
+        self.assertFalse(self.output.exists())
+        self.assertNotIn('"download"', (self.directory / "calls").read_text())
+
+    def test_old_single_run_manual_rollback_uses_legacy_image_records(self):
+        result = self.run_prepare(CI_RUN_ID="1", VISIT_RUN_ID="1", REPORT_RUN_ID="1", NOTIFICATION_RUN_ID="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(self.output.read_text())["services"], self.records)
 
     def test_failed_preflight_prevents_deployment(self):
         fake = self.directory / "python3"
