@@ -56,6 +56,18 @@ main CI 按 Git 文件内容和构建依赖指纹选择构建范围：单服务�
 
 部署不直接信任“CI 判定未变”：它比较最新 Helm 渲染结果、已保存的 Helm 清单和实际运行镜像，只有一致且运行就绪才跳过服务。因此即使上一次 CD 失败，下一次仍会补上尚未部署的变更。core 先就绪，其余服务最多两个并行滚动更新，以限制现有两节点的 Pod 额外占用。前端在后端成功后发布，最后验证提交号、三角色登录和四服务读取。滚动发布期间允许短暂共存新旧副本，跨服务 API 和数据库迁移仍应保持向后兼容。
 
+有可用成功基线时，可以在 CI 的 **What changed** 日志核对构建范围：
+
+| 本次改动 | 预期构建范围 |
+| --- | --- |
+| `services/visit/src/` | visit；其余镜像复用源码一致的已验证版本 |
+| `frontend/src/` | 前端；四个后端镜像复用 |
+| 共享库、父 POM、构建流程或 API 契约 | 所有后端；前端按自身输入判断 |
+| `charts/` | 无需重建镜像；CD 仍应用最新部署配置 |
+| `docs/platform/` | 无需重建应用；CD 仍核对完整版本和线上状态 |
+
+即使没有组件需要重建，密钥扫描、部署配置检查、完整发布清单校验和公网验收仍会执行。发布后将 `/version.json` 的提交号与本次成功 main CI 对照；各服务实际复用的镜像提交和输入指纹在 **Complete verified release** 的 `verified-release-<sha>/inputs.json` 中查看，不能仅凭镜像标签较旧就断定网站漏发了代码。
+
 后端发布任务由 GitHub 托管 runner 使用 OIDC 触发 CodeBuild；CodeBuild 使用现有 VPC 的私有子网访问 EKS，不依赖 Mac 或开放集群公网 IP 范围。源码包只存放在私有状态桶的 `carelink/deployment-inputs/` 前缀，部署角色无权读取 Terraform 状态。任务结束后 CodeBuild 计算实例退出。
 
 前端 `/version.json` 显示实际部署提交号；四服务 digest 和来源指纹记录在 Deploy staging 的 `staging-release` artifact 中。被新 main 取代的 CI 或其他仓库的产物不能触发自动发布，手动发布保留用于回滚。
