@@ -118,7 +118,7 @@ class FamilyReportDetailIT {
 		seedReport(301, 101, "FAMILY", "PUBLISHED", CONTENT);
 		seedReport(302, 102, "FAMILY", "ARCHIVED", CONTENT);
 		seedReport(310, 110, "FAMILY", "PUBLISHED", CONTENT);
-		seedReport(320, 101, "FAMILY", "DRAFT", null);
+		seedReport(320, 101, "FAMILY", "DRAFT", null, "2026-09-28");
 		seedReport(321, 101, "INTERNAL", "PUBLISHED", CONTENT);
 		seedReport(322, 101, "REGULATOR", "PUBLISHED", CONTENT);
 	}
@@ -384,10 +384,15 @@ class FamilyReportDetailIT {
 	}
 
 	private void seedReport(long id, long elderId, String audience, String reportStatus, String reportContent) {
+		seedReport(id, elderId, audience, reportStatus, reportContent, "2026-09-21");
+	}
+
+	private void seedReport(long id, long elderId, String audience, String reportStatus, String reportContent, String start) {
+		var periodStart = java.time.LocalDate.parse(start);
 		jdbc.update("""
 				INSERT INTO report (id, elder_id, generated_by_user_id, audience, period_start, period_end, status, content, created_at)
-				VALUES (?, ?, 10, ?, '2026-09-21', '2026-09-27', ?, ?, ?)
-				""", id, elderId, audience, reportStatus, reportContent, NOW);
+				VALUES (?, ?, 10, ?, ?, ?, ?, ?, ?)
+				""", id, elderId, audience, periodStart, periodStart.plusDays(6), reportStatus, reportContent, NOW);
 	}
 
 	/** The session core leaves after {@code username} signs in. */
