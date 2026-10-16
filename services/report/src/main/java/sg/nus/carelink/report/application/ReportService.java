@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.report.domain.model.Report;
@@ -56,12 +57,20 @@ public class ReportService {
 	private final ReportBasisRepository bases;
 	private final ReportFactsSource facts;
 	private final Clock clock;
+	private final ReportAiEnricher ai;
 
 	ReportService(ReportRepository reports, ReportBasisRepository bases, ReportFactsSource facts, Clock clock) {
+		this(reports, bases, facts, clock, new ReportAiEnricher(ignored -> java.util.Optional.empty()));
+	}
+
+	@Autowired
+	ReportService(ReportRepository reports, ReportBasisRepository bases, ReportFactsSource facts,
+			Clock clock, ReportAiEnricher ai) {
 		this.reports = reports;
 		this.bases = bases;
 		this.facts = facts;
 		this.clock = clock;
+		this.ai = ai;
 	}
 
 	// ----------------------------------------------------------------- generating ---
@@ -134,7 +143,7 @@ public class ReportService {
 						basis.id(),
 						audience,
 						period,
-						ReportAssembler.forAudience(audience).assemble(gathered),
+						ai.enrich(ReportAssembler.forAudience(audience).assemble(gathered)),
 						requestedByUserId,
 						now));
 			}
