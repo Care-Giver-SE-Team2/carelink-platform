@@ -2,6 +2,7 @@ package sg.nus.carelink.report.infrastructure.schedule;
 
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import sg.nus.carelink.report.application.ReportService;
@@ -21,6 +22,7 @@ import sg.nus.carelink.report.application.ReportService;
  * Generate, simply tries again. With two replicas, the lock lets one of them run it.
  */
 @Component
+@ConditionalOnProperty(name = "carelink.report.legacy-scheduler-enabled", havingValue = "true", matchIfMissing = true)
 class ReportScheduler {
 
 	private final ReportService reports;

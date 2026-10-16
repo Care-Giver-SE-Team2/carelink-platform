@@ -40,3 +40,8 @@ logging:
   pattern:
     # requestId and user are put in the MDC by RequestContextInterceptor (libs/shared)
     level: "%5p [%X{requestId:-}] [%X{user:-}]"
+
+# Disable the legacy weekly timer after the SQS worker is deployed.
+carelink:
+  report:
+    legacy-scheduler-enabled: ${REPORT_LEGACY_SCHEDULER_ENABLED:true}
