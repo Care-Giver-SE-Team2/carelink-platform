@@ -1,0 +1,6 @@
+# API: HTTP endpoints and the existing report facts queue.
+carelink:
+  events:
+    service: report
+  report:
+    legacy-scheduler-enabled: false

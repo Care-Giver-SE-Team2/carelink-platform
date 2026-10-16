@@ -152,6 +152,8 @@ services:
       localstack:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: api
+      REPORT_LEGACY_SCHEDULER_ENABLED: "false"
       DB_URL: jdbc:mysql://mysql:3306/carelink_report?connectionTimeZone=Asia/Singapore
       DB_USER: report
       DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
@@ -174,6 +176,37 @@ services:
       timeout: 3s
       retries: 60
       start_period: 20s
+
+  report-worker:
+    image: ${IMAGE_PREFIX:-carelink}/report:${IMAGE_TAG:-local}
+    profiles: [worker]
+    depends_on:
+      mysql-setup:
+        condition: service_completed_successfully
+      core:
+        condition: service_healthy
+      visit:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: worker
+      SPRING_MAIN_WEB_APPLICATION_TYPE: servlet
+      REPORT_LEGACY_SCHEDULER_ENABLED: "false"
+      DB_URL: jdbc:mysql://mysql:3306/carelink_report?connectionTimeZone=Asia/Singapore
+      DB_USER: report
+      DB_PASSWORD: ${MYSQL_PASSWORD:?run scripts/run.sh, which writes .env}
+      SPRING_DATA_REDIS_HOST: redis
+      CARELINK_COREAPI_BASEURL: http://core:8080
+      CARELINK_VISITAPI_BASEURL: http://visit:8080
+      CARELINK_EVENTS_SERVICE: report-worker
+      CARELINK_EVENTS_TOPICARN: arn:aws:sns:ap-southeast-1:000000000000:carelink-events
+      CARELINK_EVENTS_QUEUEURL: http://localstack:4566/000000000000/carelink-report-worker
+      CARELINK_EVENTS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
 
   notification:
     image: ${IMAGE_PREFIX:-carelink}/notification:${IMAGE_TAG:-local}

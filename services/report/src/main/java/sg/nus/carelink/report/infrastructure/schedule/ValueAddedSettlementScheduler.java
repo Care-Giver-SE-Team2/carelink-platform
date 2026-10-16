@@ -4,6 +4,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import sg.nus.carelink.report.application.ValueAddedServiceDispatchService;
@@ -16,6 +17,7 @@ import sg.nus.carelink.report.application.ValueAddedServiceDispatchService;
  * on one replica at a time.
  */
 @Component
+@Profile("!worker")
 class ValueAddedSettlementScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ValueAddedSettlementScheduler.class);

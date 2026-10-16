@@ -1,0 +1,11 @@
+# Temporary servlet mode to preserve the existing web security beans.
+# The worker has no published host ports in docker-compose.yml.
+spring:
+  main:
+    web-application-type: servlet
+
+carelink:
+  events:
+    service: report-worker
+  report:
+    legacy-scheduler-enabled: false
