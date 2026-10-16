@@ -83,15 +83,17 @@ class EventsIT {
 	}
 
 	/**
-	 * The script's last step subscribes report's queue, the second subscription, so the script is
-	 * done when the topic has two. Polled in this thread: this runs in the class's static
-	 * initializer, and a condition run on Awaitility's own thread would wait for that initializer
-	 * to finish.
-	 */
+     * The script subscribes the report-worker, notification and report queues.
+     * Report is subscribed last, so the initialization is complete when
+     * all three subscriptions exist.
+     *
+     * Poll in the same thread because this method runs in the static
+     * initializer.
+     */
 	private static void awaitInitScript() {
 		try (SnsClient sns = sns()) {
 			await().pollInSameThread().atMost(Duration.ofSeconds(90)).pollInterval(Duration.ofMillis(500)).ignoreExceptions()
-					.until(() -> sns.listSubscriptionsByTopic(topic -> topic.topicArn(TOPIC_ARN)).subscriptions().size() == 2);
+					.until(() -> sns.listSubscriptionsByTopic(topic -> topic.topicArn(TOPIC_ARN)).subscriptions().size() == 3);
 		}
 		catch (ConditionTimeoutException notFinished) {
 			throw new IllegalStateException(

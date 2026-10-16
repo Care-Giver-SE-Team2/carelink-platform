@@ -18,7 +18,7 @@ account=000000000000
 
 topic_arn=$(awslocal sns create-topic --region "$region" --name carelink-events --query TopicArn --output text)
 
-for service in core visit report notification; do
+for service in core visit report report-worker notification; do
   queue="carelink-$service"
   awslocal sqs create-queue --region "$region" --queue-name "$queue-dlq" >/dev/null
   redrive=$(printf '{"RedrivePolicy":"{\\"deadLetterTargetArn\\":\\"arn:aws:sqs:%s:%s:%s-dlq\\",\\"maxReceiveCount\\":\\"5\\"}"}' \
@@ -35,7 +35,8 @@ subscribe() {
     --attribute-name FilterPolicy --attribute-value "$2"
 }
 
+subscribe report-worker '{"type":["ReportRequested"]}'
 subscribe notification '{"type":["NotificationRequested"]}'
 subscribe report '{"type":["IncidentRaised","IncidentUpdated","SpotCheckUpdated","RosterChangeUpdated","VisitScheduled","VisitCaregiverChanged","VisitCancelled","VisitCheckedIn","VisitCompleted","VisitExceptionRaised","VisitTaskRecorded","VitalsRecorded","ElderConfirmationSubmitted","VisitClosed","VisitEvidenceUpdated"]}'
 
-echo "events: topic $topic_arn; queues carelink-{core,visit,report,notification} with dead-letter queues; notification and report subscribed"
+echo "events: topic $topic_arn; queues carelink-{core,visit,report,report-worker,notification} with dead-letter queues; notification, report and report-worker subscribed"
