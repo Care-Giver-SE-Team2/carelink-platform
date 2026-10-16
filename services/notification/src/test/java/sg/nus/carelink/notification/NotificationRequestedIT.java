@@ -146,7 +146,7 @@ class NotificationRequestedIT {
 	private static void awaitInitScript() {
 		try (SnsClient sns = sns()) {
 			await().pollInSameThread().atMost(Duration.ofSeconds(90)).pollInterval(Duration.ofMillis(500)).ignoreExceptions()
-					.until(() -> sns.listSubscriptionsByTopic(topic -> topic.topicArn(TOPIC_ARN)).subscriptions().size() == 2);
+					.until(() -> sns.listSubscriptionsByTopic(topic -> topic.topicArn(TOPIC_ARN)).subscriptions().size() == 3);
 		}
 		catch (ConditionTimeoutException notFinished) {
 			throw new IllegalStateException(

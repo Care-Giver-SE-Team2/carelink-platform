@@ -4,6 +4,7 @@ import java.util.function.BiConsumer;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import sg.nus.carelink.events.EventHandler;
 import sg.nus.carelink.events.EventMetadata;
@@ -30,6 +31,7 @@ import sg.nus.carelink.report.domain.repository.KeptFacts;
  * library runs each in a transaction with the record that the event was handled.
  */
 @Configuration(proxyBeanMethods = false)
+@Profile("!worker")
 class ReportFactHandlers {
 
 	@Bean
