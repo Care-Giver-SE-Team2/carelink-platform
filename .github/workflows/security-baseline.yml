@@ -1,0 +1,54 @@
+name: Staging ZAP baseline
+
+# Preparation only: absent/false CARELINK_ZAP_ENABLED skips every scan.
+# This separate workflow cannot block, deploy or roll back the existing website.
+on:
+  workflow_run:
+    workflows: [Deploy staging]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      staging_run_id:
+        description: Successful automatic staging deployment with public acceptance
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: carelink-staging-zap
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    if: >-
+      github.ref == 'refs/heads/main' && vars.CARELINK_ZAP_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.id == github.event.repository.id))
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify accepted staging release and run bounded passive baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAGING_RUN_ID: ${{ github.event.workflow_run.id || inputs.staging_run_id }}
+          CARELINK_ZAP_ENABLED: ${{ vars.CARELINK_ZAP_ENABLED }}
+        run: python3 scripts/run-zap-baseline.py --run-id "$STAGING_RUN_ID" --output "$RUNNER_TEMP/zap-report"
+
+      - name: Keep scan reports and release identity even on failure
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: staging-zap-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/zap-report/
+          retention-days: 7
+          if-no-files-found: warn
