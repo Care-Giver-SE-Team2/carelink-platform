@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { listJobs } from '../../../features/provider-platform/api'
+import { LIVE, listJobs } from '../../../features/provider-platform/api'
 import { ApiError } from '../../../features/provider-platform/errors'
 import { areaShort, formatClock, formatDayTime, formatShort } from '../../../features/provider-platform/format'
 import type { JobTab } from '../../../features/provider-platform/types'
 import { cx } from '../../../shared/components/ui/cx'
 import { SandboxConnect } from '../components/SandboxConnect'
+import { JobsUnavailable } from '../components/JobsUnavailable'
 import { Banner, Button, RefreshIcon, StateTag } from '../components/ui'
 import { WorkbenchShell } from '../components/WorkbenchShell'
 import { useWorkbench } from '../workbenchContext'
@@ -30,6 +31,10 @@ const POLL_MS = 30_000
  * in the URL (?tab=accepted&page=2).
  */
 export default function Jobs() {
+  return LIVE ? <JobsUnavailable /> : <DemoJobs />
+}
+
+function DemoJobs() {
   const { token, expireToken, application } = useWorkbench()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()

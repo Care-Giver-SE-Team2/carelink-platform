@@ -3,7 +3,29 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'exclude-provider-mock-from-build',
+      configResolved(config) {
+        if (config.command === 'build' && config.env.VITE_OPEN_PLATFORM_MOCK === 'true') {
+          throw new Error('Provider mock mode is for local development and tests, not publishable builds.')
+        }
+      },
+      generateBundle(_options, bundle) {
+        for (const output of Object.values(bundle)) {
+          // Rolldown can retain unused scalar declarations in module metadata until minification.
+          // Reject any used mock export or the mock's storage/seed state in the final chunk.
+          if (output.type === 'chunk' && (output.code.includes('carelink.mock.providerPlatform.v1')
+            || Object.entries(output.modules).some(([id, module]) =>
+              id.replaceAll('\\', '/').endsWith('/features/provider-platform/mockPlatform.ts') && module.renderedExports.length > 0,
+            ))) {
+            this.error('Publishable builds must not contain the provider mock platform.')
+          }
+        }
+      },
+    },
+  ],
   // Proxy /api to the local backend during development, avoiding CORS configuration
   server: {
     proxy: {

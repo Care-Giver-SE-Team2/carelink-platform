@@ -26,7 +26,8 @@ const EVENT_HELP: Record<(typeof WEBHOOK_EVENTS)[number], string> = {
 }
 
 /** "200 · 84 ms", "503 · 40 ms" or "Timed out". */
-function responseLabel(attempt: DeliveryAttempt): string {
+function responseLabel(attempt: DeliveryAttempt | undefined): string {
+  if (!attempt) return 'Awaiting first attempt'
   return attempt.status === null ? 'Timed out' : `${attempt.status} · ${attempt.ms} ms`
 }
 
@@ -164,7 +165,7 @@ export default function Webhooks() {
                         <td>
                           <div className={styles.statusCell}>
                             <StateTag kind={d.status} />
-                            <span className={cx(styles.response, last.status !== null && last.status < 300 && styles.ok)}>
+                            <span className={cx(styles.response, last && last.status !== null && last.status < 300 && styles.ok)}>
                               {responseLabel(last)}
                               {d.attempts.length > 1 && <span className={styles.tries}> · {d.attempts.length} tries</span>}
                             </span>

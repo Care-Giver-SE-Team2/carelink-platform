@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { acceptJob, completeJob, declineJob, getJob, newIdempotencyKey } from '../../../features/provider-platform/api'
+import { LIVE, acceptJob, completeJob, declineJob, getJob, newIdempotencyKey } from '../../../features/provider-platform/api'
 import { ApiError, isTransient } from '../../../features/provider-platform/errors'
 import { areaLong, formatDayTime, formatSchedule, formatShort, formatTime } from '../../../features/provider-platform/format'
 import type { DeclineReason, Job } from '../../../features/provider-platform/types'
 import { cx } from '../../../shared/components/ui/cx'
 import { CompleteDialog, DeclineDialog } from '../components/JobDialogs'
 import { JobTimeline } from '../components/JobTimeline'
+import { JobsUnavailable } from '../components/JobsUnavailable'
 import { Banner, Button, Facts, LockIcon, SectionLabel, StateTag } from '../components/ui'
 import { WorkbenchShell } from '../components/WorkbenchShell'
 import { useOnline } from '../useOnline'
@@ -43,6 +44,10 @@ function latestLine(job: Job): string {
  * once. A 409 means CareLink cancelled the job first; a 401 that the token ran out.
  */
 export default function JobDetail() {
+  return LIVE ? <JobsUnavailable /> : <DemoJobDetail />
+}
+
+function DemoJobDetail() {
   const { jobId = '' } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
