@@ -6,6 +6,11 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
@@ -44,6 +50,8 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
             """;
 
     private static final int MAX_MESSAGES = 10;
+    private static final int WORKER_VISIBILITY_SECONDS = 180;
+    private static final int WORKER_RENEW_INTERVAL_SECONDS = 60;
 
 	private static final Duration PAUSE_AFTER_FAILURE = Duration.ofSeconds(1);
 
@@ -63,6 +71,8 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 
 	private final Duration receiveWait;
 
+    private final boolean longRunningWorker;
+
 	private final Map<String, EventHandler<?>> handlers;
 
 	private Thread worker;
@@ -79,6 +89,7 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 		this.service = service;
 		this.queueUrl = properties.queueUrl();
 		this.receiveWait = properties.receiveWait();
+        this.longRunningWorker = "report-worker".equals(service);
 		this.handlers = byType(handlers);
 	}
 
@@ -144,7 +155,7 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 	private List<Message> receive() {
 		return sqs.receiveMessage(ReceiveMessageRequest.builder()
 				.queueUrl(queueUrl)
-				.maxNumberOfMessages(MAX_MESSAGES)
+				.maxNumberOfMessages(longRunningWorker ? 1 : MAX_MESSAGES)
 				.waitTimeSeconds((int) receiveWait.toSeconds())
 				.messageSystemAttributeNames(MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT)
 				.build()).messages();
@@ -166,17 +177,23 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 			delete(message);
 			return;
 		}
-		try {
+        // Only the report worker needs a lease during slow external AI calls.
+        // Normal event consumers retain their original transactional behavior.
+        try (VisibilityHeartbeat heartbeat =
+                     longRunningWorker && handler instanceof PreparedEventHandler<?>
+                             ? new VisibilityHeartbeat(message) : null) {
             if (handler instanceof PreparedEventHandler<?> prepared) {
-                // Fast-path only: avoid expensive Bedrock calls for known duplicates.
-                // This check is not a lock. firstDelivery inside the write transaction
-                // remains the authoritative deduplication barrier for concurrent workers.
                 if (alreadyConsumed(event)) {
                     log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
                 } else {
-                    // Slow I/O (Bedrock) happens BEFORE starting the DB transaction.
                     Runnable commit = prepare(prepared, event);
+                    if (heartbeat != null) {
+                        heartbeat.checkHealthy();
+                    }
                     transactions.executeWithoutResult(status -> {
+                        if (heartbeat != null) {
+                            heartbeat.checkHealthy();
+                        }
                         if (firstDelivery(event)) {
                             commit.run();
                         } else {
@@ -185,7 +202,6 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
                     });
                 }
             } else {
-                // Preserve original atomic behavior for every existing handler.
                 transactions.executeWithoutResult(status -> {
                     if (firstDelivery(event)) {
                         dispatch(handler, event);
@@ -194,12 +210,12 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
                     }
                 });
             }
+        } catch (RuntimeException failed) {
+            log.error("Handling {} event {} failed on receive {}; SQS delivers it again", event.type(), event.id(),
+                    message.attributes().get(MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT), failed);
+            return;
         }
-		catch (RuntimeException failed) {
-			log.error("Handling {} event {} failed on receive {}; SQS delivers it again", event.type(), event.id(),
-					message.attributes().get(MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT), failed);
-			return;
-		}
+
 		delete(message);
 	}
 
@@ -222,6 +238,56 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
     private <T> Runnable prepare(PreparedEventHandler<T> handler, Envelope event) {
         T payload = json.treeToValue(event.payload(), handler.payloadType());
         return handler.prepare(payload, event.metadata());
+    }
+
+    /**
+     * Extends the current receipt's lease while preparation/commit is in progress.
+     * A failed renewal prevents starting a write transaction, when detected in time.
+     * This is not a distributed lock: the database constraints remain authoritative.
+     */
+    private final class VisibilityHeartbeat implements AutoCloseable {
+        private final ScheduledExecutorService executor;
+        private final ScheduledFuture<?> task;
+        private final AtomicReference<RuntimeException> failure = new AtomicReference<>();
+
+        private VisibilityHeartbeat(Message message) {
+            executor = Executors.newSingleThreadScheduledExecutor(r ->
+                    Thread.ofPlatform().daemon(true).name("report-visibility-heartbeat").unstarted(r));
+            task = executor.scheduleAtFixedRate(() -> {
+                try {
+                    sqs.changeMessageVisibility(ChangeMessageVisibilityRequest.builder()
+                            .queueUrl(queueUrl)
+                            .receiptHandle(message.receiptHandle())
+                            .visibilityTimeout(WORKER_VISIBILITY_SECONDS)
+                            .build());
+                } catch (RuntimeException error) {
+                    failure.compareAndSet(null, error);
+                    log.error("Cannot renew visibility for SQS message {}; processing will be retried",
+                            message.messageId(), error);
+                }
+            }, WORKER_RENEW_INTERVAL_SECONDS, WORKER_RENEW_INTERVAL_SECONDS, TimeUnit.SECONDS);
+        }
+
+        private void checkHealthy() {
+            RuntimeException error = failure.get();
+            if (error != null) {
+                throw new IllegalStateException("SQS visibility renewal failed", error);
+            }
+        }
+
+        @Override
+        public void close() {
+            task.cancel(false);
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException interrupted) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
 	private void delete(Message message) {
