@@ -43,8 +43,11 @@ The live job API is not connected. In publishable builds both the Sandbox list a
 detail routes show **Job integration is not available yet**, without a token form or job action
 buttons. The five job functions reject locally with `501 jobs_not_available`; this is a capability
 error, not an HTTP response from report. Real token issuance still works, but its token is never
-handed to the mock. Applying, portal sign-in, credentials, webhook management and the manager's
-provider screens retain their real API paths.
+handed to the mock. After confirming one-time credentials, live mode clears the secret instead of
+keeping a Sandbox prefill that cannot be consumed; local mock mode still supports that prefill.
+Applying, portal sign-in, credentials, webhook management and the manager's
+provider screens retain their real API paths. A newly queued webhook can have no attempts yet;
+the delivery log shows “Awaiting first attempt” until the scheduler records a response.
 
 Under Vitest, and in local development with `VITE_OPEN_PLATFORM_MOCK=true`, every provider call
 uses the mock in localStorage, with the seeded providers below. `npm run build` rejects that flag
@@ -150,3 +153,6 @@ flowchart LR
 
 旧浏览器 localStorage 可能仍含基线留下的 mock 状态和旧令牌。本 PR 停止使用它，但不自动迁移、
 删除或把其中的演示任务导入数据库。需要清除时只处理上述三个功能专属键，不使用 `localStorage.clear()`。
+
+既有发布脚本会保留旧哈希资源以兼容已打开的页面和回退，因此本 PR 不会删除历史 JS/CSS 或清空 CDN。
+隔离结论针对新正式构建；旧资源或旧标签页仍可能含之前的演示内容，这不等于已经清除了全部历史副本。

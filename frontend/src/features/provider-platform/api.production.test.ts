@@ -5,6 +5,7 @@ const fetchMock = vi.fn()
 beforeEach(() => {
   vi.resetModules()
   vi.stubEnv('MODE', 'production')
+  vi.stubEnv('PROD', true)
   vi.stubEnv('VITE_OPEN_PLATFORM_MOCK', '')
   vi.stubGlobal('fetch', fetchMock)
   fetchMock.mockReset()
@@ -51,5 +52,16 @@ describe('the live provider API does not use the job simulator', () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe('/api/open/v1/oauth2/token')
     expect(localStorage.length).toBe(0)
     expect(sessionStorage.length).toBe(0)
+  })
+
+  it('does not fall back to the mock after a live sign-in refusal, even with a stale mock flag', async () => {
+    vi.stubEnv('VITE_OPEN_PLATFORM_MOCK', 'true')
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ code: 'INVALID_CREDENTIALS', detail: 'Sign-in refused.' }), { status: 401 }))
+    const api = await import('./api')
+
+    expect(api.LIVE).toBe(true)
+    await expect(api.signIn('operator@example.invalid', 'incorrect')).rejects.toMatchObject({ status: 401, code: 'invalid_credentials' })
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/open/v1/portal/sessions')
+    expect(localStorage.length).toBe(0)
   })
 })

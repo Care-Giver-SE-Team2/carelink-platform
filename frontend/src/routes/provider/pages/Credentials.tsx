@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getCredentialsSummary, rotateClientSecret } from '../../../features/provider-platform/api'
+import { LIVE, getCredentialsSummary, rotateClientSecret } from '../../../features/provider-platform/api'
 import { formatLong } from '../../../features/provider-platform/format'
 import type { IssuedCredentials } from '../../../features/provider-platform/types'
 import { RevealSecret } from '../components/RevealSecret'
@@ -32,7 +32,7 @@ function FirstView({ credentials }: { credentials: IssuedCredentials }) {
   }, [stored, setLeaveGuard])
 
   function proceed() {
-    setConnectPrefill({ clientId: credentials.clientId, clientSecret: credentials.clientSecret })
+    setConnectPrefill(LIVE ? null : { clientId: credentials.clientId, clientSecret: credentials.clientSecret })
     setLeaveGuard(null)
     setCredentials(null)
   }
@@ -166,7 +166,8 @@ function Manage() {
   -u "${data.clientId}:$CARELINK_CLIENT_SECRET" \\
   -d "grant_type=client_credentials&scope=${data.scope.replace(' ', '%20')}"`}</pre>
               <p className={styles.note}>
-                Try it without writing code in the <Link to="/provider/sandbox">Sandbox</Link>. The webhook signing secret is on{' '}
+                {LIVE ? 'The job API is not connected in this deployment. ' : <>Try it without writing code in the <Link to="/provider/sandbox">Sandbox</Link>. </>}
+                The webhook signing secret is on{' '}
                 <Link to="/provider/webhooks">Webhooks</Link>.
               </p>
             </div>
