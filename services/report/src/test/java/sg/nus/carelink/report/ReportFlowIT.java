@@ -28,6 +28,9 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.domain.model.Report;
@@ -108,6 +111,9 @@ class ReportFlowIT {
 
 	@Autowired
 	private JdbcClient jdbc;
+
+	@Autowired
+	private TransactionTemplate transactionTemplate;
 
 	@BeforeEach
 	void givenAManagerACaregiverAndAFreshElder() {
@@ -337,6 +343,71 @@ class ReportFlowIT {
 		assertThat(facts.gather(elder, new ReportPeriod(MONDAY, SUNDAY))).get()
 				.satisfies(quiet -> assertThat(quiet.visits()).isEmpty());
 		assertThat(facts.gather(-1L, new ReportPeriod(MONDAY, SUNDAY))).isEmpty();
+	}
+
+	// -------------------------------------------------- prepared worker transactions ---
+
+	/** A prepared worker batch must not write anything until its atomic commit. */
+	@Test
+	void preparedBatchDoesNotWriteBeforeCommit() {
+		givenTheElderHadAVerifiedWeek();
+		assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+		ReportService.PreparedBatch batch = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+		assertThat(reportCountForCurrentElder()).isZero();
+		assertThat(basisCountForCurrentElder()).isZero();
+
+		transactionTemplate.executeWithoutResult(status -> {
+			assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+			reports.commitPreparedBatch(batch);
+		});
+		assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+		assertThat(basisCountForCurrentElder()).isEqualTo(1L);
+	}
+
+	/** Report, basis and consumed-message marker must roll back together. */
+	@Test
+	void preparedBatchAndMessageMarkerRollbackTogether() {
+		givenTheElderHadAVerifiedWeek();
+		ReportService.PreparedBatch batch = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		String messageId = "txn-rollback-" + elder;
+
+		assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+			jdbc.sql("insert into consumed_message (consumer, message_id, event_type, consumed_at) "
+					+ "values ('report-worker', :messageId, 'ReportRequested', current_timestamp)")
+					.param("messageId", messageId).update();
+			reports.commitPreparedBatch(batch);
+			assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+			throw new IllegalStateException("injected failure before transaction commit");
+		})).isInstanceOf(IllegalStateException.class)
+				.hasMessageContaining("injected failure");
+
+		assertThat(reportCountForCurrentElder()).isZero();
+		assertThat(basisCountForCurrentElder()).isZero();
+		assertThat(jdbc.sql("select count(*) from consumed_message "
+				+ "where consumer = 'report-worker' and message_id = :id")
+				.param("id", messageId).query(Long.class).single()).isZero();
+	}
+
+	/** The same prepared data may be committed twice without another report or basis. */
+	@Test
+	void repeatedPreparedCommitDoesNotDuplicateReports() {
+		givenTheElderHadAVerifiedWeek();
+		ReportService.PreparedBatch batch = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		transactionTemplate.executeWithoutResult(status -> reports.commitPreparedBatch(batch));
+		transactionTemplate.executeWithoutResult(status -> reports.commitPreparedBatch(batch));
+		assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+		assertThat(basisCountForCurrentElder()).isEqualTo(1L);
+	}
+
+	private long reportCountForCurrentElder() {
+		return jdbc.sql("select count(*) from report where elder_id = :elder")
+				.param("elder", elder).query(Long.class).single();
+	}
+
+	private long basisCountForCurrentElder() {
+		return jdbc.sql("select count(*) from report_basis where elder_id = :elder")
+				.param("elder", elder).query(Long.class).single();
 	}
 
 	// ------------------------------------------------------------- the weekly run ---
