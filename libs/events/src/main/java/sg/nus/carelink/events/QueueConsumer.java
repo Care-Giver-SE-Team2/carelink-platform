@@ -38,7 +38,12 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 			VALUES (?, ?, ?, ?)
 			""";
 
-	private static final int MAX_MESSAGES = 10;
+	private static final String ALREADY_CONSUMED = """
+            SELECT COUNT(*) FROM consumed_message
+            WHERE consumer = ? AND message_id = ?
+            """;
+
+    private static final int MAX_MESSAGES = 10;
 
 	private static final Duration PAUSE_AFTER_FAILURE = Duration.ofSeconds(1);
 
@@ -163,15 +168,22 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 		}
 		try {
             if (handler instanceof PreparedEventHandler<?> prepared) {
-                // Slow I/O (Bedrock) happens BEFORE starting the DB transaction.
-                Runnable commit = prepare(prepared, event);
-                transactions.executeWithoutResult(status -> {
-                    if (firstDelivery(event)) {
-                        commit.run();
-                    } else {
-                        log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
-                    }
-                });
+                // Fast-path only: avoid expensive Bedrock calls for known duplicates.
+                // This check is not a lock. firstDelivery inside the write transaction
+                // remains the authoritative deduplication barrier for concurrent workers.
+                if (alreadyConsumed(event)) {
+                    log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
+                } else {
+                    // Slow I/O (Bedrock) happens BEFORE starting the DB transaction.
+                    Runnable commit = prepare(prepared, event);
+                    transactions.executeWithoutResult(status -> {
+                        if (firstDelivery(event)) {
+                            commit.run();
+                        } else {
+                            log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
+                        }
+                    });
+                }
             } else {
                 // Preserve original atomic behavior for every existing handler.
                 transactions.executeWithoutResult(status -> {
@@ -190,6 +202,12 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 		}
 		delete(message);
 	}
+
+    /** Optimization only; never replaces the atomic insert in firstDelivery. */
+    private boolean alreadyConsumed(Envelope event) {
+        Integer count = jdbc.queryForObject(ALREADY_CONSUMED, Integer.class, service, event.id());
+        return count != null && count > 0;
+    }
 
 	/** Records the event as handled; false when a row was already there. */
 	private boolean firstDelivery(Envelope event) {
