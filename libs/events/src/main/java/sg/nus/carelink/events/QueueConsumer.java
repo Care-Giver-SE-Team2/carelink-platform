@@ -162,15 +162,27 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 			return;
 		}
 		try {
-			transactions.executeWithoutResult(status -> {
-				if (firstDelivery(event)) {
-					dispatch(handler, event);
-				}
-				else {
-					log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
-				}
-			});
-		}
+            if (handler instanceof PreparedEventHandler<?> prepared) {
+                // Slow I/O (Bedrock) happens BEFORE starting the DB transaction.
+                Runnable commit = prepare(prepared, event);
+                transactions.executeWithoutResult(status -> {
+                    if (firstDelivery(event)) {
+                        commit.run();
+                    } else {
+                        log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
+                    }
+                });
+            } else {
+                // Preserve original atomic behavior for every existing handler.
+                transactions.executeWithoutResult(status -> {
+                    if (firstDelivery(event)) {
+                        dispatch(handler, event);
+                    } else {
+                        log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
+                    }
+                });
+            }
+        }
 		catch (RuntimeException failed) {
 			log.error("Handling {} event {} failed on receive {}; SQS delivers it again", event.type(), event.id(),
 					message.attributes().get(MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT), failed);
@@ -188,6 +200,11 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 		T payload = json.treeToValue(event.payload(), handler.payloadType());
 		handler.handle(payload, event.metadata());
 	}
+
+    private <T> Runnable prepare(PreparedEventHandler<T> handler, Envelope event) {
+        T payload = json.treeToValue(event.payload(), handler.payloadType());
+        return handler.prepare(payload, event.metadata());
+    }
 
 	private void delete(Message message) {
 		sqs.deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle(message.receiptHandle()).build());

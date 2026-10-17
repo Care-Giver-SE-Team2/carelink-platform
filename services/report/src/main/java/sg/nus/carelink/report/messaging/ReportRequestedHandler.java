@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 import sg.nus.carelink.events.EventHandler;
+import sg.nus.carelink.events.PreparedEventHandler;
 import sg.nus.carelink.events.EventMetadata;
 import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.domain.model.ReportPeriod;
@@ -22,7 +23,7 @@ class ReportRequestedHandler {
 
     @Bean
     EventHandler<Map> reportRequestedEventHandler(ReportService reports) {
-        return new EventHandler<>() {
+        return new PreparedEventHandler<>() {
             @Override
             public String type() {
                 return "ReportRequested";
@@ -34,15 +35,16 @@ class ReportRequestedHandler {
             }
 
             @Override
-            public void handle(Map payload, EventMetadata metadata) {
+            public Runnable prepare(Map payload, EventMetadata metadata) {
                 if (metadata.occurredAt() == null) {
                     throw new IllegalArgumentException("ReportRequested requires occurredAt");
                 }
                 LocalDate scheduledDate = metadata.occurredAt().atZone(SINGAPORE).toLocalDate();
-                // Monday's scheduled run covers the Monday-Sunday week just completed.
                 ReportPeriod period = ReportPeriod.weekEndingOnOrBefore(scheduledDate.minusDays(1));
-                reports.generate(null, period.start(), period.end(), null);
+                ReportService.PreparedBatch batch = reports.prepareBatch(null, period.start(), period.end(), null);
+                return () -> reports.commitPreparedBatch(batch);
             }
+
         };
     }
 }
