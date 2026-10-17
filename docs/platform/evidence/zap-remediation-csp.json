@@ -1,0 +1,173 @@
+{
+  "kind": "local browser compatibility evidence, not a live ZAP rescan",
+  "base_commit": "19f11961576a6fdae9d7fe1116c054369fe79c5a",
+  "browser": "Codex in-app browser",
+  "routes": [
+    {
+      "route": "/",
+      "fonts": [
+        {
+          "family": "Instrument Sans",
+          "weight": 400,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 500,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 600,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 700,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 400,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 500,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 600,
+          "loaded": true
+        }
+      ],
+      "sameOriginApi": true,
+      "inlineStyles": true,
+      "sameOriginFrameNavigation": true,
+      "nativePdfRendering": "not tested; requires a real certificate and PDF viewer",
+      "productionResourcesUseSameOrigin": true,
+      "unexpectedViolations": [],
+      "inlineScriptBlocked": true,
+      "foreignConnectionBlocked": true,
+      "passed": true
+    },
+    {
+      "route": "/apply",
+      "fonts": [
+        {
+          "family": "Instrument Sans",
+          "weight": 400,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 500,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 600,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 700,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 400,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 500,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 600,
+          "loaded": true
+        }
+      ],
+      "sameOriginApi": true,
+      "inlineStyles": true,
+      "sameOriginFrameNavigation": true,
+      "nativePdfRendering": "not tested; requires a real certificate and PDF viewer",
+      "productionResourcesUseSameOrigin": true,
+      "unexpectedViolations": [],
+      "inlineScriptBlocked": true,
+      "foreignConnectionBlocked": true,
+      "passed": true
+    },
+    {
+      "route": "/provider/apply",
+      "fonts": [
+        {
+          "family": "Instrument Sans",
+          "weight": 400,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 500,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 600,
+          "loaded": true
+        },
+        {
+          "family": "Instrument Sans",
+          "weight": 700,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 400,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 500,
+          "loaded": true
+        },
+        {
+          "family": "IBM Plex Mono",
+          "weight": 600,
+          "loaded": true
+        }
+      ],
+      "sameOriginApi": true,
+      "inlineStyles": true,
+      "sameOriginFrameNavigation": true,
+      "nativePdfRendering": "not tested; requires a real certificate and PDF viewer",
+      "productionResourcesUseSameOrigin": true,
+      "unexpectedViolations": [],
+      "inlineScriptBlocked": true,
+      "foreignConnectionBlocked": true,
+      "passed": true
+    }
+  ],
+  "source_sha256": {
+    "deploy/cloudfront/security-headers.json": "382f206add19ecdd80cb07bb0d93cc0459695746ff1d62f56b62ce8198fad511",
+    "frontend/package-lock.json": "ae1f37f00eeaa06a0aa1eedfd97b7e7c10d8cfb271587f1aa15d09adb0e88420",
+    "frontend/index.html": "c489ca10e39dee2c944678c7cbe29c05c1464f0d3ad331829be0616dfe292ada",
+    "frontend/src/main.tsx": "25b7368b3a2f2147a31a90c2f0cc2ad8a799eb70e3e45850f218908a0a55fe7b",
+    "frontend/src/routes/landing/Landing.module.css": "dedcba34fc47b2f8a292f38969fe463f0f678f9f9420e2b70453f2cee5578038",
+    "scripts/tests/security_headers_fixture.py": "9240ab0da8e3c894f7579da88bfec8f346de2aa2149641e507e5906657bb0413",
+    "scripts/tests/security_headers_probe.js": "2e31bbcb3d16e744a4192f739ecafd47b1111325e471d38073efe582ad44ea49",
+    "frontend/dist/index.html": "614114aad1e351daad12448b590c3523a15e555ea60da87b0cce336e5e9c5394"
+  },
+  "frontend_tests": 1235,
+  "python_tests": 66,
+  "limitations": [
+    "API responses are loopback fakes",
+    "Authenticated staging role data not tested",
+    "Native PDF rendering and real uploaded certificates require separate acceptance",
+    "HSTS browser persistence not tested over local HTTP",
+    "No live policy attachment or ZAP rescan performed"
+  ]
+}
