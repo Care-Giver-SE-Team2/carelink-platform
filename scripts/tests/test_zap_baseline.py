@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from xml.etree import ElementTree
@@ -12,6 +13,9 @@ from xml.etree import ElementTree
 spec = importlib.util.spec_from_file_location("zap_baseline", Path(__file__).resolve().parents[1] / "run-zap-baseline.py")
 zap = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(zap)
+spec = importlib.util.spec_from_file_location("zap_hooks", Path(__file__).resolve().parents[1] / "zap-baseline-hooks.py")
+hooks = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hooks)
 
 
 class BaselineSourceTest(unittest.TestCase):
@@ -43,17 +47,50 @@ class BaselineSourceTest(unittest.TestCase):
             zap.accepted_commit(self.run, self.jobs[:-1])
 
     def test_scope_excludes_api_other_hosts_and_non_static_routes(self):
-        scope = ElementTree.fromstring(zap.context_xml()).findtext("context/incregex")
-        for path in ("/", "/index.html", "/version.json", "/assets/index-123.js"):
+        scope = ElementTree.fromstring(zap.context_xml()).findtext("context/incregexes")
+        for path in ("/", "/index.html", "/version.json", "/assets/index-123.js", "/assets/font_1.woff2"):
             self.assertIsNotNone(re.fullmatch(scope, zap.TARGET + path))
         for url in (zap.TARGET + "/api/auth/logout", zap.TARGET + "/admin/delete",
                     "https://example.com/", zap.TARGET + ".example.com/",
-                    "http://dzfs8sv334fwf.cloudfront.net/"):
+                    "http://dzfs8sv334fwf.cloudfront.net/", zap.TARGET + "/assets/../api/auth/logout",
+                    zap.TARGET + "/assets/%2e%2e/api/auth/logout", zap.TARGET + "/assets/%252e%252e%252fapi",
+                    zap.TARGET + "/assets/x.js?delete=1", zap.TARGET + "/?delete=1",
+                    zap.TARGET + "/assets/x.js/../../api", zap.TARGET + "/assets/x..js",
+                    zap.TARGET + "/assets/x\\..\\api.js", zap.TARGET + "/assets//x.js"):
             self.assertIsNone(re.fullmatch(scope, url))
 
     def test_version_redirect_is_rejected(self):
         with self.assertRaises(ValueError):
             zap.NoRedirect().redirect_request(None, None, 302, "", {}, "https://example.com/")
+
+    def test_seed_get_uses_api_without_redirects_and_rejects_redirect_or_failure(self):
+        for status in ("200 OK", "301 Moved", "302 Found", "307 Temporary", "308 Permanent", "403 Forbidden"):
+            core = SimpleNamespace(access_url=unittest.mock.Mock(return_value=[{
+                "responseHeader": "HTTP/1.1 " + status + "\r\n", "responseBody": "ok"}]))
+            client = SimpleNamespace(core=core)
+            hooks.zap_access_target(client, zap.TARGET + "/")
+            if status == "200 OK":
+                self.assertEqual(client.urlopen(zap.TARGET + "/"), "ok")
+            else:
+                with self.assertRaises(ValueError):
+                    client.urlopen(zap.TARGET + "/")
+            core.access_url.assert_called_once_with(zap.TARGET + "/", followredirects="false")
+            with self.assertRaises(ValueError):
+                client.urlopen("https://example.com/")
+
+    def test_raw_spider_exclusion_is_installed_or_scan_stops(self):
+        for result in ("OK", "error"):
+            api = unittest.mock.Mock(return_value=result)
+            client = SimpleNamespace(spider=SimpleNamespace(exclude_from_scan=api))
+            if result == "OK":
+                hooks.zap_started(client, zap.TARGET + "/")
+            else:
+                with self.assertRaises(ValueError):
+                    hooks.zap_started(client, zap.TARGET + "/")
+            regex = api.call_args.args[0]
+            for url in (zap.TARGET + "/?delete=1", zap.TARGET + "/assets/x.js?delete=1",
+                        zap.TARGET + "/assets/%2e%2e/x.js"):
+                self.assertIsNotNone(re.fullmatch(regex, url))
 
     def test_disabled_script_stops_before_any_github_or_target_request(self):
         with patch.dict(zap.os.environ, {}, clear=True), patch.object(zap, "gh") as api:

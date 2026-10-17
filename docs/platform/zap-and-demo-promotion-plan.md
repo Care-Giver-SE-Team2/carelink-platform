@@ -8,7 +8,9 @@ This PR prepares the remaining workstream 2 delivery controls in Proposal §5.5 
 |---|---|---|
 | `.github/workflows/security-baseline.yml` | Separate post-staging ZAP workflow | All scan jobs skipped while the flag is absent/false |
 | `scripts/run-zap-baseline.py` | Verify successful staging acceptance and run a bounded passive baseline | Not called by existing deployment scripts |
+| `scripts/zap-baseline-hooks.py` | Reject seed redirects before context-bound crawling | Mounted read-only into the opt-in scanner |
 | `scripts/tests/test_zap_baseline.py` | Offline source/scope validation | No AWS, Docker or website requests |
+| `scripts/tests/zap_scope_fixture.py` | Explicit real-scanner scope regression test on an internal Docker network | Not run by normal CI; never contacts staging |
 | This document | Activation, demo approval/promotion and acceptance design | No infrastructure or permissions changes |
 | `devsecops-verification-20261017.md` | Dated GitHub/ECR findings | Records gaps without changing settings |
 
@@ -36,13 +38,15 @@ flowchart TD
 
 ## ZAP execution and boundaries
 
-The prepared workflow listens to completion of `Deploy staging`; it also allows an explicit staging deployment run ID through manual dispatch. Both paths require main and `CARELINK_ZAP_ENABLED=true`. PRs, tags and forks cannot authorize a scan. The script rechecks repository IDs, workflow path, successful automatic deployment and the success of all four jobs: release, backend deploy, frontend deploy and public acceptance.
+The prepared workflow listens to completion of `Deploy staging`; it also allows an explicit staging deployment run ID through manual dispatch. Both paths require main and `CARELINK_ZAP_ENABLED=true`. PRs, tags and forks cannot authorize a scan. Checkout uses the workflow's fixed `github.sha`, rather than a moving main ref. The script rechecks repository IDs, workflow path, successful automatic deployment and the success of all four jobs: release, backend deploy, frontend deploy and public acceptance.
 
 Before and after scanning, `/version.json` must match that deployment's full commit SHA. A mismatched version or redirect rejects the evidence. This detects a newer release arriving during the scan; it is not an atomic deployment lock, and a release that changes and changes back between checks is outside this guarantee. ECR digests remain in the source deployment's `staging-release` artifact; the ZAP report does not independently prove the running backend digests.
 
-The first scope is unauthenticated public static pages and assets on the fixed existing CloudFront host. Context inclusion excludes `/api/*`, arbitrary application routes and other origins. No credentials, authenticated sessions, AJAX spider, active attack scan or full API scan are used. The traditional spider still makes HTTP requests: one thread, one-minute spider, depth 2, at most 20 children per node, no form processing, and a five-minute startup/passive-scan limit plus an outer process timeout. This is bounded baseline collection, not a load test or a guarantee of zero traffic impact.
+The first scope is unauthenticated public static pages and assets on the fixed existing CloudFront host. The context permits the root, index/version/robots/sitemap files and a restricted set of flat static asset filenames. It rejects `/api/*`, nested or dot-segment paths, percent escapes, query strings, fragments and other origins. New file types or nested asset layouts are outside this baseline until reviewed. No credentials, authenticated sessions, AJAX spider, active attack scan or full API scan are used. The traditional spider still makes HTTP requests: one thread, one-minute spider, depth 2, at most 20 children per node, no form processing, and a five-minute startup/passive-scan limit plus an outer process timeout. This is bounded baseline collection, not a load test or a guarantee of zero traffic impact.
 
-The official stable scanner image is pulled, its immutable local image ID and registry digests are recorded, and the scan uses that resolved image ID. Scanner/container resource limits are 1 CPU and 2 GiB. GitHub credentials are not passed into the scanner container. The script removes its own local scanner container when the scan exits.
+Context alone does not constrain the baseline script's initial `zap.urlopen` call, which normally follows redirects. The read-only mounted hook replaces that seed GET with `core.access_url(..., followredirects="false")` and requires a single HTTP 200 response; a seed redirect fails before crawling. The traditional spider checks discovered URLs and redirects against its context, but context matching strips query strings. The hook therefore also installs a raw spider exclusion for query strings, percent escapes and fragments, failing closed if the exclusion API rejects it. `-silent` disables scanner update/telemetry calls; image pulls still contact the official registry. This is an application-level request boundary, not a container firewall for the later live scan. The isolated regression test independently prevents external egress during testing.
+
+The official stable scanner is pinned to the reviewed multi-architecture digest `sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6`. Its immutable local image ID and registry digests are recorded, and the scan uses that resolved image ID. A scanner update needs a reviewed digest change and another scope regression check. Scanner/container resource limits are 1 CPU and 2 GiB. GitHub credentials are not passed into the scanner container. The script removes its own local scanner container on normal completion, process timeout or SIGTERM cancellation. Forced termination of the runner itself cannot be handled by Python; hosted-runner disposal remains the final boundary.
 
 Reports: HTML, JSON, Markdown and `release-evidence.json`, uploaded even when the scan fails. Retention is seven days; download the accepted reports into the evidence package before expiry. Evidence includes the staging run/attempt, commit, target, scanner identity, timestamps and exit code. `completed` means reports exist; only `accepted=true` means exit 0 with matching pre/post versions. Findings are not suppressed: baseline exit 1 (FAIL), 2 (WARN) and scanner errors all fail this separate workflow. This result does not roll back or block the existing staging deployment.
 
@@ -56,6 +60,14 @@ This scope cannot prove authenticated-session safety, API authorization, busines
 4. Inspect the complete report, covered URLs, exit code and version evidence. A warning remains a failed scan pending review/remediation. Do not add `continue-on-error`, `-I` or broad ignore rules to obtain a green result.
 5. Check CloudFront/ALB health and request/error metrics during the first scan. This PR does not perform that live acceptance.
 6. After the controlled first run, keep the flag enabled only if the team accepts scan-after-deploy operation. Setting it false prevents future starts; cancel any running scan separately.
+
+### Scope regression verification without staging traffic
+
+Normal CI runs the offline tests. For a real-scanner check, pull the exact `IMAGE` digest from `scripts/run-zap-baseline.py` separately and explicitly run `python3 scripts/tests/zap_scope_fixture.py`. The harness creates only a temporary Docker internal network, a local HTTPS fixture and scanner containers; it publishes no host ports, uses no AWS credentials and removes its test containers/network afterward. Only inside that test process are GitHub/version reads mocked and the fixed target replaced with the fixture origin. No production target override is exposed by the runner CLI or workflow.
+
+The fixture includes API links, a POST form, query strings, traversal/encoded paths, an external-host trap, allowed static assets and allowed asset URLs that redirect to API/external traps. The test requires the good asset and redirecting assets to be fetched, but rejects any non-GET request, forbidden path or other host in the fixture access log. A second run makes the seed itself redirect; only the initial GET is allowed and the scan must fail. ZAP findings on this deliberately minimal test fixture are expected and do not count as a clean security acceptance. Record the scanner image ID and actual request log; this tests dispatch behavior, not just regex membership.
+
+The reviewed image passed both isolated cases on Docker linux/arm64. The link case made five allowed GETs (two root requests and three flat assets) and no API/form/query/other-host requests. The seed-redirect case made only one root GET and failed before following its redirect. Full request records and source checksums are in [the scope regression evidence](evidence/pr56-zap-scope-check.json). This does not substitute for the future controlled staging acceptance or prove identical behavior for every scanner update/platform.
 
 ## Demo promotion design
 
@@ -104,5 +116,8 @@ Before implementation of demo deployment, the team must choose its isolated reso
 ## References
 
 - [ZAP baseline behavior, scope options and exit codes](https://www.zaproxy.org/docs/docker/baseline-scan/)
+- [ZAP baseline initial access and spider implementation](https://github.com/zaproxy/zaproxy/blob/main/docker/zap_common.py)
+- [Traditional spider redirect handling](https://github.com/zaproxy/zap-extensions/blob/main/addOns/spider/src/main/java/org/zaproxy/addon/spider/Spider.java)
+- [Silent scanner operation](https://www.zaproxy.org/docs/desktop/cmdline/)
 - [GitHub deployment environments and protection rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
 - [Reviewing GitHub deployments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/review-deployments)

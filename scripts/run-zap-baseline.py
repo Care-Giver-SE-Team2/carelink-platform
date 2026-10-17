@@ -6,14 +6,17 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
+import sys
 import urllib.request
 from xml.sax.saxutils import escape
 
 REPOSITORY = "Care-Giver-SE-Team2/carelink-platform"
 REPOSITORY_ID = 1408273257
 TARGET = "https://dzfs8sv334fwf.cloudfront.net"
-IMAGE = "ghcr.io/zaproxy/zaproxy:stable"
+# Official stable multi-architecture image reviewed with the isolated scope fixture.
+IMAGE = "ghcr.io/zaproxy/zaproxy@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6"
 
 
 def accepted_commit(run, jobs):
@@ -46,12 +49,12 @@ def public_commit():
 
 
 def context_xml():
-    # No /api endpoints, forms, authenticated sessions or arbitrary external targets.
-    scope = (re.escape(TARGET) + r"/(?:|index\.html|version\.json|robots\.txt|sitemap\.xml|assets/[^?#]+)"
-             + r"(?:\?[^#]*)?")
+    # Flat static filenames only: no traversal, escapes, nested paths, query or fragment.
+    asset = r"assets/(?![^/]*\.\.)[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:js|css|png|jpg|jpeg|svg|ico|webp|woff|woff2|ttf)"
+    scope = re.escape(TARGET) + r"/(?:|index\.html|version\.json|robots\.txt|sitemap\.xml|" + asset + ")"
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<configuration><context><name>carelink-public-baseline</name>'
-            '<inscope>true</inscope><incregex>' + escape(scope) + '</incregex>'
+            '<inscope>true</inscope><incregexes>' + escape(scope) + '</incregexes>'
             '</context></configuration>\n')
 
 
@@ -90,12 +93,15 @@ def main():
     evidence["scanner_repo_digests"] = image.get("RepoDigests", [])
     result.write_text(json.dumps(evidence, indent=2) + "\n")
     container = f"carelink-zap-{os.getpid()}"
+    hook = Path(__file__).with_name("zap-baseline-hooks.py").resolve()
     command = ["docker", "run", "--rm", "--name", container, "--cpus=1", "--memory=2g", "--cap-drop=ALL",
                "--security-opt=no-new-privileges", "-v", f"{args.output.resolve()}:/zap/wrk:rw",
+               "-v", f"{hook}:/zap/carelink-hooks.py:ro",
                image["Id"], "zap-baseline.py", "--autooff", "-t", TARGET + "/",
+               "--hook", "/zap/carelink-hooks.py",
                "-n", "/zap/wrk/scope.context", "-m", "1", "-T", "5",
                "-r", "report.html", "-J", "report.json", "-w", "report.md",
-               "-z", "-config spider.thread=1 -config spider.maxDepth=2 "
+               "-z", "-silent -config spider.thread=1 -config spider.maxDepth=2 "
                "-config spider.maxChildren=20 -config spider.processForm=false "
                "-config spider.postForm=false -config spider.parseRobotsTxt=false "
                "-config spider.parseSitemapXml=false"]
@@ -119,4 +125,5 @@ def main():
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
     main()
