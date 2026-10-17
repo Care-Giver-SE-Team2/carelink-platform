@@ -92,11 +92,13 @@ deliberately cause two CSP violations; unexpected application violations must be
 zero. A local fake login returns 401 to confirm the request/error path without
 authenticating against staging.
 
-**Limits:** this is not an authenticated staging acceptance test. Native PDF
-rendering, real uploaded certificate URLs, actual role-specific data, browser
-extensions and every supported browser are not proven by the local fixture.
-Keep them as explicit activation gates. Existing component/API tests complement
-the browser check; jsdom tests alone do not enforce CSP.
+**Limits:** this fixture is not an authenticated staging acceptance test. Actual
+role-specific data needs separate verification. Native PDF rendering and uploaded
+certificate URLs are not proven: the current application serves only certificate
+metadata and placeholders. The user explicitly deferred PDF implementation and
+removed it from this activation gate. No upload/download feature is added here.
+Existing component/API tests complement the browser check; jsdom tests alone do
+not enforce CSP. Browser extensions and every supported browser are not covered.
 
 ## Activation plan — not executed by this PR
 
@@ -109,9 +111,11 @@ Do not expand IAM just to make a command succeed.
 1. Review the PR, its tests and the policy. After separate approval to release,
    let the existing CI/CD publish the bundled fonts. Check the public version
    SHA and three-role login/read acceptance. No infrastructure recreation.
-2. Before attaching CSP, test a real certificate image/PDF and authenticated
-   manager/family/caregiver workflows under these exact headers in a controlled
-   browser session. A report-only observation stage may help, but is not the
+2. Before attaching CSP, test the implemented authenticated manager, family,
+   caregiver and elder workflows under these exact headers in a controlled
+   browser session. Real certificate PDF functionality is deferred by the user;
+   it must be tested before that future feature is enabled, not fabricated here.
+   A report-only observation stage may help, but is not the
    final enforced remediation and must not be reported as fixing missing CSP.
 3. Create the **policy only**, using the reviewed JSON. Save its ID. Export the
    existing distribution with `get-distribution`, including its ETag, and save

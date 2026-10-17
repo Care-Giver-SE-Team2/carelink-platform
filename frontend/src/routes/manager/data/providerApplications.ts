@@ -112,13 +112,13 @@ function toApplication(app: ReviewApplication): ProviderApplication {
 
 /** Applications waiting for an answer, newest first. */
 export async function fetchProviderApplications(): Promise<ProviderApplication[]> {
-  if (LIVE) return (await api<WireApplication[]>('/api/provider-applications')).map(fromWire)
+  if (LIVE) return (await api<WireApplication[]>('/provider-applications')).map(fromWire)
   return listApplicationsForReview().map(toApplication)
 }
 
 /** Approved providers, most recently approved first. */
 export async function fetchProviders(): Promise<Provider[]> {
-  if (LIVE) return (await api<WireProvider[]>('/api/providers')).map(providerFromWire)
+  if (LIVE) return (await api<WireProvider[]>('/providers')).map(providerFromWire)
   return listApprovedProviders().map((p) => ({
     ...toApplication(p),
     providerId: p.providerId,
@@ -133,7 +133,7 @@ export async function fetchProviders(): Promise<Provider[]> {
 /** Suspends the provider: its tokens stop working, so it can't see or act on jobs. */
 export async function suspendProvider(id: number): Promise<void> {
   if (LIVE) {
-    await api(`/api/providers/${id}/suspend`, { method: 'POST' })
+    await api(`/providers/${id}/suspend`, { method: 'POST' })
     return
   }
   suspend(id)
@@ -142,7 +142,7 @@ export async function suspendProvider(id: number): Promise<void> {
 /** Lifts a suspension. */
 export async function reinstateProvider(id: number): Promise<void> {
   if (LIVE) {
-    await api(`/api/providers/${id}/reinstate`, { method: 'POST' })
+    await api(`/providers/${id}/reinstate`, { method: 'POST' })
     return
   }
   reinstate(id)
@@ -151,7 +151,7 @@ export async function reinstateProvider(id: number): Promise<void> {
 /** Approves the application: the provider is registered and its Open API client created. */
 export async function approveProviderApplication(id: number, message: string | null): Promise<{ providerId: number }> {
   if (LIVE) {
-    const provider = await api<WireProvider>(`/api/provider-applications/${id}/approve`, { method: 'POST' })
+    const provider = await api<WireProvider>(`/provider-applications/${id}/approve`, { method: 'POST' })
     return { providerId: provider.id }
   }
   return approveApplication(id, message)
@@ -160,7 +160,7 @@ export async function approveProviderApplication(id: number, message: string | n
 /** Declines the application; `message` tells the provider why when they check their status. */
 export async function declineProviderApplication(id: number, message: string): Promise<void> {
   if (LIVE) {
-    await api(`/api/provider-applications/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason: message }) })
+    await api(`/provider-applications/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason: message }) })
     return
   }
   rejectApplication(id, message)

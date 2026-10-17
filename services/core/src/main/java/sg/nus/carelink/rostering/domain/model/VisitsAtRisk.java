@@ -50,7 +50,8 @@ public final class VisitsAtRisk {
 		int count = (int) bookings.stream()
 				.filter(b -> Objects.equals(b.caregiverId(), caregiverId))
 				.filter(b -> !b.start().isBefore(from) && b.start().isBefore(windowEnd))
-				.filter(b -> requiredTypesByPlan.getOrDefault(b.carePlanId(), Set.of()).contains(credentialTypeId))
+				.filter(b -> b.carePlanId() != null
+						&& requiredTypesByPlan.getOrDefault(b.carePlanId(), Set.of()).contains(credentialTypeId))
 				.count();
 		return Optional.of(count);
 	}
