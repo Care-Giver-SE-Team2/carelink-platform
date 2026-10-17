@@ -180,6 +180,9 @@ services:
   report-worker:
     image: ${IMAGE_PREFIX:-carelink}/report:${IMAGE_TAG:-local}
     profiles: [worker]
+
+    # Allow in-flight Bedrock jobs to finish during shutdown.
+    stop_grace_period: 250s
     depends_on:
       mysql-setup:
         condition: service_completed_successfully
