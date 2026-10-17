@@ -46,6 +46,7 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
     private static final int MAX_MESSAGES = 10;
     private static final int WORKER_VISIBILITY_SECONDS = 180;
     private static final int WORKER_RENEW_INTERVAL_SECONDS = 60;
+    private static final Duration WORKER_SHUTDOWN_WAIT = Duration.ofMinutes(4);
 
 	private static final Duration PAUSE_AFTER_FAILURE = Duration.ofSeconds(1);
 
@@ -66,6 +67,7 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 	private final Duration receiveWait;
 
     private final boolean longRunningWorker;
+    private final Duration heartbeatInterval;
 
 	private final Map<String, EventHandler<?>> handlers;
 
@@ -75,6 +77,17 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 
 	QueueConsumer(SqsClient sqs, JdbcTemplate jdbc, TransactionTemplate transactions, JsonMapper json, Clock clock,
 			String service, EventsProperties properties, List<EventHandler<?>> handlers) {
+        this(sqs, jdbc, transactions, json, clock, service, properties, handlers,
+                Duration.ofSeconds(WORKER_RENEW_INTERVAL_SECONDS));
+    }
+
+    // Package-private seam for deterministic heartbeat failure tests.
+    QueueConsumer(SqsClient sqs, JdbcTemplate jdbc, TransactionTemplate transactions, JsonMapper json, Clock clock,
+            String service, EventsProperties properties, List<EventHandler<?>> handlers, Duration heartbeatInterval) {
+        if (heartbeatInterval.isNegative() || heartbeatInterval.isZero()) {
+            throw new IllegalArgumentException("Heartbeat interval must be positive");
+        }
+        this.heartbeatInterval = heartbeatInterval;
 		this.sqs = sqs;
 		this.jdbc = jdbc;
 		this.transactions = transactions;
@@ -112,8 +125,13 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 			return;
 		}
 		try {
-			// A receive in progress returns within receiveWait
-			worker.join(receiveWait.plusSeconds(5).toMillis());
+            // Do not interrupt an in-flight Bedrock call or database commit.
+            // The heartbeat continues until the message handler finishes.
+            Duration wait = longRunningWorker ? WORKER_SHUTDOWN_WAIT : receiveWait.plusSeconds(5);
+            worker.join(wait.toMillis());
+            if (worker.isAlive()) {
+                log.warn("Event consumer has not finished within {}; deployment termination may cause redelivery", wait);
+            }
 		}
 		catch (InterruptedException interrupted) {
 			Thread.currentThread().interrupt();
@@ -127,14 +145,22 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
 
 	@Override
 	public void destroy() {
+        if (worker != null && worker.isAlive()) {
+            // Do not close the client while the active handler may still renew visibility.
+            log.warn("SQS client left open because the event consumer is still processing a message");
+            return;
+        }
 		sqs.close();
 	}
 
 	private void receiveUntilStopped() {
 		while (running) {
 			try {
-				for (Message message : receive()) {
-					handle(message);
+                for (Message message : receive()) {
+                    if (!running) {
+                        break;
+                    }
+                    handle(message);
 				}
 			}
 			catch (RuntimeException failed) {
@@ -176,7 +202,7 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
         try (VisibilityHeartbeat heartbeat =
                      longRunningWorker && handler instanceof PreparedEventHandler<?>
                              ? new VisibilityHeartbeat(sqs, queueUrl, message,
-                                      Duration.ofSeconds(WORKER_RENEW_INTERVAL_SECONDS), WORKER_VISIBILITY_SECONDS) : null) {
+                                      heartbeatInterval, WORKER_VISIBILITY_SECONDS) : null) {
             if (handler instanceof PreparedEventHandler<?> prepared) {
                 if (alreadyConsumed(event)) {
                     log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
