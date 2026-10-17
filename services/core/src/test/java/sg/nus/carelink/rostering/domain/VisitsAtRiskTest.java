@@ -46,6 +46,15 @@ class VisitsAtRiskTest {
 	}
 
 	@Test
+	void aStandaloneVisitWithoutACarePlanDoesNotBreakOtherRiskCounts() {
+		VisitsAtRisk mixed = new VisitsAtRisk(NOW, WINDOW_END, List.of(
+				new Booking(DEVI, null, NOW.plusDays(1)),
+				new Booking(DEVI, 1L, NOW.plusDays(1))), Map.of(1L, Set.of(FIRST_AID)));
+
+		assertThat(mixed.count(DEVI, FIRST_AID, NOW.toLocalDate().minusDays(1))).contains(1);
+	}
+
+	@Test
 	void aTypeNoPlanRequiresPutsNothingAtRisk() {
 		assertThat(atRisk.count(DEVI, 99L, LocalDate.of(2026, 10, 1))).contains(0);
 	}
