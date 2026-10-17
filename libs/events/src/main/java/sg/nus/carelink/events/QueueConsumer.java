@@ -6,11 +6,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +15,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
-import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
@@ -181,7 +175,8 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
         // Normal event consumers retain their original transactional behavior.
         try (VisibilityHeartbeat heartbeat =
                      longRunningWorker && handler instanceof PreparedEventHandler<?>
-                             ? new VisibilityHeartbeat(message) : null) {
+                             ? new VisibilityHeartbeat(sqs, queueUrl, message,
+                                      Duration.ofSeconds(WORKER_RENEW_INTERVAL_SECONDS), WORKER_VISIBILITY_SECONDS) : null) {
             if (handler instanceof PreparedEventHandler<?> prepared) {
                 if (alreadyConsumed(event)) {
                     log.info("{} event {} was handled before; this delivery is ignored", event.type(), event.id());
@@ -240,55 +235,6 @@ final class QueueConsumer implements SmartLifecycle, DisposableBean {
         return handler.prepare(payload, event.metadata());
     }
 
-    /**
-     * Extends the current receipt's lease while preparation/commit is in progress.
-     * A failed renewal prevents starting a write transaction, when detected in time.
-     * This is not a distributed lock: the database constraints remain authoritative.
-     */
-    private final class VisibilityHeartbeat implements AutoCloseable {
-        private final ScheduledExecutorService executor;
-        private final ScheduledFuture<?> task;
-        private final AtomicReference<RuntimeException> failure = new AtomicReference<>();
-
-        private VisibilityHeartbeat(Message message) {
-            executor = Executors.newSingleThreadScheduledExecutor(r ->
-                    Thread.ofPlatform().daemon(true).name("report-visibility-heartbeat").unstarted(r));
-            task = executor.scheduleAtFixedRate(() -> {
-                try {
-                    sqs.changeMessageVisibility(ChangeMessageVisibilityRequest.builder()
-                            .queueUrl(queueUrl)
-                            .receiptHandle(message.receiptHandle())
-                            .visibilityTimeout(WORKER_VISIBILITY_SECONDS)
-                            .build());
-                } catch (RuntimeException error) {
-                    failure.compareAndSet(null, error);
-                    log.error("Cannot renew visibility for SQS message {}; processing will be retried",
-                            message.messageId(), error);
-                }
-            }, WORKER_RENEW_INTERVAL_SECONDS, WORKER_RENEW_INTERVAL_SECONDS, TimeUnit.SECONDS);
-        }
-
-        private void checkHealthy() {
-            RuntimeException error = failure.get();
-            if (error != null) {
-                throw new IllegalStateException("SQS visibility renewal failed", error);
-            }
-        }
-
-        @Override
-        public void close() {
-            task.cancel(false);
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                }
-            } catch (InterruptedException interrupted) {
-                executor.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
 
 	private void delete(Message message) {
 		sqs.deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle(message.receiptHandle()).build());
