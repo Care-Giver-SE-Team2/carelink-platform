@@ -30,7 +30,7 @@ import { api } from '../../../shared/api/client'
  * jobs it offers. Under Vitest, and with VITE_OPEN_PLATFORM_MOCK=true, the mock Open Platform in
  * features/provider-platform/mockPlatform.ts answers instead.
  */
-const LIVE = import.meta.env.MODE !== 'test' && import.meta.env.VITE_OPEN_PLATFORM_MOCK !== 'true'
+const LIVE = import.meta.env.PROD || (import.meta.env.MODE !== 'test' && import.meta.env.VITE_OPEN_PLATFORM_MOCK !== 'true')
 
 export type ProviderApplication = {
   id: number

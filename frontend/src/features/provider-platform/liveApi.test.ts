@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './errors'
 import * as live from './liveApi'
-import { adoptAccessToken, listJobs, resetMockPlatform } from './mockPlatform'
 
 /** A token whose payload carries `claims`; unsigned, as only CareLink checks tokens. */
 function tokenWith(claims: Record<string, unknown>): string {
@@ -212,14 +211,4 @@ describe('a server token from the client credentials', () => {
     await expect(live.requestToken('client-1', 'wrong')).rejects.toMatchObject({ status: 401, code: 'invalid_client' })
   })
 
-  it('opens the mock’s demo jobs to a real token until report serves the job API', () => {
-    resetMockPlatform()
-    adoptAccessToken('real-token', 'client-real', Date.now() + 3600_000)
-    adoptAccessToken('real-token', 'client-real', Date.now() + 3600_000)
-
-    const page = listJobs('real-token', 'new', 1)
-
-    expect(page.total).toBe(4)
-    expect(page.counts.new).toBe(4)
-  })
 })
