@@ -12,7 +12,7 @@ alert types. The following are proposed fixes, **not a clean live rescan result*
 | Risk / ZAP ID | Observed finding | Fix prepared in this PR | When it becomes effective |
 | --- | --- | --- | --- |
 | Medium / 10038-1 | Missing CSP on HTML | Enforced CSP in `deploy/cloudfront/security-headers.json` | Separately reviewed policy attachment |
-| Medium / 10020-1 | Missing anti-framing protection | `frame-ancestors 'none'` and `X-Frame-Options: DENY` | Policy attachment |
+| Medium / 10020-1 | Missing anti-framing protection | `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` | Policy attachment |
 | Medium / 90003 | Google Fonts stylesheet has no SRI | Bundle the same Instrument Sans 400/500/600/700 and IBM Plex Mono 400/500/600 faces; remove both HTML link and landing CSS import | Normal frontend release after PR approval/merge |
 | Low / 10036-2 | `Server: AmazonS3` | Remove `Server` via response headers policy | Policy attachment |
 | Low / 10035-1 | Missing HSTS | `max-age=86400`, no subdomains or preload | Policy attachment; browsers must first receive HTTPS |
@@ -42,7 +42,7 @@ comments, SPA coverage and cache review are not silently reclassified as fixed.
   Certificate URLs currently have no fixed external-host contract and mock scan
   URLs are null. HTTPS media/frame permissions are intentionally broader than
   scripts/connections; narrow them when the upload host contract is implemented.
-- `frame-ancestors 'none'` prevents *other pages embedding the application*;
+- `frame-ancestors 'self'` prevents *foreign-origin pages embedding the application*, while preserving same-origin frames;
   `frame-src` separately controls previews *inside the application*. The API
   behaviors do not receive this policy, including any API-served certificate.
 - `object-src 'none'` is compatible with the existing `<iframe>` viewer; the

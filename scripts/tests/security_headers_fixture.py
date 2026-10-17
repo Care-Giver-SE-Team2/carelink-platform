@@ -16,7 +16,7 @@ class Fixture(SimpleHTTPRequestHandler):
         # The proposed CloudFront policy is deliberately NOT attached to API behaviors.
         if not urlsplit(self.path).path.startswith("/api/"):
             self.send_header("Content-Security-Policy", POLICY["ContentSecurityPolicy"]["ContentSecurityPolicy"])
-            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("X-Frame-Options", POLICY["FrameOptions"]["FrameOption"])
             self.send_header("Strict-Transport-Security", "max-age=86400")
             self.send_header("X-Content-Type-Options", "nosniff")
         super().end_headers()
