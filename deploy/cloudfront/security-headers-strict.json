@@ -1,0 +1,22 @@
+{
+  "Name": "CareLinkStagingStrictStaticSecurityHeaders",
+  "Comment": "Candidate only; no live attachment. Review compatibility and rollback before enabling.",
+  "SecurityHeadersConfig": {
+    "ContentSecurityPolicy": {
+      "Override": true,
+      "ContentSecurityPolicy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self'; style-src 'self'; style-src-attr 'none'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; form-action 'self'"
+    },
+    "FrameOptions": { "Override": true, "FrameOption": "SAMEORIGIN" },
+    "StrictTransportSecurity": {
+      "Override": true,
+      "AccessControlMaxAgeSec": 86400,
+      "IncludeSubdomains": false,
+      "Preload": false
+    },
+    "ContentTypeOptions": { "Override": true }
+  },
+  "RemoveHeadersConfig": {
+    "Quantity": 1,
+    "Items": [{ "Header": "Server" }]
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "status": "candidate only; PR review; not enabled",
+  "base_commit": "72d48000c02056a9003d663ef68d20ff68b7a533",
+  "production_policy_unchanged": true,
+  "live_domain": "dzfs8sv334fwf.cloudfront.net",
+  "verified_browser": "Chrome Incognito",
+  "font_faces_loaded": 7,
+  "public_fixture_routes": [
+    "/",
+    "/apply",
+    "/provider/apply",
+    "/elder/register"
+  ],
+  "strict_negative_probes": [
+    "inline script",
+    "foreign connection",
+    "HTML style attribute",
+    "inline style block",
+    "foreign image",
+    "foreign frame"
+  ],
+  "unexpected_csp_violations_in_chrome": 0,
+  "role_checks": [
+    {
+      "role": "manager",
+      "page": "home",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "manager",
+      "page": "roster-day",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "manager",
+      "page": "roster-week",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "manager",
+      "page": "providers",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "manager",
+      "page": "certifications",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "manager",
+      "page": "reports",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "manager",
+      "page": "modal-cancelled-no-submit",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "family",
+      "page": "home",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "family",
+      "page": "weekly-summary",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "caregiver",
+      "page": "schedule",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "caregiver",
+      "page": "work-pack",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "elder",
+      "page": "home",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    },
+    {
+      "role": "elder",
+      "page": "confirmation-read-only",
+      "cspViolations": 0,
+      "mode": "Chrome Incognito; strict local production build, read-only staging API relay"
+    }
+  ],
+  "relay_requests": {
+    "count": 124,
+    "distinct_read_paths": 28,
+    "statuses": {
+      "200": 121,
+      "204": 3
+    },
+    "business_writes": 0
+  },
+  "local_zap": {
+    "image": "ghcr.io/zaproxy/zaproxy@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6",
+    "scope": "local unauthenticated static fixture only; no public scan",
+    "counts": {
+      "High": 0,
+      "Medium": 0,
+      "Low": 0,
+      "Informational": 2
+    },
+    "csp_10055_findings": 0,
+    "suppressed_rules": 0
+  },
+  "limits": {
+    "real_pdf": "deferred; no native business PDF workflow tested",
+    "in_app_fixture": "not passed: empty-source style-src-elem line 135 also reproduced without application code; blob frame did not complete",
+    "all_browsers": "not established"
+  },
+  "source_sha256": {
+    "deploy/cloudfront/security-headers.json": "0d88c16a5640ac20d06431a8c2c1234cbc31885cc260e15f138a71af7a9c9770",
+    "deploy/cloudfront/security-headers-strict.json": "38aa9feaa03923ec4e89045e6f298110c648ee12c1a8059c69ecf1a3e5d7ab0a",
+    "scripts/tests/security_headers_fixture.py": "0f30584f4bcf247772b1cae26ce0ccb6e4b55131005e5f0b3f98eed23225ddda",
+    "scripts/tests/security_headers_probe.js": "5a648d18d1b9c71f3d27c4c36c46bcd1fb8d8e056a2c5f31f89c604422ef6495",
+    "scripts/prepare-security-headers.py": "a1c09850b603a4fd7c35935fba2eebb28dc4359fae36a468fe9bd2a9831103ef"
+  },
+  "offline_python_tests_passed": 70,
+  "production_build": "passed",
+  "production_build_sha256": {
+    "index.html": "ae8893637892f9dc7a61517954a31406f3d420444bf90f8f77542a7fe35bd86d",
+    "assets/index-DvpdM4nn.js": "5180793f6ba4338536c17a6642f9c76878cbc434b0f69d1dd77c2e353d6b5ef1",
+    "assets/index-D3r0kWST.css": "3f802081289c5148f07c1f780ac91f20fea0de562b6c30c268c5c5fb2e516374"
+  }
+}

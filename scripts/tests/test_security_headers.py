@@ -10,6 +10,7 @@ spec = spec_from_file_location("headers", ROOT / "scripts/prepare-security-heade
 headers = module_from_spec(spec)
 spec.loader.exec_module(headers)
 POLICY_ID = "12345678-1234-1234-1234-123456789012"
+PREVIOUS_POLICY_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
 
 class SecurityHeadersTest(unittest.TestCase):
@@ -67,6 +68,35 @@ class SecurityHeadersTest(unittest.TestCase):
         self.export["Distribution"]["DistributionConfig"] = update["DistributionConfig"]
         self.assertEqual(headers.prepare(self.export, POLICY_ID), update)
 
+    def test_explicit_transition_preserves_everything_except_two_reviewed_references(self):
+        config = self.export["Distribution"]["DistributionConfig"]
+        for behavior in [config["DefaultCacheBehavior"], config["CacheBehaviors"]["Items"][2]]:
+            behavior["ResponseHeadersPolicyId"] = PREVIOUS_POLICY_ID
+        original = deepcopy(self.export)
+        update = headers.prepare(self.export, POLICY_ID, PREVIOUS_POLICY_ID)
+        self.assertEqual(self.export, original)
+        self.assertEqual(update["IfMatch"], "current-version")
+        for behavior in [update["DistributionConfig"]["DefaultCacheBehavior"],
+                         update["DistributionConfig"]["CacheBehaviors"]["Items"][2]]:
+            self.assertEqual(behavior["ResponseHeadersPolicyId"], POLICY_ID)
+            behavior["ResponseHeadersPolicyId"] = PREVIOUS_POLICY_ID
+        self.assertEqual(update["DistributionConfig"], original["Distribution"]["DistributionConfig"])
+
+    def test_explicit_transition_refuses_missing_foreign_or_inconsistent_policies(self):
+        for attached in [(None, None), (PREVIOUS_POLICY_ID, None), (PREVIOUS_POLICY_ID, POLICY_ID),
+                         (POLICY_ID, PREVIOUS_POLICY_ID), (POLICY_ID, "foreign")]:
+            with self.subTest(attached=attached):
+                export = deepcopy(self.export)
+                config = export["Distribution"]["DistributionConfig"]
+                config["DefaultCacheBehavior"]["ResponseHeadersPolicyId"] = attached[0]
+                config["CacheBehaviors"]["Items"][2]["ResponseHeadersPolicyId"] = attached[1]
+                with self.assertRaises(ValueError): headers.prepare(export, POLICY_ID, PREVIOUS_POLICY_ID)
+        with self.assertRaises(ValueError): headers.prepare(self.export, POLICY_ID, "not-a-policy")
+
+    def test_explicit_transition_reapplication_is_idempotent(self):
+        self.export["Distribution"]["DistributionConfig"] = headers.prepare(self.export, POLICY_ID)["DistributionConfig"]
+        self.assertEqual(headers.prepare(self.export, POLICY_ID, PREVIOUS_POLICY_ID), headers.prepare(self.export, POLICY_ID))
+
     def test_security_policy_keeps_current_ui_requirements_without_weakening_scripts(self):
         policy = json.loads((ROOT / "deploy/cloudfront/security-headers.json").read_text())
         security = policy["SecurityHeadersConfig"]
@@ -94,6 +124,25 @@ class SecurityHeadersTest(unittest.TestCase):
             for weight in weights:
                 self.assertIn(f"@fontsource/{font}/{weight}.css", main)
             self.assertIn("SIL OPEN FONT LICENSE", (ROOT / f"frontend/public/licenses/{font}.txt").read_text())
+
+    def test_strict_candidate_removes_both_csp_findings_without_changing_other_headers(self):
+        current = json.loads((ROOT / "deploy/cloudfront/security-headers.json").read_text())
+        candidate = json.loads((ROOT / "deploy/cloudfront/security-headers-strict.json").read_text())
+        self.assertNotEqual(candidate["Name"], current["Name"])
+        csp = candidate["SecurityHeadersConfig"]["ContentSecurityPolicy"]["ContentSecurityPolicy"]
+        directives = {part.strip().split()[0]: part.strip().split()[1:] for part in csp.split(";")}
+        for directive in ("script-src", "style-src", "font-src", "connect-src"):
+            self.assertEqual(directives[directive], ["'self'"])
+        self.assertEqual(directives["style-src-attr"], ["'none'"])
+        self.assertEqual(directives["img-src"], ["'self'", "data:", "blob:"])
+        self.assertEqual(directives["frame-src"], ["'self'", "blob:"])
+        self.assertEqual(directives["frame-ancestors"], ["'self'"])
+        for forbidden in ("'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "https:", "*"):
+            self.assertNotIn(forbidden, csp)
+        candidate["SecurityHeadersConfig"].pop("ContentSecurityPolicy")
+        current["SecurityHeadersConfig"].pop("ContentSecurityPolicy")
+        self.assertEqual(candidate["SecurityHeadersConfig"], current["SecurityHeadersConfig"])
+        self.assertEqual(candidate["RemoveHeadersConfig"], current["RemoveHeadersConfig"])
 
 
 if __name__ == "__main__":

@@ -48,8 +48,10 @@ class Fixture(SimpleHTTPRequestHandler):
             super().do_GET()
         else:
             html = (Path(self.directory) / "index.html").read_text()
+            strict = "true" if "'unsafe-inline'" not in POLICY["ContentSecurityPolicy"]["ContentSecurityPolicy"] else "false"
             self.send_body(html.replace('<div id="root">',
-                '<script src="/__csp/probe.js"></script><pre id="csp-result">Checking CSP…</pre><div id="root">').encode())
+                f'<script src="/__csp/probe.js" data-strict="{strict}"></script>'
+                '<pre id="csp-result">Checking CSP…</pre><div id="root">').encode())
 
     def do_POST(self):
         self.rfile.read(int(self.headers.get("Content-Length", "0")))
@@ -59,7 +61,9 @@ class Fixture(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=15174)
+    parser.add_argument("--policy", type=Path, default=ROOT / "deploy/cloudfront/security-headers.json")
     args = parser.parse_args()
+    POLICY = json.loads(args.policy.read_text())["SecurityHeadersConfig"]
     directory = ROOT / "frontend/dist"
     if not (directory / "index.html").is_file():
         raise SystemExit("Build frontend first")
