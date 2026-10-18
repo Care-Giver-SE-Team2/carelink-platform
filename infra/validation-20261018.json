@@ -1,0 +1,26 @@
+{
+  "scope": "offline source validation and scoped live read-only readiness audit; no real plan/apply/destroy",
+  "terraform": "1.16.5",
+  "aws_provider": "6.68.0",
+  "base_commit": "902fd4bbd69f46c297792d8e06fb9407c5a44bd6",
+  "mock_tests": {
+    "infra": 2,
+    "infra/bootstrap": 1,
+    "infra/runtime": 17,
+    "infra/public-site": 3
+  },
+  "readiness_script_unit_tests": 6,
+  "format_validate": "passed",
+  "private_artifact_allowlist_check": "passed",
+  "checkov": "not run; separate security-owner handoff",
+  "live_plan": "not run",
+  "budget": "unverified; budgets:ViewBudget denied",
+  "metrics_server": "2/2 Ready v0.8.1; Metrics API available; 2 nodes and 8 staging pods return metrics",
+  "keda": "no deployments/release; all 4 CRDs and external metrics API not found",
+  "hpa": "0 objects",
+  "public_version_unchanged": "902fd4bbd69f46c297792d8e06fb9407c5a44bd6",
+  "pr59_unchanged": "d58543434ced04713d6cf4303d513592164a4624",
+  "auto_deploy_flags": "both true; read only; not changed",
+  "kubeconfig_failure_regression": "TimeoutExpired and OSError preserve partial inventory, mark Kubernetes unverified and suppress raw process output",
+  "merge_behavior": "With existing flags enabled and successful main CI, merge triggers ordinary application CD; Terraform is not automatically executed. Keep unmerged for zero deployment."
+}
