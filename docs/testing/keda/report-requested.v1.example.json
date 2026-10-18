@@ -1,0 +1,13 @@
+{
+  "id": "4fc1c032-9854-4a34-8cb4-9a994b0a8d78",
+  "type": "ReportRequested",
+  "source": "report",
+  "occurredAt": "2026-10-18T09:00:00Z",
+  "payload": {
+    "schemaVersion": 1,
+    "elderId": 700000101,
+    "periodStart": "2026-10-05",
+    "periodEnd": "2026-10-11",
+    "runId": "cl-keda-fixture-01"
+  }
+}
