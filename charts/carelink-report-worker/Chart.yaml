@@ -1,0 +1,5 @@
+apiVersion: v2
+name: carelink-report-worker
+description: Independent report task consumer; no public service or ingress
+type: application
+version: 0.1.0

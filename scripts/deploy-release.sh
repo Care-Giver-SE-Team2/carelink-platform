@@ -18,4 +18,8 @@ check=(python3 scripts/check-deployment.py "$1" --manifest "$RELEASE_MANIFEST"
   --registry "$IMAGE_REGISTRY" --context "$KUBE_CONTEXT")
 if [ -n "${AWS_PROFILE:-}" ]; then check+=(--profile "$AWS_PROFILE"); fi
 "${check[@]}"
-exec bash scripts/deploy.sh all "$1"
+bash scripts/deploy.sh all "$1"
+worker=(python3 scripts/deploy-report-worker.py deploy "$1" --manifest "$RELEASE_MANIFEST"
+  --registry "$IMAGE_REGISTRY" --context "$KUBE_CONTEXT")
+if [ -n "${AWS_PROFILE:-}" ]; then worker+=(--profile "$AWS_PROFILE"); fi
+"${worker[@]}"
