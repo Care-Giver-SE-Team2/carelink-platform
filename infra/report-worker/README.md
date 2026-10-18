@@ -70,7 +70,8 @@ SNS 测试发布权限只覆盖现有 staging topic，应用仍需按 v1 校验�
 
 ## 证据与恢复
 
-四轮标准、消息与 SQL 以板块四验收包和 docs/testing/keda/README.md 为准。
+四轮标准、消息与 SQL 以板块四验收包及 PR #62 的交接资料为准：
+https://github.com/Care-Giver-SE-Team2/carelink-platform/pull/62 。该 PR 仍未合并，不应假定交接目录已在 main。
 不要把手动 SNS 投递当 Producer/Outbox 已验收，不把 AI disabled 当真实 Bedrock 已验收。
 仅在目标业务结果正确且无任务丢失后记录消费通过；仅 Pod 数量变化不算 KEDA 完成。
 
