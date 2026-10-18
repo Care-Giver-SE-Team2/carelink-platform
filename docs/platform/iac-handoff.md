@@ -3,6 +3,19 @@
 本次只准备源码、离线校验和只读核验。未执行真实 Terraform plan/apply/destroy，未安装组件、
 未修改 IAM、预算、网站或 CI/CD 开关。PR #59 保持独立且不变。
 
+## 合并会触发什么
+
+**本 PR 未合并时不会发布；合并到 main 后，CI 成功且现有自动部署开关开启，会触发正常的应用 CD。**
+没有修改工作流不代表不会触发它。仅 IaC/文档/工具变更仍会进入 main CI 和完整 release 组装；
+有可用验证基线时复用未改动的镜像/前端资源。之后 CodeBuild 执行部署与 Ingress 检查，前端发布
+更新 S3 制品及版本标记并刷新 CloudFront。后端镜像和渲染清单均未变化时可跳过服务 upgrade，
+但不能据此宣称没有线上操作。现有域名/分发继续使用；这些工作流不会自动执行本 PR 的 Terraform。
+
+如果本阶段要求完全不部署，就保持未合并。本次补充只修改说明和本地盘点脚本，不修改工作流、
+main 发布条件、部署开关或线上资源；也不会为了实现零发布而静默关闭全自动 CD。
+现有触发与发布代码见 `.github/workflows/ci.yml`、`.github/workflows/deploy.yml`、
+`deploy/codebuild/buildspec.yml` 和 `scripts/publish-frontend.py`。
+
 ## 队员从哪里开始
 
 1. 读 `infra/README.md` 和本文件；使用干净 clone，先运行

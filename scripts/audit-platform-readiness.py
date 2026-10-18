@@ -81,39 +81,45 @@ def main():
                                          "--cluster-name", args.cluster], env)
         # --dry-run writes only our private temporary kubeconfig, never ~/.kube/config.
         with tempfile.TemporaryDirectory(prefix="carelink-readiness-") as temporary:
-            result = subprocess.run([*aws, "--region", "ap-southeast-1", "eks", "update-kubeconfig",
-                                     "--name", args.cluster, "--alias", args.cluster, "--dry-run"],
-                                    env=env, capture_output=True, text=True, timeout=45)
-            if result.returncode:
-                report["kubernetes"] = {"status": "unverified", "error": result.stderr.strip()}
+            try:
+                result = subprocess.run([*aws, "--region", "ap-southeast-1", "eks", "update-kubeconfig",
+                                         "--name", args.cluster, "--alias", args.cluster, "--dry-run"],
+                                        env=env, capture_output=True, text=True, timeout=45)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                # Partial process output can contain kubeconfig; record only the failure type.
+                report["kubernetes"] = {"status": "unverified",
+                                        "error": f"Local kubeconfig generation failed ({type(error).__name__}); command output suppressed."}
             else:
-                config = Path(temporary) / "kubeconfig"
-                config.write_text(result.stdout)
-                config.chmod(0o600)
-                kubectl = ["kubectl", "--kubeconfig", str(config), "--context", args.cluster, "--request-timeout=20s"]
-                queries = {
-                    "metrics_server": ["-n", "kube-system", "get", "deployment", "metrics-server", "-o", "json"],
-                    "metrics_api": ["get", "apiservice", "v1beta1.metrics.k8s.io", "-o", "json"],
-                    "node_metrics": ["get", "--raw=/apis/metrics.k8s.io/v1beta1/nodes"],
-                    "staging_pod_metrics": ["get", "--raw=/apis/metrics.k8s.io/v1beta1/namespaces/staging/pods"],
-                    "deployments": ["get", "deployments", "-A", "-o", "json"],
-                    "hpa": ["get", "hpa", "-A", "-o", "json"],
-                    "external_metrics_api": ["get", "apiservice", "v1beta1.external.metrics.k8s.io", "-o", "json"],
-                }
-                for name in ["scaledobjects", "scaledjobs", "triggerauthentications", "clustertriggerauthentications"]:
-                    queries[name] = ["get", "crd", f"{name}.keda.sh", "-o", "json"]
-                report["kubernetes"] = {}
-                for name, query in queries.items():
-                    value = request([*kubectl, *query], env)
-                    if value["status"] == "observed" and name in {"metrics_server", "deployments"}:
-                        data = value["data"]
-                        deployments = data.get("items", [data])
-                        value["data"] = [{"namespace": d["metadata"].get("namespace"), "name": d["metadata"]["name"],
-                                          "desired": d.get("spec", {}).get("replicas"),
-                                          "ready": d.get("status", {}).get("readyReplicas", 0),
-                                          "images": [c["image"] for c in d["spec"]["template"]["spec"]["containers"]]}
-                                         for d in deployments]
-                    report["kubernetes"][name] = value
+                if result.returncode:
+                    report["kubernetes"] = {"status": "unverified", "error": result.stderr.strip()}
+                else:
+                    config = Path(temporary) / "kubeconfig"
+                    config.write_text(result.stdout)
+                    config.chmod(0o600)
+                    kubectl = ["kubectl", "--kubeconfig", str(config), "--context", args.cluster, "--request-timeout=20s"]
+                    queries = {
+                        "metrics_server": ["-n", "kube-system", "get", "deployment", "metrics-server", "-o", "json"],
+                        "metrics_api": ["get", "apiservice", "v1beta1.metrics.k8s.io", "-o", "json"],
+                        "node_metrics": ["get", "--raw=/apis/metrics.k8s.io/v1beta1/nodes"],
+                        "staging_pod_metrics": ["get", "--raw=/apis/metrics.k8s.io/v1beta1/namespaces/staging/pods"],
+                        "deployments": ["get", "deployments", "-A", "-o", "json"],
+                        "hpa": ["get", "hpa", "-A", "-o", "json"],
+                        "external_metrics_api": ["get", "apiservice", "v1beta1.external.metrics.k8s.io", "-o", "json"],
+                    }
+                    for name in ["scaledobjects", "scaledjobs", "triggerauthentications", "clustertriggerauthentications"]:
+                        queries[name] = ["get", "crd", f"{name}.keda.sh", "-o", "json"]
+                    report["kubernetes"] = {}
+                    for name, query in queries.items():
+                        value = request([*kubectl, *query], env)
+                        if value["status"] == "observed" and name in {"metrics_server", "deployments"}:
+                            data = value["data"]
+                            deployments = data.get("items", [data])
+                            value["data"] = [{"namespace": d["metadata"].get("namespace"), "name": d["metadata"]["name"],
+                                              "desired": d.get("spec", {}).get("replicas"),
+                                              "ready": d.get("status", {}).get("readyReplicas", 0),
+                                              "images": [c["image"] for c in d["spec"]["template"]["spec"]["containers"]]}
+                                             for d in deployments]
+                        report["kubernetes"][name] = value
     args.output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with os.fdopen(os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as target:
         json.dump(report, target, indent=2)

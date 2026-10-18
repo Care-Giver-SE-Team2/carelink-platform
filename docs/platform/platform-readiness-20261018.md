@@ -36,6 +36,8 @@ python3 scripts/audit-platform-readiness.py \
 只调用 STS/Budgets/EKS 的读取接口和 kubectl get，不 apply、安装、重启、发布、创建预算或发通知。
 输出权限为0600且位于 Git 忽略目录；预算接收地址只保留数量/类型，禁止把原始报告直接上传公开仓库。
 权限不足、超时、网络不通记为 unverified，只有明确 NotFound 才记缺失。
+本地 kubeconfig 生成若超时或出现执行错误，也会保留已取得的身份、预算和 add-on 结果并落盘；
+Kubernetes 整项记 unverified，不执行后续 kubectl，异常中的原始进程输出不写入报告。
 该 JSON 的存在/脚本退出成功不表示所有检查通过，必须看每项 status。
 
 控制台路径：
@@ -67,8 +69,9 @@ python3 scripts/audit-platform-readiness.py \
 
 Terraform 1.16.5 / AWS provider 6.68.0：四个根在无远程 backend 的临时目录中通过 fmt、validate、
 mock tests，共23项（platform 2、bootstrap 1、runtime 17、public-site 3）。新增检查包括完整HA
-节点/双NAT路径以及响应头策略必填与两个静态行为的引用。只读核验脚本5项单元测试通过，覆盖权限
-拒绝不冒充不存在、NotFound分类、接收人脱敏、root/错误账号拒绝及仅执行GET/读取命令。
+节点/双NAT路径以及响应头策略必填与两个静态行为的引用。只读核验脚本6项单元测试通过，覆盖权限
+拒绝不冒充不存在、NotFound分类、接收人脱敏、root/错误账号拒绝及仅执行GET/读取命令；
+新增回归覆盖 kubeconfig 生成超时和 OSError 时保留部分报告、0600权限及屏蔽原始输出。
 
 提交前白名单检查未发现state/plan/实际输入、访问密钥/私钥标记、现网账号ID、现网响应头策略ID或
 本机绝对路径进入infra源码。该检查不替代Checkov或完整安全评审。原始盘点JSON不进Git。

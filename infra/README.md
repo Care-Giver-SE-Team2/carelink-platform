@@ -1,8 +1,16 @@
 # CareLink IaC source handoff — review only
 
 This is a source handoff, not a provisioning or teardown request. No workflow imports or runs
-these roots automatically. The existing public URL and main application CI/CD are unchanged.
-Do not apply the examples to the running environment.
+these Terraform roots automatically. Do not apply the examples to the running environment.
+
+**Merging into main triggers ordinary application CI/CD when CI passes and the existing automatic
+deployment flags remain enabled.** This PR does not change workflow definitions or deployment
+switches, but a source-only merge is not deployment-free. CI can reuse source-identical artifacts
+when a verified baseline is available. CodeBuild still executes the deployment/Ingress checks,
+and frontend publication uploads artifacts and a new version marker and invalidates CloudFront.
+Unchanged backend manifests/images can skip the service upgrade; this does not skip all online work.
+These steps keep the existing distribution/domain; they do not run Terraform apply/destroy.
+If no deployment is allowed at this stage, keep this PR unmerged. Do not disable normal CD silently.
 
 ## What is included
 
