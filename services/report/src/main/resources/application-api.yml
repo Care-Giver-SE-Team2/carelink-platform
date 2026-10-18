@@ -4,3 +4,5 @@ carelink:
     service: report
   report:
     legacy-scheduler-enabled: false
+
+    task-producer-enabled: ${REPORT_TASK_PRODUCER_ENABLED:false}
