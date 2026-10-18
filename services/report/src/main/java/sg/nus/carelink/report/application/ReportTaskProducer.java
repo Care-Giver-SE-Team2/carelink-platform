@@ -45,7 +45,7 @@ public class ReportTaskProducer {
     public int publishPeriod(ReportPeriod period) {
         Objects.requireNonNull(period, "period");
         LocalDate today = LocalDate.now(clock.withZone(SINGAPORE));
-        if (period.start().getDayOfWeek() != java.time.DayOfWeek.MONDAY
+        if (!java.time.DayOfWeek.MONDAY.equals(period.start().getDayOfWeek())
                 || !period.end().equals(period.start().plusDays(6))
                 || !period.end().isBefore(today)) {
             throw new IllegalArgumentException("ReportRequested requires a completed Monday-Sunday week");

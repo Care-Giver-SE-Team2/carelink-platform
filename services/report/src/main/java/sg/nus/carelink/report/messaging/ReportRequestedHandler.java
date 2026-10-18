@@ -141,7 +141,7 @@ class ReportRequestedHandler {
                     throw new IllegalArgumentException("ReportRequested requires occurredAt");
                 }
                 LocalDate occurredDate = metadata.occurredAt().atZone(SINGAPORE).toLocalDate();
-                if (start.getDayOfWeek() != DayOfWeek.MONDAY
+                if (!DayOfWeek.MONDAY.equals(start.getDayOfWeek())
                         || !end.equals(start.plusDays(6))
                         || !end.isBefore(occurredDate)) {
                     throw new IllegalArgumentException("ReportRequested requires completed Monday-Sunday period");
