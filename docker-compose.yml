@@ -94,6 +94,8 @@ services:
       # schema core migrates), so core's calls fail until visit is up: the scans that run every
       # minute try again, and the roster catch-up at start-up waits for the nightly run
       CARELINK_VISITAPI_BASEURL: http://visit:8080
+    volumes:
+      - core-private:/var/lib/carelink/private/credentials
     ports:
       - "8080:8080"
     healthcheck:
@@ -128,6 +130,8 @@ services:
       CARELINK_EVENTS_ENDPOINT: http://localstack:4566
       AWS_ACCESS_KEY_ID: test             # LocalStack takes any key
       AWS_SECRET_ACCESS_KEY: test
+    volumes:
+      - visit-private:/var/lib/carelink/private/evidences
     ports:
       - "8081:8080"
     healthcheck:
@@ -253,3 +257,5 @@ services:
 
 volumes:
   mysql-data:
+  core-private:
+  visit-private:

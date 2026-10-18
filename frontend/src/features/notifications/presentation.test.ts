@@ -69,3 +69,11 @@ describe('when', () => {
     expect(when('soon')).toBe('soon')
   })
 })
+
+describe('caregiver system alert routing',()=>{
+ it('routes only the caregiver to its minimal summary',()=>{
+  expect(linkFor({resourceType:'CAREGIVER_SYSTEM_ALERT',resourceId:42},'caregiver')).toBe('/caregiver/system-alerts/42')
+  expect(linkFor({resourceType:'CAREGIVER_SYSTEM_ALERT',resourceId:42},'family')).toBeNull()
+  expect(linkFor({resourceType:'CAREGIVER_SYSTEM_ALERT',resourceId:42},'manager')).toBeNull()
+ })
+})

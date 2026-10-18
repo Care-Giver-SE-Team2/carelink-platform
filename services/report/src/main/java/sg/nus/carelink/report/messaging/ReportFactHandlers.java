@@ -33,6 +33,9 @@ import sg.nus.carelink.report.domain.repository.KeptFacts;
 @Configuration(proxyBeanMethods = false)
 @Profile("!worker")
 class ReportFactHandlers {
+    @Bean EventHandler<sg.nus.carelink.eventtypes.VisitEvidenceUpdated> evidenceUpdatedHandler(KeptFacts facts){
+        return on(sg.nus.carelink.eventtypes.VisitEvidenceUpdated.TYPE,sg.nus.carelink.eventtypes.VisitEvidenceUpdated.class,(event,sequence)->facts.keep(event));
+    }
 
 	@Bean
 	EventHandler<VisitScheduled> visitScheduledHandler(KeptFacts facts) {

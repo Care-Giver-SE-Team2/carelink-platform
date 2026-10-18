@@ -20,9 +20,10 @@ export default function ExecutionPanel({ pack, command }: { pack: WorkPack; comm
       {check ? <form onSubmit={e => { e.preventDefault(); command.start(pack.visit.id, pack.visit.version) }}>
         <fieldset disabled={command.blocked}><legend>Record arrival location</legend>
           <label>Location source<select value={command.mode} onChange={e => command.setMode(e.target.value as 'GPS' | 'MANUAL_LOCATION_NOTE')}><option value="GPS">GPS</option><option value="MANUAL_LOCATION_NOTE">Manual location note (not GPS verified)</option></select></label>
-          {command.mode === 'GPS' ? <><button type="button" className={styles.button} onClick={command.locate}>Get GPS location</button>{command.fix && <p role="status">Device location obtained. Accuracy: {Math.round(command.fix.accuracy)} m.</p>}</>
+          {command.mode === 'GPS' ? <button type="button" className={styles.button} onClick={command.locate}>Get GPS location</button>
             : <label>Manual location note<textarea value={command.note} maxLength={500} rows={3} onChange={e => command.setNote(e.target.value)} required /></label>}
           <button className={styles.button}>Check in and start service</button>
+          {command.mode === 'GPS' && command.fix && <p role="status">Device location obtained. Accuracy: {Math.round(command.fix.accuracy)} m.</p>}
         </fieldset>
       </form> : <p>Check-in is blocked: {state.blockedReason === 'VISIT_CHECK_IN_WINDOW' ? 'outside the time window' : state.blockedReason === 'VISIT_TASKS_REQUIRED' ? 'no valid plan task assigned — contact your manager' : 'current visit state or service strategy does not permit check-in'}.</p>}
     </>}
@@ -30,13 +31,18 @@ export default function ExecutionPanel({ pack, command }: { pack: WorkPack; comm
     {state.allowedActions.includes('CHECK_OUT') && <>
       <p>Check out records the end of your service. No manager or elder approval is required.</p>
       {pack.tasks.some(task => task.status === 'PENDING') && <p className={styles.readOnly}>Some tasks are still pending. You may check out; their recorded status will not change.</p>}
-      {pack.requiredEvidenceKinds.length > 0 && <p className={styles.readOnly}>Evidence cannot be uploaded or verified here yet. Missing evidence does not prevent check-out.</p>}
+      {pack.requiredEvidenceKinds.length > 0 && <p className={styles.readOnly}>Use “View or upload evidence images” below before checking out. Uploaded images remain Unverified. Missing evidence does not prevent check-out.</p>}
       <p className={styles.readOnly}>Save any task or health drafts you want to keep before checking out. New task results and health readings cannot be submitted after check-out.</p>
       <button className={styles.button} disabled={command.blocked} onClick={() => command.finishVisit(pack.visit.id, pack.visit.version)}>Check out</button>
     </>}
+    {command.pendingCheckout && <div className={styles.readOnly} role="alertdialog" aria-label="Unsaved visit entries">
+      <p>You have unsaved task or health entries. New entries cannot be submitted after check-out. Check out without saving them?</p>
+      <button className={styles.button} onClick={command.cancelCheckout}>Continue editing</button>
+      <button className={styles.button} disabled={!state.allowedActions.includes('CHECK_OUT')} onClick={command.confirmCheckout}>Check out without saving</button>
+    </div>}
     {pack.visit.status === 'EXCEPTION' && !check && <p className={styles.readOnly}>Execution paused. Reporting or resolving an incident does not automatically resume this visit.</p>}
     {pack.visit.status === 'EXCEPTION' && check && <p className={styles.readOnly}>This previous missed-check-in alert does not prevent check-in. The alert remains recorded.</p>}
-    <p className={styles.readOnly}>Task results are not check-out. Evidence upload is not included here; elder confirmation is a separate step after service completion.</p>
+    <p className={styles.readOnly}>Task results are not check-out. Use the evidence images page to upload PHOTO or SIGNATURE material; elder confirmation is a separate step after service completion.</p>
   </section>
 }
 export function ExecutionTasks({ pack, command }: { pack: WorkPack; command: ReturnType<typeof useExecutionCommands> }) {

@@ -78,7 +78,7 @@ missed check-in, so a consumer sees gaps, never a repeat.
 | `VitalsRecorded` | `CaregiverHealthService.record` | A set of readings is recorded | report | published |
 | `ElderConfirmationSubmitted` | `VisitService.submitElderConfirmation` | The elder confirms or disputes a visit | report | published |
 | `VisitClosed` | No code sets VERIFIED or AUTO_CLOSED yet | The visit becomes VERIFIED or AUTO_CLOSED | report | reserved |
-| `VisitEvidenceUpdated` | No code writes visit evidence yet | Evidence is added or verified | report | reserved |
+| `VisitEvidenceUpdated` | `CaregiverEvidenceService.upload` through `OutboxVisitEvents` | Private evidence uploaded (count snapshot) | report | published |
 
 **The state a visit event leaves.** Each event says what the visit is after it, so a consumer that keeps visits
 applies an event only when its `version` is higher than the one it holds, and needs nothing else:
@@ -112,7 +112,7 @@ transaction, so every method listed publishes it.
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
-| `NotificationRequested` | core: the credential expiry alert, incident's staff, spot check and family alerts, rostering's absence and roster change messages, the care plan notice; report: the value-added messages. Each sends one event per recipient | A message should reach someone | notification | published |
+| `NotificationRequested` | core: credential expiry, incident staff, spot check/family, rostering and care plan notices; visit: caregiver-safe SYS03; report: value-added messages. Each sends one event per recipient | A message should reach someone | notification | published |
 | `ReportRequested` | EventBridge Scheduler, straight into report's queue | Once a week | the report worker | with the report move |
 
 **The Open Platform's events.** Third-party providers take value-added service jobs through the Open Platform
@@ -379,5 +379,29 @@ catalogue already reserves the events they will need.
 
 - **Nothing sets a visit to VERIFIED or AUTO_CLOSED.** So every week with a completed visit is marked incomplete (`data_complete`). `VisitClosed` is reserved for this.
 - **Readings are stored with `out_of_range = false`.** The caregiver's own judgement is the health record's flag. `VitalsRecorded` carries both, so report can follow whichever rule the owners decide.
-- **Nothing writes visit evidence.** So evidence counts are 0, except what the first deployment copied. `VisitEvidenceUpdated` is reserved for this.
+- **Evidence counts.** `VisitEvidenceUpdated` now snapshots counts on private uploads. report keeps a separate ordered projection and falls back to legacy visit counters only until a snapshot exists. Private files and verification workflows remain separate.
 - **The value-added availability check was 8 hours off.** It bound `LocalDateTime` straight into SQL, while visit times are written through JPA, so the overlap check was 8 hours off in a JVM running on UTC. It is the calls in section 4 now, and visit binds the times the way it writes them.
+
+## Caregiver feature port: evidence snapshot and SYS03 (2026-10-19)
+
+`VisitEvidenceUpdated` is published in the same visit transaction as an upload:
+
+```json
+{"visitId":812,"elderId":101,"scheduledStart":"2026-10-19T09:00:00+08:00","version":4,"evidenceCount":2,"verifiedEvidenceCount":0}
+```
+
+Counts are authoritative snapshots, not increments. report applies a higher version to
+`report_visit_evidence`; duplicate/older versions do not rewind counts. This projection
+is independent of visit state, so an early evidence event does not create a fabricated
+scheduled/completed visit. Report reads coalesce to legacy report_visit counts when no
+snapshot has arrived. The event contains no document key, filename, URL, bytes or note.
+An upload stays UNVERIFIED; this port adds no verification event producer.
+
+SYS03 caregiver messages use existing `NotificationRequested`, type `INCIDENT_RAISED`,
+resource `CAREGIVER_SYSTEM_ALERT` and the incident ID. visit obtains the immutable trigger
+caregiver's account through CoreApi and writes outbox rows before committing the trigger.
+core retains manager notification delivery and does not guess a caregiver from the latest
+elder visit. Multi-role manager recipients do not receive a duplicate caregiver copy.
+No full incident or elder private detail is exposed through the caregiver alert route.
+Both message types were exercised through local SNS/SQS and production relay/consumer
+code. Cloud filters and worker deployment compatibility still require Board4 review.

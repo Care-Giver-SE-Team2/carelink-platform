@@ -9,13 +9,12 @@ import ExecutionPanel, { ExecutionTasks } from './ExecutionPanel'
 import { useExecutionCommands } from './useExecutionCommands'
 import { ApiError } from '../../shared/api/client'
 import HealthPanel from './HealthPanel'
+import { scheduleSearch } from './navigation'
 
 export default function WorkPackPage() {
   const { visitId = '' } = useParams()
   const [params] = useSearchParams()
-  const backParams = new URLSearchParams()
-  for (const name of ['dateFrom', 'dateTo']) if (params.has(name)) backParams.set(name, params.get(name)!)
-  const back = '/caregiver' + (backParams.size ? '?' + backParams.toString() : '')
+  const back = '/caregiver' + scheduleSearch(params)
   return <div className={styles.page}><Link className={styles.back} to={back}>← My schedule</Link>
     {!/^[1-9]\d*$/.test(visitId) ? <div role="alert" className={styles.error}>Visit not found</div> : <WorkPack key={visitId} id={visitId} back={back} />}
   </div>
@@ -31,9 +30,7 @@ function WorkPack({ id, back }: { id: string; back: string }) {
   if (result.status === 'error') return <QueryError error={result.error} retry={reload} back={back} />
   const pack = result.data
   return <>
-    <p className={styles.eyebrow}>Assigned visit · #{pack.visit.id}</p>
-    <div className={styles.heading}><div><h1>{pack.elder.preferredName}</h1><p className={styles.muted}>{titleCase(pack.visit.serviceType)}</p></div><button className={styles.button} disabled={command.write.pending} onClick={reload}>Refresh</button></div>
-    {pack.execution?.allowedActions.includes('REPORT_INCIDENT') && !command.blocked && <Link className={styles.linkButton} to={'/caregiver/visits/' + id + '/report-incident' + (back.includes('?') ? back.slice(back.indexOf('?')) : '')}>Report incident</Link>}
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Assigned visit · #{pack.visit.id}</p><h1>{pack.elder.preferredName}</h1><p className={styles.muted}>{titleCase(pack.visit.serviceType)}</p></div></div><div className={styles.toolbar}>{pack.execution?.allowedActions.includes('REPORT_INCIDENT') && !command.blocked && <Link className={styles.linkButton} to={'/caregiver/visits/' + id + '/report-incident' + (back.includes('?') ? back.slice(back.indexOf('?')) : '')}>Report incident</Link>}<button className={styles.refresh} disabled={command.write.pending} onClick={reload}>Refresh</button></div>
     <ExecutionPanel pack={pack} command={command} />
     <LastFetched at={result.receivedAt} />
     <section className={styles.card} aria-label="Visit details"><div className={styles.cardTop}><strong>Visit details</strong><span className={styles.badge}>{titleCase(pack.visit.status)}</span></div>
@@ -61,6 +58,7 @@ function WorkPack({ id, back }: { id: string; back: string }) {
     <ExecutionTasks pack={pack} command={command} />
     {pack.healthObservation && <HealthPanel pack={pack} command={command} revision={result.receivedAt} />}
     <section className={styles.card} aria-label="Required evidence"><h2>Required evidence</h2><p className={styles.muted}>Requirements for the tasks assigned to this visit.</p>
+      <Link to={`/caregiver/visits/${id}/evidence${back.includes('?') ? back.slice(back.indexOf('?')) : ''}`}>View or upload evidence images</Link>
       {pack.requiredEvidenceKinds.length ? <div className={styles.pills}>{pack.requiredEvidenceKinds.map(kind => <span className={styles.badge} key={kind}>{titleCase(kind)}</span>)}</div> : <p>No evidence requirements recorded.</p>}
     </section>
   </>

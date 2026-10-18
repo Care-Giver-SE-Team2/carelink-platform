@@ -61,7 +61,7 @@ class SecurityConfig {
 						).permitAll()
 
 						// Family sign-up: the caller has no account, so no role, yet.
-						.requestMatchers(HttpMethod.POST, "/api/family-registrations", "/api/elder-registrations").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/family-registrations", "/api/elder-registrations", "/api/caregiver-registrations").permitAll()
 
 						// Front-end static assets.
 						.requestMatchers(
@@ -69,7 +69,7 @@ class SecurityConfig {
 								"/index.html",
 								"/apply",
 								"/caregiver", "/caregiver/", "/caregiver/visits/*", "/caregiver/visits/*/report-incident",
-                                "/caregiver/absences", "/caregiver/spot-checks", "/caregiver/incidents", "/caregiver/incidents/*",
+                                "/caregiver/register", "/caregiver/application", "/caregiver/absences", "/caregiver/spot-checks", "/caregiver/incidents", "/caregiver/incidents/*",
 								"/favicon.ico",
 								"/assets/**",
 								"/vite.svg"

@@ -378,3 +378,19 @@ core's tests that load demonstration data build visit's database beside their ow
 whose privileges cover that database only, and the service's `DB_URL`, `DB_USER` and `DB_PASSWORD` in the Secret
 its chart reads (`envFromSecret`).
 
+
+## Caregiver partial port, 2026-10-19
+
+core owns `caregiver_credential_submission_guard`, `credential_document`, `credential_submission`,
+`caregiver_work_settings_state` and `caregiver_work_settings_receipt`, in addition to the
+prior admission tables. visit owns `visit_evidence_file`; report owns
+`report_visit_evidence`. See ServiceTables for the complete executable ownership list.
+No migration adds a foreign key across service databases.
+
+Work settings read bookings through core's existing rostering visit port (HTTP VisitApi),
+not visit domain classes. Own history reads core spot-check facts through CoreApi
+`/caregivers/by-username/{username}/own-spot-checks`, with actor authorization applied
+by core. SYS03 account resolution also uses CoreApi. Evidence facts reach report only
+through outbox events; report does not query visit's private files or metadata table.
+See [caregiver feature migration](caregiver-feature-migration.md) for exact versions,
+routing, persistence requirements, local validation and release limits.

@@ -43,6 +43,10 @@ import sg.nus.carelink.coreapi.CoreRuleViolation;
  * alert recipients) are not answered here: report's tests stub {@code CoreApi} themselves.
  */
 public class CoreStandIn implements CoreApi {
+    @Override public List<OwnSpotCheck> ownSpotChecks(String username) {
+        var profile=caregiverByUsername(username);
+        return jdbc.query("select id,visit_id,result,checked_at,caregiver_response from spot_check where caregiver_id=? and result is not null",(r,n)->new OwnSpotCheck(r.getLong("id"),r.getLong("visit_id"),r.getString("result"),r.getTimestamp("checked_at")==null?null:r.getTimestamp("checked_at").toLocalDateTime(),r.getString("caregiver_response")),profile.id());
+    }
 
 	private static final ZoneId SINGAPORE = ZoneId.of("Asia/Singapore");
 
@@ -218,7 +222,8 @@ public class CoreStandIn implements CoreApi {
 
 	@Override
 	public AccountRef caregiverAccount(Long caregiverId) {
-		throw notAnswered();
+		return jdbc.query("select user_id from caregiver where id=?", (row,n)->new AccountRef(row.getLong("user_id")), caregiverId)
+                .stream().findFirst().orElseThrow(()->new CoreNotFound("Caregiver [%s] does not exist".formatted(caregiverId)));
 	}
 
 	@Override

@@ -6,6 +6,7 @@ import FamilyHome from './routes/family'
 import ElderHome from './routes/elder'
 import LandingHome from './routes/landing'
 import FamilySignUp from './routes/landing/FamilySignUp'
+import CaregiverSignUp from './routes/landing/CaregiverSignUp'
 import ElderSignUp from './routes/landing/ElderSignUp'
 import ProviderWorkbench from './routes/provider'
 import NotFound from './routes/not-found'
@@ -27,6 +28,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingHome />} />
+        <Route path="/caregiver/register" element={<CaregiverSignUp />} />
         <Route path="/apply" element={<FamilySignUp />} />
         <Route path="/elder/register" element={<ElderSignUp />} />
         <Route path="/provider/*" element={<ProviderWorkbench />} />

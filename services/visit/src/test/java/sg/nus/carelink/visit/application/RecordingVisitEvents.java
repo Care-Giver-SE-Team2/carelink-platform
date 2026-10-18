@@ -23,6 +23,7 @@ final class RecordingVisitEvents implements VisitEvents {
 		return List.copyOf(published);
 	}
 
+    @Override public void evidenceUpdated(Visit visit,int count,int verified){add("VisitEvidenceUpdated",visit,count+"/"+verified);}
 	@Override
 	public void scheduled(Visit visit, String origin, Long movedFromVisitId) {
 		add("VisitScheduled", visit, movedFromVisitId == null ? origin : origin + " from " + movedFromVisitId);

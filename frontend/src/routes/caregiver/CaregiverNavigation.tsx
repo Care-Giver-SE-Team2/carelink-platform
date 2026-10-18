@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import styles from './Caregiver.module.css'
 
-export default function CaregiverNavigation() {
+export default function CaregiverNavigation({ workAllowed = true }: { workAllowed?: boolean }) {
   const { pathname, search } = useLocation()
   const [scheduleSearch, setScheduleSearch] = useState('')
   if (pathname === '/caregiver' || pathname.startsWith('/caregiver/visits/')) {
@@ -13,9 +13,10 @@ export default function CaregiverNavigation() {
     if (nextSearch !== scheduleSearch) setScheduleSearch(nextSearch)
   }
   return <nav className={styles.navigation} aria-label="Caregiver navigation">
-    <NavLink to={'/caregiver' + scheduleSearch} end>My schedule</NavLink>
+    <NavLink to="/caregiver/application">My application</NavLink>
+    {workAllowed && <><NavLink to={'/caregiver' + scheduleSearch} end>My schedule</NavLink>
     <NavLink to="/caregiver/absences">My leave</NavLink>
     <NavLink to="/caregiver/spot-checks">Spot checks</NavLink>
-    <NavLink to="/caregiver/incidents">My reports</NavLink>
+    <NavLink to="/caregiver/incidents">My reports</NavLink></>}
   </nav>
 }

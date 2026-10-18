@@ -38,7 +38,9 @@ FROM eclipse-temurin:25-jre
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/* \
- && useradd --system --uid 1001 --create-home carelink
+ && useradd --system --uid 1001 --create-home carelink \
+ && mkdir -p /var/lib/carelink/private/credentials /var/lib/carelink/private/evidences \
+ && chown -R 1001:1001 /var/lib/carelink/private
 WORKDIR /app
 COPY --from=build /src/app.jar app.jar
 COPY --chmod=755 build/entrypoint.sh entrypoint.sh

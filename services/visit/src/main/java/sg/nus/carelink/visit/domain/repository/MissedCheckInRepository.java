@@ -11,4 +11,7 @@ public interface MissedCheckInRepository {
     boolean exists(Long visitId);
     Optional<MissedCheckInTrigger> find(Long visitId);
     void save(MissedCheckInTrigger trigger);
+    Optional<MissedCheckInTrigger> findByIncident(Long incidentId);
+    List<MissedCheckInTrigger> forCaregiver(Long caregiverId, int offset, int size);
+    long countForCaregiver(Long caregiverId);
 }

@@ -53,7 +53,8 @@ class NotificationRequestedIncidentAlert implements IncidentAlert {
 	@Override
 	public int broadcastRaised(Incident incident) {
 		Set<Long> audience = new LinkedHashSet<>(managers());
-		audience.addAll(recentCaregiver(incident.elderId()));
+		if (incident.source() != Incident.Source.SYSTEM_MISSED_CHECKIN) audience.addAll(recentCaregiver(incident.elderId()));
+        // visit owns the immutable trigger and publishes its caregiver-safe notification atomically with that fact.
 
 		String title = "%s: %s".formatted(incident.severity(), incident.category());
 		String body = "%s. %s".formatted(

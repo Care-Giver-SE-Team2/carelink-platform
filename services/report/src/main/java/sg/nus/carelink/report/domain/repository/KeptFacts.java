@@ -26,6 +26,7 @@ import sg.nus.carelink.eventtypes.VitalsRecorded;
  * that event arrives.
  */
 public interface KeptFacts {
+    void keep(sg.nus.carelink.eventtypes.VisitEvidenceUpdated event);
 
 	void keep(VisitScheduled event);
 

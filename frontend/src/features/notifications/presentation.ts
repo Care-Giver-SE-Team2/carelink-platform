@@ -23,6 +23,7 @@ export function linkFor(item: Pick<NotificationItem, 'resourceType' | 'resourceI
   }
   const routes: Record<string, Partial<Record<Portal, string>>> = {
     INCIDENT: { manager: item.resourceId == null ? '/manager/exceptions' : `/manager/exceptions/${item.resourceId}`, caregiver: item.resourceId == null ? '/caregiver/incidents' : `/caregiver/incidents/${item.resourceId}` },
+    CAREGIVER_SYSTEM_ALERT: { caregiver: validId(item.resourceId) ? `/caregiver/system-alerts/${item.resourceId}` : '/caregiver/system-alerts' },
     ABSENCE: { manager: item.resourceId == null ? '/manager/absences' : `/manager/absences/${item.resourceId}` },
     ROSTER_CHANGE: { manager: '/manager/absences', family: '/family/changes', caregiver: '/caregiver' },
     SPOT_CHECK: { manager: '/manager/quality', family: '/family/spot-checks', caregiver: item.resourceId == null ? '/caregiver/spot-checks' : `/caregiver/spot-checks?spotCheckId=${item.resourceId}` },

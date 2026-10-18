@@ -34,6 +34,12 @@ envFromSecret: ""
 # Optional public RDS CA truststore; used by DB_URL's Connector/J truststore settings.
 rdsTruststoreConfigMap: ""
 
+# File features require a reviewed durable volume, shared by every replica of this service.
+# Empty by default: no cloud storage, PVC or HPA setting is enabled by this migration.
+privateStorage:
+  existingClaim: ""
+  mountPath: /var/lib/carelink/private
+
 containerPort: 8080
 
 # Spring Boot's own probe groups

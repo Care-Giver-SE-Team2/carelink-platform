@@ -254,6 +254,9 @@ class FamilyVisitTaskIT {
 	@Test
 	void caregiverTasksRequireCurrentAssignmentAndAValidWorkPack() throws Exception {
 		var session = loginAs("caregiver");
+		// This legacy fixture defaults to ONBOARDING; admission is required before plan validation.
+		mvc.perform(get("/api/visits/501/tasks").session(session)).andExpect(status().isForbidden());
+		jdbc.update("UPDATE caregiver SET status = 'AVAILABLE' WHERE user_id = 14");
 		// This older family fixture intentionally has no valid plan; it is not an executable work-pack.
 		mvc.perform(get("/api/visits/501/tasks").session(session)).andExpect(status().isConflict());
 		jdbc.update("UPDATE visit SET caregiver_id = NULL WHERE id = 501");

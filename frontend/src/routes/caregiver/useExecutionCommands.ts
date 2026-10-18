@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { checkIn, checkOut, completeTask, saveHealthRecord, type CommandIdentity, type CheckInInput, type TaskInput, type HealthInput, type HealthFlag } from '../../features/caregiver-execution/api'
 import { isAccessFailure, useSelfServiceWrite } from './selfService'
 import { unknownResult } from './commandErrors'
+import { useUnsavedCaregiverForm } from './useUnsavedCaregiverForm'
 
 type TaskDraft = { status: 'DONE' | 'SKIPPED' | 'REFUSED'; outcome: string; caregiverNote: string }
 type Attempt = { visitId: number } & ({ kind: 'CHECK_IN'; input: CheckInInput } | { kind: 'CHECK_OUT'; input: CommandIdentity } | { kind: 'TASK_RESULT'; taskId: number; input: TaskInput } | { kind: 'HEALTH_RECORD'; input: HealthInput })
@@ -11,6 +12,7 @@ const blankHealth: HealthDraft = { systolic: '', diastolic: '', pulse: '', tempe
 export function useExecutionCommands(reload: () => void) {
   const write = useSelfServiceWrite()
   const [attempt, setAttempt] = useState<Attempt | null>(null)
+  const [pendingCheckout, setPendingCheckout] = useState<{ visitId: number; version: number } | null>(null)
   const inFlight = useRef(false)
   const retainedAttempt = useRef<Attempt | null>(null)
   const [drafts, setDrafts] = useState<Record<number, TaskDraft>>({})
@@ -25,10 +27,13 @@ export function useExecutionCommands(reload: () => void) {
   const [healthDraft, setHealthDraft] = useState<HealthDraft>(blankHealth)
   const [healthEditing, setHealthEditing] = useState(false)
   const [healthAccessError, setHealthAccessError] = useState<unknown>(null)
+  const unsaved = Object.values(drafts).some(draft => draft.status !== 'DONE' || draft.outcome !== '' || draft.caregiverNote !== '')
+    || Object.values(healthDraft).some(Boolean)
+  useUnsavedCaregiverForm(unsaved)
   const accessError = healthAccessError ?? (isAccessFailure(write.error) ? write.error : null)
   function clearProtected() {
     retainedAttempt.current = null
-    generation.current++; setDrafts({}); setAttempt(null); setNote(''); setFix(null); setSaved(''); setValidation(''); setLocating(false)
+    generation.current++; setDrafts({}); setAttempt(null); setPendingCheckout(null); setNote(''); setFix(null); setSaved(''); setValidation(''); setLocating(false)
     setHealthDraft(blankHealth); setHealthEditing(false)
   }
   function send(next: Attempt) {
@@ -44,6 +49,7 @@ export function useExecutionCommands(reload: () => void) {
     }, () => {
       if (next.kind === 'TASK_RESULT') setDrafts(old => { const copy = { ...old }; delete copy[next.taskId]; return copy })
       if (next.kind === 'HEALTH_RECORD') { setHealthDraft(blankHealth); setHealthEditing(false) }
+      if (next.kind === 'CHECK_OUT') { setDrafts({}); setHealthDraft(blankHealth); setHealthEditing(false) }
       retainedAttempt.current = null
       setAttempt(null); setNote(''); setFix(null); setSaved(next.kind === 'HEALTH_RECORD' ? 'Health record saved. Reloading the work pack…' : 'Saved on the server. Reloading the work pack…'); reload()
     }).finally(() => { inFlight.current = false })
@@ -63,7 +69,15 @@ export function useExecutionCommands(reload: () => void) {
     healthDraft, setHealthDraft, healthEditing, setHealthAccessError,
     hasHealthDraft: Object.values(healthDraft).some(Boolean) || healthEditing,
     anotherMeasurement: () => { setHealthDraft(blankHealth); setHealthEditing(true); setSaved(''); setValidation('') },
-    blocked: write.pending || attempt !== null || locating,
+    blocked: write.pending || attempt !== null || locating || pendingCheckout !== null,
+    pendingCheckout,
+    cancelCheckout: () => setPendingCheckout(null),
+    confirmCheckout: () => {
+      if (!pendingCheckout || inFlight.current || retainedAttempt.current !== null) return
+      const { visitId, version } = pendingCheckout
+      setPendingCheckout(null)
+      send({ kind: 'CHECK_OUT', visitId, input: { expectedVersion: version, clientRequestId: crypto.randomUUID() } })
+    },
     uncertain: write.error != null && unknownResult(write.error),
     send, retry: () => { if (attempt) send(attempt) }, edit: () => { retainedAttempt.current = null; setAttempt(null); write.clearError(); reload() }, recover: () => { setHealthAccessError(null); write.clearError(); reload() },
     recordHealth: (visitId: number, version: number) => {
@@ -81,6 +95,8 @@ export function useExecutionCommands(reload: () => void) {
         expectedVersion: version, clientRequestId: crypto.randomUUID() } })
     },
     finishVisit: (visitId: number, version: number) => {
+      if (inFlight.current || retainedAttempt.current !== null) return
+      if (unsaved) { setPendingCheckout({ visitId, version }); return }
       send({ kind: 'CHECK_OUT', visitId, input: { expectedVersion: version, clientRequestId: crypto.randomUUID() } })
     },
     start: (visitId: number, version: number) => {

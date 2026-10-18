@@ -1,0 +1,122 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { ApiError } from '../../shared/api/client'
+import * as contract from '../../features/credentials/api'
+import CredentialsPage from './CredentialsPage'
+
+vi.mock('../../features/credentials/api', () => ({ getCredentials: vi.fn(), getCredential: vi.fn(), getCredentialTypes: vi.fn(), submitCredential: vi.fn() }))
+const row: contract.Credential = { id: 9, credentialTypeId: 1, credentialTypeName: 'First aid', certificateNo: 'DEMO', issuingBody: 'Demo Institute', validFrom: '2026-01-01', expiryDate: '2026-10-11', status: 'PUBLISHED', submittedAt: '2026-01-01T10:00:00', reviewNote: null, reviewedAt: null, renewsCredentialId: null, resubmitsCredentialId: null, historical: false, documents: [] }
+function open(path = '/caregiver/credentials') {
+  return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/caregiver/credentials" element={<CredentialsPage />} /><Route path="/caregiver/credentials/:credentialId" element={<CredentialsPage />} /><Route path="/" element={<p>Sign in</p>} /></Routes></MemoryRouter>)
+}
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(contract.getCredentials).mockResolvedValue({ items: [row], page: 0, size: 20, total: 1 })
+  vi.mocked(contract.getCredential).mockResolvedValue(row)
+  vi.mocked(contract.getCredentialTypes).mockResolvedValue([{ id: 1, name: 'First aid' }])
+  vi.mocked(contract.submitCredential).mockResolvedValue({ credentialId: 12, status: 'SUBMITTED', submittedAt: '2026-10-11T10:00:00', documentIds: [2] })
+})
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
+describe('My credentials', () => {
+  it('reads real records, marks legacy missing files and links renewals', async () => {
+    open()
+    expect(await screen.findByText('No document available.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'First aid' })).toHaveAttribute('href', '/caregiver/credentials/9')
+    expect(screen.getByText(/Uploading does not approve/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Renew certificate' }))
+    expect(screen.getByLabelText('Credential type')).toBeDisabled()
+    expect(screen.getByLabelText('Issuing body')).toHaveValue('Demo Institute')
+  })
+  it('uploads explicit no-expiry material and refreshes the saved fact', async () => {
+    open(); fireEvent.click(await screen.findByRole('button', { name: 'Add certificate' }))
+    fireEvent.change(screen.getByLabelText('Issuing body'), { target: { value: 'Demo Issuer' } })
+    fireEvent.click(screen.getByLabelText('No expiry'))
+    fireEvent.change(screen.getByLabelText('Documents'), { target: { files: [new File(['demo'], 'proof.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
+    expect(await screen.findByText(/Submitted — awaiting manager review/)).toBeInTheDocument()
+    expect(contract.submitCredential).toHaveBeenCalledWith('NEW', null, expect.objectContaining({ noExpiry: true, issuingBody: 'Demo Issuer', clientRequestId: expect.any(String) }), expect.any(AbortSignal))
+    expect(screen.getByRole('link', { name: 'Open submitted certificate' })).toHaveAttribute('href', '/caregiver/credentials/12')
+  })
+  it('retains identical request and files when the outcome is unknown', async () => {
+    vi.mocked(contract.submitCredential).mockRejectedValueOnce(new TypeError('offline'))
+    open(); fireEvent.click(await screen.findByRole('button', { name: 'Add certificate' }))
+    fireEvent.change(screen.getByLabelText('Issuing body'), { target: { value: 'Demo' } })
+    fireEvent.click(screen.getByLabelText('No expiry'))
+    fireEvent.change(screen.getByLabelText('Documents'), { target: { files: [new File(['demo'], 'proof.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
+    await screen.findByRole('button', { name: 'Retry the same submission' })
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() => expect(contract.getCredentialTypes).toHaveBeenCalledTimes(2))
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry the same submission' }))
+    await screen.findByText(/Submitted — awaiting manager review/)
+    expect(vi.mocked(contract.submitCredential).mock.calls[0][2]).toEqual(vi.mocked(contract.submitCredential).mock.calls[1][2])
+  })
+  it('rejects invalid form and oversized documents before sending', async () => {
+    open(); fireEvent.click(await screen.findByRole('button', { name: 'Add certificate' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose valid dates')
+    fireEvent.change(screen.getByLabelText('Issuing body'), { target: { value: 'Demo' } })
+    fireEvent.click(screen.getByLabelText('No expiry'))
+    fireEvent.change(screen.getByLabelText('Documents'), { target: { files: [new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('5 MiB')
+    expect(contract.submitCredential).not.toHaveBeenCalled()
+  })
+  it('shows rejected history, original linkage, real downloads and resubmission', async () => {
+    vi.mocked(contract.getCredential).mockResolvedValue({ ...row, status: 'REJECTED', reviewNote: 'Unreadable', reviewedAt: '2026-10-11T10:00:00', renewsCredentialId: 5, resubmitsCredentialId: 6, documents: [{ id: 2, credentialId: 9, fileName: 'scan.pdf', contentType: 'application/pdf', byteSize: 123, uploadedAt: '', contentAvailable: true, contentUrl: '/untrusted' }] })
+    open('/caregiver/credentials/9')
+    expect(await screen.findByText('Review reason: Unreadable')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'scan.pdf' })).toHaveAttribute('href', '/api/credentials/9/documents/2/content')
+    fireEvent.click(screen.getByRole('button', { name: 'Resubmit certificate' }))
+    expect(screen.getByRole('form')).toHaveTextContent('Resubmit certificate')
+  })
+  it('does not replace a failed load with an empty list or a submission form', async () => {
+    vi.mocked(contract.getCredentials).mockRejectedValue(new ApiError('unavailable', 503))
+    open(); expect(await screen.findByText('Unable to load your credentials')).toBeInTheDocument()
+    expect(screen.queryByText('No credentials recorded yet.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add certificate' })).not.toBeInTheDocument()
+  })
+  it('clears content on access failure and exposes unconfigured catalogue honestly', async () => {
+    vi.mocked(contract.getCredentialTypes).mockResolvedValue([])
+    const view = open()
+    expect(await screen.findByText(/catalogue has not been configured/)).toBeInTheDocument()
+    view.unmount(); vi.mocked(contract.getCredentials).mockRejectedValue(new ApiError('denied', 403))
+    open(); expect(await screen.findByText('Access not permitted')).toBeInTheDocument()
+    expect(screen.queryByText('First aid')).not.toBeInTheDocument()
+  })
+  it('supports pagination and manual refresh without cached cross-account facts', async () => {
+    vi.mocked(contract.getCredentials).mockResolvedValue({ items: [], page: 0, size: 20, total: 21 })
+    open(); expect(await screen.findByText('No credentials recorded yet.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(contract.getCredentials).toHaveBeenCalledWith(1, expect.any(AbortSignal)))
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' })); fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+  })
+  it('collapses historical records without losing their detail', async () => {
+    vi.mocked(contract.getCredentials).mockResolvedValue({ items: [{ ...row, historical: true }], page: 0, size: 20, total: 1 })
+    open()
+    const summary = await screen.findByText(/History — First aid/)
+    expect(summary.closest('details')).not.toHaveAttribute('open')
+    expect(summary.closest('details')).toHaveTextContent('No document available.')
+  })
+  it('discards private form data after write access expires', async () => {
+    vi.mocked(contract.submitCredential).mockRejectedValue(new ApiError('denied', 403))
+    open(); fireEvent.click(await screen.findByRole('button', { name: 'Add certificate' }))
+    fireEvent.change(screen.getByLabelText('Issuing body'), { target: { value: 'Private draft' } })
+    fireEvent.click(screen.getByLabelText('No expiry'))
+    fireEvent.change(screen.getByLabelText('Documents'), { target: { files: [new File(['demo'], 'private.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
+    expect(await screen.findByText('Access not permitted')).toBeInTheDocument()
+    expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    expect(screen.queryByText('First aid')).not.toBeInTheDocument()
+  })
+  it('warns before following an internal link with an unsaved draft', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    open(); fireEvent.click(await screen.findByRole('button', { name: 'Add certificate' }))
+    fireEvent.change(screen.getByLabelText('Issuing body'), { target: { value: 'Draft' } })
+    fireEvent.click(screen.getByRole('link', { name: 'First aid' }))
+    expect(window.confirm).toHaveBeenCalledWith('Discard this unsubmitted certificate draft?')
+    expect(contract.getCredential).not.toHaveBeenCalled()
+    expect(screen.getByRole('form')).toBeInTheDocument()
+  })
+})

@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import sg.nus.carelink.identity.application.UserDirectory;
 import sg.nus.carelink.profile.domain.model.CredentialType;
 import sg.nus.carelink.profile.domain.service.CaregiverCredentialAlertPolicy;
+import sg.nus.carelink.profile.domain.service.CredentialResubmissionHistory;
+import sg.nus.carelink.profile.domain.repository.CredentialSubmissionStore;
 import sg.nus.carelink.profile.domain.repository.CaregiverRepository;
 import sg.nus.carelink.profile.domain.repository.CredentialRepository;
 import sg.nus.carelink.profile.domain.repository.CredentialTypeRepository;
@@ -27,10 +29,12 @@ class CaregiverWorkDirectoryService implements CaregiverWorkDirectory {
     private final CredentialRepository credentials;
     private final CredentialTypeRepository types;
     private final int warningDays;
+    private final CredentialSubmissionStore submissions;
 
     CaregiverWorkDirectoryService(UserDirectory users, CaregiverRepository caregivers, ElderRepository elders,
             CredentialRepository credentials, CredentialTypeRepository types,
-            @Value("${carelink.caregiver.credential-warning-days:30}") int warningDays) {
+            @Value("${carelink.caregiver.credential-warning-days:30}") int warningDays,
+            CredentialSubmissionStore submissions) {
         this.users = users;
         this.caregivers = caregivers;
         this.elders = elders;
@@ -38,6 +42,7 @@ class CaregiverWorkDirectoryService implements CaregiverWorkDirectory {
         this.types = types;
         if (warningDays < 0) throw new IllegalArgumentException("Credential warning days must be non-negative");
         this.warningDays = warningDays;
+        this.submissions = submissions;
     }
 
     public Profile require(String username) {
@@ -60,7 +65,8 @@ class CaregiverWorkDirectoryService implements CaregiverWorkDirectory {
 
     public CredentialAlerts alerts(Long caregiverId, LocalDate today) {
         var evaluation = new CaregiverCredentialAlertPolicy().evaluate(
-                caregiverId, credentials.findByCaregiverId(caregiverId), today, warningDays);
+                caregiverId, CredentialResubmissionHistory.forAlerts(credentials.findByCaregiverId(caregiverId),
+                        submissions.resubmissions(caregiverId)), today, warningDays);
         var typeIds = evaluation.alerts().stream().map(a -> a.credential().credentialTypeId()).collect(Collectors.toSet());
         var typeNames = types.findByIds(typeIds).stream().collect(Collectors.toMap(CredentialType::id, CredentialType::name));
         boolean missingType = !typeNames.keySet().containsAll(typeIds);

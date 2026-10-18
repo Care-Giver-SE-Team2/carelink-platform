@@ -9,6 +9,17 @@ be taken by merging the whole tree. They are ported, a batch at a time.
 **Last synced:** upstream `f9bc4f1` (2026-10-10, this repository's PR #18). Update this line in every sync pull
 request.
 
+**Partial local port, 2026-10-19:** selected caregiver scope from #98/#99 and supporting
+#100/#101/#111, read at local upstream `facae96eae25d20d0a4e1d37cdb888239d640a16`.
+Includes private credentials, admission, work settings, own alerts, evidence/history,
+manager attachment reads and the required platform event projections. This is a partial
+feature port, not a complete upstream-tree sync, merge or deployment; the full-sync marker
+above remains unchanged. See [scope, contracts and limits](caregiver-feature-migration.md).
+
+**Local acceptance after Docker recovery:** final134 selected integrations, a fresh16-checkpoint
+real flow, final schema upgrades, Linux private-storage probes and two diagnostic6b pilots
+passed. This changes neither the complete-sync marker nor merge/deployment status.
+
 ## 1. What has changed upstream
 
 ```sh

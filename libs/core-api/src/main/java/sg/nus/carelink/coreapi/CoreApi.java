@@ -178,6 +178,10 @@ public interface CoreApi {
 	SoleIncident soleMissedCheckInIncident(@PathVariable Long incidentId, @RequestParam Long elderId,
 			@RequestParam Long visitId);
 
+    @GetExchange("/caregivers/by-username/{username}/own-spot-checks")
+    List<OwnSpotCheck> ownSpotChecks(@PathVariable String username);
+    record OwnSpotCheck(Long id, Long visitId, String result, LocalDateTime checkedAt, String caregiverResponse) {}
+
 	// ---------- Visit cover (rostering) ----------
 
 	@GetExchange("/visits/{visitId}/cover-options")

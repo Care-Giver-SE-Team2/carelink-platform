@@ -1,12 +1,13 @@
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import WorkPackPage from './WorkPackPage'
 import { getWorkPack, type WorkPack } from '../../features/caregiver/api'
 import { checkIn, checkOut, completeTask } from '../../features/caregiver-execution/api'
 import { ApiError } from '../../shared/api/client'
 vi.mock('../../features/caregiver/api',()=>({getWorkPack:vi.fn()}))
 vi.mock('../../features/caregiver-execution/api',()=>({checkIn:vi.fn(),checkOut:vi.fn(),completeTask:vi.fn()}))
+afterEach(() => vi.restoreAllMocks())
 const execution={allowedActions:['TASK_RESULT','REPORT_INCIDENT','CHECK_OUT'],blockedReason:null,serverNow:'2026-10-07T12:00:00',checkInOpensAt:'2026-10-07T11:30:00',checkInClosesAt:'2026-10-07T13:00:00',checkedInAt:'2026-10-07T12:00:00',checkedOutAt:null,lateArrival:false,locationSource:'MANUAL_LOCATION_NOTE'}
 const pack:WorkPack={visit:{id:3,elderId:4,elderName:'Mei',serviceType:'Care',scheduledStart:'2026-10-07T12:00:00',scheduledEnd:'2026-10-07T13:00:00',status:'IN_PROGRESS',version:1},elder:{elderId:4,preferredName:'Mei',serviceAddress:'Private address',postalSector:'North',languageNeeds:[],accessNotes:null,emergencyNotes:null},carePlanId:7,carePlanVersion:1,serviceInstructions:['Hygiene'],tasks:[{id:9,name:'Hygiene',status:'PENDING',outcome:null,caregiverNote:null}],requiredEvidenceKinds:['CHECKLIST'],execution}
 function mount() {render(<MemoryRouter initialEntries={['/caregiver/visits/3']}><Routes><Route path="/caregiver/visits/:visitId" element={<WorkPackPage/>}/></Routes></MemoryRouter>)}
@@ -76,6 +77,23 @@ it('checks out with pending tasks and missing evidence without approval, and bec
   expect(screen.queryByRole('button',{name:'Save task result'})).toBeNull()
   expect(screen.getByText('Pending')).toBeInTheDocument()
   expect(screen.getByRole('link',{name:'Report incident'})).toBeInTheDocument()
+})
+it('keeps task drafts when checkout is cancelled and allows explicit checkout without saving', async () => {
+  mount(); await screen.findByRole('button', { name: 'Check out' })
+  fireEvent.change(screen.getByLabelText('Outcome (optional)'), { target: { value: 'Unsaved observation' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Check out' }))
+  expect(screen.getByRole('alertdialog', { name: 'Unsaved visit entries' })).toBeInTheDocument()
+  expect(checkOut).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Continue editing' }))
+  expect(screen.getByLabelText('Outcome (optional)')).toHaveValue('Unsaved observation')
+  fireEvent.click(screen.getByRole('button', { name: 'Check out' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Check out without saving' }))
+  await waitFor(() => expect(checkOut).toHaveBeenCalledTimes(1))
+  expect(completeTask).not.toHaveBeenCalled()
+})
+it('carries validated schedule filters into evidence navigation', async () => {
+  render(<MemoryRouter initialEntries={['/caregiver/visits/3?dateFrom=2026-10-09&dateTo=2026-10-15&note=secret']}><Routes><Route path="/caregiver/visits/:visitId" element={<WorkPackPage />} /></Routes></MemoryRouter>)
+  expect(await screen.findByRole('link', { name: 'View or upload evidence images' })).toHaveAttribute('href', '/caregiver/visits/3/evidence?dateFrom=2026-10-09&dateTo=2026-10-15')
 })
 it('keeps checkout identity and version across unknown-result refresh and explicit retry',async()=>{
   vi.mocked(checkOut).mockRejectedValue(new TypeError('Network'));mount();await screen.findByRole('button',{name:'Check out'})

@@ -38,5 +38,5 @@ export function useCaregiverQuery<T>(key: string, load: (signal: AbortSignal) =>
     return () => controller.abort()
   }, [key, load, revision])
   const current: QueryResult<T> = result.key === key && result.revision === revision ? result : { key, revision, status: 'loading' }
-  return { result: current, reload }
+  return { result: current, reload, retainedData: result.key === key && result.status === 'success' ? result.data : undefined }
 }

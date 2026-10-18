@@ -1,54 +1,861 @@
-.page { color: #173c3b; padding: 12px 0 40px; }
-.eyebrow { color: #527773; font-size: 12px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; margin: 0 0 8px; }
-.heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 22px; }
-.heading h1 { font-size: clamp(28px, 6vw, 36px); letter-spacing: -.035em; margin: 0 0 8px; }
-.muted { color: #526b68; margin: 5px 0; line-height: 1.6; }
-.button, .linkButton { border: 1px solid #bdd1ca; border-radius: 9px; padding: 11px 16px; min-height: 44px; background: white; color: #174940; cursor: pointer; font: inherit; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
-.button:hover, .linkButton:hover { background: #eef5f1; }
-.button:focus-visible, .linkButton:focus-visible, .filters input:focus-visible { outline: 3px solid #398573; outline-offset: 3px; }
-.filters { background: #f2f6f2; padding: 18px; border: 1px solid #dce6dd; border-radius: 12px; margin-bottom: 22px; }
-.quick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.dateForm { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
-.dateForm label { flex: 1; min-width: 130px; font-size: 13px; font-weight: 600; display: grid; gap: 7px; }
-.dateForm input { min-width: 0; width: 100%; box-sizing: border-box; border: 1px solid #baccc4; border-radius: 6px; padding: 10px; min-height: 44px; background: white; font: inherit; color: #183d34; }
-.sectionTitle { font-size: 19px; margin: 26px 0 12px; }
-.card { border: 1px solid #d9e4dd; border-radius: 12px; padding: 20px; margin: 12px 0; background: #fff; box-shadow: 0 3px 12px #173c3b05; overflow-wrap: anywhere; }
-.card h2 { margin: 10px 0 5px; font-size: 22px; }
-.cardTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.time { color: #275f52; font-size: 14px; font-weight: 700; }
-.badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .03em; padding: 5px 9px; border-radius: 20px; background: #e9f3ec; color: #22583d; }
-.card .linkButton { margin-top: 14px; background: #1c594b; color: white; border-color: #1c594b; }
-.alert { background: #fff9ed; border: 1px solid #ecd8ae; border-radius: 10px; padding: 14px 16px; margin: 10px 0; color: #714f1f; overflow-wrap: anywhere; }
-.expired { background: #fff1ee; border-color: #edc4b8; color: #8c3425; }
-.alert p { margin: 4px 0 0; line-height: 1.5; font-size: 14px; }
-.empty { border: 1px dashed #bdcec4; border-radius: 12px; text-align: center; padding: 36px 18px; color: #526b68; background: #f8faf7; }
-.error { border: 1px solid #e6c4be; border-radius: 12px; padding: 24px; background: #fff7f5; color: #70362f; }
-.error h2 { font-size: 22px; margin: 0 0 12px; }
-.error .button { margin-top: 12px; }
-.back { color: #275f52; display: inline-block; margin: 0 0 20px; padding: 8px 0; }
-.readOnly { border-left: 3px solid #598c78; padding: 9px 13px; margin-bottom: 20px; background: #f0f6f1; color: #3b5e51; font-size: 14px; line-height: 1.5; }
-.details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 18px 0 4px; }
-.details div { min-width: 0; }
-.details dt { font-size: 12px; color: #526b68; margin-bottom: 6px; }
-.details dd { margin: 0; line-height: 1.5; }
-.task { border-top: 1px solid #e2e9e3; padding: 15px 0; }
-.task:first-of-type { border-top: none; }
-.task p { margin: 6px 0; line-height: 1.5; }
-.pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
-@media (max-width: 430px) {
- .heading { flex-wrap: wrap; } .card { padding: 17px; }
- .details { grid-template-columns: 1fr; gap: 15px; } .dateForm .button { width: 100%; }
+/*
+ * Caregiver pages in the family app's visual style: white cards on a tinted page, one green accent,
+ * pill tags, a white header band at the top of every page. The palette repeats the family app's
+ * --fm-* properties so the two clients read as one product; shared/theme has no equivalent (its
+ * standard theme is the manager's purple).
+ *
+ * Base element styles use :where() so they carry no specificity and any class below overrides them.
+ */
+.shell {
+  --fm-page: #f3f7f5;
+  --fm-card: #fff;
+  --fm-accent: #1a6b5a;
+  --fm-accent-strong: #145446;
+  --fm-accent-tint: #e6f0ec;
+  --fm-ink: #1f3a33;
+  --fm-secondary: #3a4f48;
+  --fm-muted: #5c6e68;
+  --fm-faint: #7d8f89;
+  --fm-disabled: #b5c4be;
+  --fm-line-card: #e2e9e6;
+  --fm-line-control: #d5e2dc;
+  --fm-line-row: #e8eeeb;
+  --fm-note: #eef4f1;
+  --fm-pending: #a8691b;
+  --fm-pending-tint: #fbf3e6;
+  --fm-pending-line: #ecd9bc;
+  --fm-urgent: var(--danger);
+  --fm-urgent-tint: var(--danger-tint);
+  --fm-urgent-line: #f0d6d1;
+
+  min-height: 100dvh;
+  background: var(--fm-page);
+  color: var(--fm-ink);
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
-.shell > div > header { flex-wrap: wrap; }
-.navigation { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 18px; border-bottom: 1px solid var(--border); }
-.navigation a { color: var(--text); padding: 10px 14px; border-radius: 8px; text-decoration: none; min-height: 44px; box-sizing: border-box; }
-.navigation a[aria-current="page"] { background: var(--surface-alt, #eef5f1); font-weight: 700; }
-.formPanel { background: var(--surface, white); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 18px 0; }
-.formPanel h2 { margin-top: 0; }
-.formPanel fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.formPanel label, .filterLabel { display: grid; gap: 7px; margin: 14px 0; font-weight: 600; }
-.formPanel select, .formPanel input, .formPanel textarea, .filterLabel select { box-sizing: border-box; width: 100%; min-height: 44px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface, white); color: var(--text); font: inherit; padding: 10px; }
-.formPanel textarea { resize: vertical; }
-.button:disabled { opacity: .6; cursor: wait; }
-.navigation a:focus-visible, .formPanel :is(input, select, textarea, button):focus-visible, .filterLabel select:focus-visible { outline: 3px solid var(--accent, #398573); outline-offset: 3px; }
-.highlighted { outline: 3px solid var(--accent, #398573); outline-offset: 3px; }
+
+:where(.shell) *,
+:where(.shell) *::before,
+:where(.shell) *::after {
+  box-sizing: border-box;
+}
+
+:where(.shell) :is(h1, h2, h3, p) {
+  margin: 0;
+}
+
+:where(.shell) h1 {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+:where(.shell) h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+:where(.shell) h3 {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+:where(.shell) a {
+  color: var(--fm-accent);
+  font-weight: 500;
+}
+
+:where(.shell) time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Secondary button: white, control line, accent text. */
+:where(.shell) button,
+.button,
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 16px;
+  background: var(--fm-card);
+  padding: 12px 18px;
+  color: var(--fm-accent);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+:where(.shell) button:not(:disabled):hover,
+.button:not(:disabled):hover,
+.linkButton:hover {
+  background: var(--fm-note);
+}
+
+:where(.shell) button:disabled,
+.button:disabled {
+  color: var(--fm-disabled);
+  cursor: default;
+}
+
+:where(.shell) :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  background: var(--fm-card);
+  padding: 11px 14px;
+  color: var(--fm-ink);
+  color-scheme: light;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* The browser's own arrow sits against the edge; draw it instead, inset to match the text. */
+:where(.shell) select {
+  appearance: none;
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a4f48' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 16px center;
+  background-repeat: no-repeat;
+  background-size: 18px;
+}
+
+:where(.shell) input:is([type='checkbox'], [type='radio']) {
+  width: 20px;
+  min-height: 20px;
+  flex: 0 0 20px;
+  padding: 0;
+  accent-color: var(--fm-accent);
+}
+
+:where(.shell) input[type='file'] {
+  padding: 10px;
+  font-size: 14px;
+}
+
+:where(.shell) textarea {
+  resize: vertical;
+}
+
+:where(.shell) :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 3px;
+}
+
+/* Primary actions: a work pack link on a visit card, and a form's submit button. */
+.card .linkButton,
+.formPanel > button:not([type='button']),
+.formPanel > fieldset > button:not([type='button']),
+.formPanel > form > fieldset > button:not([type='button']) {
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
+  color: #fff;
+}
+
+.card .linkButton:hover,
+.formPanel > button:not([type='button']):not(:disabled):hover,
+.formPanel > fieldset > button:not([type='button']):not(:disabled):hover,
+.formPanel > form > fieldset > button:not([type='button']):not(:disabled):hover {
+  background: var(--fm-accent-strong);
+}
+
+.formPanel > button:not([type='button']):disabled,
+.formPanel > fieldset > button:not([type='button']):disabled,
+.formPanel > form > fieldset > button:not([type='button']):disabled {
+  border-color: var(--fm-disabled);
+  background: var(--fm-disabled);
+  color: #fff;
+}
+
+.page {
+  overflow-wrap: anywhere;
+}
+
+/*
+ * The white header band: eyebrow, title, subtitle and the page's refresh. It owns the top inset
+ * (the phone's safe area plus 24px) and keeps clear of the floating notification bell on the right.
+ * The background bleeds to the viewport edges without widening the page (border-image outsets are
+ * not scrollable overflow), and the bottom 1px of the image is the card line.
+ */
+.heading,
+.back {
+  border-image: linear-gradient(to top, var(--fm-line-card) 1px, var(--fm-card) 1px) fill 0 / / 0 100vmax;
+}
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: calc(env(safe-area-inset-top) + 24px) 56px 18px 0;
+}
+
+.heading > div {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.heading > div > p:last-child:not(:first-child),
+.heading > p {
+  margin-top: 6px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+
+/* Refresh: a quiet accent text action at the top of the content, under the header rather than in it. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: -10px 0 6px;
+}
+
+/*
+ * A page action sharing the row with Refresh (Report incident on a visit) takes the left end. A
+ * bordered button needs the row to keep the heading's full 18px above it, and the same below.
+ */
+.toolbar > .linkButton {
+  margin-right: auto;
+}
+
+.toolbar:has(> .linkButton) {
+  margin: 0 0 18px;
+}
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  padding: 10px 8px;
+  color: var(--fm-accent);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 2M5 16a8 8 0 0 0 13 2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.refresh:not(:disabled):hover {
+  background: var(--fm-note);
+}
+
+.refresh:disabled {
+  color: var(--fm-disabled);
+  cursor: default;
+}
+
+/* A back link above the title reads as the top of the same header. */
+.back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-bottom: 18px;
+  padding: calc(env(safe-area-inset-top) + 14px) 56px 4px 0;
+  color: var(--fm-accent);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back:has(+ .heading) {
+  margin-bottom: 0;
+  border-image-source: linear-gradient(var(--fm-card) 0 0);
+}
+
+.back + .heading {
+  padding-top: 8px;
+}
+
+.eyebrow {
+  margin-bottom: 8px !important;
+  color: var(--fm-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.muted {
+  color: var(--fm-muted);
+  margin: 6px 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.page > p:not([class]) {
+  margin-block: 10px;
+  color: var(--fm-secondary);
+  font-size: 14px;
+}
+
+/* Buttons and links placed straight on the page sit on their own line, sized to their label. */
+.page > :is(button, a):not(.back) {
+  display: flex;
+  width: fit-content;
+  margin-block: 12px;
+}
+
+.page > a:not(.back) {
+  align-items: center;
+  min-height: 44px;
+}
+
+.page > :is(h2, h3) {
+  margin-block: 22px 8px;
+}
+
+.page > :is(ul, ol),
+.page aside ul {
+  margin-block: 8px;
+  padding-left: 22px;
+  font-size: 14px;
+}
+
+/* Side notes beside a page's main content (bookings, leave): a white card. */
+.page aside {
+  margin-block: 12px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 14px 16px;
+}
+
+.page aside h3 {
+  margin-bottom: 4px;
+}
+
+.page aside p {
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+
+/* A collapsible record (a credential and its history): the summary is a quiet row above its card. */
+.page > details {
+  margin-block: 10px;
+}
+
+.page > details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 4px 6px;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.page > details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.page > details > summary::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 1.8px solid currentColor;
+  border-bottom: 1.8px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+
+.page > details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.page > details > summary:hover {
+  background: var(--fm-note);
+  color: var(--fm-ink);
+}
+
+.page > details > .card {
+  margin-top: 4px;
+}
+
+.page > details > ol {
+  padding-left: 28px;
+  font-size: 14px;
+}
+
+.card h3 {
+  margin: 14px 0 4px;
+}
+
+.card ul {
+  margin: 4px 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.sectionTitle {
+  margin: 26px 0 12px;
+  font-size: 17px;
+}
+
+/* Date filter on the schedule: a white card holding the quick ranges and the custom range. */
+.filters {
+  margin-bottom: 18px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 16px;
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.quick .button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.dateForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+/* A date or month picker straight on the page: the same white card as the schedule's filters. */
+.page > .dateForm {
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 16px;
+}
+
+.dateForm fieldset {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.dateForm label {
+  display: grid;
+  flex: 1;
+  gap: 7px;
+  min-width: 130px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.card {
+  margin: 10px 0;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+
+.card h2 {
+  margin: 10px 0 4px;
+}
+
+.card > h2:first-child,
+.card > h1:first-child {
+  margin-top: 0;
+}
+
+.card > h1 {
+  margin-bottom: 8px;
+  font-size: 22px;
+}
+
+.card > p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.card .linkButton {
+  margin-top: 14px;
+}
+
+.cardTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTop .sectionTitle {
+  margin-bottom: 12px;
+}
+
+.time {
+  color: var(--fm-accent);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status tag: pill, uppercase, in the accent tint. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--fm-accent-tint);
+  border-radius: 999px;
+  background: var(--fm-accent-tint);
+  padding: 6px 10px;
+  color: var(--fm-accent);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+/* Reminder that needs attention: the family palette's pending amber; expired turns it urgent red. */
+.alert {
+  margin: 10px 0;
+  border: 1px solid var(--fm-pending-line);
+  border-radius: 18px;
+  background: var(--fm-pending-tint);
+  padding: 14px 16px;
+  color: var(--fm-pending);
+  overflow-wrap: anywhere;
+}
+
+.alert p {
+  margin: 4px 0 0;
+  color: var(--fm-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.alert.expired {
+  border-color: var(--fm-urgent-line);
+  background: var(--fm-urgent-tint);
+  color: var(--fm-urgent);
+}
+
+.empty {
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 32px 18px;
+  color: var(--fm-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.empty p {
+  margin-top: 6px;
+  font-size: 13.5px;
+}
+
+.error {
+  margin: 10px 0;
+  border: 1px solid var(--fm-urgent-line);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 20px;
+  color: var(--fm-ink);
+}
+
+.error h2 {
+  margin-bottom: 8px;
+  color: var(--fm-urgent);
+}
+
+.error p {
+  color: var(--fm-muted);
+  font-size: 14px;
+}
+
+.error .button {
+  margin: 14px 12px 0 0;
+}
+
+/*
+ * A note the caregiver should read but cannot act on: a white card with an info mark, so it stands
+ * off the tinted page. Inside a white card or form it falls back to the pale note fill instead.
+ */
+.readOnly {
+  position: relative;
+  margin: 0 0 16px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 16px;
+  background: var(--fm-card);
+  padding: 13px 16px 13px 44px;
+  color: var(--fm-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.readOnly::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  width: 18px;
+  height: 18px;
+  background: var(--fm-accent);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6M12 7.5v.01'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.readOnly > p + p {
+  margin-top: 8px;
+}
+
+/* A note under a card's text gets the same breathing room above it as below. */
+.card > .readOnly {
+  margin-top: 14px;
+}
+
+:is(.card, .formPanel, .error) .readOnly {
+  border-color: transparent;
+  background: var(--fm-note);
+}
+
+.readOnly ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+  margin: 14px 0 4px;
+}
+
+.details div {
+  min-width: 0;
+}
+
+.details dt {
+  margin-bottom: 4px;
+  color: var(--fm-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.details dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.task {
+  border-top: 1px solid var(--fm-line-row);
+  padding: 14px 0;
+}
+
+.task:first-of-type {
+  border-top: none;
+}
+
+.task p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+}
+
+.formPanel {
+  margin: 16px 0;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 18px 16px;
+}
+
+.formPanel h2 {
+  margin-bottom: 4px;
+}
+
+.formPanel fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.formPanel legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.formPanel label,
+.filterLabel {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.formPanel label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.formPanel > button,
+.formPanel > fieldset > button,
+.formPanel > form > fieldset > button {
+  margin: 8px 8px 0 0;
+}
+
+/*
+ * A panel that holds a form rather than being one (the visit execution card): the form starts a
+ * new block under the panel's text, and the notes after it are spaced from it and from each other
+ * instead of trailing a bottom margin into the panel's padding.
+ */
+.formPanel > form {
+  margin-top: 16px;
+}
+
+/* A status line under the form's buttons (e.g. the GPS fix). */
+.formPanel > form > fieldset > p {
+  margin: 12px 0 0;
+  color: var(--fm-secondary);
+  font-size: 14px;
+}
+
+.formPanel > .readOnly {
+  margin: 16px 0 0;
+}
+
+.formPanel > .readOnly + .readOnly {
+  margin-top: 10px;
+}
+
+.formPanel > .readOnly + button {
+  margin-top: 16px;
+}
+
+.highlighted {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 430px) {
+  .details {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .dateForm .button {
+    width: 100%;
+  }
+}
+
+@media (min-width: 900px) {
+  /* Desktop page header: no phone inset, wider type; the bell sits further into the corner. */
+  .heading {
+    margin-bottom: 26px;
+    padding: 24px 32px 20px 0;
+  }
+
+  .heading h1 {
+    font-size: 28px;
+  }
+
+  .back {
+    padding: 18px 32px 4px 0;
+  }
+
+  /* Content keeps a 640px reading width, centred under the header. Side margins rather than a max
+     width, so inline-sized buttons and links line up with the column's left edge too. */
+  .page > :not(.heading):not(.back) {
+    margin-inline: max(0px, calc((100% - 640px) / 2));
+  }
+}
+
+/* Before the profile loads, or when it cannot: the status or error alone, in the page column. */
+.bare {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 24px) 20px 24px;
+}
+
+/* The availability date field carries a format hint beneath its input; line the button up with the input. */
+.dateForm fieldset {
+  align-items: flex-start;
+}
+
+@media (min-width: 431px) {
+  .dateForm fieldset > .button {
+    margin-top: 27px;
+  }
+}
+
+/* Inside a card, side notes and actions take the card's quieter treatment. */
+.card aside {
+  border-color: transparent;
+  background: var(--fm-note);
+}
+
+.card > .button {
+  margin-top: 12px;
+}

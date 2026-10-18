@@ -100,6 +100,10 @@ spec:
             capabilities:
               drop: ["ALL"]
           volumeMounts:
+            {{- if .Values.privateStorage.existingClaim }}
+            - name: private-files
+              mountPath: {{ .Values.privateStorage.mountPath | quote }}
+            {{- end }}
             - name: tmp
               mountPath: /tmp
             {{- if .Values.rdsTruststoreConfigMap }}
@@ -108,7 +112,12 @@ spec:
               readOnly: true
             {{- end }}
       volumes:
-        # The only writable path: Tomcat's work directory and the JVM's temporary files
+        {{- if .Values.privateStorage.existingClaim }}
+        - name: private-files
+          persistentVolumeClaim:
+            claimName: {{ .Values.privateStorage.existingClaim | quote }}
+        {{- end }}
+        # Temporary files; private uploads use the optional durable claim above
         - name: tmp
           emptyDir: {}
         {{- if .Values.rdsTruststoreConfigMap }}

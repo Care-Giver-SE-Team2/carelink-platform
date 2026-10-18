@@ -40,8 +40,8 @@ export default function AbsencesPage() {
   }
 
   return <div className={styles.page}>
-    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My leave</h1><p className={styles.muted}>Request whole-day leave and check your manager's decision.</p></div><button className={styles.button} onClick={reload}>Refresh</button></div>
-    <p className={styles.readOnly}>Both dates are included, in Singapore time. Submission requests approval. Your manager approves or rejects it, then arranges any roster changes separately.</p>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My leave</h1><p className={styles.muted}>Request whole-day leave and check your manager's decision.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} onClick={reload}>Refresh</button></div>
+    <p className={styles.readOnly}>Both dates are included, in Singapore time. Only approved leave blocks scheduling. Pending or rejected leave is not permission to miss a published visit. Your manager approves or rejects your request, then handles affected visits separately. Approved leave does not mean replacement cover has been arranged.</p>
     <form className={styles.formPanel} onSubmit={submit} aria-label="Request leave" noValidate>
       <h2>Request leave</h2>
       <fieldset disabled={mutation.pending}>
@@ -63,6 +63,9 @@ export default function AbsencesPage() {
       <LastFetched at={result.receivedAt} subject="leave record" />
       {result.data.length === 0 ? <p className={styles.empty}>No leave requests yet.</p> : result.data.filter(a => filter === 'ALL' || a.status === filter).length === 0 ? <p className={styles.empty}>No requests with this status.</p> : result.data.filter(a => filter === 'ALL' || a.status === filter).map(a => <article className={styles.card} key={a.id} aria-label={`Leave request ${a.id}`}>
         <div className={styles.cardTop}><h3>{titleCase(a.type)} leave</h3><span className={styles.badge}>{titleCase(a.status)}</span></div>
+        {a.status === 'APPROVED' && <p>Leave approved. Your manager handles affected visits separately; this status does not confirm replacement cover.</p>}
+        {a.status === 'PENDING' && <p>Awaiting approval. Continue to follow your published schedule.</p>}
+        {a.status === 'REJECTED' && <p>Leave not approved. Follow your published schedule or contact your manager.</p>}
         <p>{dateLabel(a.startDate)} – {dateLabel(a.endDate)} (both days included)</p><p>{a.reason || 'No reason provided.'}</p>
       </article>)}
     </>}

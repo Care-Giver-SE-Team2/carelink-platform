@@ -1,13 +1,14 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import WorkPackPage from './WorkPackPage'
 import { getWorkPack, type WorkPack } from '../../features/caregiver/api'
-import { checkIn, completeTask, getHealthRecords, saveHealthRecord, type HealthRecord, type HealthResult } from '../../features/caregiver-execution/api'
+import { checkIn, checkOut, completeTask, getHealthRecords, saveHealthRecord, type HealthRecord, type HealthResult } from '../../features/caregiver-execution/api'
 import { ApiError } from '../../shared/api/client'
 
 vi.mock('../../features/caregiver/api', () => ({ getWorkPack: vi.fn() }))
-vi.mock('../../features/caregiver-execution/api', () => ({ checkIn: vi.fn(), completeTask: vi.fn(), getHealthRecords: vi.fn(), saveHealthRecord: vi.fn() }))
+vi.mock('../../features/caregiver-execution/api', () => ({ checkIn: vi.fn(), checkOut: vi.fn(), completeTask: vi.fn(), getHealthRecords: vi.fn(), saveHealthRecord: vi.fn() }))
+afterEach(() => vi.restoreAllMocks())
 const pack: WorkPack = {
   visit: { id: 3, elderId: 4, elderName: 'Mei', serviceType: 'Care', scheduledStart: '2026-10-09T12:00:00', scheduledEnd: '2026-10-09T13:00:00', status: 'IN_PROGRESS', version: 1 },
   elder: { elderId: 4, preferredName: 'Mei', serviceAddress: 'Private address', postalSector: 'North', languageNeeds: [], accessNotes: null, emergencyNotes: null },
@@ -113,4 +114,20 @@ it('holds all write controls while a health command is in flight', async () => {
   expect(screen.getByRole('group', { name: 'Record result · Care' })).toBeDisabled()
   finish({ record, visitVersion: 2, replayed: false })
   await waitFor(() => expect(getWorkPack).toHaveBeenCalledTimes(2))
+})
+it('warns before discarding measured health values on checkout but not for an untouched blank form', async () => {
+  vi.mocked(getWorkPack).mockResolvedValue({ ...pack, execution: { ...pack.execution!, allowedActions: ['HEALTH_RECORD', 'CHECK_OUT'] } })
+  vi.mocked(checkOut).mockResolvedValue({ visitId: 3, visitVersion: 2, savedState: 'COMPLETED', checkedInAt: '2026-10-09T12:00:00', checkedOutAt: '2026-10-09T12:05:00', replayed: false })
+  mount(); const group = await form()
+  fireEvent.change(group.getByLabelText('Pulse · bpm'), { target: { value: '72' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Check out' }))
+  expect(screen.getByRole('alertdialog', { name: 'Unsaved visit entries' })).toBeInTheDocument()
+  expect(checkOut).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Continue editing' }))
+  expect(group.getByLabelText('Pulse · bpm')).toHaveValue(72)
+  fireEvent.change(group.getByLabelText('Pulse · bpm'), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Check out' }))
+  await waitFor(() => expect(checkOut).toHaveBeenCalledTimes(1))
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  expect(saveHealthRecord).not.toHaveBeenCalled()
 })

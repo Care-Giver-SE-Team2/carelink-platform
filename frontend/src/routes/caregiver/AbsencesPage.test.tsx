@@ -16,7 +16,7 @@ beforeEach(() => {
   read = async () => reply(records)
   write = async () => { records = [{ id: 1, type: 'ANNUAL', startDate: today, endDate: today, reason: 'Family time', status: 'PENDING' }]; return reply(records[0], 201) }
   vi.stubGlobal('fetch', vi.fn((url: string, options?: RequestInit) => {
-    if (url === '/api/caregivers/me') return Promise.resolve(reply({ id: 1, userId: 10, fullName: 'Caregiver A' }))
+    if (url === '/api/caregivers/me') return Promise.resolve(reply({ id: 1, userId: 10, fullName: 'Caregiver A', status: 'AVAILABLE' }))
     if (url === '/api/auth/csrf') return Promise.resolve(new Response(null, { status: 200 }))
     if (url === '/api/caregivers/me/absences') return options?.method === 'POST' ? write() : read()
     if (url.startsWith('/api/caregivers/me/schedule')) return Promise.resolve(reply({ upcomingVisits: [], certificationAlerts: [], dateFrom: today, dateTo: today, timeZone: 'Asia/Singapore' }))
@@ -58,7 +58,7 @@ describe('caregiver leave self-service', () => {
     expect(posts).toHaveLength(1)
     expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ type: 'ANNUAL', startDate: today, endDate: today, reason: 'Family time' })
     expect(screen.getByLabelText('Reason (optional)')).toHaveValue('')
-    expect(screen.getByText(/arranges any roster changes separately/)).toBeInTheDocument()
+    expect(screen.getByText(/Approved leave does not mean replacement cover has been arranged/)).toBeInTheDocument()
   })
   it('allows an ongoing absence and an optional blank reason', async () => {
     mount(); await fill(addDays(today, -1), today)
@@ -100,7 +100,7 @@ describe('caregiver leave self-service', () => {
     mount(); await fill(); fireEvent.click(screen.getByRole('button', { name: 'Submit leave request' }))
     const sending = await screen.findByRole('button', { name: 'Submitting…' })
     expect(sending).toBeDisabled(); fireEvent.click(sending)
-    fireEvent.click(screen.getByRole('link', { name: 'My schedule' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Schedule' }))
     await screen.findByRole('heading', { name: 'My schedule' })
     await act(async () => resolve(reply({ id: 1 }, 201)))
     expect(screen.queryByText(/Leave request submitted/)).not.toBeInTheDocument()

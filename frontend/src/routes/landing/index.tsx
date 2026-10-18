@@ -344,6 +344,7 @@ export default function LandingHome() {
                 it from their own account, then you can request care.
               </div>
             </Link>
+            <Link to="/caregiver/register" className={styles.applyCard}>Apply as a caregiver</Link>
             <Link to="/elder/register" className={styles.applyCard}>
               <div className={styles.applyCardRow}>
                 <span className={styles.applyCardLabel}>Register as an elder</span>

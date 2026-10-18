@@ -15,6 +15,7 @@ public interface VisitEvents {
 
 	/** @param origin {@code PLAN}, {@code STANDALONE} or {@code MOVED} */
 	void scheduled(Visit visit, String origin, Long movedFromVisitId);
+	void evidenceUpdated(Visit visit,int evidenceCount,int verifiedEvidenceCount);
 
 	void caregiverChanged(Visit visit, Long previousCaregiverId);
 
