@@ -20,6 +20,10 @@ If no deployment is allowed at this stage, keep this PR unmerged. Do not disable
 | `infra` | Four immutable ECR repositories, GitHub OIDC publisher role | EKS application deployment or CodeBuild executor |
 | `infra/runtime` | VPC, NAT, EKS, node groups, Pod Identity Agent, optional RDS/Redis/Secrets and SNS/SQS, LB Controller identity | Helm installation of metrics-server/KEDA/LB Controller, business workloads, CodeBuild project/access entries |
 | `infra/public-site` | Private static S3, CloudFront/VPC origin, optional WAF, frontend publication role | Controller-created ALB, security-header policy creation, custom domain/certificate |
+| `infra/report-worker` | Dedicated report task SQS/DLQ, SNS subscription, bounded Worker/KEDA roles and Pod Identity associations, separate state key | Existing runtime/data/network changes, administrator boundary creation, KEDA Helm installation, business fixtures |
+
+The report-worker root is a new, opt-in integration increment; its source is not part of the earlier
+local-source hash manifest. See `infra/report-worker/README.md` for its IAM and first-plan gates.
 
 The files were allowlisted from the operator's local working copy, which had not been committed.
 `source-manifest.json` records original source hashes and handed-off hashes. No local state,
@@ -41,7 +45,8 @@ The validator copies only Terraform source, tests, lockfiles, controller policy 
 function into a disposable directory. It removes inherited AWS/TF environment overrides, does not
 copy real input/state files, initializes with `-backend=false` and runs only mocked-provider tests.
 A test's `command = apply` uses Terraform's mock provider, not an AWS apply. Provider download
-requires network access. Lockfiles pin AWS 6.68.0; all four roots must pass independently.
+requires network access. The original four roots pin AWS 6.68.0; the new Worker root pins 6.69.1.
+All five roots must pass independently.
 These checks prove configuration/test wiring, not live IAM authorization, drift or a safe real plan.
 Checkov policy assessment is still a separate workstream-five handoff; this is not a Checkov pass.
 

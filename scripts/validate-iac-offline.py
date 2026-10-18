@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-ROOTS = ["infra", "infra/bootstrap", "infra/runtime", "infra/public-site"]
+ROOTS = ["infra", "infra/bootstrap", "infra/runtime", "infra/public-site", "infra/report-worker"]
 
 
 def main():

@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: carelink-report-worker
+value: -10
+globalDefault: false
+preemptionPolicy: Never
+description: Background reports yield capacity to the existing HTTP services.
