@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -30,8 +31,11 @@ class WorkerDeploymentTest(unittest.TestCase):
                               capture_output=True, text=True)
 
     def test_disabled_deploy_needs_no_credentials_or_cluster(self):
-        self.assertFalse(worker.configuration("staging")["enabled"])
-        result = subprocess.run([sys.executable, str(ROOT / "scripts/deploy-report-worker.py"), "deploy", "staging"],
+        with patch.object(worker, "configuration", return_value={"enabled": False}), \
+                patch.object(sys, "argv", ["deploy-report-worker.py", "deploy", "staging"]), \
+                patch.object(worker, "run", side_effect=AssertionError("No external calls when disabled")):
+            worker.main()
+        result = subprocess.run([sys.executable, str(ROOT / "scripts/deploy-report-worker.py"), "deploy", "demo"],
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("no cloud or cluster calls", result.stdout)

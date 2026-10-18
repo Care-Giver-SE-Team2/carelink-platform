@@ -8,7 +8,10 @@
 ## 当前交付与开测条件
 
 源代码基线为 main `2c59b3a`。板块四 v1 单老人任务和 Producer 已在该基线中。
-`deploy/report-worker/staging.json` 默认 enabled=false；未合并、未设置 Cloud Ready 前不参与现有部署。
+`deploy/report-worker/staging.json` 当前进入 fixed-one 接入阶段：enabled=true、scalingEnabled=false。
+2026-10-18 已核验独立 11 项资源创建成功、KEDA 2.21 三组件及 external metrics API Ready，
+专用 Cloud Ready 记录已创建；合并后的正常 CD 将部署单 Worker，并将 report API 的旧 timer/Producer 关闭。
+真实消费及 0→N→0 尚待受控验收，不应仅凭配置声称通过。
 新增 Chart 没有 Service/Ingress，不在 `services/*/deploy/values.yaml` 自动发现路径中。
 Worker 镜像取完整 release manifest 的 report digest，不构建第五个镜像。
 

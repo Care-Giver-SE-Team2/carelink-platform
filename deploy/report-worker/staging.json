@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "scalingEnabled": false,
   "scalingPaused": true,
   "maxReplicas": 1
