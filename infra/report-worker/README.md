@@ -8,10 +8,13 @@
 ## 当前交付与开测条件
 
 源代码基线为 main `2c59b3a`。板块四 v1 单老人任务和 Producer 已在该基线中。
-`deploy/report-worker/staging.json` 当前进入 fixed-one 接入阶段：enabled=true、scalingEnabled=false。
+`deploy/report-worker/staging.json` 当前进入有界 KEDA 验收阶段：enabled=true、scalingEnabled=true、maxReplicas=2。
 2026-10-18 已核验独立 11 项资源创建成功、KEDA 2.21 三组件及 external metrics API Ready，
 专用 Cloud Ready 记录已创建；合并后的正常 CD 将部署单 Worker，并将 report API 的旧 timer/Producer 关闭。
-真实消费及 0→N→0 尚待受控验收，不应仅凭配置声称通过。
+fixed-one 已通过真实 SNS→SQS→Worker 消费：合成老人 A 生成 3 类报告、1 份 basis、1 条消费记录，队列排空。
+0→N→0 尚待受控验收，不应仅凭配置声称通过。
+操作者另行应用 deploy/report-worker/deployer-rbac.yaml，仅给现有 staging CD 组增加该 namespace 的
+ScaledObject/TriggerAuthentication 管理，不增加 IAM、集群 RBAC 或其他 namespace 权限。
 新增 Chart 没有 Service/Ingress，不在 `services/*/deploy/values.yaml` 自动发现路径中。
 Worker 镜像取完整 release manifest 的 report digest，不构建第五个镜像。
 
