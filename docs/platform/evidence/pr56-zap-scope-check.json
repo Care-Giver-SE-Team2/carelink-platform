@@ -1,0 +1,61 @@
+{
+  "verified_at_utc": "2026-10-17T12:17:39.516029+00:00",
+  "scanner_version": "ZAP 2.17.0",
+  "platform": "Docker Desktop linux/arm64",
+  "network": "temporary Docker --internal; no published host ports",
+  "live_staging_requests": 0,
+  "source_sha256": {
+    "scripts/run-zap-baseline.py": "0ef519f77366d1d0701beada71c66f81a4cb1935a313eb880501792e57a95d5a",
+    "scripts/zap-baseline-hooks.py": "16b8884ff6f34dc672caf53453589c20dd1033599741018ede47812cd86e5326",
+    "scripts/tests/zap_scope_fixture.py": "8944be00215974717191a5c0559feaaed13b94d0ca843ad16a20137f25afc019"
+  },
+  "cases": [
+    {
+      "case": "links-and-redirects",
+      "requests": [
+        {
+          "method": "GET",
+          "host": "carelink-zap-fixture:8443",
+          "path": "/"
+        },
+        {
+          "method": "GET",
+          "host": "carelink-zap-fixture:8443",
+          "path": "/"
+        },
+        {
+          "method": "GET",
+          "host": "carelink-zap-fixture:8443",
+          "path": "/assets/good.js"
+        },
+        {
+          "method": "GET",
+          "host": "carelink-zap-fixture:8443",
+          "path": "/assets/redirect-api.js"
+        },
+        {
+          "method": "GET",
+          "host": "carelink-zap-fixture:8443",
+          "path": "/assets/redirect-other.js"
+        }
+      ],
+      "zap_exit_code": 2,
+      "scanner_image_id": "sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6",
+      "scope_check": "PASS"
+    },
+    {
+      "case": "seed-redirect",
+      "requests": [
+        {
+          "method": "GET",
+          "host": "carelink-zap-fixture:8443",
+          "path": "/"
+        }
+      ],
+      "zap_exit_code": 3,
+      "scanner_image_id": "sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6",
+      "scope_check": "PASS"
+    }
+  ],
+  "interpretation": "Scope regressions passed. Exit 2 is expected fixture warnings, exit 3 is the deliberately rejected seed redirect. Neither is a clean website security acceptance."
+}

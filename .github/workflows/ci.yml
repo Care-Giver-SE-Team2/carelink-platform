@@ -208,7 +208,7 @@ jobs:
   publish:
     name: Publish to ECR
     needs: [changes, gate]
-    if: needs.gate.result == 'success' && needs.changes.outputs.services != '[]' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: always() && needs.gate.result == 'success' && needs.changes.outputs.services != '[]' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -279,7 +279,8 @@ jobs:
     needs: [changes, gate, publish]
     if: >-
       always() && needs.gate.result == 'success' &&
-      (needs.publish.result == 'success' || needs.publish.result == 'skipped') &&
+      (needs.publish.result == 'success' ||
+       (needs.publish.result == 'skipped' && needs.changes.outputs.services == '[]')) &&
       github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 5

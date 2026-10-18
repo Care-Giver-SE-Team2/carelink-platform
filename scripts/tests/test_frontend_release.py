@@ -79,6 +79,10 @@ else:
         self.assertNotIn("must never be downloaded", result.stderr)
 
     def test_assets_precede_index_and_a_failed_upload_does_not_publish_index(self):
+        # nosniff requires correct MIME types for the newly self-hosted font files too.
+        (self.site / "assets/font.woff2").write_bytes(b"fixture-font")
+        (self.site / "assets/theme.css").write_text("body { color: black; }")
+        (self.directory / "release.json").write_text(json.dumps({"commit": self.sha, "files": release.files(self.directory)}))
         account = "123456789012"
         bucket = f"carelink-frontend-{account}-staging"
         config = {"Distribution": {"DomainName": "example.cloudfront.net", "DistributionConfig": {
@@ -101,7 +105,12 @@ else:
                     else:
                         publisher.publish(self.directory, bucket, "E123")
                 uploads = [args[3] for args in calls if args[0] == "s3"]
-                self.assertEqual(uploads[0], f"s3://{bucket}/assets/main-123.js")
+                self.assertTrue(uploads[0].startswith(f"s3://{bucket}/assets/"))
+                if not fail:
+                    for suffix, mimes in [(".woff2", {"font/woff2"}), (".css", {"text/css"}),
+                                          (".js", {"text/javascript", "application/javascript"})]:
+                        upload = next(args for args in calls if args[0] == "s3" and args[3].endswith(suffix))
+                        self.assertIn(upload[upload.index("--content-type") + 1], mimes)
                 self.assertEqual(f"s3://{bucket}/index.html" in uploads, not fail)
                 self.assertEqual(any(args[:2] == ("cloudfront", "create-invalidation") for args in calls), not fail)
 

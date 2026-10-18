@@ -1,0 +1,6 @@
+# A distinct key; never point runtime at infra/'s carelink/platform state.
+bucket       = "carelink-tfstate-123456789012-ap-southeast-1"
+key          = "carelink/runtime/terraform.tfstate"
+region       = "ap-southeast-1"
+encrypt      = true
+use_lockfile = true

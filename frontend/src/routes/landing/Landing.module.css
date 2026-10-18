@@ -7,7 +7,6 @@
  * rather than promoted to shared/theme.css until the rest of the app is
  * restyled to match.
  */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap');
 
 .page {
   --ink: #111111;

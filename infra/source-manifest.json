@@ -1,0 +1,223 @@
+{
+  "description": "Allowlisted local Terraform source snapshot; excludes real inputs, state, plans, credentials, old run logs and .local scripts. Sanitization changes are described in README.",
+  "files": [
+    {
+      "path": "infra/.terraform.lock.hcl",
+      "source_sha256": "56a8d4719252b89791ec320c402f53e9133118fa20e1a3454b073dcdd093f90b",
+      "handoff_sha256": "56a8d4719252b89791ec320c402f53e9133118fa20e1a3454b073dcdd093f90b",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/backend.hcl.example",
+      "source_sha256": "278ac99475e488409844b1c7ccb0e70a5f977cecd46f54a06df3061763d733cd",
+      "handoff_sha256": "278ac99475e488409844b1c7ccb0e70a5f977cecd46f54a06df3061763d733cd",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/backend.tf",
+      "source_sha256": "393bcee6bd8990f5de130098b376e4c80c0c04698ab418e8ef7a3dd08594d6a6",
+      "handoff_sha256": "393bcee6bd8990f5de130098b376e4c80c0c04698ab418e8ef7a3dd08594d6a6",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/bootstrap/.terraform.lock.hcl",
+      "source_sha256": "56a8d4719252b89791ec320c402f53e9133118fa20e1a3454b073dcdd093f90b",
+      "handoff_sha256": "56a8d4719252b89791ec320c402f53e9133118fa20e1a3454b073dcdd093f90b",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/bootstrap/main.tf",
+      "source_sha256": "f729b4bfda8b6e45dac1710226026e3d243c559ea3013db2092fba8c63c48535",
+      "handoff_sha256": "f729b4bfda8b6e45dac1710226026e3d243c559ea3013db2092fba8c63c48535",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/bootstrap/tests/state.tftest.hcl",
+      "source_sha256": "88f073b125e567e22d7f3fa21e09baeeeae9157b7f14f46403f76ba313889ba3",
+      "handoff_sha256": "88f073b125e567e22d7f3fa21e09baeeeae9157b7f14f46403f76ba313889ba3",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/github-oidc.tf",
+      "source_sha256": "ad8f5d6892a022e753b939fc16a7cbda1cfd6a7e3368b4df0435acda4827f85a",
+      "handoff_sha256": "ad8f5d6892a022e753b939fc16a7cbda1cfd6a7e3368b4df0435acda4827f85a",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/main.tf",
+      "source_sha256": "f49e5be2f69a58e97ee3f680918fcc07d6cec4166d1205e9d4edc8181f86b567",
+      "handoff_sha256": "f49e5be2f69a58e97ee3f680918fcc07d6cec4166d1205e9d4edc8181f86b567",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/outputs.tf",
+      "source_sha256": "2736f9f3d9342ce9266cd76e6033cf6fe442d6018e2619d62d34fb300a34b817",
+      "handoff_sha256": "2736f9f3d9342ce9266cd76e6033cf6fe442d6018e2619d62d34fb300a34b817",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/public-site/.terraform.lock.hcl",
+      "source_sha256": "70ca3774579d62e2f5c1599974ccbbf2a6bc7e613aa5c5476e1dd17aa6cd03bd",
+      "handoff_sha256": "70ca3774579d62e2f5c1599974ccbbf2a6bc7e613aa5c5476e1dd17aa6cd03bd",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/public-site/main.tf",
+      "source_sha256": "888de7fc9dcabc1c2dcac3b0ab8873b45e43829f7ee128eed3d27f25bc1cc489",
+      "handoff_sha256": "6226bc0a5f11aa84d4f089ed3d3d9ea3e246878f3882a9ee836b78bd7bfda329",
+      "adapted_for_handoff": true
+    },
+    {
+      "path": "infra/public-site/tests/public-site.tftest.hcl",
+      "source_sha256": "6b27f0d81b179d5e6883f039deeaa11f0fa571895fb8dc84f366696dd67ae639",
+      "handoff_sha256": "36b52030fe879f6b1af950b74da2ac727023af41d767c990573bd14c8d6f697f",
+      "adapted_for_handoff": true
+    },
+    {
+      "path": "infra/public-site/waf.tf",
+      "source_sha256": "52faa688f7f32c5b65876080fbbdefea60d632e034d8938a7bd0c78eacc43390",
+      "handoff_sha256": "52faa688f7f32c5b65876080fbbdefea60d632e034d8938a7bd0c78eacc43390",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/.terraform.lock.hcl",
+      "source_sha256": "56a8d4719252b89791ec320c402f53e9133118fa20e1a3454b073dcdd093f90b",
+      "handoff_sha256": "56a8d4719252b89791ec320c402f53e9133118fa20e1a3454b073dcdd093f90b",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/backend.hcl.example",
+      "source_sha256": "2e6c57ca3e2f164bb3f48295344341000f94da3440d507f060eb07874853f3f2",
+      "handoff_sha256": "2e6c57ca3e2f164bb3f48295344341000f94da3440d507f060eb07874853f3f2",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/controller-policy.json",
+      "source_sha256": "0dfc2fc23ad01fde49cfe32cc96e23a8232187e4b586ec3703fefdb3934351c6",
+      "handoff_sha256": "0dfc2fc23ad01fde49cfe32cc96e23a8232187e4b586ec3703fefdb3934351c6",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/data-outputs.tf",
+      "source_sha256": "03569e839a58dc3d5b59db3d95b2112f7978b3196352df54f18e9a2c46b9ab5e",
+      "handoff_sha256": "03569e839a58dc3d5b59db3d95b2112f7978b3196352df54f18e9a2c46b9ab5e",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/data-secrets.tf",
+      "source_sha256": "201e9359b8a4836be387660ee1c266d2a0e6308c352148e38c733694fd86559f",
+      "handoff_sha256": "201e9359b8a4836be387660ee1c266d2a0e6308c352148e38c733694fd86559f",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/data-variables.tf",
+      "source_sha256": "8323bd450a39fbe31260bdb7f8ac59319c24d866af1609dfdd4ffde294eddbf1",
+      "handoff_sha256": "8323bd450a39fbe31260bdb7f8ac59319c24d866af1609dfdd4ffde294eddbf1",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/data.tf",
+      "source_sha256": "7d89e70c296939dfffdc8adf1a5ad06dae63cbf4bc192acd968a0c5ebed23f95",
+      "handoff_sha256": "7d89e70c296939dfffdc8adf1a5ad06dae63cbf4bc192acd968a0c5ebed23f95",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/eks.tf",
+      "source_sha256": "0fb968a930e847aab76a011029b57cd806b4abd255ade2cbaf34f793943a306f",
+      "handoff_sha256": "0fb968a930e847aab76a011029b57cd806b4abd255ade2cbaf34f793943a306f",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/load-balancer-controller.tf",
+      "source_sha256": "db7a9c2f28e1c46881f1090a9f4020a7ca38aa131fbead5ccb7b7d65ae2a61f3",
+      "handoff_sha256": "db7a9c2f28e1c46881f1090a9f4020a7ca38aa131fbead5ccb7b7d65ae2a61f3",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/messaging.tf",
+      "source_sha256": "3367d09021c6aa806930837a7414148755b6d445d01d8bde9957cd147301d34c",
+      "handoff_sha256": "3367d09021c6aa806930837a7414148755b6d445d01d8bde9957cd147301d34c",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/network.tf",
+      "source_sha256": "7c42194f07a9d726426dde72e554b343315ed249ca449c195306191f4b36ae6b",
+      "handoff_sha256": "7c42194f07a9d726426dde72e554b343315ed249ca449c195306191f4b36ae6b",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/outputs.tf",
+      "source_sha256": "ee8cc95a2f25e1e181ade04de0e5a43748cfb683e8fc97be3f669e9986117b6a",
+      "handoff_sha256": "ee8cc95a2f25e1e181ade04de0e5a43748cfb683e8fc97be3f669e9986117b6a",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/terraform.tfvars.example",
+      "source_sha256": "fa192829014c6dcc5e4f6cbdb929e4119035455fefbdafe098c798c8a10b1e00",
+      "handoff_sha256": "f4be5fc72bebcd279527c5cb459570fcf77192b0406e5557259269ca38af6120",
+      "adapted_for_handoff": true
+    },
+    {
+      "path": "infra/runtime/tests/data.tftest.hcl",
+      "source_sha256": "ae6a7b921093ec0fe770032790e774a16eb676d49e76284faf7be4ddcb6d0d2a",
+      "handoff_sha256": "ae6a7b921093ec0fe770032790e774a16eb676d49e76284faf7be4ddcb6d0d2a",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/tests/messaging.tftest.hcl",
+      "source_sha256": "11bfe800ec84167d3841013f2680ed193332ebb8e1fff241bc6029cf2f71188a",
+      "handoff_sha256": "11bfe800ec84167d3841013f2680ed193332ebb8e1fff241bc6029cf2f71188a",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/tests/runtime.tftest.hcl",
+      "source_sha256": "41dfcdf078569ef6477a46784a054cac31f2ee67a26b7406757fcd6cf02eb5a2",
+      "handoff_sha256": "fc55d40e6f356170b50a82be5dae95667912ed61845fb772de02206ad136ad1c",
+      "adapted_for_handoff": true
+    },
+    {
+      "path": "infra/runtime/variables.tf",
+      "source_sha256": "7397e884945fe407a9f3867b192da1912c72674c9877ac60e423b2619b79bfbe",
+      "handoff_sha256": "7397e884945fe407a9f3867b192da1912c72674c9877ac60e423b2619b79bfbe",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/runtime/versions.tf",
+      "source_sha256": "55b417236867655077f62b480a5e27e0b408984ed28b40d796c10190bb003cc8",
+      "handoff_sha256": "55b417236867655077f62b480a5e27e0b408984ed28b40d796c10190bb003cc8",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/terraform.tfvars.example",
+      "source_sha256": "7656d2d69322733f2c7e8cbbb6be3bdc8591f120ea69fb7a08c2b5d10415ea6f",
+      "handoff_sha256": "7656d2d69322733f2c7e8cbbb6be3bdc8591f120ea69fb7a08c2b5d10415ea6f",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/tests/ecr.tftest.hcl",
+      "source_sha256": "1160c6aafd61a130a02515f63b8ead2d722e8d13f69f9f859b18fe1c2faa7dde",
+      "handoff_sha256": "1160c6aafd61a130a02515f63b8ead2d722e8d13f69f9f859b18fe1c2faa7dde",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/tests/github-oidc.tftest.hcl",
+      "source_sha256": "94036a8988e3321f5c9bed0be39b949a302baa4be71d898a6cac6d200d7c58c1",
+      "handoff_sha256": "94036a8988e3321f5c9bed0be39b949a302baa4be71d898a6cac6d200d7c58c1",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/variables.tf",
+      "source_sha256": "ea0a2b9404eef90faa0bd73206bd232255dea4f1cca2d1fae2760bc8ee201a54",
+      "handoff_sha256": "ea0a2b9404eef90faa0bd73206bd232255dea4f1cca2d1fae2760bc8ee201a54",
+      "adapted_for_handoff": false
+    },
+    {
+      "path": "infra/versions.tf",
+      "source_sha256": "13045455bc0bd95f444fbffd8270a417da499912ebe18678b5b29b6c27313764",
+      "handoff_sha256": "13045455bc0bd95f444fbffd8270a417da499912ebe18678b5b29b6c27313764",
+      "adapted_for_handoff": false
+    }
+  ],
+  "source_checkout_base_commit": "63f14088856fd4c7a7ad050e263462d22434f04c",
+  "source_was_uncommitted": true
+}
