@@ -45,3 +45,5 @@ logging:
 carelink:
   report:
     legacy-scheduler-enabled: ${REPORT_LEGACY_SCHEDULER_ENABLED:true}
+
+    task-producer-enabled: ${REPORT_TASK_PRODUCER_ENABLED:false}
