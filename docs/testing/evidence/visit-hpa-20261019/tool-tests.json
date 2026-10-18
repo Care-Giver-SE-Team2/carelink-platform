@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "tests": 18,
+  "failures": 0,
+  "errors": 0,
+  "scope": "offline guards and loopback HTTP; not backend unit or cloud tests",
+  "cases": [
+    "test_latency_windows_stop",
+    "test_offline_validation_does_not_open_network",
+    "test_rejects_credentials_paths_and_mixed_session_host",
+    "test_rejects_nonfinite_negative_and_excessive_load",
+    "test_remote_requires_exact_approved_origin",
+    "test_small_samples_are_not_sla_pass_and_failed_http_not_hidden",
+    "test_two_bad_windows_stop_and_empty_window_resets",
+    "test_unapproved_remote_blocked_before_network",
+    "test_write_pool_is_finite_and_unique",
+    "test_auth_failure_during_load_stops_remaining_arrivals",
+    "test_first_checkins_are_unique_and_postverified",
+    "test_operator_stop_file_prevents_load",
+    "test_real_http_login_cookies_csrf_and_read_success",
+    "test_redirect_auth_html_wrong_visit_and_replay_fail_closed",
+    "test_replayed_checkin_is_not_new_throughput",
+    "test_server_failures_trigger_runtime_window_stop",
+    "test_slow_generator_drops_without_queue_or_retries",
+    "test_timed_out_write_not_retried_or_counted_success"
+  ]
+}

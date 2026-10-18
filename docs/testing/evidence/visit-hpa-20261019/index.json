@@ -1,0 +1,46 @@
+{
+  "applicationBaseline": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "mainBaseline": "59a91a3c021d0d85a76faf1dd64690c4b4d5c99e",
+  "toolTests": 18,
+  "successfulIndependentLocalEnvironments": 2,
+  "finalRun": "hpa-20261018T222639-4e0376",
+  "priorRun": "hpa-20261018T222355-cd309b",
+  "finalWorkloads": [
+    {
+      "scenario": "work-pack",
+      "plannedIterations": 12,
+      "launchedIterations": 12,
+      "httpRequestsDuringLoad": 12,
+      "failedIterations": 0,
+      "droppedIterations": 0
+    },
+    {
+      "scenario": "check-in",
+      "plannedIterations": 4,
+      "launchedIterations": 4,
+      "httpRequestsDuringLoad": 12,
+      "failedIterations": 0,
+      "droppedIterations": 0
+    },
+    {
+      "scenario": "work-pack",
+      "plannedIterations": 12,
+      "launchedIterations": 12,
+      "httpRequestsDuringLoad": 12,
+      "failedIterations": 0,
+      "droppedIterations": 0
+    }
+  ],
+  "toolSha256": {
+    "tools/visit_hpa/example.joint.json": "872be199c80327489dd6c16b0505c80361249da7eae125774912424a7b4de217",
+    "tools/visit_hpa/example.local.json": "8717e8ea5c6b16f8ec9da8041ded77548a85d3594e2bb1197493799b7aed0b5d",
+    "tools/visit_hpa/load.py": "09380a7330be4b7fe7afaf80018fe88f46e181f716cfb295aff9ec563eb4f6c2",
+    "tools/visit_hpa/local_smoke.py": "f64facacdd37c4348b6509c2692582feb0827efe1c1074b1d65584c1cd31ae7c",
+    "tools/visit_hpa/README.md": "937f22b3751a692b8345b818ad192224d1258bdd286754b732edd85640606dbb",
+    "tools/visit_hpa/tests/test_load.py": "0b22233fcc0edcf6a2306610b1a690e84c50ae9215d652989464921c0d982a33"
+  },
+  "formalHpaOrSlaAcceptance": false,
+  "cloudBusinessRequests": 0,
+  "deploymentOrScalingChanges": false,
+  "initialRunsRetainedAsFailures": true
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "runId": "replace-with-unique-run-id",
+  "codeBaseline": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "scenario": "work-pack",
+  "coreBase": "http://127.0.0.1:18080",
+  "visitBase": "http://127.0.0.1:18081",
+  "maxVUs": 2,
+  "timeoutSeconds": 8,
+  "maxLaunchLagMs": 200,
+  "maxIterations": 100,
+  "phases": [
+    {"name": "baseline", "rps": 1, "durationSeconds": 5},
+    {"name": "step-2", "rps": 2, "durationSeconds": 5},
+    {"name": "hold", "rps": 2, "durationSeconds": 5},
+    {"name": "cooldown", "rps": 0, "durationSeconds": 2}
+  ],
+  "actors": [{
+    "alias": "synthetic-cg-1", "userId": 71100,
+    "usernameEnv": "HPA_CG1_USERNAME", "passwordEnv": "HPA_CG_PASSWORD",
+    "visits": [{"visitId": 1, "elderId": 73100, "expectedStatus": "SCHEDULED", "expectedVersion": 0}]
+  }],
+  "targets": {"httpP95Ms": 1000, "checkinHttpP95Ms": 2000, "iterationP95Ms": 3000, "errorRate": 0.01, "minSamplesPerEndpoint": 100},
+  "stop": {"errorWindowSeconds": 30, "latencyWindowSeconds": 60, "errorRate": 0.05,
+    "p95Ms": 5000, "consecutiveWindows": 2, "minSamples": 20},
+  "approval": {"confirmed": false, "environment": "localhost-only", "windowUtc": "UNCONFIRMED",
+    "owner": "Chenyu + Zhili", "deploymentRef": "UNCONFIRMED", "allowedOrigins": []}
+}

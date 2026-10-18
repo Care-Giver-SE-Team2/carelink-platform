@@ -1,0 +1,100 @@
+{
+  "runId": "hpa-20261018T222639-4e0376-read",
+  "finishedUtc": "2026-10-18T22:27:47.213079+00:00",
+  "outcome": "COMPLETED",
+  "stopReasons": [],
+  "scenario": "work-pack",
+  "plannedIterations": 12,
+  "launchedIterations": 12,
+  "failedIterations": 0,
+  "droppedIterations": 0,
+  "notScheduledAfterStop": 0,
+  "httpRequestsDuringLoad": 12,
+  "httpRequestsDuringSetup": 20,
+  "targetsAreDraft": true,
+  "formalAcceptance": false,
+  "phases": [
+    {
+      "phase": "baseline",
+      "targetRps": 1,
+      "durationSeconds": 4,
+      "plannedIterations": 4,
+      "launchedIterations": 4,
+      "droppedIterations": 0,
+      "notScheduledAfterStop": 0,
+      "actualLaunchRps": 0.9960159362549801,
+      "emissionSeconds": 4.016,
+      "failedIterations": 0,
+      "iterationErrorRate": 0.0,
+      "iterationP95Ms": 156.0,
+      "iterationTargetObservation": "INSUFFICIENT_SAMPLES",
+      "launchLagP95Ms": 16.0,
+      "endpoints": [
+        {
+          "method": "GET",
+          "endpoint": "/api/visits/{id}/work-pack",
+          "samples": 4,
+          "httpFailures": 0,
+          "businessFailures": 0,
+          "errorRate": 0.0,
+          "allP95Ms": 161.194,
+          "successP95Ms": 161.194,
+          "targetObservation": "INSUFFICIENT_SAMPLES"
+        }
+      ]
+    },
+    {
+      "phase": "step-2",
+      "targetRps": 2,
+      "durationSeconds": 4,
+      "plannedIterations": 8,
+      "launchedIterations": 8,
+      "droppedIterations": 0,
+      "notScheduledAfterStop": 0,
+      "actualLaunchRps": 2.0,
+      "emissionSeconds": 4.0,
+      "failedIterations": 0,
+      "iterationErrorRate": 0.0,
+      "iterationP95Ms": 171.0,
+      "iterationTargetObservation": "INSUFFICIENT_SAMPLES",
+      "launchLagP95Ms": 16.0,
+      "endpoints": [
+        {
+          "method": "GET",
+          "endpoint": "/api/visits/{id}/work-pack",
+          "samples": 8,
+          "httpFailures": 0,
+          "businessFailures": 0,
+          "errorRate": 0.0,
+          "allP95Ms": 174.733,
+          "successP95Ms": 174.733,
+          "targetObservation": "INSUFFICIENT_SAMPLES"
+        }
+      ]
+    },
+    {
+      "phase": "cooldown",
+      "targetRps": 0,
+      "durationSeconds": 1,
+      "plannedIterations": 0,
+      "launchedIterations": 0,
+      "droppedIterations": 0,
+      "notScheduledAfterStop": 0,
+      "actualLaunchRps": 0.0,
+      "emissionSeconds": 0.984,
+      "failedIterations": 0,
+      "iterationErrorRate": null,
+      "iterationP95Ms": null,
+      "iterationTargetObservation": "INSUFFICIENT_SAMPLES",
+      "launchLagP95Ms": null,
+      "endpoints": []
+    }
+  ],
+  "limitations": [
+    "Client-side elapsed time; no HPA/resource observations collected by this tool.",
+    "No retry/logout/reset; timed-out writes require reconciliation before cleanup.",
+    "Read work-pack endpoint also writes access audit records.",
+    "Fixed-account backend test does not cover account switching, UI freshness or FM03 caching.",
+    "Threads/urllib: verify generator headroom and dropped iterations before increasing rate."
+  ]
+}

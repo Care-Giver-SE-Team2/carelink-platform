@@ -1,0 +1,3 @@
+phase,method,endpoint,samples,httpFailures,businessFailures,errorRate,allP95Ms,successP95Ms,targetObservation
+baseline,GET,/api/visits/{id}/work-pack,4,0,0,0.0,121.754,121.754,INSUFFICIENT_SAMPLES
+step-2,GET,/api/visits/{id}/work-pack,8,0,0,0.0,123.395,123.395,INSUFFICIENT_SAMPLES

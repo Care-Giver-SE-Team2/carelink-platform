@@ -1,0 +1,65 @@
+{
+  "runId": "hpa-20261018T222639-4e0376-write",
+  "finishedUtc": "2026-10-18T22:27:50.263612+00:00",
+  "outcome": "COMPLETED",
+  "stopReasons": [],
+  "scenario": "check-in",
+  "plannedIterations": 4,
+  "launchedIterations": 4,
+  "failedIterations": 0,
+  "droppedIterations": 0,
+  "notScheduledAfterStop": 0,
+  "httpRequestsDuringLoad": 12,
+  "httpRequestsDuringSetup": 20,
+  "targetsAreDraft": true,
+  "formalAcceptance": false,
+  "phases": [
+    {
+      "phase": "fresh-checkins",
+      "targetRps": 2,
+      "durationSeconds": 2,
+      "plannedIterations": 4,
+      "launchedIterations": 4,
+      "droppedIterations": 0,
+      "notScheduledAfterStop": 0,
+      "actualLaunchRps": 1.9841269841269842,
+      "emissionSeconds": 2.016,
+      "failedIterations": 0,
+      "iterationErrorRate": 0.0,
+      "iterationP95Ms": 500.0,
+      "iterationTargetObservation": "INSUFFICIENT_SAMPLES",
+      "launchLagP95Ms": 16.0,
+      "endpoints": [
+        {
+          "method": "GET",
+          "endpoint": "/api/visits/{id}/work-pack",
+          "samples": 8,
+          "httpFailures": 0,
+          "businessFailures": 0,
+          "errorRate": 0.0,
+          "allP95Ms": 127.769,
+          "successP95Ms": 127.769,
+          "targetObservation": "INSUFFICIENT_SAMPLES"
+        },
+        {
+          "method": "POST",
+          "endpoint": "/api/visits/{id}/check-in",
+          "samples": 4,
+          "httpFailures": 0,
+          "businessFailures": 0,
+          "errorRate": 0.0,
+          "allP95Ms": 253.886,
+          "successP95Ms": 253.886,
+          "targetObservation": "INSUFFICIENT_SAMPLES"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Client-side elapsed time; no HPA/resource observations collected by this tool.",
+    "No retry/logout/reset; timed-out writes require reconciliation before cleanup.",
+    "Read work-pack endpoint also writes access audit records.",
+    "Fixed-account backend test does not cover account switching, UI freshness or FM03 caching.",
+    "Threads/urllib: verify generator headroom and dropped iterations before increasing rate."
+  ]
+}

@@ -1,0 +1,7 @@
+timestamp,phase
+2026-10-18T22:27:47.224701+00:00,setup-start
+2026-10-18T22:27:48.255398+00:00,setup-end
+2026-10-18T22:27:48.255398+00:00,fresh-checkins-start
+2026-10-18T22:27:50.263612+00:00,fresh-checkins-end
+2026-10-18T22:27:50.263612+00:00,load-stopped-draining
+2026-10-18T22:27:50.263612+00:00,drain-complete

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "runId": "hpa-20261018T222639-4e0376-write",
+  "startedUtc": "2026-10-18T22:27:47.223686+00:00",
+  "scenario": "check-in",
+  "codeBaseline": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "targetOrigins": [
+    "http://127.0.0.1:18080",
+    "http://127.0.0.1:18081"
+  ],
+  "approval": {
+    "confirmed": false,
+    "environment": "localhost-only",
+    "windowUtc": "UNCONFIRMED",
+    "owner": "Chenyu + Zhili",
+    "deploymentRef": "UNCONFIRMED",
+    "allowedOrigins": []
+  },
+  "plan": {
+    "plannedIterations": 4,
+    "freshVisits": 4,
+    "localhost": true,
+    "remoteExecutionConfirmed": false,
+    "maximumRequestSeconds": 8
+  },
+  "maxVUs": 4,
+  "phases": [
+    {
+      "name": "fresh-checkins",
+      "rps": 2,
+      "durationSeconds": 2,
+      "iterations": 4,
+      "dropped": 0,
+      "notScheduledAfterStop": 4,
+      "emissionSeconds": 0
+    }
+  ],
+  "targets": {
+    "httpP95Ms": 1000,
+    "checkinHttpP95Ms": 2000,
+    "iterationP95Ms": 3000,
+    "errorRate": 0.01,
+    "minSamplesPerEndpoint": 100
+  },
+  "stop": {
+    "errorWindowSeconds": 30,
+    "latencyWindowSeconds": 60,
+    "errorRate": 0.05,
+    "p95Ms": 5000,
+    "consecutiveWindows": 2,
+    "minSamples": 20
+  },
+  "configSha256": "f26fa64496bdabff770eef170a2093e20845420c58bad4bcd1946b816965965c",
+  "toolSha256": "09380a7330be4b7fe7afaf80018fe88f46e181f716cfb295aff9ec563eb4f6c2",
+  "formalAcceptance": false,
+  "sensitiveBodiesAndCookiesRecorded": false
+}

@@ -1,0 +1,21 @@
+{
+  "runId": "hpa-20261018T222140-b53a96",
+  "status": "FAIL",
+  "scope": "localhost-only; events disabled; no HPA",
+  "checks": [
+    "production_core_visit_real_redis_ready",
+    "four_independent_pairs_four_http_published_plans_eight_real_visits"
+  ],
+  "applicationJars": {
+    "core": "44fa50a55579faaad0a67db7634191ac2b4897952cd9012baf2a4dc3b09fa420",
+    "visit": "46cdcd5c637729be2a42c0d2fa65fe7f204616947375e4f244c23d04ce1f2875"
+  },
+  "errorType": "ValueError",
+  "errorCategory": "local_load_failed",
+  "cleanup": {
+    "ownedContainersRemoved": true,
+    "ownedNetworkRemoved": true,
+    "originalContainersUnchanged": true,
+    "temporaryPortsClosed": true
+  }
+}

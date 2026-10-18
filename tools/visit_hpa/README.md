@@ -1,0 +1,71 @@
+# Visit HPA business workload
+
+Python **3.10+**, standard library only. No package install, k6, Maven, Docker or cluster credentials are required on the load generator. Windows, Linux and macOS use the same `load.py`. Docker and production JARs are needed **only** for the optional disposable local smoke test.
+
+Start with [the handoff and joint confirmation sheet](../../docs/testing/visit-hpa-handoff.md). Application baseline: `09d6a3f` (main `59a91a3` + caregiver migration + Redis fix); record the later tool delivery commit separately. No application/deployment configuration is changed by this package.
+
+## Offline first
+
+From the repository root:
+
+```text
+python -m unittest discover -s tools/visit_hpa/tests -v
+python tools/visit_hpa/load.py --config tools/visit_hpa/example.local.json
+python tools/visit_hpa/load.py --config tools/visit_hpa/example.joint.json
+```
+
+Without `--execute` there is **no network access**, not even login or DNS lookup. Example IDs, actors and targets are placeholders, not prepared accounts or approved cloud parameters. Copy a template to a private directory and fill in real synthetic fixtures. Do not commit the filled file.
+
+## Data and credentials
+
+Each actor has a private fixture list: numeric `userId`, `visitId`, `elderId`, `expectedStatus`, `expectedVersion`. The actor must be the assigned caregiver. Supply its username/password in the environment variables named by `usernameEnv`/`passwordEnv`; the tool never loads browser Cookies or sends credentials to another host. Use a secure prompt or secret manager; keep passwords out of command arguments, source control and chat. Every VU logs in independently, using a genuine CSRF token and shared-session Cookie. No logout or account switch occurs.
+
+`coreBase` and `visitBase` must use the **same hostname and scheme** (different local ports are allowed). Remote use requires a single HTTPS origin, exact `approval.allowedOrigins`, `confirmed: true`, owner, environment, agreed window and deployment reference. The check is an operator-filled guard, **not verification of human approval or the deployed image**. Zhili must independently confirm both. Do not set it merely to bypass a refusal. No supplied file authorizes remote execution; this delivery was tested only locally.
+
+Run only after the separate environment/window approval:
+
+```text
+python tools/visit_hpa/load.py --config /private/run-config.json --output /private/results/run-A0 --execute
+```
+
+PowerShell accepts Windows paths for both arguments. Output must be a new directory. `runId` must be unique. `approval.deploymentRef` records the **actual deployment**, and `codeBaseline` records source; the script does not deploy or verify `/actuator/info` automatically.
+
+## Scenarios
+
+* `work-pack`: one `GET /api/visits/{id}/work-pack` per iteration; assert visit, elder, state, version, tasks and execution envelope. Fixed synthetic visits can be reused. This endpoint writes access audit records even though the HTTP method is GET.
+* `check-in`: GET work-pack → POST check-in → GET saved work-pack. Every arrival needs a **different SCHEDULED, assigned, eligible visit**, a valid published service instruction, an open check-in window and its true current version. Check the server's `allowedActions` includes `CHECK_IN`: execution `tasks` can legitimately be empty before check-in materializes them. Expect `replayed=false`, `savedState=IN_PROGRESS`, `visitVersion=old+1`, and verify saved state via HTTP. It is approximately **three business HTTP requests per successful iteration**, not one. Do not reuse visits or count idempotent replays as new throughput. A timed-out write is ambiguous; it is **not retried**.
+
+Phases specify **business iteration arrivals per second**, duration, and unique names. `maxVUs` is the upper bound on simultaneous iteration clients. More VUs than actors creates isolated sessions for the same synthetic actor; distribute actor fixtures/rates intentionally. With multiple actors, round-robin allocation and per-actor lanes may drop one actor's arrival even if another actor has an idle session. These are generator drops, not a claim about server capacity.
+
+The open-loop scheduler never queues arrivals behind busy VUs. A busy lane or launch delay above `maxLaunchLagMs` is counted as `droppedIterations`. There is no retry/catch-up burst. Write-pool sizing counts **all planned arrivals**, including drops; dropped slots are not recycled. The fixture pool must cover the entire configured run before any request is sent. Recreate an independent pool for a second write arm. The read template must not be changed to `check-in` without enough new visits.
+
+## Results, stop and interpretation
+
+* `manifest.json`: origins, code/deployment references, exact phases, bounds, thresholds, config/tool hashes. No passwords, actor names, fixture IDs, Cookies or response bodies are recorded.
+* `requests.jsonl`: per HTTP operation, UTC start, method, endpoint template, elapsed milliseconds, status, HTTP/business checks. `setup` is separate from workload.
+* `iterations.jsonl`: per business iteration, UTC, launch delay, latency, pass/error category. No visit IDs or bodies.
+* `summary.json` / `summary.csv`: per phase/endpoint, all-response and successful-response p95, actual counts and failure rate; iteration p95/error rate, launch rate/delay, drops and unscheduled arrivals are separate. `phases.csv` uses `timestamp,phase` and timezone-aware ISO8601, compatible with Zhili's scaling report markers. Generation is local; no uploads.
+
+`httpPassed` means HTTP 200; `businessPassed` additionally requires JSON and the endpoint assertions. A JSON 200 with wrong visit/state is a failure. Setup is excluded from measured load. The GET summary in a write scenario includes before/after reads. Percentiles use nearest-rank, client-observed elapsed time; they include transport/HTTP checks and exclude scheduler wait. Success-only p95 never hides the all-response p95 and failure counts. `businessFailures` includes HTTP failures; do not add the two failure counters together. `actualLaunchRps` uses the measured emission interval, not just completed throughput. Some requests can finish during the next phase/drain; assignment stays with the originating iteration.
+
+Under 100 observations/endpoint/phase the default target label is `INSUFFICIENT_SAMPLES`; defaults remain proposed until confirmed. Even `COMPLETED` / `WITHIN_DRAFT_TARGET` is **not HPA, formal SLA, cache, or complete 6b acceptance**. Check generator CPU/network, drops, missing samples and test validity, then combine with Zhili's resource/replica observations. A standalone threaded urllib tool should be replaced or calibrated against a larger generator if its own overhead becomes material.
+
+Exit 0: completed with no failed or dropped iterations. Exit 2: rejected config, stopped, failures or drops. Inspect summary for the exact category; a successful tiny pilot still lacks a capacity conclusion.
+
+Stop immediately on wrong identity/visit/state, replayed first check-in, 401/403, redirects or malformed/non-JSON contracts. Unexpected 5xx/transport failures use the configured consecutive **non-overlapping** error windows; latency uses separate windows on completed business iterations. A low-sample/empty window is not evidence of health and resets a streak. Setup failures stop before load. Record a monitoring failure or stuck requests separately; a low request rate may never fill a statistical window, so operators must watch in-flight timeouts and cluster health.
+
+To stop: Ctrl+C, or create an empty file named `STOP` in that run's output directory. The operator file/signal prevents new arrivals; in-flight requests drain under their network timeout. A first POST already in flight can still commit after stop. The tool does **not** scale, patch, roll back or delete server data. Zhili stops the workload on Ready/Pending/OOM/database conditions; this client cannot observe those automatically.
+
+## Disposable real local smoke
+
+Build current core/visit JARs using the project's normal offline-capable build. Record hashes and compare source before reusing existing JARs. Do not use a pre-migration JAR accidentally. Require Java 25 and **already-cached** `mysql:8.4`, `redis:7.4-alpine`. This command never pulls images:
+
+```text
+python tools/visit_hpa/local_smoke.py --core-jar /local/core.jar --visit-jar /local/visit.jar --java /local/jdk25/bin/java --docker-context desktop-linux --output /private/results/local-smoke-unique
+```
+
+Use Java's actual platform path (`java.exe` on Windows). The helper binds only 127.0.0.1:13306/16379/18080/18081, clears inherited application/cloud overrides **for child services only**, disables events and background business scans, seeds five fictional accounts and four independent caregiver/elder pairs in **empty disposable databases**, then uses actual manager publication APIs to produce four plans/eight scheduled visits. Each pair has one eligible visit and one untouched future control. It uses `{noop}` passwords solely in the disposable local fixtures; this is **not** a shared-environment seed strategy. Same-day Singapore scheduling currently requires starting before the late-evening window stated by the helper; it refuses rather than fabricating legal roster conditions.
+
+It runs scheduled work-pack reads → four unique first check-ins → saved-state/receipt/control SQL checks → repeatable IN_PROGRESS reads. Original containers are snapshotted. Cleanup terminates only its child Java processes and removes only exact-ID/name/ownership-label-matched containers and network. MySQL uses tmpfs. Output records port closure and unchanged original containers. It does not perform broad Docker cleanup or delete a filesystem tree. Keep all logs/config/SQL fixtures under the private output directory. Share only reviewed summaries.
+
+On a hard process kill, `runtime-private/owned-resources.json` and `child-pids.json` identify resources. Verify container label `carelink.visit-hpa=<runId>`, exact name and Java command/config path before manual cleanup. Never use `docker system prune`, wildcard deletion or a stale PID blindly. Shared/cloud fixture cleanup follows the separately approved inventory, not this local teardown.
