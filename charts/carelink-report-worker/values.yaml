@@ -1,0 +1,16 @@
+image:
+  repository: ""
+  digest: ""
+  tag: ""
+replicaCount: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 768Mi
+scaling:
+  enabled: false
+  paused: true
+  maxReplicas: 1
+queueURL: ""

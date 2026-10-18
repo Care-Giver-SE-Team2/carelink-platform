@@ -38,3 +38,5 @@ carelink:
       # Example:
       # REPORT_WORKER_TEST_PREPARE_DELAY=90s
       test-prepare-delay: ${REPORT_WORKER_TEST_PREPARE_DELAY:0s}
+
+    task-producer-enabled: false

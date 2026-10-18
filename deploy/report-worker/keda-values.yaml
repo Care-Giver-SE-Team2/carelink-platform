@@ -1,0 +1,24 @@
+# Pin official chart/app 2.21.0. These values are not loaded by normal app CD.
+watchNamespace: staging
+rbac:
+  aggregateToDefaultRoles: false
+  enabledCustomScaledRefKinds: false
+operator:
+  replicaCount: 1
+metricsServer:
+  replicaCount: 1
+webhooks:
+  replicaCount: 1
+serviceAccount:
+  operator:
+    name: keda-operator
+resources:
+  operator:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: "1", memory: 512Mi}
+  metricServer:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: "1", memory: 512Mi}
+  webhooks:
+    requests: {cpu: 100m, memory: 64Mi}
+    limits: {cpu: "1", memory: 256Mi}

@@ -1,5 +1,7 @@
 # Taking changes from upstream
 
+**Local main alignment (2026-10-19):** caregiver branch integrates platform main `59a91a3`, preserves the Redis fix, and resolves the report evidence migration as V5 while keeping main V4 unchanged. See [combined local regression](main-alignment-20261019.md). This is still a selected upstream feature port; the full-sync marker is unchanged.
+
 This repository started from the care platform's single-service code base, which its own team keeps developing
 (the `upstream` remote, push disabled). Since then the code here has been split: visit, report and notification are
 services of their own, shared code is in `libs/`, the services talk through internal APIs and events, and each has a

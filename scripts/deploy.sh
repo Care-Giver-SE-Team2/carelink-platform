@@ -64,6 +64,7 @@ fi
 
 tag=""
 image_rows=""
+worker_enabled=$(python3 scripts/deploy-report-worker.py enabled "$env")
 if [ -n "${RELEASE_MANIFEST:-}" ]; then
   if [ -n "${IMAGE_TAG:-}" ]; then
     echo "Use RELEASE_MANIFEST or IMAGE_TAG, not both" >&2
@@ -127,6 +128,11 @@ deploy_service() {
     --set-string "image.tag=$tag"
     --set-string "image.digest=$digest"
   )
+  if [ "$service" = report ] && [ "$worker_enabled" = true ]; then
+    release+=(--set-string "env.SPRING_PROFILES_ACTIVE=api"
+      --set-string "env.REPORT_LEGACY_SCHEDULER_ENABLED=false"
+      --set-string "env.REPORT_TASK_PRODUCER_ENABLED=false")
+  fi
   case ${PUBLIC_HTTPS:-false} in
     true) release+=(-f deploy/environments/public-https.yaml) ;;
     false) ;;

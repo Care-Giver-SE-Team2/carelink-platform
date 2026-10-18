@@ -1,0 +1,6 @@
+bucket       = "carelink-tfstate-123456789012-ap-southeast-1"
+key          = "carelink/report-worker/terraform.tfstate"
+region       = "ap-southeast-1"
+encrypt      = true
+use_lockfile = true
+workspace_key_prefix = "carelink/report-worker/workspaces"

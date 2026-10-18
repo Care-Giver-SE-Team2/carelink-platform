@@ -1,6 +1,6 @@
 # Caregiver feature port (local, 2026-10-19)
 
-This is the selected caregiver scope from upstream #98/#99 plus the supporting #100/#101/#111 changes, read at local commit `facae96eae25d20d0a4e1d37cdb888239d640a16`. It builds on platform main `20e456a8`, the preserved Redis fix `1d3c3d8`, and the prior admission port. It is a local implementation, not a merge or deployment. The full upstream-sync marker stays `f9bc4f1`.
+This is the selected caregiver scope from upstream #98/#99 plus the supporting #100/#101/#111 changes, read at local commit `facae96eae25d20d0a4e1d37cdb888239d640a16`. It builds on platform main `20e456a8`, the preserved Redis fix `1d3c3d8`, and the prior admission port. It is now integrated locally with main `59a91a3`; deployment remains outside this record. See [combined regression](main-alignment-20261019.md). The full upstream-sync marker stays `f9bc4f1`.
 
 ## Scope and ownership
 
@@ -27,7 +27,8 @@ Public route ownership: credentials, admission and work settings go to core; `/a
 | visit | V3 | Caregiver/time trigger index |
 | visit | V4 | Private evidence metadata, visit/evidence and uploader indexes |
 | visit | V5 | Own-history actor/month index (upstream V31) |
-| report | V4 | Independent evidence snapshot projection |
+| report | V4 (main) | Existing report task dispatch claims, unchanged |
+| report | V5 | Independent evidence snapshot projection (renamed from the feature-only V4) |
 
 The existing visit V2 request migration is unchanged. Existing legacy credential rows without attachments and legacy evidence rows without upload ownership remain compatible; the migration does not invent old actors or private documents. Each service owns its new tables; cross-service identities are logical IDs, without cross-database foreign keys. Upgrade proofs use real Flyway: core26->28, visit2->4, report3->4, preserving synthetic legacy rows, receipts and counters. The final visitV5 index and isolated test-output path were subsequently validated after Docker recovery: fresh initialization, visit2->5 upgrade and restore preserve the actor/month index and legacy facts.
 
@@ -74,7 +75,7 @@ temporary resources were cleaned; the five pre-existing stopped containers were 
 No app code changed during recovery, and existing identity-switch/hidden-tab issues
 and cloud handoff requirements remain open.
 
-### Publication baseline and merge prerequisites (2026-10-19)
+### Publication baseline and merge prerequisites (historical, before local alignment)
 
 Pre-publication verification matched all 189 changed paths to the validated source;
 the preserved Redis fix and the original carelink working-tree test remained unchanged.
@@ -93,3 +94,10 @@ on the combined version before merge or deployment. Do not edit or renumber a mi
 that has already been applied to a shared database. Boards 2 and 4 should review the
 combined worker, queue and storage configuration. Publishing this feature branch does
 not enable KEDA, deploy infrastructure, or assert compatibility with the newer main.
+
+### Local main alignment completed (2026-10-19)
+
+Main report V4 is retained unchanged and this feature's evidence projection is now V5.
+The earlier V4 collision described above is resolved in the local combined branch.
+All 2021 backend unit tests and 160 selected integrations passed, with the real16-checkpoint flow, main V4->V5 upgrade and five API/worker checks.
+See [scope, upgrade policy and limits](main-alignment-20261019.md). No deployment or formal6b result is implied.
