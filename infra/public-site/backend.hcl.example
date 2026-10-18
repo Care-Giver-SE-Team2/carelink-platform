@@ -1,0 +1,5 @@
+bucket = "carelink-tfstate-123456789012-ap-southeast-1"
+key = "carelink/public-site/terraform.tfstate"
+region = "ap-southeast-1"
+encrypt = true
+use_lockfile = true

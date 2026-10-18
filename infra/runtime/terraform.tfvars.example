@@ -1,0 +1,24 @@
+# Placeholder values only. Real settings belong in terraform.tfvars (Git-ignored).
+aws_account_id         = "123456789012"
+operator_principal_arn = "arn:aws:iam::123456789012:user/carelink-dev"
+admin_ipv4_cidr        = "203.0.113.10/32" # replace with your actual public IPv4
+high_availability      = false
+
+# Opt in only after reviewing data permissions, price and retention.
+enable_data_services         = false
+data_environment             = "staging"
+data_run_id                  = "example-new-run"
+database_deletion_protection  = true
+# Supply TF_VAR_data_credentials through an approved secret manager/session; never in this file.
+# This handoff does not include the historical credential-generation/apply helper.
+
+# Opt in after reviewing messaging/IAM permissions and the workload boundary.
+enable_messaging = false
+
+# Development defaults above are NOT the current live HA inputs.
+# For an existing HA environment, first recover its authoritative inputs/state.
+# Its reviewed HA settings include high_availability=true and ha_worker_migration="complete".
+# Never apply these example defaults to the existing state: that could plan HA removals.
+ha_worker_migration = "legacy"
+ha_apply_immediately = false
+enable_public_ingress = false

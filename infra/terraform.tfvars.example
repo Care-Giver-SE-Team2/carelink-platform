@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and replace this example with your account ID.
+# Credentials are supplied through AWS CLI profiles, never in this file.
+aws_account_id = "123456789012"
+aws_region     = "ap-southeast-1"
