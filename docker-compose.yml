@@ -195,7 +195,8 @@ services:
       localstack:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: worker
+      SPRING_PROFILES_ACTIVE: ${REPORT_WORKER_SPRING_PROFILES:-worker}
+      REPORT_WORKER_TEST_PREPARE_DELAY: ${REPORT_WORKER_TEST_PREPARE_DELAY:-0s}
       SPRING_MAIN_WEB_APPLICATION_TYPE: servlet
       REPORT_LEGACY_SCHEDULER_ENABLED: "false"
       DB_URL: jdbc:mysql://mysql:3306/carelink_report?connectionTimeZone=Asia/Singapore
