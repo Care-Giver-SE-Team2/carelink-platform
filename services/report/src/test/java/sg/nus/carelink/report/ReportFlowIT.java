@@ -12,6 +12,11 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -28,6 +33,9 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import sg.nus.carelink.report.application.ReportService;
 import sg.nus.carelink.report.domain.model.Report;
@@ -108,6 +116,9 @@ class ReportFlowIT {
 
 	@Autowired
 	private JdbcClient jdbc;
+
+	@Autowired
+	private TransactionTemplate transactionTemplate;
 
 	@BeforeEach
 	void givenAManagerACaregiverAndAFreshElder() {
@@ -337,6 +348,202 @@ class ReportFlowIT {
 		assertThat(facts.gather(elder, new ReportPeriod(MONDAY, SUNDAY))).get()
 				.satisfies(quiet -> assertThat(quiet.visits()).isEmpty());
 		assertThat(facts.gather(-1L, new ReportPeriod(MONDAY, SUNDAY))).isEmpty();
+	}
+
+	// -------------------------------------------------- prepared worker transactions ---
+
+	/** A prepared worker batch must not write anything until its atomic commit. */
+	@Test
+	void preparedBatchDoesNotWriteBeforeCommit() {
+		givenTheElderHadAVerifiedWeek();
+		assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+		ReportService.PreparedBatch batch = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+		assertThat(reportCountForCurrentElder()).isZero();
+		assertThat(basisCountForCurrentElder()).isZero();
+
+		transactionTemplate.executeWithoutResult(status -> {
+			assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+			reports.commitPreparedBatch(batch);
+		});
+		assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+		assertThat(basisCountForCurrentElder()).isEqualTo(1L);
+	}
+
+	/** Report, basis and consumed-message marker must roll back together. */
+	@Test
+	void preparedBatchAndMessageMarkerRollbackTogether() {
+		givenTheElderHadAVerifiedWeek();
+		ReportService.PreparedBatch batch = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		String messageId = "txn-rollback-" + elder;
+
+		assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+			jdbc.sql("insert into consumed_message (consumer, message_id, event_type, consumed_at) "
+					+ "values ('report-worker', :messageId, 'ReportRequested', current_timestamp)")
+					.param("messageId", messageId).update();
+			reports.commitPreparedBatch(batch);
+			assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+			throw new IllegalStateException("injected failure before transaction commit");
+		})).isInstanceOf(IllegalStateException.class)
+				.hasMessageContaining("injected failure");
+
+		assertThat(reportCountForCurrentElder()).isZero();
+		assertThat(basisCountForCurrentElder()).isZero();
+		assertThat(jdbc.sql("select count(*) from consumed_message "
+				+ "where consumer = 'report-worker' and message_id = :id")
+				.param("id", messageId).query(Long.class).single()).isZero();
+	}
+
+	/** The same prepared data may be committed twice without another report or basis. */
+	@Test
+	void repeatedPreparedCommitDoesNotDuplicateReports() {
+		givenTheElderHadAVerifiedWeek();
+		ReportService.PreparedBatch batch = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		transactionTemplate.executeWithoutResult(status -> reports.commitPreparedBatch(batch));
+		transactionTemplate.executeWithoutResult(status -> reports.commitPreparedBatch(batch));
+		assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+		assertThat(basisCountForCurrentElder()).isEqualTo(1L);
+	}
+
+
+	/** Two distinct SQS event IDs may prepare the same week before either commits. */
+	@Test
+	void stalePreparedBatchesWithDifferentMessageIdsRemainBusinessIdempotent() {
+		givenTheElderHadAVerifiedWeek();
+		ReportService.PreparedBatch first = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		ReportService.PreparedBatch second = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		String firstId = "stale-first-" + elder;
+		String secondId = "stale-second-" + elder;
+
+		transactionTemplate.executeWithoutResult(status -> {
+			insertConsumedMessage(firstId);
+			reports.commitPreparedBatch(first);
+		});
+		transactionTemplate.executeWithoutResult(status -> {
+			insertConsumedMessage(secondId);
+			reports.commitPreparedBatch(second);
+		});
+
+		assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+		assertThat(basisCountForCurrentElder()).isEqualTo(1L);
+		assertThat(consumedCount(firstId)).isEqualTo(1L);
+		assertThat(consumedCount(secondId)).isEqualTo(1L);
+	}
+
+	/** A real SQL constraint failure after the batch writes must roll back the entire transaction. */
+	@Test
+	void databaseConstraintFailureRollsBackReportsBasisAndMessageMarker() {
+		givenTheElderHadAVerifiedWeek();
+		ReportService.PreparedBatch batch = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		String marker = "sql-failure-" + elder;
+
+		assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+			insertConsumedMessage(marker);
+			reports.commitPreparedBatch(batch);
+			// Violate the existing (consumer, message_id) unique key in MySQL.
+			insertConsumedMessage(marker);
+		})).isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+		assertThat(reportCountForCurrentElder()).isZero();
+		assertThat(basisCountForCurrentElder()).isZero();
+		assertThat(consumedCount(marker)).isZero();
+	}
+
+	/**
+	 * Two real MySQL transactions compete for the same elder/week. Each event has a
+	 * different ID, so event deduplication cannot hide business-key races. A losing
+	 * transaction must leave neither reports, basis nor a consumed-message marker.
+	 * Retrying it in a NEW transaction must be safe.
+	 */
+	@Test
+	void concurrentWorkersCompeteAndFailedDeliveryCanRetry() throws Exception {
+		givenTheElderHadAVerifiedWeek();
+		ReportService.PreparedBatch batchA = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		ReportService.PreparedBatch batchB = reports.prepareBatch(elder, MONDAY, SUNDAY, null);
+		String eventA = "concurrent-a-" + elder;
+		String eventB = "concurrent-b-" + elder;
+		CountDownLatch ready = new CountDownLatch(2);
+		CountDownLatch go = new CountDownLatch(1);
+		ExecutorService pool = Executors.newFixedThreadPool(2);
+		try {
+			Future<Boolean> a = pool.submit(() -> commitCompetingBatch(batchA, eventA, ready, go));
+			Future<Boolean> b = pool.submit(() -> commitCompetingBatch(batchB, eventB, ready, go));
+			assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+			go.countDown();
+			boolean aSucceeded = a.get(45, TimeUnit.SECONDS);
+			boolean bSucceeded = b.get(45, TimeUnit.SECONDS);
+			assertThat(aSucceeded || bSucceeded).isTrue();
+			assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+			assertThat(basisCountForCurrentElder()).isEqualTo(1L);
+			assertThat(consumedCount(eventA)).isEqualTo(aSucceeded ? 1L : 0L);
+			assertThat(consumedCount(eventB)).isEqualTo(bSucceeded ? 1L : 0L);
+
+			// If a competing commit failed, simulate its SQS redelivery after rollback.
+			if (!aSucceeded) {
+				transactionTemplate.executeWithoutResult(status -> {
+					insertConsumedMessage(eventA);
+					reports.commitPreparedBatch(batchA);
+				});
+			}
+			if (!bSucceeded) {
+				transactionTemplate.executeWithoutResult(status -> {
+					insertConsumedMessage(eventB);
+					reports.commitPreparedBatch(batchB);
+				});
+			}
+			assertThat(consumedCount(eventA)).isEqualTo(1L);
+			assertThat(consumedCount(eventB)).isEqualTo(1L);
+			assertThat(reportCountForCurrentElder()).isEqualTo(3L);
+			assertThat(basisCountForCurrentElder()).isEqualTo(1L);
+			assertThat(jdbc.sql("select audience, count(*) from report where elder_id = :elder "
+					+ "and period_start = :start and period_end = :end group by audience")
+					.param("elder", elder).param("start", MONDAY).param("end", SUNDAY)
+					.query((rs, rowNum) -> rs.getLong(2)).list())
+					.containsExactlyInAnyOrder(1L, 1L, 1L);
+		} finally {
+			go.countDown();
+			pool.shutdownNow();
+		}
+	}
+
+	private boolean commitCompetingBatch(ReportService.PreparedBatch batch, String messageId,
+			CountDownLatch ready, CountDownLatch go) throws InterruptedException {
+		ready.countDown();
+		if (!go.await(10, TimeUnit.SECONDS)) {
+			throw new IllegalStateException("Concurrent start gate timed out");
+		}
+		try {
+			transactionTemplate.executeWithoutResult(status -> {
+				insertConsumedMessage(messageId);
+				reports.commitPreparedBatch(batch);
+			});
+			return true;
+		} catch (org.springframework.dao.DataAccessException
+				| org.springframework.transaction.TransactionException expectedRace) {
+			return false;
+		}
+	}
+
+	private void insertConsumedMessage(String messageId) {
+		jdbc.sql("insert into consumed_message (consumer, message_id, event_type, consumed_at) "
+				+ "values ('report-worker', :id, 'ReportRequested', current_timestamp)")
+				.param("id", messageId).update();
+	}
+
+	private long consumedCount(String messageId) {
+		return jdbc.sql("select count(*) from consumed_message "
+				+ "where consumer = 'report-worker' and message_id = :id")
+				.param("id", messageId).query(Long.class).single();
+	}
+
+	private long reportCountForCurrentElder() {
+		return jdbc.sql("select count(*) from report where elder_id = :elder")
+				.param("elder", elder).query(Long.class).single();
+	}
+
+	private long basisCountForCurrentElder() {
+		return jdbc.sql("select count(*) from report_basis where elder_id = :elder")
+				.param("elder", elder).query(Long.class).single();
 	}
 
 	// ------------------------------------------------------------- the weekly run ---

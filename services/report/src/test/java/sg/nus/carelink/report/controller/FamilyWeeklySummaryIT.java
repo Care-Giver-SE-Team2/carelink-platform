@@ -119,7 +119,7 @@ class FamilyWeeklySummaryIT {
 		seedReport(301, 101, "FAMILY", "PUBLISHED", CONTENT);
 		seedReport(302, 102, "FAMILY", "ARCHIVED", CONTENT);
 		seedReport(310, 110, "FAMILY", "PUBLISHED", CONTENT);
-		seedReport(320, 101, "FAMILY", "DRAFT", null);
+		seedReport(320, 101, "FAMILY", "DRAFT", null, "2026-09-28");
 		seedReport(321, 101, "INTERNAL", "PUBLISHED", CONTENT);
 		seedReport(322, 101, "REGULATOR", "PUBLISHED", CONTENT);
 	}
@@ -151,16 +151,12 @@ class FamilyWeeklySummaryIT {
 	}
 
 	@Test
-	void picksLatestReadableExactPeriodWithoutChangingManagerGenerationIdempotency() throws Exception {
-		seedReport(401, 101, "FAMILY", "PUBLISHED", CONTENT);
-		seedReport(402, 101, "FAMILY", "ARCHIVED", CONTENT);
-		seedReport(900, 101, "FAMILY", "PUBLISHED", CONTENT);
-		jdbc.update("UPDATE report SET created_at = ? WHERE id IN (401, 402)", NOW.plusHours(1));
-		jdbc.update("UPDATE report SET created_at = ? WHERE id IN (310, 320, 321, 322)", NOW.plusHours(2));
-		jdbc.update("UPDATE report SET content = NULL WHERE id IN (310, 320, 321, 322)");
-		assertThat(readSummary(loginAs("family-a"), 101, "2026-09-21").path("reportId").longValue()).isEqualTo(402);
-		// Restore the manager's other audiences: its lookup must still return the earliest IDs.
-		jdbc.update("UPDATE report SET content = ? WHERE id IN (321, 322)", CONTENT);
+	void selectsTheOnlyExactPeriodAndManagerGenerationRemainsIdempotent() throws Exception {
+		// The unique constraint permits only one FAMILY report per elder and week.
+		// A later report for a different week must not replace the selected report.
+		seedReport(401, 101, "FAMILY", "PUBLISHED", CONTENT, "2026-09-14");
+		jdbc.update("UPDATE report SET created_at = ? WHERE id = 401", NOW.plusHours(1));
+		assertThat(readSummary(loginAs("family-a"), 101, "2026-09-21").path("reportId").longValue()).isEqualTo(301L);
 		var before = jdbc.queryForList("SELECT * FROM report ORDER BY id");
 		var generated = managerPost(loginAs("manager"), "/api/reports/generate",
 				Map.of("elderId", 101, "periodStart", "2026-09-21", "periodEnd", "2026-09-27"), 202);
@@ -173,10 +169,10 @@ class FamilyWeeklySummaryIT {
 	@Test
 	void missingExactWeekDoesNotSelectOverlappingOrForbiddenReportsOrCreateContent() throws Exception {
 		jdbc.update("UPDATE report SET period_end = '2026-09-26' WHERE id = 301");
-		seedReport(401, 101, "FAMILY", "ARCHIVED", null);
-		seedReport(402, 101, "FAMILY", "PUBLISHED", null);
+		// Insert directly with distinct period keys; avoid transient duplicates.
+		seedReport(401, 101, "FAMILY", "ARCHIVED", null, "2026-09-14");
 		jdbc.update("UPDATE report SET period_start = '2026-09-20' WHERE id = 401");
-		jdbc.update("UPDATE report SET period_start = '2026-09-28', period_end = '2026-10-04' WHERE id = 402");
+		seedReport(402, 101, "FAMILY", "PUBLISHED", null, "2026-10-05");
 		jdbc.update("UPDATE report SET content = NULL WHERE id IN (320, 321, 322)");
 		var before = jdbc.queryForList("SELECT * FROM report ORDER BY id");
 		var session = loginAs("family-a");
@@ -402,10 +398,15 @@ class FamilyWeeklySummaryIT {
 	}
 
 	private void seedReport(long id, long elderId, String audience, String reportStatus, String reportContent) {
+		seedReport(id, elderId, audience, reportStatus, reportContent, "2026-09-21");
+	}
+
+	private void seedReport(long id, long elderId, String audience, String reportStatus, String reportContent, String start) {
+		var periodStart = java.time.LocalDate.parse(start);
 		jdbc.update("""
 				INSERT INTO report (id, elder_id, generated_by_user_id, audience, period_start, period_end, status, content, created_at)
-				VALUES (?, ?, 10, ?, '2026-09-21', '2026-09-27', ?, ?, ?)
-				""", id, elderId, audience, reportStatus, reportContent, NOW);
+				VALUES (?, ?, 10, ?, ?, ?, ?, ?, ?)
+				""", id, elderId, audience, periodStart, periodStart.plusDays(6), reportStatus, reportContent, NOW);
 	}
 
 	/** The session core leaves after {@code username} signs in. */

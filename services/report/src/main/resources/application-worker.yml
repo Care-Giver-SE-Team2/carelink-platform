@@ -1,5 +1,20 @@
-# Temporary servlet mode to preserve the existing web security beans.
-# The worker has no published host ports in docker-compose.yml.
+
+# ============================================================
+# CareLink Report Worker Configuration
+# ============================================================
+#
+# The worker consumes ReportRequested events from SQS.
+#
+# Report generation uses two phases:
+#   1. Prepare reports outside the consumer write transaction.
+#   2. Atomically commit reports and consumed_message.
+#
+# The worker keeps servlet mode to preserve the existing
+# Spring Security configuration.
+#
+# Docker Compose does not publish the worker's HTTP port.
+# ============================================================
+
 spring:
   main:
     web-application-type: servlet
@@ -7,5 +22,19 @@ spring:
 carelink:
   events:
     service: report-worker
+
   report:
+    # Disable the legacy synchronous weekly scheduler.
     legacy-scheduler-enabled: false
+
+    worker:
+      # Fault-drill preparation delay.
+      #
+      # Default: 0s (disabled).
+      #
+      # The Java handler additionally requires the
+      # fault-drill Spring profile to activate this delay.
+      #
+      # Example:
+      # REPORT_WORKER_TEST_PREPARE_DELAY=90s
+      test-prepare-delay: ${REPORT_WORKER_TEST_PREPARE_DELAY:0s}

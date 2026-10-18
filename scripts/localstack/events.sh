@@ -26,6 +26,14 @@ for service in core visit report report-worker notification; do
   awslocal sqs create-queue --region "$region" --queue-name "$queue" --attributes "$redrive" >/dev/null
 done
 
+# Long-running report AI preparation may exceed the default 30-second lease.
+# Reapply this attribute on every LocalStack initialization (also safe on rerun).
+report_worker_url=$(awslocal sqs get-queue-url --region "$region" \
+  --queue-name carelink-report-worker --query QueueUrl --output text)
+awslocal sqs set-queue-attributes --region "$region" \
+  --queue-url "$report_worker_url" \
+  --attributes VisibilityTimeout=180
+
 # subscribe <service> <filter policy>: the service's queue takes the events the policy names, delivered raw
 subscribe() {
   arn=$(awslocal sns subscribe --region "$region" --topic-arn "$topic_arn" --protocol sqs \

@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.report.domain.model.Report;
@@ -56,12 +57,20 @@ public class ReportService {
 	private final ReportBasisRepository bases;
 	private final ReportFactsSource facts;
 	private final Clock clock;
+	private final ReportAiEnricher ai;
 
 	ReportService(ReportRepository reports, ReportBasisRepository bases, ReportFactsSource facts, Clock clock) {
+		this(reports, bases, facts, clock, new ReportAiEnricher(ignored -> java.util.Optional.empty()));
+	}
+
+	@Autowired
+	ReportService(ReportRepository reports, ReportBasisRepository bases, ReportFactsSource facts,
+			Clock clock, ReportAiEnricher ai) {
 		this.reports = reports;
 		this.bases = bases;
 		this.facts = facts;
 		this.clock = clock;
+		this.ai = ai;
 	}
 
 	// ----------------------------------------------------------------- generating ---
@@ -93,6 +102,72 @@ public class ReportService {
 		}
 		return generated;
 	}
+
+
+    /** Immutable prepared data; created without a write transaction. */
+    public record PreparedReport(Long elderId, ReportFacts facts,
+            Map<Report.Audience, sg.nus.carelink.report.domain.model.ReportContent> content) {
+        public PreparedReport {
+            content = Map.copyOf(content);
+        }
+    }
+
+    public record PreparedBatch(ReportPeriod period, Long requestedByUserId,
+            List<PreparedReport> pending) {
+        public PreparedBatch {
+            pending = List.copyOf(pending);
+        }
+    }
+
+    /**
+     * Called outside a transaction by the asynchronous worker. Bedrock calls happen here.
+     * No basis or report is written until commitPreparedBatch.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public PreparedBatch prepareBatch(Long elderId, LocalDate start, LocalDate end, Long requestedByUserId) {
+        ReportPeriod period = new ReportPeriod(start, end);
+        List<Long> elders = elderId == null ? facts.eldersWithVisitsIn(period) : List.of(elderId);
+        List<PreparedReport> pending = new ArrayList<>();
+        for (Long elder : elders) {
+            Map<Report.Audience, sg.nus.carelink.report.domain.model.ReportContent> content =
+                    new EnumMap<>(Report.Audience.class);
+            boolean missing = false;
+            for (Report.Audience audience : Report.Audience.values()) {
+                if (reports.findFor(elder, audience, period).isEmpty()) missing = true;
+            }
+            if (!missing) continue;
+            ReportFacts gathered = facts.gather(elder, period)
+                    .orElseThrow(() -> new ResourceNotFound("Elder", elder));
+            for (Report.Audience audience : Report.Audience.values()) {
+                content.put(audience, ai.enrich(ReportAssembler.forAudience(audience).assemble(gathered)));
+            }
+            pending.add(new PreparedReport(elder, gathered, content));
+        }
+        return new PreparedBatch(period, requestedByUserId, pending);
+    }
+
+    /**
+     * Must be called inside the SAME transaction as consumed_message insertion.
+     * Any failure rolls back every new basis/report and the consumption marker.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void commitPreparedBatch(PreparedBatch batch) {
+        LocalDateTime timestamp = now();
+        for (PreparedReport item : batch.pending()) {
+            List<Report.Audience> missing = new ArrayList<>();
+            for (Report.Audience audience : Report.Audience.values()) {
+                if (reports.findFor(item.elderId(), audience, batch.period()).isEmpty()) {
+                    missing.add(audience);
+                }
+            }
+            if (missing.isEmpty()) continue;
+            ReportBasis basis = bases.save(ReportBasis.of(item.facts(), timestamp), item.facts());
+            for (Report.Audience audience : missing) {
+                reports.save(Report.generate(item.elderId(), basis.id(), audience, batch.period(),
+                        item.content().get(audience), batch.requestedByUserId(), timestamp));
+            }
+        }
+    }
 
 	/**
 	 * The scheduled run: the week ending on or before today, for every elder who had a visit
@@ -134,7 +209,7 @@ public class ReportService {
 						basis.id(),
 						audience,
 						period,
-						ReportAssembler.forAudience(audience).assemble(gathered),
+						ai.enrich(ReportAssembler.forAudience(audience).assemble(gathered)),
 						requestedByUserId,
 						now));
 			}

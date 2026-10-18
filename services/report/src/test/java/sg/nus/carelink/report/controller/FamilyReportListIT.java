@@ -125,7 +125,7 @@ class FamilyReportListIT {
 		seedBinding(110, 7, "FULL", "ACTIVE", null);
 		seedReport(301, 101, "FAMILY", "PUBLISHED", "2026-09-21", NOW);
 		seedReport(302, 102, "FAMILY", "ARCHIVED", "2026-09-21", NOW.plusMinutes(1));
-		seedReport(303, 101, "FAMILY", "PUBLISHED", "2026-09-21", NOW.plusMinutes(1));
+		seedReport(303, 101, "FAMILY", "PUBLISHED", "2026-08-31", NOW.plusMinutes(1));
 		seedReport(304, 101, "FAMILY", "PUBLISHED", "2026-09-14", NOW.plusDays(1));
 		seedReport(310, 110, "FAMILY", "PUBLISHED", "2026-09-28", NOW);
 		seedReport(320, 101, "FAMILY", "DRAFT", "2026-09-28", NOW);
@@ -144,7 +144,7 @@ class FamilyReportListIT {
 	void listsOnlyReadableFamilyReportsUsingExplicitMetadataAndSingaporeTimestamps() throws Exception {
 		var body = readPage(loginAs("family-a"));
 		assertThat(body.propertyNames()).containsExactlyInAnyOrder("items", "page", "size", "totalElements");
-		assertPage(body, 0, 20, 4, 303L, 302L, 301L, 304L);
+		assertPage(body, 0, 20, 4, 302L, 301L, 304L, 303L);
 		assertThat(body.path("items")).allSatisfy(item -> {
 			assertThat(item.propertyNames()).containsExactlyInAnyOrder("id", "elderId", "audience", "periodStart",
 					"periodEnd", "status", "dataComplete", "missingItems", "generatedBy", "createdAt", "archivedAt");
@@ -155,8 +155,8 @@ class FamilyReportListIT {
 					.containsExactly("Visit 201 on 2026-09-22 not closed");
 			assertThat(item.path("archivedAt").isNull()).isTrue();
 		});
-		assertThat(body.path("items").get(2).path("createdAt").asString()).isEqualTo("2026-09-28T00:30:00+08:00");
-		assertThat(body.path("items").get(1).path("status").asString()).isEqualTo("ARCHIVED");
+		assertThat(body.path("items")).filteredOn(item -> item.path("id").longValue() == 301L).singleElement().satisfies(item ->assertThat(item.path("createdAt").asString()).isEqualTo("2026-09-28T00:30:00+08:00"));
+		assertThat(body.path("items")).filteredOn(item -> item.path("id").longValue() == 302L).singleElement().satisfies(item ->assertThat(item.path("status").asString()).isEqualTo("ARCHIVED"));
 		assertThat(jdbc.queryForObject("SELECT @@session.time_zone", String.class)).isEqualTo("+05:00");
 	}
 
@@ -166,10 +166,10 @@ class FamilyReportListIT {
 				"\"Visit 201 on 2026-09-22 not closed\",\"Internal staff performance details\"");
 		jdbc.update("UPDATE report SET content = ? WHERE id = 301", stored);
 		var original = jdbc.queryForObject("SELECT content FROM report WHERE id = 301", String.class);
-		var family = readPage(loginAs("family-a"), "elderId", "101").path("items").get(1);
+		var family = readPage(loginAs("family-a"), "elderId", "101").path("items").get(0);
 		assertThat(family.path("missingItems")).extracting(JsonNode::asString)
 				.containsExactly("Visit 201 on 2026-09-22 not closed", "Some care records are incomplete.");
-		var manager = readPage(loginAs("manager"), "elderId", "101", "audience", "FAMILY").path("items").get(2);
+		var manager = readPage(loginAs("manager"), "elderId", "101", "audience", "FAMILY").path("items").get(1);
 		assertThat(manager.path("missingItems")).extracting(JsonNode::asString)
 				.containsExactly("Visit 201 on 2026-09-22 not closed", "Internal staff performance details");
 		assertThat(jdbc.queryForObject("SELECT content FROM report WHERE id = 301", String.class)).isEqualTo(original);
@@ -180,10 +180,10 @@ class FamilyReportListIT {
 		assertPage(readPage(loginAs("family-b"), "familyMemberId", "42", "userId", "7", "role", "MANAGER"),
 				0, 20, 1, 310L);
 		var session = loginAs("family-a");
-		assertPage(readPage(session, "size", "2"), 0, 2, 4, 303L, 302L);
-		assertPage(readPage(session, "page", "1", "size", "2"), 1, 2, 4, 301L, 304L);
+		assertPage(readPage(session, "size", "2"), 0, 2, 4, 302L, 301L);
+		assertPage(readPage(session, "page", "1", "size", "2"), 1, 2, 4, 304L, 303L);
 		assertPage(readPage(session, "page", "2", "size", "2"), 2, 2, 4);
-		assertPage(readPage(session, "elderId", "101", "audience", "FAMILY", "size", "1"), 0, 1, 3, 303L);
+		assertPage(readPage(session, "elderId", "101", "audience", "FAMILY", "size", "1"), 0, 1, 3, 301L);
 		assertPage(readPage(session, "elderId", "102"), 0, 20, 1, 302L);
 	}
 
@@ -211,7 +211,7 @@ class FamilyReportListIT {
 	@Test
 	void revocationAndExpiryApplyToTheNextReadInTheSameSession() throws Exception {
 		var session = loginAs("family-a");
-		assertPage(readPage(session), 0, 20, 4, 303L, 302L, 301L, 304L);
+		assertPage(readPage(session), 0, 20, 4, 302L, 301L, 304L, 303L);
 		jdbc.update("UPDATE elder_family_binding SET status = 'REVOKED' WHERE elder_id = 101");
 		jdbc.update("UPDATE elder_family_binding SET expires_at = ? WHERE elder_id = 102", NOW);
 		assertPage(readPage(session), 0, 20, 0);
@@ -252,11 +252,11 @@ class FamilyReportListIT {
 	void managerKeepsItsAudienceRulesOrderingAndPaginationClamping() throws Exception {
 		var session = loginAs("manager");
 		var body = readPage(session);
-		assertPage(body, 0, 20, 13, 320L, 403L, 404L, 405L, 406L, 407L, 310L, 322L, 321L, 303L, 301L, 302L, 304L);
+		assertPage(body, 0, 20, 13, 320L, 403L, 404L, 405L, 406L, 407L, 310L, 322L, 321L, 301L, 302L, 304L, 303L);
 		assertThat(body.path("items").get(0).path("createdAt").asString()).isEqualTo("2026-09-28T00:30:00");
 		assertPage(readPage(session, "page", "-1", "size", "0"), 0, 1, 13, 320L);
 		assertPage(readPage(session, "audience", "INTERNAL"), 0, 20, 1, 321L);
-		assertPage(readPage(session, "elderId", "101", "audience", "FAMILY"), 0, 20, 4, 320L, 303L, 301L, 304L);
+		assertPage(readPage(session, "elderId", "101", "audience", "FAMILY"), 0, 20, 4, 320L, 301L, 304L, 303L);
 		mvc.perform(get(PATH + "/301").session(session)).andExpect(status().isOk())
 				.andExpect(jsonPath("$.sections[0].body").value("Report body excluded from list"))
 				.andExpect(jsonPath("$.amendments[0].authorUserId").value(10));
@@ -281,9 +281,9 @@ class FamilyReportListIT {
 		long familyId = generated.stream().filter(report -> report.audience() == Report.Audience.FAMILY).findFirst().orElseThrow().id();
 		var before = jdbc.queryForList("SELECT * FROM report ORDER BY id");
 		var body = readPage(loginAs("family-a"), "elderId", "101");
-		assertPage(body, 0, 20, 4, 303L, 301L, 304L, familyId);
-		assertThat(body.path("items").get(3).path("dataComplete").booleanValue()).isTrue();
-		assertThat(body.path("items").get(3).path("missingItems")).isEmpty();
+		assertPage(body, 0, 20, 4, 301L, 304L, familyId, 303L);
+		assertThat(body.path("items").get(2).path("dataComplete").booleanValue()).isTrue();
+		assertThat(body.path("items").get(2).path("missingItems")).isEmpty();
 		assertThat(jdbc.queryForList("SELECT * FROM report ORDER BY id")).isEqualTo(before);
 	}
 
