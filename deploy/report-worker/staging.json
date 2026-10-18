@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "scalingEnabled": false,
-  "scalingPaused": true,
-  "maxReplicas": 1
+  "scalingEnabled": true,
+  "scalingPaused": false,
+  "maxReplicas": 2
 }

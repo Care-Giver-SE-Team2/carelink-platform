@@ -1,0 +1,25 @@
+# Applied once by the cloud operator; application CD cannot grant itself RBAC.
+# Existing CD already manages Deployments in staging; add only KEDA release objects there.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: carelink-worker-scaling-deployer
+  namespace: staging
+rules:
+  - apiGroups: [keda.sh]
+    resources: [scaledobjects, triggerauthentications]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: carelink-worker-scaling-deployer
+  namespace: staging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: carelink-worker-scaling-deployer
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: carelink:staging-deployers
