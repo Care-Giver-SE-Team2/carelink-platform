@@ -1,0 +1,38 @@
+{
+  "base": "578cddf1926fa23bd3127bc56f877e7d43334072",
+  "network": "loopback only; no CareLink/AWS requests",
+  "rounds": [
+    {
+      "name": "initial existing regression",
+      "testsRun": 18,
+      "successful": true
+    },
+    {
+      "name": "first new tests",
+      "testsRun": 18,
+      "failureEntries": 12,
+      "errorEntries": 1,
+      "successful": false,
+      "explanation": "Short HTTP deadline was also used for Windows worker bootstrap; no HTTP samples in affected cases; separate bootstrap budget added."
+    },
+    {
+      "name": "second new tests",
+      "testsRun": 18,
+      "failureEntries": 0,
+      "errorEntries": 0,
+      "successful": true,
+      "seconds": 50.182
+    },
+    {
+      "name": "final combined regression",
+      "testsRun": 40,
+      "failureEntries": 0,
+      "errorEntries": 0,
+      "skipped": 0,
+      "successful": true,
+      "seconds": 84.0
+    }
+  ],
+  "counting": "Failure entries include subtests; do not subtract entries from testsRun or add repeated observations as independent methods.",
+  "remaining": "D2-D6 and Zhili review/Z1-Z4; no cloud performance result; no fresh real-Java smoke in D1."
+}

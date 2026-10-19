@@ -224,7 +224,7 @@ class LoopbackTests(unittest.TestCase):
 
     def test_timed_out_write_not_retried_or_counted_success(self):
         self.mode = "post-timeout"
-        c = self.cfg(); c.update(scenario="check-in", timeoutSeconds=.1)
+        c = self.cfg(); c.update(scenario="check-in", socketTimeoutSeconds=.1)
         c["phases"][0]["rps"] = 1
         code, s, _ = self.execute(c)
         self.assertEqual((code, s["failedIterations"], self.versions[1]), (2, 1, 1))

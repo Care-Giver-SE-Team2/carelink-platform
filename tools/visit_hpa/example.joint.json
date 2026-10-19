@@ -6,7 +6,9 @@
   "coreBase": "https://visit-hpa.example.invalid",
   "visitBase": "https://visit-hpa.example.invalid",
   "maxVUs": 8,
-  "timeoutSeconds": 8,
+  "socketTimeoutSeconds": 8,
+  "requestDeadlineSeconds": 10,
+  "stopDrainSeconds": 12,
   "maxLaunchLagMs": 200,
   "maxIterations": 4000,
   "phases": [

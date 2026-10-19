@@ -6,7 +6,9 @@
   "coreBase": "http://127.0.0.1:18080",
   "visitBase": "http://127.0.0.1:18081",
   "maxVUs": 2,
-  "timeoutSeconds": 8,
+  "socketTimeoutSeconds": 8,
+  "requestDeadlineSeconds": 10,
+  "stopDrainSeconds": 12,
   "maxLaunchLagMs": 200,
   "maxIterations": 100,
   "phases": [
