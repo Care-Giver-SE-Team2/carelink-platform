@@ -1,0 +1,3 @@
+phase,method,endpoint,samples,httpFailures,businessFailures,errorRate,allP95Ms,successP95Ms,targetObservation,errorCategories,cancelledRequests,requestDeadlineFailures
+pilot-1,GET,/api/visits/{id}/work-pack,100,0,0,0.0,94.0,94.0,WITHIN_DRAFT_TARGET,{},0,0
+pilot-5,GET,/api/visits/{id}/work-pack,100,0,0,0.0,94.0,94.0,WITHIN_DRAFT_TARGET,{},0,0

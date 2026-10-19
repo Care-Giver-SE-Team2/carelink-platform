@@ -1,0 +1,2 @@
+phase,method,endpoint,samples,httpFailures,businessFailures,errorRate,allP95Ms,successP95Ms,targetObservation,errorCategories,cancelledRequests,requestDeadlineFailures
+stop-pilot,GET,/api/visits/{id}/work-pack,3,0,0,0.0,94.0,94.0,INSUFFICIENT_SAMPLES,{},0,0

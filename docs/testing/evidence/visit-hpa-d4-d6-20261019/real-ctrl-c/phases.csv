@@ -1,0 +1,8 @@
+timestamp,phase
+2026-10-19T15:04:59.453633+00:00,setup-start
+2026-10-19T15:05:02.322069+00:00,setup-end
+2026-10-19T15:05:02.322069+00:00,stop-pilot-start
+2026-10-19T15:05:03.657432+00:00,stop-pilot-end
+2026-10-19T15:05:03.657432+00:00,load-stopped-draining
+2026-10-19T15:05:03.657981+00:00,drain-complete
+2026-10-19T15:05:03.692492+00:00,worker-cleanup-complete

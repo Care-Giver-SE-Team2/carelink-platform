@@ -1,0 +1,15 @@
+{
+  "tools/visit_hpa/local_read_acceptance.py": "8d5cf0a72c51c8f3484d3342aa505ef7d06fa4fef5fc543d515d5a9526db2eb2",
+  "tools/visit_hpa/example.joint.four-pair.json": "e9a0498e08ee8073835e96547dd338cc9d18805ea294ff899331bc3e4f95d7f2",
+  "tools/visit_hpa/tests/test_release_fixture.py": "3e2bcf6ecd963065b70e2554451ff2fd55e2b28998ace69ea1a1a582c11ca062",
+  "tools/visit_hpa/load.py": "5ab58bcf9c061ce7f63c767a736fe6a92a240741bbd34e00196e6c507192b321",
+  "tools/visit_hpa/compare_read.py": "fd8af7fd2abdc336cad504fc203adc93b7cf212c1fe47590ac5c66c8ef6a16f3",
+  "tools/visit_hpa/fixture_guard.py": "c3c27b9d8712f669d0fbe27a56375e704be232fa3bda0fc74b8676c6100c182d",
+  "tools/visit_hpa/release_lock.py": "0fab507f0ff400f073b8c47100a071e60745e65c326a205a09ce9a04816b1054",
+  "tools/visit_hpa/example.joint.json": "b4edf49c809177f170747d250a77c7c6fbe27c1e628021a216daee22b7d0d7ee",
+  "tools/visit_hpa/README.md": "4568013c5207e8634c927382c407814e0d40211e90fb05bad76961af3f7bf93f",
+  "docs/testing/visit-hpa-operator-guide.md": "c45a7e6df31560897a9ef3daa25eb98a276c9985d1cb109c2067b11357886307",
+  "docs/testing/visit-hpa-d4-d6-local-validation.md": "f8b34b3078f1ff915fe823be79c3fedd799f378d6ccf9fe8ff6465e5c526d790",
+  "docs/testing/visit-hpa-handoff.md": "bda0db3685b12058fbf338077c75e9af6c187b55f02eea65e89bfbe7e0bd4f59",
+  "docs/testing/visit-hpa-fixture-runbook.md": "6b1e8511cb80ed9665808c616c4b080a9ae13ee0d15b15a697f891a160f37e95"
+}

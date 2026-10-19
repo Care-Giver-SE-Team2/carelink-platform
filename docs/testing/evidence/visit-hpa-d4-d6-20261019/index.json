@@ -1,0 +1,13 @@
+{
+  "scope": "Local-only D4 production APIs and D6 client workflow; no cloud or HPA",
+  "applicationCommit": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "engineCommit": "c5b13e2d91b9e5daa8cb536b8427fa184f60d394",
+  "d3d4Commit": "90844b2c5ccbf30001ae29a114a5b938e6a985a6",
+  "materialCommit": "See files-2/plans completion table",
+  "included": "Reviewed summaries/manifests/markers, cleanup without PIDs, test results and actual local migration checks",
+  "excluded": "Credentials, Cookie jars, actual whitelist/config/registration identities, SQL, logs/bodies, child PIDs, raw request/iteration samples",
+  "rawEvidenceLocation": "Private local acceptance directory; redacted copies alone cannot be passed back to compare_read.py",
+  "formalAcceptance": false,
+  "cloudContacted": false,
+  "pushed": false
+}

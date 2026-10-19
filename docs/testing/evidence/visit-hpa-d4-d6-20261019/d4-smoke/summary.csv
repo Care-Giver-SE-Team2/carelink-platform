@@ -1,0 +1,2 @@
+phase,method,endpoint,samples,httpFailures,businessFailures,errorRate,allP95Ms,successP95Ms,targetObservation,errorCategories,cancelledRequests,requestDeadlineFailures
+d4-smoke,GET,/api/visits/{id}/work-pack,4,0,0,0.0,141.0,141.0,INSUFFICIENT_SAMPLES,{},0,0

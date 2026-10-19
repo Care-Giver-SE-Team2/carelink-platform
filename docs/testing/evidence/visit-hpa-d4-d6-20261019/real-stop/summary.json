@@ -1,0 +1,82 @@
+{
+  "runId": "hpa-20261019t145921-360961-real-stop",
+  "finishedUtc": "2026-10-19T15:04:57.154275+00:00",
+  "outcome": "STOPPED",
+  "stopReasons": [
+    "operator_stop_file"
+  ],
+  "scenario": "work-pack",
+  "plannedIterations": 60,
+  "launchedIterations": 3,
+  "failedIterations": 0,
+  "droppedIterations": 0,
+  "notScheduledAfterStop": 57,
+  "httpRequestsDuringLoad": 3,
+  "httpRequestsDuringSetup": 20,
+  "targetsAreDraft": true,
+  "httpErrorCategories": {},
+  "iterationErrorCategories": {},
+  "cancelledRequests": 0,
+  "requestDeadlineFailures": 0,
+  "clientEvidenceStatus": "STOPPED",
+  "formalAcceptance": false,
+  "phases": [
+    {
+      "phase": "stop-pilot",
+      "clientEvidenceStatus": "INCOMPLETE_LOAD",
+      "targetRps": 2,
+      "durationSeconds": 30,
+      "plannedIterations": 60,
+      "launchedIterations": 3,
+      "droppedIterations": 0,
+      "notScheduledAfterStop": 57,
+      "actualLaunchRps": 2.6666666666666665,
+      "emissionSeconds": 1.125,
+      "failedIterations": 0,
+      "iterationErrorRate": 0.0,
+      "iterationP95Ms": 94.0,
+      "iterationSuccessP95Ms": 94.0,
+      "iterationErrorCategories": {},
+      "iterationTargetObservation": "INSUFFICIENT_SAMPLES",
+      "launchLagP95Ms": 16.0,
+      "endpoints": [
+        {
+          "method": "GET",
+          "endpoint": "/api/visits/{id}/work-pack",
+          "samples": 3,
+          "httpFailures": 0,
+          "businessFailures": 0,
+          "errorRate": 0.0,
+          "allP95Ms": 94.0,
+          "successP95Ms": 94.0,
+          "errorCategories": {},
+          "cancelledRequests": 0,
+          "requestDeadlineFailures": 0,
+          "targetObservation": "INSUFFICIENT_SAMPLES"
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "socketTimeoutSeconds": 8,
+    "requestDeadlineSeconds": 10,
+    "stopDrainSeconds": 12,
+    "stopDetectedUtc": "2026-10-19T15:04:57.116524+00:00",
+    "signalReceivedUtc": null,
+    "drainStartedUtc": "2026-10-19T15:04:57.116524+00:00",
+    "inFlightAtStop": 0,
+    "inFlightAtDrain": 0,
+    "inFlightRemaining": 0,
+    "lastRequestAdmittedUtc": "2026-10-19T15:04:57.007911+00:00",
+    "stopToSupervisorEndMs": 31.0
+  },
+  "workerCleanupComplete": true,
+  "accountingValid": true,
+  "limitations": [
+    "Client-side elapsed time; no HPA/resource observations collected by this tool.",
+    "No retry/logout/reset; timed-out writes require reconciliation before cleanup.",
+    "Read work-pack endpoint also writes access audit records.",
+    "Fixed-account backend test does not cover account switching, UI freshness or FM03 caching.",
+    "Supervised per-VU HTTP processes: verify generator headroom and drops before increasing rate."
+  ]
+}

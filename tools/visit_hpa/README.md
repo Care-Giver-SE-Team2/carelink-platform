@@ -1,6 +1,6 @@
 # Visit HPA business workload
 
-**D1–D5 local preparation update (2026-10-19).** The joint A template is now the candidate 5 RPS / 2700 business GETs per arm. See the [read budget and evidence contract](../../docs/testing/visit-hpa-read-contract.md). D3/D4 source lock and fixture instructions are now available; real local fixture validation is blocked by the Docker engine, and D6/operator review/cloud conditions remain open; this branch is not cloud-test approval.
+**D4/D6 local acceptance completed (2026-10-19).** Full 104 tool tests pass; real production core/visit/MySQL/Redis A fixtures and independent CLI pilots/STOP/native Ctrl+C pass. See [final operator guide](../../docs/testing/visit-hpa-operator-guide.md) and [current local evidence](../../docs/testing/visit-hpa-d4-d6-local-validation.md). Candidate cloud profile remains 5 RPS/2700 GET per arm, unapproved by default. No push, cloud access, HPA activation or formal performance result.
 
 Python **3.10+**, standard library only. No package install, k6, Maven, Docker or cluster credentials are required on the load generator. Windows, Linux and macOS use the same `load.py`. Docker and production JARs are needed **only** for the optional disposable local smoke test.
 
@@ -98,4 +98,14 @@ On a hard process kill, `runtime-private/owned-resources.json` and `child-pids.j
 
 ## D3/D4 update (2026-10-19)
 
-See the [fixed release/migration prerequisites](../../docs/testing/visit-hpa-release-prerequisites.md) and [synthetic A fixture runbook](../../docs/testing/visit-hpa-fixture-runbook.md). The release-lock.json pins application 09d6a3f separately from engine c5b13e2, all 41 migrations and the old report evidence V4 stop condition. fixture_guard.py checks a private four-pair scheduled-small-v1 whitelist/config offline; it does not prepare or query shared data. All approvals and cloud history remain operator checks. Current real local A validation is BLOCKED (Docker unavailable); offline checks are separate evidence.
+See the [fixed release/migration prerequisites](../../docs/testing/visit-hpa-release-prerequisites.md) and [synthetic A fixture runbook](../../docs/testing/visit-hpa-fixture-runbook.md). The release-lock.json pins application 09d6a3f separately from engine c5b13e2, all 41 migrations and the old report evidence V4 stop condition. fixture_guard.py checks a private four-pair scheduled-small-v1 whitelist/config offline; it does not prepare or query shared data. All approvals and cloud history remain operator checks. Docker was unavailable in that earlier round; the new D4/D6 record supersedes the runtime blocker. Historical offline evidence remains separate.
+
+## A-only independent local reproduction and four-pair handoff
+
+Use example.joint.four-pair.json for the full four-actor candidate (placeholder IDs, HTTPS .invalid origin, approval=false, background budget unconfirmed). Offline checks and actual private filling/STOP/result commands are in the operator guide.
+
+local_read_acceptance.py is the A-only disposable production verification entry point. It checks pinned core/visit JAR hashes, uses cached local containers only, bootstraps only an initial manager in an empty DB and performs all caregiver/elder registrations, approvals, assignment and plan/roster preparation through normal APIs. Four future SCHEDULED:0 fixtures stay unchanged; --include-handoff-checks continues only after D4 passes, running two local 200-GET CLI pilots, STOP/native Ctrl+C and refusal/compare checks. This is no HPA benchmark. No shared data is seeded/deleted; only this owned disposable outer environment is removed.
+
+python tools/visit_hpa/local_read_acceptance.py --core-jar /local/core.jar --visit-jar /local/visit.jar --java /local/jdk25/bin/java --output /private/new-output --include-handoff-checks
+
+The legacy local_smoke.py intentionally includes B check-ins; use the A-only entry above for this handoff.

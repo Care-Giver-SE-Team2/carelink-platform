@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "runId": "hpa-20261019t145921-360961-d4",
+  "startedUtc": "2026-10-19T15:00:21.459606+00:00",
+  "scenario": "work-pack",
+  "codeBaseline": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "targetOrigins": [
+    "http://127.0.0.1:18080",
+    "http://127.0.0.1:18081"
+  ],
+  "approval": {
+    "confirmed": false,
+    "environment": "localhost-only",
+    "windowUtc": "UNCONFIRMED",
+    "owner": "Chenyu + Zhili",
+    "deploymentRef": "UNCONFIRMED",
+    "allowedOrigins": []
+  },
+  "plan": {
+    "plannedIterations": 4,
+    "freshVisits": 4,
+    "localhost": true,
+    "remoteExecutionConfirmed": false,
+    "socketTimeoutSeconds": 8,
+    "requestDeadlineSeconds": 10,
+    "stopDrainSeconds": 12,
+    "readBudget": null,
+    "warnings": []
+  },
+  "maxVUs": 4,
+  "phases": [
+    {
+      "name": "d4-smoke",
+      "rps": 1,
+      "durationSeconds": 4,
+      "iterations": 4,
+      "dropped": 0,
+      "notScheduledAfterStop": 4,
+      "emissionSeconds": 0
+    }
+  ],
+  "targets": {
+    "httpP95Ms": 1000,
+    "checkinHttpP95Ms": 2000,
+    "iterationP95Ms": 3000,
+    "errorRate": 0.01,
+    "minSamplesPerEndpoint": 100
+  },
+  "stop": {
+    "errorWindowSeconds": 30,
+    "latencyWindowSeconds": 60,
+    "errorRate": 0.05,
+    "p95Ms": 5000,
+    "consecutiveWindows": 2,
+    "minSamples": 20
+  },
+  "comparisonInputs": {
+    "fixtureSha256": "0d8ad475725526d9066defa5409d58e610061ad0d67c4d2f746bed9f6b231271",
+    "workloadSha256": "32b66c4fae5a427ee34fabce8d62b801b2e4c7cd2f26b67e89041d6620fb7aa8",
+    "scope": "declared fixture/actor allocation and workload; not cloud state verification"
+  },
+  "maxLaunchLagMs": 200,
+  "configSha256": "72a959cb9fa265513c0c6d89684aa14d25aa56757ab264e23ca78b82725c3939",
+  "toolSha256": "5ab58bcf9c061ce7f63c767a736fe6a92a240741bbd34e00196e6c507192b321",
+  "timing": {
+    "socketTimeoutSeconds": 8,
+    "requestDeadlineSeconds": 10,
+    "stopDrainSeconds": 12,
+    "supervisorPollSeconds": 0.02,
+    "workerCleanupGraceSeconds": 0.5,
+    "workerStartDeadlineSeconds": 10
+  },
+  "formalAcceptance": false,
+  "sensitiveBodiesAndCookiesRecorded": false
+}

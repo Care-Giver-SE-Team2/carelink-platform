@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "status": "AWAITING_RESOURCE_REVIEW",
+  "clientComparable": true,
+  "clientIssues": {
+    "A0": [],
+    "A1": []
+  },
+  "differences": [],
+  "resourceReviewIssues": [
+    "resource_context_not_supplied"
+  ],
+  "resourceConditionsAreOperatorDeclarations": true,
+  "candidateMetrics": {
+    "A0": [
+      {
+        "phase": "pilot-1",
+        "iterationP95Ms": 125.0,
+        "iterationTargetObservation": "WITHIN_DRAFT_TARGET",
+        "endpoints": [
+          {
+            "method": "GET",
+            "endpoint": "/api/visits/{id}/work-pack",
+            "samples": 100,
+            "httpFailures": 0,
+            "businessFailures": 0,
+            "errorRate": 0.0,
+            "allP95Ms": 125.0,
+            "successP95Ms": 125.0,
+            "errorCategories": {},
+            "cancelledRequests": 0,
+            "requestDeadlineFailures": 0,
+            "targetObservation": "WITHIN_DRAFT_TARGET"
+          }
+        ]
+      },
+      {
+        "phase": "pilot-5",
+        "iterationP95Ms": 109.0,
+        "iterationTargetObservation": "WITHIN_DRAFT_TARGET",
+        "endpoints": [
+          {
+            "method": "GET",
+            "endpoint": "/api/visits/{id}/work-pack",
+            "samples": 100,
+            "httpFailures": 0,
+            "businessFailures": 0,
+            "errorRate": 0.0,
+            "allP95Ms": 109.0,
+            "successP95Ms": 109.0,
+            "errorCategories": {},
+            "cancelledRequests": 0,
+            "requestDeadlineFailures": 0,
+            "targetObservation": "WITHIN_DRAFT_TARGET"
+          }
+        ]
+      },
+      {
+        "phase": "cooldown",
+        "iterationP95Ms": null,
+        "iterationTargetObservation": "NOT_APPLICABLE",
+        "endpoints": []
+      }
+    ],
+    "A1": [
+      {
+        "phase": "pilot-1",
+        "iterationP95Ms": 109.0,
+        "iterationTargetObservation": "WITHIN_DRAFT_TARGET",
+        "endpoints": [
+          {
+            "method": "GET",
+            "endpoint": "/api/visits/{id}/work-pack",
+            "samples": 100,
+            "httpFailures": 0,
+            "businessFailures": 0,
+            "errorRate": 0.0,
+            "allP95Ms": 94.0,
+            "successP95Ms": 94.0,
+            "errorCategories": {},
+            "cancelledRequests": 0,
+            "requestDeadlineFailures": 0,
+            "targetObservation": "WITHIN_DRAFT_TARGET"
+          }
+        ]
+      },
+      {
+        "phase": "pilot-5",
+        "iterationP95Ms": 94.0,
+        "iterationTargetObservation": "WITHIN_DRAFT_TARGET",
+        "endpoints": [
+          {
+            "method": "GET",
+            "endpoint": "/api/visits/{id}/work-pack",
+            "samples": 100,
+            "httpFailures": 0,
+            "businessFailures": 0,
+            "errorRate": 0.0,
+            "allP95Ms": 94.0,
+            "successP95Ms": 94.0,
+            "errorCategories": {},
+            "cancelledRequests": 0,
+            "requestDeadlineFailures": 0,
+            "targetObservation": "WITHIN_DRAFT_TARGET"
+          }
+        ]
+      },
+      {
+        "phase": "cooldown",
+        "iterationP95Ms": null,
+        "iterationTargetObservation": "NOT_APPLICABLE",
+        "endpoints": []
+      }
+    ]
+  },
+  "formalAcceptance": false,
+  "hpaMechanism": "NOT_EVALUATED",
+  "performanceBenefit": "NOT_EVALUATED",
+  "limitations": "Offline evidence consistency plus operator declarations; no cloud reads, scaling proof or performance/SLA approval."
+}

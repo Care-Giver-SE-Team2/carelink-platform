@@ -234,4 +234,28 @@ class FixtureTests(unittest.TestCase):
             c=config(w); c[k]=v
             with self.subTest(k=k),self.assertRaises(ValueError): self.check(w,c)
 
+
+class HandoffTemplateTests(unittest.TestCase):
+    def test_four_pair_formal_candidate_preserves_budget_and_whitelist(self):
+        c=json.loads((ROOT/"example.joint.four-pair.json").read_text(encoding="utf-8"))
+        spec=importlib.util.spec_from_file_location("d6_load_template",ROOT/"load.py")
+        loader=importlib.util.module_from_spec(spec);spec.loader.exec_module(loader)
+        with patch.object(socket,"socket",side_effect=AssertionError("network forbidden")), \
+             patch.object(socket,"getaddrinfo",side_effect=AssertionError("DNS forbidden")):
+            plan=loader.validate(c)
+            checked=fixture.validate(whitelist(),c,NOW)
+        self.assertEqual((plan["plannedIterations"],c["maxVUs"],len(c["actors"])),(2700,8,4))
+        self.assertFalse(c["approval"]["confirmed"])
+        self.assertFalse(checked["executionApproved"])
+        self.assertEqual(len({a["passwordEnv"] for a in c["actors"]}),4)
+        self.assertFalse(plan["readBudget"]["inputsReviewed"])
+
+    def test_four_pair_remote_template_is_rejected_before_dns_or_worker(self):
+        c=json.loads((ROOT/"example.joint.four-pair.json").read_text(encoding="utf-8"))
+        spec=importlib.util.spec_from_file_location("d6_load_refusal",ROOT/"load.py")
+        loader=importlib.util.module_from_spec(spec);spec.loader.exec_module(loader)
+        with patch.object(socket,"getaddrinfo",side_effect=AssertionError("DNS forbidden")), \
+             patch.object(loader.subprocess,"Popen",side_effect=AssertionError("worker forbidden")):
+            with self.assertRaises(ValueError):loader.validate(c,execute=True)
+
 if __name__=="__main__": unittest.main()

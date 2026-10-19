@@ -1,0 +1,12 @@
+{
+  "tests": 104,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": 79.453,
+  "status": "PASS",
+  "python": "3.12.7",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "observedAtUtc": "2026-10-19T15:03:09.699119+00:00",
+  "scope": "Full tools offline + loopback suite; no cloud CareLink connections"
+}
