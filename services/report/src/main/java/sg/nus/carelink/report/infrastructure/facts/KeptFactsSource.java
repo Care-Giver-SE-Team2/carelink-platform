@@ -68,11 +68,12 @@ class KeptFactsSource implements ReportFactsSource {
 			select v.visit_id as id, v.caregiver_id, v.service_type, v.scheduled_start, v.status,
 			       timestampdiff(minute, v.scheduled_start, v.scheduled_end) as planned_minutes,
 			       timestampdiff(minute, v.checked_in_at, v.checked_out_at) as worked_minutes,
-			       v.evidence_count, v.verified_evidence_count,
+			       coalesce(ev.evidence_count,v.evidence_count) as evidence_count,
+			       coalesce(ev.verified_evidence_count,v.verified_evidence_count) as verified_evidence_count,
 			       exists (select 1 from report_roster_change rc
 			                where rc.visit_id = v.visit_id and rc.outcome = 'SKIPPED'
 			                  and rc.decided_by = 'FAMILY') as skipped_by_family
-			from report_visit v
+			from report_visit v left join report_visit_evidence ev on ev.visit_id=v.visit_id
 			where v.elder_id = :elderId and v.scheduled_start >= :from and v.scheduled_start < :to
 			order by v.scheduled_start, v.visit_id
 			""";

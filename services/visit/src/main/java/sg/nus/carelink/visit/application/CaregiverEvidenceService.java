@@ -26,11 +26,12 @@ public class CaregiverEvidenceService {
     private final EvidenceImageStorage images;
     private final CaregiverCommandStore receipts;
     private final int maxFiles;
+    private final VisitEvents events;
     public CaregiverEvidenceService(CaregiverCommandExecutor executor,CaregiverWorkDirectory directory,VisitRepository visits,
             VisitCommandRepository commands,VisitTaskRepository tasks,VisitEvidenceRepository evidence,VisitEvidenceFileStore metadata,
-            EvidenceImageStorage images,CaregiverCommandStore receipts,@Value("${carelink.caregiver.evidence-max-files:20}") int maxFiles) {
+            EvidenceImageStorage images,CaregiverCommandStore receipts,VisitEvents events,@Value("${carelink.caregiver.evidence-max-files:20}") int maxFiles) {
         this.executor=executor; this.directory=directory; this.visits=visits; this.commands=commands; this.tasks=tasks;
-        this.evidence=evidence; this.metadata=metadata; this.images=images; this.receipts=receipts;
+        this.evidence=evidence; this.metadata=metadata; this.images=images; this.receipts=receipts; this.events=events;
         if(maxFiles<1 || maxFiles>20) throw new IllegalArgumentException("Evidence count limit must be 1–20."); this.maxFiles=maxFiles;
     }
     public Saved upload(String username,Long visitId,VisitEvidence.Kind kind,Long taskId,Integer version,UUID requestId,String fileName,String type,byte[] bytes) {
@@ -64,6 +65,7 @@ public class CaregiverEvidenceService {
             var changed=commands.save(visit); // version only; never invent a state transition or finish a task
             receipts.audit(actor.userId(),visitId,ACTION,"OK","UNVERIFIED");
             receipts.save(new CaregiverCommandReceipt(actor.userId(),requestId,ACTION,visitId,fingerprint,saved.id(),changed.version(),now));
+            events.evidenceUpdated(changed,(int)metadata.count(visitId),(int)metadata.verifiedCount(visitId));
             return new Saved(view(new VisitEvidenceFileStore.Entry(saved,file)),changed.version(),false);
         });
     }

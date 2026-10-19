@@ -78,7 +78,7 @@ missed check-in, so a consumer sees gaps, never a repeat.
 | `VitalsRecorded` | `CaregiverHealthService.record` | A set of readings is recorded | report | published |
 | `ElderConfirmationSubmitted` | `VisitService.submitElderConfirmation` | The elder confirms or disputes a visit | report | published |
 | `VisitClosed` | `VisitService.submitElderConfirmation` (CONFIRMED); nothing sets AUTO_CLOSED yet | The visit becomes VERIFIED or AUTO_CLOSED | report | published |
-| `VisitEvidenceUpdated` | No code writes visit evidence yet | Evidence is added or verified | report | reserved |
+| `VisitEvidenceUpdated` | `CaregiverEvidenceService.upload` | A private evidence upload commits a new count snapshot | report | published |
 
 **The state a visit event leaves.** Each event says what the visit is after it, so a consumer that keeps visits
 applies an event only when its `version` is higher than the one it holds, and needs nothing else:
@@ -392,5 +392,5 @@ catalogue already reserves the events they will need.
 
 - **Nothing sets a visit to AUTO_CLOSED.** A visit the elder confirms becomes VERIFIED (`VisitClosed`), but one the elder never answers stays COMPLETED, so its week is marked incomplete (`data_complete`).
 - **Readings are stored with `out_of_range = false`.** The caregiver's own judgement is the health record's flag. `VitalsRecorded` carries both, so report can follow whichever rule the owners decide.
-- **Nothing writes visit evidence.** So evidence counts are 0, except what the first deployment copied. `VisitEvidenceUpdated` is reserved for this.
+- **Private evidence uploads publish count snapshots.** `VisitEvidenceUpdated` updates report's separate V5 projection without changing visit execution state. Replays do not publish twice; rollback does not publish. Uploads remain UNVERIFIED; this does not add an evidence-verification workflow. Older copied counters remain the fallback when no snapshot exists.
 - **The value-added availability check was 8 hours off.** It bound `LocalDateTime` straight into SQL, while visit times are written through JPA, so the overlap check was 8 hours off in a JVM running on UTC. It is the calls in section 4 now, and visit binds the times the way it writes them.

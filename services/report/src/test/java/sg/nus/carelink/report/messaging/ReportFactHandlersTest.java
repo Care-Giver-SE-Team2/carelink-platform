@@ -46,7 +46,7 @@ class ReportFactHandlersTest {
 			config.visitTaskRecordedHandler(facts), config.vitalsRecordedHandler(facts),
 			config.elderConfirmationSubmittedHandler(facts), config.incidentRaisedHandler(facts),
 			config.incidentUpdatedHandler(facts), config.spotCheckUpdatedHandler(facts),
-			config.rosterChangeUpdatedHandler(facts))
+			config.rosterChangeUpdatedHandler(facts), config.evidenceUpdatedHandler(facts))
 			.stream().collect(Collectors.toMap(EventHandler::type, Function.identity()));
 
 	@Test
@@ -54,7 +54,7 @@ class ReportFactHandlersTest {
 		assertThat(handlers.keySet()).containsExactlyInAnyOrder("VisitScheduled", "VisitCaregiverChanged",
 				"VisitCancelled", "VisitCheckedIn", "VisitCompleted", "VisitExceptionRaised", "VisitClosed", "VisitTaskRecorded",
 				"VitalsRecorded", "ElderConfirmationSubmitted", "IncidentRaised", "IncidentUpdated",
-				"SpotCheckUpdated", "RosterChangeUpdated");
+				"SpotCheckUpdated", "RosterChangeUpdated", "VisitEvidenceUpdated");
 		assertThat(handlers.get("VitalsRecorded").payloadType()).isEqualTo(VitalsRecorded.class);
 	}
 
@@ -69,8 +69,9 @@ class ReportFactHandlersTest {
 		var vitals = new VitalsRecorded(77L, 812L, 101L, NINE, NINE, "ATTENTION", null, List.of());
 		var answer = new ElderConfirmationSubmitted(812L, 101L, NINE, "CONFIRMED", 5, null, NINE, null);
 		var closed = new VisitClosed(812L, 101L, NINE, 9L, "VERIFIED", 6, NINE);
+		var evidence = new sg.nus.carelink.eventtypes.VisitEvidenceUpdated(812L, 101L, NINE, 7, 2, 0);
 
-		for (Object event : List.of(scheduled, changed, cancelled, checkedIn, completed, exception, vitals, answer, closed)) {
+		for (Object event : List.of(scheduled, changed, cancelled, checkedIn, completed, exception, vitals, answer, closed, evidence)) {
 			handle(event, 900L);
 		}
 
@@ -81,6 +82,7 @@ class ReportFactHandlersTest {
 		verify(facts).keep(completed);
 		verify(facts).keep(exception);
 		verify(facts).keep(closed);
+		verify(facts).keep(evidence);
 		verify(facts).keep(vitals);
 		verify(facts).keep(answer);
 	}

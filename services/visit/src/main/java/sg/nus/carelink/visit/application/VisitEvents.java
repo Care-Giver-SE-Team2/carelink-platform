@@ -28,6 +28,8 @@ public interface VisitEvents {
 	/** The visit became VERIFIED (the elder confirmed it) or AUTO_CLOSED. */
 	void closed(Visit visit);
 
+	void evidenceUpdated(Visit visit, int evidenceCount, int verifiedEvidenceCount);
+
 	/** @param cause {@code CAREGIVER_REPORT}, {@code UNCOVERED_AT_START} or {@code ABSENCE_UNCOVERED} */
 	void exceptionRaised(Visit visit, String cause, Long incidentId);
 
