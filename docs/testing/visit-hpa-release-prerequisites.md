@@ -13,7 +13,7 @@
 | 云端release、镜像digest | **UNCONFIRMED** | Zhili批准发布后核对四服务及report-worker；A0/A1使用同一应用release和core/visit digest |
 | 后续本地6b功能 | `codex/visit-6b-followup` / `a106286224669cc9660ca1a47b0d107ae89f09f8` | 保全的k6、FM03缓存和前端跨标签工作；首轮A不自动纳入，不从该分支重建本轮应用 |
 
-需部署的是获准的**应用组合**，不能只搬负载脚本却认为新护理员接口已在线。建议沿正常CI/CD构建应用基线对应的完整release；既有PR59只能作为背景索引，不能代替最终固定commit与review。D1～D4当前仅本地提交，未新建PR、未推送、未合并main。
+需部署的是获准的**应用组合**，不能只搬负载脚本却认为新护理员接口已在线。建议沿正常CI/CD构建应用基线对应的完整release；迁移分支codex/migrate-caregiver-admission已推送但尚无合入main的迁移PR；[D1～D6草稿PR #68](https://github.com/Care-Giver-SE-Team2/carelink-platform/pull/68)以该分支为评审base，仅展示工具/文档差异。PR59是provider构建隔离，与本包无关。交付已上传，未合并main或部署，后续应用集成/发布仍须单独审核。
 
 `release-lock.json`固定了14个应用/发布路径的Git对象、引擎3个核心文件的Git字节SHA256，以及四服务共41个迁移。工作树应用路径与组合基线一致。检查同时拒绝已跟踪应用差异与未跟踪应用路径；忽略文件和实际构建输入仍需发布审查，不以工具检查代替审查。新构建应使用干净checkout/clean输出，避免旧report V4资源残留在target/classes。
 

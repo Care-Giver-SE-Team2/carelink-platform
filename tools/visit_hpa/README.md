@@ -1,6 +1,6 @@
 # Visit HPA business workload
 
-**D4/D6 local acceptance completed (2026-10-19).** Full 104 tool tests pass; real production core/visit/MySQL/Redis A fixtures and independent CLI pilots/STOP/native Ctrl+C pass. See [final operator guide](../../docs/testing/visit-hpa-operator-guide.md) and [current local evidence](../../docs/testing/visit-hpa-d4-d6-local-validation.md). Candidate cloud profile remains 5 RPS/2700 GET per arm, unapproved by default. No push, cloud access, HPA activation or formal performance result.
+**D4/D6 local acceptance completed (2026-10-19).** Full 104 tool tests pass; real production core/visit/MySQL/Redis A fixtures and independent CLI pilots/STOP/native Ctrl+C pass. See [final operator guide](../../docs/testing/visit-hpa-operator-guide.md) and [current local evidence](../../docs/testing/visit-hpa-d4-d6-local-validation.md). Candidate cloud profile remains 5 RPS/2700 GET per arm, unapproved by default. Published later as [draft PR #68](https://github.com/Care-Giver-SE-Team2/carelink-platform/pull/68); see the [current review handoff](../../docs/testing/visit-hpa-review-handoff.md). No merge, cloud application access, HPA activation or formal performance result.
 
 Python **3.10+**, standard library only. No package install, k6, Maven, Docker or cluster credentials are required on the load generator. Windows, Linux and macOS use the same `load.py`. Docker and production JARs are needed **only** for the optional disposable local smoke test.
 

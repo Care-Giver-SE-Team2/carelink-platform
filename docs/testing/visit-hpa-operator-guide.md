@@ -4,7 +4,7 @@
 
 ## 1. 版本和依赖先核对
 
-- 应用固定 `09d6a3f9ec453906f613efd0af7f99fad4fdd8d3`，HTTP负载/离线对照引擎固定 `c5b13e2d91b9e5daa8cb536b8427fa184f60d394`，D3/D4材料起点 `90844b2c5ccbf30001ae29a114a5b938e6a985a6`；最终材料完整提交号在files-2/plans完成表。**本轮按要求不推送、不建PR**，不能用一个不存在的PR链接代替交付。
+- 应用固定 `09d6a3f9ec453906f613efd0af7f99fad4fdd8d3`，HTTP负载/离线对照引擎固定 `c5b13e2d91b9e5daa8cb536b8427fa184f60d394`，D3/D4材料起点 `90844b2c5ccbf30001ae29a114a5b938e6a985a6`；最终材料完整提交号在files-2/plans完成表。本地验收当轮未推送；现已发布[草稿PR #68](https://github.com/Care-Giver-SE-Team2/carelink-platform/pull/68)，当前版本/评审基线/待反馈事项见[最新交接入口](visit-hpa-review-handoff.md)。104项与真实验收固定于9292c78，上传后仅补交接元数据，没有合并或部署。
 - 交付提交包含上述应用源码，不默认带入保全分支的FM03缓存/前端后续改动。先保留自己的工作区，再用正常方式取得/检出指定交付提交；不执行hard reset覆盖个人修改。
 - 负载机只需要Python3.10+标准库（本机验收为Windows/Python3.12.7）；Linux/macOS未实机验证。不需要pip/k6/Docker/AWS CLI/kubeconfig。Docker和Java25仅用于可选的**一次性本地真实验收**。
 - 板块二PR55被评审版本ade044a8bf47c97bb0017dd4445405552ce97b07；实际配置/采集工具及release/digest由你回填，不能把固定源码当成已发布镜像。

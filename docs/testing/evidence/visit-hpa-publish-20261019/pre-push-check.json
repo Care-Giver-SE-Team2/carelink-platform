@@ -1,0 +1,38 @@
+{
+  "checkedAtUtc": "2026-10-19T15:21:00.786869+00:00",
+  "repository": "Care-Giver-SE-Team2/carelink-platform",
+  "remoteMain": "dca04552f56259babe739d91dece74a73028fa9a",
+  "reviewBase": "codex/migrate-caregiver-admission",
+  "reviewBaseCommit": "578cddf1926fa23bd3127bc56f877e7d43334072",
+  "deliveryBranch": "codex/visit-hpa-d1-d6",
+  "validatedHead": "9292c78d5ef4aec79c08835b40833256adaa8094",
+  "changedReviewPaths": 84,
+  "reviewScope": "tools/visit_hpa and docs/testing only; application/Redis migration inherited from review base",
+  "webhookCount": 0,
+  "workflowSources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "mainGitBlobSha256": "a5bf7c0f4be39af6e2db7063f96f9c17f08a93f547da0beae29b3d8b3718ece3"
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "mainGitBlobSha256": "b0b61c39ade0d4cba610a8e170f2ff7ff405027b2bbf5621bec2fd072cbb9308"
+    },
+    {
+      "path": ".github/workflows/deploy-frontend.yml",
+      "mainGitBlobSha256": "9774432d4cb42458281308f4540e469088c3f698b79eece98128293e9829a9ef"
+    },
+    {
+      "path": ".github/workflows/service.yml",
+      "mainGitBlobSha256": "c64cc85b2277d52e00519cc7902ed3e24ecff133e65f4a808a7d8ab8f1c57e50"
+    },
+    {
+      "path": ".github/workflows/security-baseline.yml",
+      "mainGitBlobSha256": "5a0e924f29c2d8ad4ef8f5d79af4456a1f5a84952cea778421af7f8cbab6f746"
+    }
+  ],
+  "pushOrPullRequestDeploys": false,
+  "automaticCiForChosenNonMainBase": false,
+  "reason": "CI push/pull_request filters main; publish/release/backend/frontend/ZAP paths gated to main, manual dispatch untouched",
+  "actionsTaken": "Read-only GitHub/Git inspection; no manual workflow dispatch/merge/main push/AWS call"
+}
