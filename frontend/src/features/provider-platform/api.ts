@@ -28,16 +28,15 @@ import type {
  * the client credentials, and state-changing ones take an Idempotency-Key, which a retry must
  * re-send unchanged. The Partner Portal makes job calls only from its Sandbox.
  *
- * The portal's calls go to the Open API that notification serves (liveApi.ts). The job calls stay on
- * the mock (mockPlatform.ts) until report serves the job API: a token from the real token endpoint is
- * handed to the mock, which gives its client the demo's jobs. Under Vitest, or with
- * VITE_OPEN_PLATFORM_MOCK=true, every call is the mock's, after a short delay, failing like a dropped
- * request while the browser is offline. Each function names the endpoint it stands for; the pages see
- * the same signatures either way.
+ * The portal's calls go to the Open API that notification serves (liveApi.ts). The job API is not
+ * connected yet: live job calls fail explicitly instead of handing real tokens to the mock.
+ * Under Vitest, or in local development with VITE_OPEN_PLATFORM_MOCK=true, every call uses the
+ * mock after a short delay, failing like a dropped request while the browser is offline.
+ * Production builds exclude the mock and reject that environment flag.
  */
 
 /** Whether the portal talks to CareLink; the tests and a backend-less demo use the mock. */
-export const LIVE = import.meta.env.MODE !== 'test' && import.meta.env.VITE_OPEN_PLATFORM_MOCK !== 'true'
+export const LIVE = import.meta.env.PROD || (import.meta.env.MODE !== 'test' && import.meta.env.VITE_OPEN_PLATFORM_MOCK !== 'true')
 
 let latencyMs = 350
 
@@ -90,26 +89,29 @@ export function collectCredentials(session: PortalSession): Promise<IssuedCreden
 
 /** POST /oauth2/token (grant_type=client_credentials) */
 export async function requestToken(clientId: string, clientSecret: string): Promise<AccessToken> {
-  if (LIVE) {
-    const token = await live.requestToken(clientId, clientSecret)
-    platform.adoptAccessToken(token.accessToken, clientId.trim(), token.expiresAt)
-    return token
-  }
+  if (LIVE) return live.requestToken(clientId, clientSecret)
   return call(() => platform.requestToken(clientId, clientSecret))
+}
+
+function jobsUnavailable(): Promise<never> {
+  return Promise.reject(new ApiError(501, 'jobs_not_available', 'The provider job API is not connected in this deployment.', 'local_jobs_unavailable'))
 }
 
 /** GET /v1/jobs?status=new|accepted|completed|closed&page= */
 export function listJobs(token: string, tab: JobTab, page: number): Promise<JobPage> {
+  if (LIVE) return jobsUnavailable()
   return call(() => platform.listJobs(token, tab, page))
 }
 
 /** GET /v1/jobs/{id} */
 export function getJob(token: string, jobId: string): Promise<Job> {
+  if (LIVE) return jobsUnavailable()
   return call(() => platform.getJob(token, jobId))
 }
 
 /** POST /v1/jobs/{id}/accept */
 export function acceptJob(token: string, jobId: string, idempotencyKey: string): Promise<Job> {
+  if (LIVE) return jobsUnavailable()
   return call(() => platform.acceptJob(token, jobId, idempotencyKey))
 }
 
@@ -120,6 +122,7 @@ export function declineJob(
   body: { reason: DeclineReason; note: string | null },
   idempotencyKey: string,
 ): Promise<Job> {
+  if (LIVE) return jobsUnavailable()
   return call(() => platform.declineJob(token, jobId, body, idempotencyKey))
 }
 
@@ -130,6 +133,7 @@ export function completeJob(
   body: { actualStart: string; actualEnd: string; note: string },
   idempotencyKey: string,
 ): Promise<Job> {
+  if (LIVE) return jobsUnavailable()
   return call(() => platform.completeJob(token, jobId, body, idempotencyKey))
 }
 

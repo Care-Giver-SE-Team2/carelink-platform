@@ -69,7 +69,8 @@ export default function Docs() {
         </div>
 
         <Banner tone="warning" title="Draft">
-          The full contract will be published as an OpenAPI spec and a webhook guide. Until then, this page is the reference.
+          Job API examples below describe a planned integration and are not enabled in this deployment.
+          Application, API credentials and webhook management use their existing APIs.
         </Banner>
 
         <section className={styles.section} aria-labelledby="docs-token">
