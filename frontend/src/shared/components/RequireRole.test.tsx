@@ -1,5 +1,6 @@
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -48,6 +49,21 @@ afterEach(() => {
 })
 
 describe('RequireRole', () => {
+  it('retains the same caregiver draft on refresh but clears it on account switch', async () => {
+    stubMe(() => json(user(['CAREGIVER'])))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    function Draft() {
+      const [text, setText] = useState('')
+      return <label>Private caregiver draft<input value={text} onChange={event => setText(event.target.value)} /></label>
+    }
+    render(<QueryClientProvider client={client}><MemoryRouter><RequireRole role="CAREGIVER"><Draft /></RequireRole></MemoryRouter></QueryClientProvider>)
+    const input = await screen.findByLabelText('Private caregiver draft')
+    await userEvent.setup().type(input, 'First account only')
+    await act(async () => { client.setQueryData(['session', 'CAREGIVER'], { ...user(['CAREGIVER']), displayName: 'Updated display' }) })
+    expect(screen.getByLabelText('Private caregiver draft')).toHaveValue('First account only')
+    await act(async () => { client.setQueryData(['session', 'CAREGIVER'], { ...user(['CAREGIVER']), id: 2, username: 'other' }) })
+    expect(screen.getByLabelText('Private caregiver draft')).toHaveValue('')
+  })
   it('sends a visitor with no session to the landing page without showing the screen', async () => {
     stubMe(() => new Response(null, { status: 401 }))
     open('/family/schedule')
@@ -115,6 +131,8 @@ describe('RequireRole', () => {
     const client = open()
     client.setQueryData(['elders'], ['cached elder'])
     expect(await screen.findByRole('heading', { name: 'Landing' })).toBeInTheDocument()
-    expect(client.getQueryData(['elders'])).toBeUndefined()
+    // The destination can render before the departed route's passive cleanup runs.
+    // Assert the cleanup result, without depending on that scheduling order.
+    await waitFor(() => expect(client.getQueryData(['elders'])).toBeUndefined())
   })
 })

@@ -17,7 +17,7 @@ beforeEach(() => {
   read = async () => reply(records)
   write = async options => { records[0] = { ...records[0], caregiverResponse: JSON.parse(String(options?.body)).response }; return reply(records[0]) }
   vi.stubGlobal('fetch', vi.fn((url: string, options?: RequestInit) => {
-    if (url === '/api/caregivers/me') return Promise.resolve(reply({ id: 1, userId: 10, fullName: 'Caregiver A' }))
+    if (url === '/api/caregivers/me') return Promise.resolve(reply({ id: 1, userId: 10, fullName: 'Caregiver A', status: 'AVAILABLE' }))
     if (url === '/api/auth/csrf') return Promise.resolve(new Response(null, { status: 200 }))
     if (url === '/api/spot-checks') return read()
     if (url === '/api/spot-checks/8/response' && options?.method === 'POST') return write(options)

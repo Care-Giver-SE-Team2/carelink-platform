@@ -61,6 +61,7 @@ function WorkPack({ id, back }: { id: string; back: string }) {
     <ExecutionTasks pack={pack} command={command} />
     {pack.healthObservation && <HealthPanel pack={pack} command={command} revision={result.receivedAt} />}
     <section className={styles.card} aria-label="Required evidence"><h2>Required evidence</h2><p className={styles.muted}>Requirements for the tasks assigned to this visit.</p>
+      <Link to={`/caregiver/visits/${id}/evidence`}>View or upload evidence images</Link>
       {pack.requiredEvidenceKinds.length ? <div className={styles.pills}>{pack.requiredEvidenceKinds.map(kind => <span className={styles.badge} key={kind}>{titleCase(kind)}</span>)}</div> : <p>No evidence requirements recorded.</p>}
     </section>
   </>

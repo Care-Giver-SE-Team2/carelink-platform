@@ -17,6 +17,6 @@ routes:
   - {path: "/^/api/visits(/.*)?$", service: visit}
   - {path: "/^/api/elders/me/visits(/.*)?$", service: visit}
   - {path: "/^/api/caregivers/me$", service: visit}
-  - {path: "/^/api/caregivers/me/(schedule|incidents)(/.*)?$", service: visit}
+  - {path: "/^/api/caregivers/me/(schedule|incidents|history|system-alerts)(/.*)?$", service: visit}
   - {path: "/^/api/caregivers/[0-9]+(/credentials)?$", service: visit}
   - {path: "/^/api(/.*)?$", service: core}

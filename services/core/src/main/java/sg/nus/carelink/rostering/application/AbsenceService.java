@@ -64,7 +64,7 @@ public class AbsenceService {
 	 */
 	public AbsenceReport requestForSelf(String caregiverUsername, AbsenceReport.Type type, LocalDate startDate,
 			LocalDate endDate, String reason) {
-		CaregiverWorkDirectory.Profile caregiver = caregivers.require(caregiverUsername);
+        CaregiverWorkDirectory.Profile caregiver = caregivers.require(caregiverUsername).requireWorking();
 		AbsenceReport asked = keep(AbsenceReport.requested(caregiver.id(), type, startDate, endDate, reason, today()));
 		alert.requested(asked, caregiver.fullName());
 		return asked;
@@ -86,7 +86,7 @@ public class AbsenceService {
 	/** The signed-in caregiver's own absences, latest first. */
 	@Transactional(readOnly = true)
 	public List<AbsenceReport> listForSelf(String caregiverUsername) {
-		return absences.findByCaregiverId(caregivers.require(caregiverUsername).id());
+        return absences.findByCaregiverId(caregivers.require(caregiverUsername).requireAdmittedHistory().id());
 	}
 
 	@Transactional(readOnly = true)

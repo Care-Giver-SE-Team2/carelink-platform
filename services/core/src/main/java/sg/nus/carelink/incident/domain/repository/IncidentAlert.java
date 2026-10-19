@@ -17,7 +17,8 @@ import sg.nus.carelink.incident.domain.model.Incident;
 public interface IncidentAlert {
 
 	/**
-	 * Tells every manager and the caregiver on the elder's most recent visit.
+	 * Tells every manager and the caregiver on the elder's most recent visit,
+	 * except SYS03, which targets only the caregiver on its locked triggering Visit.
 	 *
 	 * @return how many people were told
 	 */

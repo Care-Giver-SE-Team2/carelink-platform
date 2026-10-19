@@ -49,6 +49,8 @@
 .formPanel label, .filterLabel { display: grid; gap: 7px; margin: 14px 0; font-weight: 600; }
 .formPanel select, .formPanel input, .formPanel textarea, .filterLabel select { box-sizing: border-box; width: 100%; min-height: 44px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface, white); color: var(--text); font: inherit; padding: 10px; }
 .formPanel textarea { resize: vertical; }
+.formPanel label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 10px; }
+.formPanel input[type="checkbox"] { width: 20px; min-height: 20px; flex: 0 0 20px; }
 .button:disabled { opacity: .6; cursor: wait; }
 .navigation a:focus-visible, .formPanel :is(input, select, textarea, button):focus-visible, .filterLabel select:focus-visible { outline: 3px solid var(--accent, #398573); outline-offset: 3px; }
 .highlighted { outline: 3px solid var(--accent, #398573); outline-offset: 3px; }

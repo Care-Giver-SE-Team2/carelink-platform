@@ -38,5 +38,8 @@ export function useCaregiverQuery<T>(key: string, load: (signal: AbortSignal) =>
     return () => controller.abort()
   }, [key, load, revision])
   const current: QueryResult<T> = result.key === key && result.revision === revision ? result : { key, revision, status: 'loading' }
-  return { result: current, reload }
+  // Callers may retain a mounted editor during a same-key refresh. Never reuse a
+  // different identity's response or retain data after a failed authorization.
+  const retainedData = result.key === key && result.status === 'success' ? result.data : undefined
+  return { result: current, reload, retainedData }
 }

@@ -11,4 +11,7 @@ interface LatestCaregivers {
 	/** The caregiver on the elder's most recent visit that had one, or empty. */
 	Optional<Long> latestCaregiverId(Long elderId);
 
+	/** The caregiver assigned to this visit now, or empty when it has none or does not exist. */
+	Optional<Long> assignedCaregiverId(Long visitId);
+
 }

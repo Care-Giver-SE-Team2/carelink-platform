@@ -21,7 +21,7 @@ let profileResponse: () => Promise<Response>
 beforeEach(() => {
   scheduleResponse = async () => reply(schedule)
   packResponse = async () => reply(pack)
-  profileResponse = async () => reply({ id: 1, fullName: 'Caregiver A' })
+  profileResponse = async () => reply({ id: 1, userId: 10, fullName: 'Caregiver A', status: 'AVAILABLE' })
   vi.stubGlobal('fetch', vi.fn((url: string) => {
     if (url === '/api/auth/me') return Promise.resolve(reply({ username: 'a', displayName: 'Caregiver A', roles: ['CAREGIVER'] }))
     if (url === '/api/auth/csrf') return Promise.resolve(new Response(null, { status: 200 }))

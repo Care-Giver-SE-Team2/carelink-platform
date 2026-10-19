@@ -100,6 +100,25 @@ class CaregiverWorkIT {
         mvc.perform(get("/api/caregivers/me/schedule").with(user("demo-cg-a").roles("CAREGIVER"))
             .param("dateFrom","invalid").param("dateTo",day.toString())).andExpect(status().isBadRequest());
     }
+    /** Admission (core's) gates caregiver work: a pending applicant signs in but cannot work, and a leaver keeps only history. */
+    @Test void caregiverAwaitingAdmissionCannotUseWorkEndpoints() throws Exception {
+        try {
+            jdbc.update("update caregiver set status='ONBOARDING' where user_id=(select id from app_user where username='demo-cg-a')");
+            mvc.perform(get("/api/caregivers/me/schedule").with(user("demo-cg-a").roles("CAREGIVER"))
+                .param("dateFrom",day.toString()).param("dateTo",day.toString())).andExpect(status().isForbidden());
+            mvc.perform(get("/api/visits/"+aVisit+"/work-pack").with(user("demo-cg-a").roles("CAREGIVER")))
+                .andExpect(status().isForbidden());
+            mvc.perform(post("/api/visits/"+aVisit+"/check-in").with(user("demo-cg-a").roles("CAREGIVER")).with(csrf())
+                .contentType("application/json")
+                .content("{\"expectedVersion\":0,\"clientRequestId\":\""+java.util.UUID.randomUUID()+"\",\"locationSource\":\"MANUAL_LOCATION_NOTE\",\"locationNote\":\"At the front door\"}"))
+                .andExpect(status().isForbidden());
+            mvc.perform(get("/api/caregivers/me/history").with(user("demo-cg-a").roles("CAREGIVER")).param("month",day.toString().substring(0,7)))
+                .andExpect(status().isForbidden());
+        }
+        finally {
+            jdbc.update("update caregiver set status='AVAILABLE' where user_id=(select id from app_user where username='demo-cg-a')");
+        }
+    }
     @Test void emptyDayIsEmptyAndProfileMissingIs404() throws Exception {
         mvc.perform(get("/api/caregivers/me/schedule").with(user("demo-cg-a").roles("CAREGIVER"))
             .param("dateFrom",day.plusDays(7).toString()).param("dateTo",day.plusDays(7).toString()))

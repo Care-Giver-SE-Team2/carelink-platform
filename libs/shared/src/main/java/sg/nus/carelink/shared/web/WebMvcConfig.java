@@ -21,6 +21,7 @@ class WebMvcConfig implements WebMvcConfigurer {
 	/** Family sign-up happens before there is an account. Mirrors the permitAll in SecurityConfig. */
 	static final String FAMILY_REGISTRATION_PATH = "/api/family-registrations";
 	static final String ELDER_REGISTRATION_PATH = "/api/elder-registrations";
+	static final String CAREGIVER_REGISTRATION_PATH = "/api/caregiver-registrations";
 	/**
 	 * The Open Platform's calls made before there is a token: applying, signing in to the Partner Portal,
 	 * the client-credentials grant and the key set. Mirrors the permitAll in platform-security's
@@ -47,7 +48,8 @@ class WebMvcConfig implements WebMvcConfigurer {
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(requestContext)
 				.addPathPatterns(API_PATHS)
-				.excludePathPatterns(LOGIN_PATH, CSRF_PATH, FAMILY_REGISTRATION_PATH, ELDER_REGISTRATION_PATH)
+				.excludePathPatterns(LOGIN_PATH, CSRF_PATH, FAMILY_REGISTRATION_PATH, ELDER_REGISTRATION_PATH,
+						CAREGIVER_REGISTRATION_PATH)
 				.excludePathPatterns(OPEN_PLATFORM_PUBLIC_PATHS);
 	}
 }

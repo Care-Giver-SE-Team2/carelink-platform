@@ -24,7 +24,7 @@ public record Caregiver(
 
 	/**
 	 * Whether a manager may name this caregiver as an elder's primary caregiver. ONBOARDING
-	 * caregivers have no published credential yet and INACTIVE ones have left, so neither can
+	 * caregivers await admission approval and INACTIVE ones have left, so neither can
 	 * take on an elder; BUSY only describes today's load and does not block.
 	 */
 	public boolean isAssignable() {

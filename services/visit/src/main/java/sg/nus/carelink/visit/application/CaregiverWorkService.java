@@ -48,7 +48,7 @@ public class CaregiverWorkService {
     public CaregiverWorkDirectory.Profile profile(String username) { return directory.require(username); }
 
     public Schedule schedule(String username, LocalDate from, LocalDate to) {
-        var caregiver = directory.require(username);
+        var caregiver = directory.require(username).requireWorking();
         var today = LocalDate.now(clock.withZone(SINGAPORE));
         if (from == null && to == null) { from = today; to = today.plusDays(6); }
         if (from == null || to == null || to.isBefore(from) || ChronoUnit.DAYS.between(from, to) > 30
@@ -62,7 +62,7 @@ public class CaregiverWorkService {
     }
 
     public WorkPack workPack(String username, Long visitId) {
-        var caregiver = directory.require(username);
+        var caregiver = directory.require(username).requireWorking();
         Visit visit = visits.findById(visitId).orElse(null);
         if (visit == null) {
             audit.workPack(caregiver.userId(), visitId, "FAILED");

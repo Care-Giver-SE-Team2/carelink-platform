@@ -22,11 +22,12 @@ export function linkFor(item: Pick<NotificationItem, 'resourceType' | 'resourceI
     return validId(item.resourceId) ? `/family/incidents/${item.resourceId}` : null
   }
   const routes: Record<string, Partial<Record<Portal, string>>> = {
+    CAREGIVER_SYSTEM_ALERT: { caregiver: validId(item.resourceId) ? `/caregiver/system-alerts/${item.resourceId}` : '/caregiver/system-alerts' },
     INCIDENT: { manager: item.resourceId == null ? '/manager/exceptions' : `/manager/exceptions/${item.resourceId}`, caregiver: item.resourceId == null ? '/caregiver/incidents' : `/caregiver/incidents/${item.resourceId}` },
     ABSENCE: { manager: item.resourceId == null ? '/manager/absences' : `/manager/absences/${item.resourceId}` },
     ROSTER_CHANGE: { manager: '/manager/absences', family: '/family/changes', caregiver: '/caregiver' },
     SPOT_CHECK: { manager: '/manager/quality', family: '/family/spot-checks', caregiver: item.resourceId == null ? '/caregiver/spot-checks' : `/caregiver/spot-checks?spotCheckId=${item.resourceId}` },
-    CREDENTIAL: { manager: '/manager/certifications', caregiver: '/caregiver' },
+    CREDENTIAL: { manager: '/manager/certifications', caregiver: validId(item.resourceId) ? `/caregiver/credentials/${item.resourceId}` : '/caregiver/credentials' },
     // An extra service's visit: staffed or reviewed on the manager's Extra services screen; for its
     // caregiver, the visit itself.
     VISIT: {
