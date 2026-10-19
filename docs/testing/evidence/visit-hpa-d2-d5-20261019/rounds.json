@@ -1,0 +1,43 @@
+{
+  "scope": "offline and loopback only; synthetic full pair rows test checker logic and are NOT measured/cloud performance",
+  "rounds": [
+    {
+      "name": "first D2/D5",
+      "testsRun": 26,
+      "failureEntries": 0,
+      "errorEntries": 1,
+      "successful": false,
+      "reason": "New endpoint JSON fields were not added to CSV fieldnames; export ValueError after first short read. CSV schema/JSON encoding fixed."
+    },
+    {
+      "name": "second D2/D5",
+      "testsRun": 30,
+      "failureEntries": 0,
+      "errorEntries": 0,
+      "successful": true,
+      "seconds": 24.108
+    },
+    {
+      "name": "first combined D1+D2+D5",
+      "testsRun": 70,
+      "failureEntries": 0,
+      "errorEntries": 0,
+      "successful": true,
+      "seconds": 94.89
+    },
+    {
+      "name": "final combined after missing-file diagnostic clarification",
+      "testsRun": 70,
+      "failureEntries": 0,
+      "errorEntries": 0,
+      "skipped": 0,
+      "successful": true,
+      "seconds": 101.812
+    }
+  ],
+  "limits": [
+    "No real Java/MySQL/Redis smoke in this round; reserved for D6.",
+    "No cloud/WAF live read or HPA result; D3/D4/D6 and Zhili Z1-Z4 still pending.",
+    "70 methods include subtests/repetitions; do not add repetitions or synthetic rows to test count."
+  ]
+}

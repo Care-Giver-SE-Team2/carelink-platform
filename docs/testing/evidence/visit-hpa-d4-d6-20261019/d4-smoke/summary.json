@@ -1,0 +1,80 @@
+{
+  "runId": "hpa-20261019t145921-360961-d4",
+  "finishedUtc": "2026-10-19T15:00:28.553423+00:00",
+  "outcome": "COMPLETED",
+  "stopReasons": [],
+  "scenario": "work-pack",
+  "plannedIterations": 4,
+  "launchedIterations": 4,
+  "failedIterations": 0,
+  "droppedIterations": 0,
+  "notScheduledAfterStop": 0,
+  "httpRequestsDuringLoad": 4,
+  "httpRequestsDuringSetup": 20,
+  "targetsAreDraft": true,
+  "httpErrorCategories": {},
+  "iterationErrorCategories": {},
+  "cancelledRequests": 0,
+  "requestDeadlineFailures": 0,
+  "clientEvidenceStatus": "INSUFFICIENT_SAMPLES",
+  "formalAcceptance": false,
+  "phases": [
+    {
+      "phase": "d4-smoke",
+      "clientEvidenceStatus": "INSUFFICIENT_SAMPLES",
+      "targetRps": 1,
+      "durationSeconds": 4,
+      "plannedIterations": 4,
+      "launchedIterations": 4,
+      "droppedIterations": 0,
+      "notScheduledAfterStop": 0,
+      "actualLaunchRps": 0.9960159362549801,
+      "emissionSeconds": 4.016,
+      "failedIterations": 0,
+      "iterationErrorRate": 0.0,
+      "iterationP95Ms": 141.0,
+      "iterationSuccessP95Ms": 141.0,
+      "iterationErrorCategories": {},
+      "iterationTargetObservation": "INSUFFICIENT_SAMPLES",
+      "launchLagP95Ms": 16.0,
+      "endpoints": [
+        {
+          "method": "GET",
+          "endpoint": "/api/visits/{id}/work-pack",
+          "samples": 4,
+          "httpFailures": 0,
+          "businessFailures": 0,
+          "errorRate": 0.0,
+          "allP95Ms": 141.0,
+          "successP95Ms": 141.0,
+          "errorCategories": {},
+          "cancelledRequests": 0,
+          "requestDeadlineFailures": 0,
+          "targetObservation": "INSUFFICIENT_SAMPLES"
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "socketTimeoutSeconds": 8,
+    "requestDeadlineSeconds": 10,
+    "stopDrainSeconds": 12,
+    "stopDetectedUtc": null,
+    "signalReceivedUtc": null,
+    "drainStartedUtc": "2026-10-19T15:00:28.515831+00:00",
+    "inFlightAtStop": 0,
+    "inFlightAtDrain": 0,
+    "inFlightRemaining": 0,
+    "lastRequestAdmittedUtc": "2026-10-19T15:00:27.509326+00:00",
+    "stopToSupervisorEndMs": null
+  },
+  "workerCleanupComplete": true,
+  "accountingValid": true,
+  "limitations": [
+    "Client-side elapsed time; no HPA/resource observations collected by this tool.",
+    "No retry/logout/reset; timed-out writes require reconciliation before cleanup.",
+    "Read work-pack endpoint also writes access audit records.",
+    "Fixed-account backend test does not cover account switching, UI freshness or FM03 caching.",
+    "Supervised per-VU HTTP processes: verify generator headroom and drops before increasing rate."
+  ]
+}

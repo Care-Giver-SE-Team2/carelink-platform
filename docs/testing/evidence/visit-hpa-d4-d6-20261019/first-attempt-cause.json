@@ -1,0 +1,9 @@
+{
+  "attempt": "r1",
+  "status": "RESOLVED_TEST_FIXTURE_FAILURE",
+  "observed": "400 on first caregiver registration; no load started",
+  "cause": "UTC runId contained uppercase T; username pattern is lowercase [a-z0-9][a-z0-9._-]{2,63}",
+  "fix": "lowercase generated local run identifier; business code unchanged",
+  "subsequent": "r2 all normal registrations and D4/D6 passed; r1 evidence retained",
+  "cleanup": "r1 all owned resources removed, original containers and ports unchanged"
+}

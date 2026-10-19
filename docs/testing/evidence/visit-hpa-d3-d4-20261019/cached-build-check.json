@@ -1,0 +1,341 @@
+{
+  "scope": "OFFLINE cached build/source and SQL-resource checks; no database/JAR startup",
+  "applicationCommit": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "cachedBuildSourceFilesChecked": 2174,
+  "sourceMismatches": [],
+  "cachedJars": [
+    {
+      "service": "core",
+      "jarSha256": "44fa50a55579faaad0a67db7634191ac2b4897952cd9012baf2a4dc3b09fa420",
+      "migrationEntries": 28,
+      "expectedMigrationEntries": 28,
+      "checks": [
+        {
+          "version": "1",
+          "script": "V1__baseline.sql",
+          "jarEntrySha256": "965b6db1fba8f194c40a8f351d51e57a8035e1493b334ac7ef7462fd2a1de1e4",
+          "flywayChecksum": -766878,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "2",
+          "script": "V2__care_domain.sql",
+          "jarEntrySha256": "8f2537e7bba52eeb981e6febbe1005873fd66188a75ce93b77117e4998632dd3",
+          "flywayChecksum": -728354739,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "3",
+          "script": "V3__stop_care_plan.sql",
+          "jarEntrySha256": "19c59fd316da04a981a3f8249a8351cf23f0a52f44fb1ec904cad0f24db9648d",
+          "flywayChecksum": 1176559857,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "4",
+          "script": "V4__flatten_care_plan_node.sql",
+          "jarEntrySha256": "bdcb53a0c2a869e9ae15793d51374bcd97e5065b0ff8a4451b90838317942220",
+          "flywayChecksum": -468232710,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "5",
+          "script": "V5__drop_care_plan_node_service_type.sql",
+          "jarEntrySha256": "5612f2c29f40a2381e59b3592837a9ae08c3ea8eeb11afc3946de9c50178cc16",
+          "flywayChecksum": -461535555,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "6",
+          "script": "V6__care_plan_start_date.sql",
+          "jarEntrySha256": "12f752528dcadb7be6f25255f373fd01e072a6119f13abec5aac5e1a5c87e441",
+          "flywayChecksum": -879592470,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "7",
+          "script": "V7__elder_service_dispute_incident_source.sql",
+          "jarEntrySha256": "0c2e813fa9cd4b293a7add5422e8b3796548a7c8af03f083d82a648ba9ce8849",
+          "flywayChecksum": 457372633,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "8",
+          "script": "V8__report_amendment.sql",
+          "jarEntrySha256": "0b1ac22124223d526e8662372016c84e1d94b4a47f1f5513c5f7fdbeb581b4b2",
+          "flywayChecksum": 1836072364,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "9",
+          "script": "V9__elder_primary_caregiver.sql",
+          "jarEntrySha256": "3ae356b416dbf099160bb394f0184786c19eddeb071b028b620460be6e54133d",
+          "flywayChecksum": -512060905,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "10",
+          "script": "V10__care_plan_node_visit.sql",
+          "jarEntrySha256": "d7ff218197c92a15a6a945742a8515e40254281dae0b76adfbf87b533073f1c0",
+          "flywayChecksum": -561518148,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "11",
+          "script": "V11__credential_review.sql",
+          "jarEntrySha256": "e287625310918e6f17036b9041549d016e01e74ef5029dda0057bc396698f9aa",
+          "flywayChecksum": -1043063645,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "12",
+          "script": "V12__absence_rerostering.sql",
+          "jarEntrySha256": "72dc3e82dd3496212a3a60237ad7933e981618a8ad69ca6e1a9ca4f31248fbc0",
+          "flywayChecksum": -276744204,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "13",
+          "script": "V13__spot_check_conclusion.sql",
+          "jarEntrySha256": "02b19e3763af33266a2ef5796ff02767010b119241f5db5b97c80fe9c3f74ea4",
+          "flywayChecksum": 462914158,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "14",
+          "script": "V14__seed_value_added_services.sql",
+          "jarEntrySha256": "c8b58e16140d6785ebdca00c57e0b643dd228c97ab4bc6eadd1fb3212dee4e16",
+          "flywayChecksum": -1677146032,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "15",
+          "script": "V15__family_alert_delivery.sql",
+          "jarEntrySha256": "9c3f9f0a7f48e07bdc412a3018e051de2eea25267738a7cfb6654550fa35b323",
+          "flywayChecksum": 1833942631,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "16",
+          "script": "V16__caregiver_command_receipt.sql",
+          "jarEntrySha256": "4cb3da121f6d94fbd77a58c350769610da9775755b3d67957eae85eec1b95620",
+          "flywayChecksum": 1295585224,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "17",
+          "script": "V17__visit_check_in_and_task_uniqueness.sql",
+          "jarEntrySha256": "b4e403cc2bab9b84f9e8980c66b69a3fda1b73a5a58254ee499b695da2b47f47",
+          "flywayChecksum": -216226740,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "18",
+          "script": "V18__visit_missed_check_in_trigger.sql",
+          "jarEntrySha256": "9a1d47f2cf1c851e673b79adb5a36bac83ce09f31b72c1c7ed458615c61d24c6",
+          "flywayChecksum": -380969238,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "19",
+          "script": "V19__incident_description_and_report_basis.sql",
+          "jarEntrySha256": "24d29003473dc2b04905a1633623e113d31382f4e782b5cfd81b27e6f0563e95",
+          "flywayChecksum": -2116843670,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "20",
+          "script": "V20__visit_health_records.sql",
+          "jarEntrySha256": "d6a9dcc4220ed7a34631bb2ec426a3755491e62dd502615894d9bc1b54e46164",
+          "flywayChecksum": 503757286,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "21",
+          "script": "V21__family_care_service_application.sql",
+          "jarEntrySha256": "4d5ca2d067a78b3a9d7065665e899a0a3171df7ed0fde99afa84c7d5d5a4d82b",
+          "flywayChecksum": 27408493,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "22",
+          "script": "V22__value_added_service_duration.sql",
+          "jarEntrySha256": "19dd8c5a403c39fcd949e9a97b1ccc6c05df392444670bd6f1cb1efff59f6f5a",
+          "flywayChecksum": -568160987,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "23",
+          "script": "V23__visit_instructions.sql",
+          "jarEntrySha256": "aea6cf50cd92e720781ea196dfb8511232089acc3f5dcb2aa075b85b732f787e",
+          "flywayChecksum": -969942316,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "24",
+          "script": "V24__care_plan_node_activity_code.sql",
+          "jarEntrySha256": "d827f342b89c4494e55f97c68d13b066703baab796491a5c822f814aa7bdb82a",
+          "flywayChecksum": -384056573,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "25",
+          "script": "V25__service_application_decline.sql",
+          "jarEntrySha256": "cf3a9c9aa4afcf364c845e36c42b0403f4e2a9c68b468db846b772897b9e3c16",
+          "flywayChecksum": 993302770,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "26",
+          "script": "V26__caregiver_admission.sql",
+          "jarEntrySha256": "a91fe6adb271e28ab26203a0d7cb8badbe20ed8d050679c006615920dbe54281",
+          "flywayChecksum": 1119888666,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "27",
+          "script": "V27__caregiver_credential_submission.sql",
+          "jarEntrySha256": "11b12dff93737c6c0108a07442e567b03194281cdc08a02dbf3649e749c8b986",
+          "flywayChecksum": 1999752257,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "28",
+          "script": "V28__caregiver_work_settings.sql",
+          "jarEntrySha256": "b2dd52f6238b2e1ff19a4bb7e283c81c508ae70b842c4a4c037f2772fe93e68f",
+          "flywayChecksum": 740801175,
+          "matchesSourceFlywayChecksum": true
+        }
+      ],
+      "flywayLibrary": [
+        "flyway-core-12.4.0.jar"
+      ]
+    },
+    {
+      "service": "visit",
+      "jarSha256": "46cdcd5c637729be2a42c0d2fa65fe7f204616947375e4f244c23d04ce1f2875",
+      "migrationEntries": 5,
+      "expectedMigrationEntries": 5,
+      "checks": [
+        {
+          "version": "1",
+          "script": "V1__visit_tables.sql",
+          "jarEntrySha256": "ac02539d1dbd86e9271f7c711a3a082daf279c7602a2784880465c4c1711a2e8",
+          "flywayChecksum": -1450296056,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "2",
+          "script": "V2__visit_request.sql",
+          "jarEntrySha256": "22ffd077bbf9caa2e0b50c27aee1710d218fb2baf987475d5f2b9c4428feb613",
+          "flywayChecksum": 556943074,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "3",
+          "script": "V3__caregiver_system_alert_index.sql",
+          "jarEntrySha256": "f082fe8db6b971c1d2a94e8dfc87ad606c9b06a54fdbb6d8db734fd8cd9e2e7b",
+          "flywayChecksum": -1444325943,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "4",
+          "script": "V4__visit_evidence_file.sql",
+          "jarEntrySha256": "ca861599d79819b1d1a5fc511124c4fb0827a5c62425faa62bbe7648ff5b196e",
+          "flywayChecksum": -597251045,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "5",
+          "script": "V5__caregiver_history_index.sql",
+          "jarEntrySha256": "2723c442a39bdcbaa04327b51c72e1694c491997c1b9e8e059bfd2f3b768aef9",
+          "flywayChecksum": 1897602332,
+          "matchesSourceFlywayChecksum": true
+        }
+      ],
+      "flywayLibrary": [
+        "flyway-core-12.4.0.jar"
+      ]
+    },
+    {
+      "service": "report",
+      "jarSha256": "b8c3e8dc304275a5219acc2ef2d7deb7b99b08f90fb3089a175f484c1a8356af",
+      "migrationEntries": 5,
+      "expectedMigrationEntries": 5,
+      "checks": [
+        {
+          "version": "1",
+          "script": "V1__report_tables.sql",
+          "jarEntrySha256": "937ba8b92eed72c8b184abdf9a5a7c4240b4efd9a42637927dae6c2b976d1b5d",
+          "flywayChecksum": 1215694517,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "2",
+          "script": "V2__value_added_service_catalogue.sql",
+          "jarEntrySha256": "99f2692615243e452ebe694ed8d4d8be4591bb6996baa01279cbdc5ac6f84c5f",
+          "flywayChecksum": 1085518467,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "3",
+          "script": "V3__report_unique_period.sql",
+          "jarEntrySha256": "3f6ad2760df8610561af309cd1dd3948777a76ccc35268c0c469e9953121e6c0",
+          "flywayChecksum": -572798646,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "4",
+          "script": "V4__report_task_dispatch.sql",
+          "jarEntrySha256": "12a8b840b38decb87dc9917eb39179b1a591283d50ccf8efd2fd0439f961d581",
+          "flywayChecksum": 1912429229,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "5",
+          "script": "V5__visit_evidence_projection.sql",
+          "jarEntrySha256": "b16fa472b9c26492e561d88589e384d3db709356e3149a113a31d006d41a6a5a",
+          "flywayChecksum": -1121044410,
+          "matchesSourceFlywayChecksum": true
+        }
+      ],
+      "flywayLibrary": [
+        "flyway-core-12.4.0.jar"
+      ]
+    },
+    {
+      "service": "notification",
+      "jarSha256": "fe41ab26a71c8bca69f719e8594ba8cb6876c4f03df02aee617433bc10c41869",
+      "migrationEntries": 3,
+      "expectedMigrationEntries": 3,
+      "checks": [
+        {
+          "version": "1",
+          "script": "V1__notification_tables.sql",
+          "jarEntrySha256": "b10276bc16de2290d35c7397f0a1a87442f99e76667bc0751b1dd44fe0e3eb61",
+          "flywayChecksum": 898893085,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "2",
+          "script": "V2__webhook_delivery.sql",
+          "jarEntrySha256": "265ee0af4091630ade7580ba258d56b151a3cedff8e36d3148e2a8eab271e813",
+          "flywayChecksum": 1050415276,
+          "matchesSourceFlywayChecksum": true
+        },
+        {
+          "version": "3",
+          "script": "V3__provider_onboarding.sql",
+          "jarEntrySha256": "dbdf9a5a9258797fa5d2847831616125df90079d1e24c6c2159991e5bc383258",
+          "flywayChecksum": 1620249201,
+          "matchesSourceFlywayChecksum": true
+        }
+      ],
+      "flywayLibrary": [
+        "flyway-core-12.4.0.jar"
+      ]
+    }
+  ],
+  "status": "PASS",
+  "runtimeBehaviorVerifiedThisRound": false
+}

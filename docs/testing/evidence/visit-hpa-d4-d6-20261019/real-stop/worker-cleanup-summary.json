@@ -1,0 +1,38 @@
+{
+  "workers": [
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 31.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 31.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 31.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 31.0
+    }
+  ],
+  "complete": true,
+  "elapsedMs": 31.0
+}

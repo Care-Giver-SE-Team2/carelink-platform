@@ -1,0 +1,72 @@
+{
+  "runId": "hpa-20261019t145921-360961",
+  "status": "PASS",
+  "scope": "localhost-only; events disabled; no HPA",
+  "checks": [
+    "production_core_visit_real_redis_ready",
+    "four_normal_certificate_free_registrations_and_manager_approvals",
+    "four_normal_elder_registrations_user_links_primary_assignments_published_plans",
+    "four_future_scheduled_v0_empty_tasks_one_service_instruction",
+    "four_unchanged_core_to_visit_session_cookies",
+    "anonymous_and_cross_caregiver_reads_rejected",
+    "d4_four_business_gets_twenty_setup_eight_ok_audits_state_unchanged",
+    "d6_two_cli_arms_two_hundred_gets_each_no_failures_drops_state_changes",
+    "d6_client_evidence_comparable_but_no_hpa_or_resource_acceptance",
+    "d6_real_service_stop_and_native_ctrl_c_cli_cleanup",
+    "d6_existing_output_and_unapproved_remote_rejected",
+    "no_checkin_B_or_visit_state_version_assignment_changes"
+  ],
+  "applicationJars": {
+    "core": "44fa50a55579faaad0a67db7634191ac2b4897952cd9012baf2a4dc3b09fa420",
+    "visit": "46cdcd5c637729be2a42c0d2fa65fe7f204616947375e4f244c23d04ce1f2875"
+  },
+  "d4": {
+    "status": "PASS",
+    "businessGets": 4,
+    "setupHttp": 20,
+    "auditDelta": 8,
+    "pairs": 4,
+    "generatedVisits": 8,
+    "userAccounts": 9,
+    "executionTasks": 0,
+    "serviceInstructions": 1,
+    "observedResponseBytesRange": [
+      814,
+      816
+    ]
+  },
+  "d6": {
+    "status": "PASS",
+    "cases": 16,
+    "clientComparable": true,
+    "resourceStatus": "AWAITING_RESOURCE_REVIEW",
+    "hpaMechanism": "NOT_EVALUATED",
+    "formalAcceptance": false
+  },
+  "runs": [
+    {
+      "name": "d4-smoke",
+      "outcome": "COMPLETED",
+      "iterations": 4,
+      "httpRequests": 4,
+      "failed": 0,
+      "dropped": 0
+    }
+  ],
+  "formalHpaOrSlaAcceptance": false,
+  "preparedData": {
+    "pairs": 4,
+    "scheduledStatus": "SCHEDULED:0",
+    "executionTasksPerVisit": 0,
+    "instructionsPerVisit": 1,
+    "totalGeneratedVisits": 8,
+    "successfulWhitelistedReadAudits": 458
+  },
+  "localRetention": "Rows frozen through all arms; explicitly-owned disposable tmpfs environment removed after checks; no shared data approval",
+  "cleanup": {
+    "ownedContainersRemoved": true,
+    "ownedNetworkRemoved": true,
+    "originalContainersUnchanged": true,
+    "temporaryPortsClosed": true
+  }
+}

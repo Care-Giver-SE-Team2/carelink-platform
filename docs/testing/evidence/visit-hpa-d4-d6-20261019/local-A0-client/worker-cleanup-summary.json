@@ -1,0 +1,70 @@
+{
+  "workers": [
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    },
+    {
+      "reaped": true,
+      "readerJoined": true,
+      "writerJoined": true,
+      "terminated": false,
+      "killed": false,
+      "cleanupMs": 63.0
+    }
+  ],
+  "complete": true,
+  "elapsedMs": 78.0
+}

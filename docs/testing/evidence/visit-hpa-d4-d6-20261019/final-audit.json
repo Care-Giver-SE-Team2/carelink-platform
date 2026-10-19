@@ -1,0 +1,16 @@
+{
+  "brokenLinks": [],
+  "sourceFingerprintDrift": [],
+  "privateValueLeaks": [],
+  "portsClosed": true,
+  "whitespaceExit": 0,
+  "applicationPathsChanged": [],
+  "proofStatuses": {
+    "full-tool-tests.json": "PASS",
+    "real-local-final.json": "PASS",
+    "d6-cli-checks.json": "PASS",
+    "actual-local-flyway.json": "PASS",
+    "guide-offline-checks.json": "PASS"
+  },
+  "status": "PASS"
+}

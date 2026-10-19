@@ -6,9 +6,11 @@
   "coreBase": "https://visit-hpa.example.invalid",
   "visitBase": "https://visit-hpa.example.invalid",
   "maxVUs": 8,
-  "timeoutSeconds": 8,
+  "socketTimeoutSeconds": 8,
+  "requestDeadlineSeconds": 10,
+  "stopDrainSeconds": 12,
   "maxLaunchLagMs": 200,
-  "maxIterations": 4000,
+  "maxIterations": 2700,
   "phases": [
     {
       "name": "baseline",
@@ -26,13 +28,13 @@
       "durationSeconds": 120
     },
     {
-      "name": "step-8",
-      "rps": 8,
+      "name": "step-5",
+      "rps": 5,
       "durationSeconds": 120
     },
     {
       "name": "hold",
-      "rps": 8,
+      "rps": 5,
       "durationSeconds": 240
     },
     {
@@ -52,7 +54,8 @@
           "visitId": 1,
           "elderId": 73100,
           "expectedStatus": "SCHEDULED",
-          "expectedVersion": 0
+          "expectedVersion": 0,
+          "expectedTaskCount": 0
         }
       ]
     }
@@ -79,5 +82,12 @@
     "owner": "Chenyu + Zhili",
     "deploymentRef": "UNCONFIRMED",
     "allowedOrigins": []
+  },
+  "readProfile": "visit-hpa-A-waf-v1",
+  "wafBudget": {
+    "windowSeconds": 300,
+    "limitRequests": 2000,
+    "otherRequestsPerWindow": null,
+    "sourceIpReviewed": false
   }
 }

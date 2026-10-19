@@ -1,0 +1,130 @@
+[
+  {
+    "run": "d4-smoke",
+    "outcome": "COMPLETED",
+    "businessGets": 4,
+    "setupHttp": 20,
+    "failed": 0,
+    "dropped": 0,
+    "clientEvidenceStatus": "INSUFFICIENT_SAMPLES",
+    "stopToSupervisorEndMs": null,
+    "phases": [
+      {
+        "phase": "d4-smoke",
+        "samples": 4,
+        "iterationP95Ms": 141.0,
+        "httpP95Ms": [
+          141.0
+        ]
+      }
+    ]
+  },
+  {
+    "run": "local-A0-client",
+    "outcome": "COMPLETED",
+    "businessGets": 200,
+    "setupHttp": 40,
+    "failed": 0,
+    "dropped": 0,
+    "clientEvidenceStatus": "COMPLETE_CLIENT_SAMPLES",
+    "stopToSupervisorEndMs": null,
+    "phases": [
+      {
+        "phase": "pilot-1",
+        "samples": 100,
+        "iterationP95Ms": 125.0,
+        "httpP95Ms": [
+          125.0
+        ]
+      },
+      {
+        "phase": "pilot-5",
+        "samples": 100,
+        "iterationP95Ms": 109.0,
+        "httpP95Ms": [
+          109.0
+        ]
+      },
+      {
+        "phase": "cooldown",
+        "samples": 0,
+        "iterationP95Ms": null,
+        "httpP95Ms": []
+      }
+    ]
+  },
+  {
+    "run": "local-A1-client",
+    "outcome": "COMPLETED",
+    "businessGets": 200,
+    "setupHttp": 40,
+    "failed": 0,
+    "dropped": 0,
+    "clientEvidenceStatus": "COMPLETE_CLIENT_SAMPLES",
+    "stopToSupervisorEndMs": null,
+    "phases": [
+      {
+        "phase": "pilot-1",
+        "samples": 100,
+        "iterationP95Ms": 109.0,
+        "httpP95Ms": [
+          94.0
+        ]
+      },
+      {
+        "phase": "pilot-5",
+        "samples": 100,
+        "iterationP95Ms": 94.0,
+        "httpP95Ms": [
+          94.0
+        ]
+      },
+      {
+        "phase": "cooldown",
+        "samples": 0,
+        "iterationP95Ms": null,
+        "httpP95Ms": []
+      }
+    ]
+  },
+  {
+    "run": "real-stop",
+    "outcome": "STOPPED",
+    "businessGets": 3,
+    "setupHttp": 20,
+    "failed": 0,
+    "dropped": 0,
+    "clientEvidenceStatus": "STOPPED",
+    "stopToSupervisorEndMs": 31.0,
+    "phases": [
+      {
+        "phase": "stop-pilot",
+        "samples": 3,
+        "iterationP95Ms": 94.0,
+        "httpP95Ms": [
+          94.0
+        ]
+      }
+    ]
+  },
+  {
+    "run": "real-ctrl-c",
+    "outcome": "STOPPED",
+    "businessGets": 3,
+    "setupHttp": 20,
+    "failed": 0,
+    "dropped": 0,
+    "clientEvidenceStatus": "STOPPED",
+    "stopToSupervisorEndMs": 47.0,
+    "phases": [
+      {
+        "phase": "stop-pilot",
+        "samples": 3,
+        "iterationP95Ms": 94.0,
+        "httpP95Ms": [
+          94.0
+        ]
+      }
+    ]
+  }
+]

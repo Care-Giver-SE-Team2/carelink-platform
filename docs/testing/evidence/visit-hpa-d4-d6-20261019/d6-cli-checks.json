@@ -1,0 +1,131 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "name": "local-A0-client-dry",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "local-A0-client-whitelist",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "local-A0-client",
+      "exitCode": 0,
+      "outcome": "COMPLETED",
+      "businessGets": 200,
+      "setupHttp": 40,
+      "auditDelta": 208,
+      "failed": 0,
+      "dropped": 0,
+      "clientEvidenceStatus": "COMPLETE_CLIENT_SAMPLES",
+      "stopReasons": [],
+      "stopToSupervisorEndMs": null,
+      "workerCleanupComplete": true,
+      "businessStateUnchanged": true
+    },
+    {
+      "name": "local-A1-client-dry",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "local-A1-client-whitelist",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "local-A1-client",
+      "exitCode": 0,
+      "outcome": "COMPLETED",
+      "businessGets": 200,
+      "setupHttp": 40,
+      "auditDelta": 208,
+      "failed": 0,
+      "dropped": 0,
+      "clientEvidenceStatus": "COMPLETE_CLIENT_SAMPLES",
+      "stopReasons": [],
+      "stopToSupervisorEndMs": null,
+      "workerCleanupComplete": true,
+      "businessStateUnchanged": true
+    },
+    {
+      "name": "compare-without-resource-context",
+      "exitCode": 2,
+      "expected": 2
+    },
+    {
+      "name": "real-stop-dry",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "real-stop-whitelist",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "real-stop",
+      "exitCode": 2,
+      "outcome": "STOPPED",
+      "businessGets": 3,
+      "setupHttp": 20,
+      "auditDelta": 7,
+      "failed": 0,
+      "dropped": 0,
+      "clientEvidenceStatus": "STOPPED",
+      "stopReasons": [
+        "operator_stop_file"
+      ],
+      "stopToSupervisorEndMs": 31.0,
+      "workerCleanupComplete": true,
+      "businessStateUnchanged": true
+    },
+    {
+      "name": "real-ctrl-c-dry",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "real-ctrl-c-whitelist",
+      "exitCode": 0,
+      "expected": 0
+    },
+    {
+      "name": "real-ctrl-c",
+      "exitCode": 2,
+      "outcome": "STOPPED",
+      "businessGets": 3,
+      "setupHttp": 20,
+      "auditDelta": 7,
+      "failed": 0,
+      "dropped": 0,
+      "clientEvidenceStatus": "STOPPED",
+      "stopReasons": [
+        "operator_interrupt"
+      ],
+      "stopToSupervisorEndMs": 47.0,
+      "workerCleanupComplete": true,
+      "businessStateUnchanged": true
+    },
+    {
+      "name": "reject-existing-load-output",
+      "exitCode": 2,
+      "expected": 2
+    },
+    {
+      "name": "reject-existing-compare-output",
+      "exitCode": 2,
+      "expected": 2
+    },
+    {
+      "name": "reject-remote-before-execute",
+      "exitCode": 2,
+      "expected": 2
+    }
+  ],
+  "comparisonStatus": "AWAITING_RESOURCE_REVIEW",
+  "cloudOrHpaTest": false
+}

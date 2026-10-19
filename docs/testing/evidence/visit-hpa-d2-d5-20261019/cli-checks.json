@@ -1,0 +1,22 @@
+{
+  "basis": "entirely synthetic unit-test result files, not measured/cloud performance",
+  "checks": [
+    {
+      "case": "matching",
+      "exit": 0,
+      "status": "CLIENT_AND_DECLARED_CONDITIONS_MATCH",
+      "formalAcceptance": false
+    },
+    {
+      "case": "missing-review",
+      "exit": 2,
+      "status": "AWAITING_RESOURCE_REVIEW",
+      "formalAcceptance": false
+    },
+    {
+      "case": "existing-report-preserved",
+      "exit": 2,
+      "unchanged": true
+    }
+  ]
+}

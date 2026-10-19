@@ -1,0 +1,127 @@
+test_completion_stop_race_three_cli_runs_counts_once (test_deadlines.DeadlineTests.test_completion_stop_race_three_cli_runs_counts_once) ... ok
+test_ctrl_c_during_setup (test_deadlines.DeadlineTests.test_ctrl_c_during_setup) ... ok
+test_ctrl_c_on_normal_request_then_repeat_stop_is_idempotent (test_deadlines.DeadlineTests.test_ctrl_c_on_normal_request_then_repeat_stop_is_idempotent) ... ok
+test_dns_connect_and_assertion_block_fault_injection (test_deadlines.DeadlineTests.test_dns_connect_and_assertion_block_fault_injection) ... ok
+test_headers_endless_chunked_and_incomplete_body_are_bounded (test_deadlines.DeadlineTests.test_headers_endless_chunked_and_incomplete_body_are_bounded) ... ok
+test_healthy_multi_vu_reuses_sessions_without_extra_login (test_deadlines.DeadlineTests.test_healthy_multi_vu_reuses_sessions_without_extra_login) ... ok
+test_legacy_socket_timeout_reproduction (test_deadlines.DeadlineTests.test_legacy_socket_timeout_reproduction) ... ok
+test_native_ctrl_c_inflight_three_cli_runs (test_deadlines.DeadlineTests.test_native_ctrl_c_inflight_three_cli_runs) ... ok
+test_output_redaction_and_header_success_is_not_business_success (test_deadlines.DeadlineTests.test_output_redaction_and_header_success_is_not_business_success) ... ok
+test_parent_crash_closes_owned_worker_without_success_summary (test_deadlines.DeadlineTests.test_parent_crash_closes_owned_worker_without_success_summary) ... ok
+test_rejected_config_has_no_worker_or_dns (test_deadlines.DeadlineTests.test_rejected_config_has_no_worker_or_dns) ... ok
+test_response_size_limit_survives_transport_change (test_deadlines.DeadlineTests.test_response_size_limit_survives_transport_change) ... ok
+test_stop_during_cooldown_with_no_inflight (test_deadlines.DeadlineTests.test_stop_during_cooldown_with_no_inflight) ... ok
+test_stop_during_setup (test_deadlines.DeadlineTests.test_stop_during_setup) ... ok
+test_stop_during_worker_bootstrap_does_not_wait_start_deadline (test_deadlines.DeadlineTests.test_stop_during_worker_bootstrap_does_not_wait_start_deadline) ... ok
+test_stop_inflight_multiple_vus_has_one_shared_drain (test_deadlines.DeadlineTests.test_stop_inflight_multiple_vus_has_one_shared_drain) ... ok
+test_stop_inflight_one_vu_three_cli_runs (test_deadlines.DeadlineTests.test_stop_inflight_one_vu_three_cli_runs) ... ok
+test_timing_legacy_mapping_and_reject_ambiguous_or_invalid_fields (test_deadlines.DeadlineTests.test_timing_legacy_mapping_and_reject_ambiguous_or_invalid_fields) ... ok
+test_tls_handshake_stall_on_local_tcp_is_bounded (test_deadlines.DeadlineTests.test_tls_handshake_stall_on_local_tcp_is_bounded) ... ok
+test_total_deadline_terminates_continuous_drip_three_cli_runs (test_deadlines.DeadlineTests.test_total_deadline_terminates_continuous_drip_three_cli_runs) ... ok
+test_worker_bootstrap_has_separate_bounded_budget (test_deadlines.DeadlineTests.test_worker_bootstrap_has_separate_bounded_budget) ... ok
+test_worker_crash_fails_closed (test_deadlines.DeadlineTests.test_worker_crash_fails_closed) ... ok
+test_latency_windows_stop (test_load.GuardTests.test_latency_windows_stop) ... ok
+test_offline_validation_does_not_open_network (test_load.GuardTests.test_offline_validation_does_not_open_network) ... ok
+test_rejects_credentials_paths_and_mixed_session_host (test_load.GuardTests.test_rejects_credentials_paths_and_mixed_session_host) ... ok
+test_rejects_nonfinite_negative_and_excessive_load (test_load.GuardTests.test_rejects_nonfinite_negative_and_excessive_load) ... ok
+test_remote_requires_exact_approved_origin (test_load.GuardTests.test_remote_requires_exact_approved_origin) ... ok
+test_small_samples_are_not_sla_pass_and_failed_http_not_hidden (test_load.GuardTests.test_small_samples_are_not_sla_pass_and_failed_http_not_hidden) ... ok
+test_two_bad_windows_stop_and_empty_window_resets (test_load.GuardTests.test_two_bad_windows_stop_and_empty_window_resets) ... ok
+test_unapproved_remote_blocked_before_network (test_load.GuardTests.test_unapproved_remote_blocked_before_network) ... ok
+test_write_pool_is_finite_and_unique (test_load.GuardTests.test_write_pool_is_finite_and_unique) ... ok
+test_auth_failure_during_load_stops_remaining_arrivals (test_load.LoopbackTests.test_auth_failure_during_load_stops_remaining_arrivals) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 1, "failedIterations": 1, "droppedIterations": 0, "stopReasons": ["authentication_or_contract_http"]}
+ok
+test_first_checkins_are_unique_and_postverified (test_load.LoopbackTests.test_first_checkins_are_unique_and_postverified) ... {"runId": "replace-with-unique-run-id", "outcome": "COMPLETED", "launchedIterations": 2, "failedIterations": 0, "droppedIterations": 0, "stopReasons": []}
+ok
+test_operator_stop_file_prevents_load (test_load.LoopbackTests.test_operator_stop_file_prevents_load) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["operator_stop_file", "setup_stopped_before_request"]}
+ok
+test_real_http_login_cookies_csrf_and_read_success (test_load.LoopbackTests.test_real_http_login_cookies_csrf_and_read_success) ... {"runId": "replace-with-unique-run-id", "outcome": "COMPLETED", "launchedIterations": 2, "failedIterations": 0, "droppedIterations": 0, "stopReasons": []}
+ok
+test_redirect_auth_html_wrong_visit_and_replay_fail_closed (test_load.LoopbackTests.test_redirect_auth_html_wrong_visit_and_replay_fail_closed) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["authentication_or_contract_http", "setup_authentication_or_contract_http"]}
+{"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["authentication_or_contract_http", "setup_authentication_or_contract_http"]}
+{"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["non_json_response", "setup_non_json_response"]}
+{"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["wrong_visit_or_state", "setup_wrong_visit_or_state"]}
+ok
+test_replayed_checkin_is_not_new_throughput (test_load.LoopbackTests.test_replayed_checkin_is_not_new_throughput) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 1, "failedIterations": 1, "droppedIterations": 0, "stopReasons": ["checkin_not_a_fresh_success"]}
+ok
+test_server_failures_trigger_runtime_window_stop (test_load.LoopbackTests.test_server_failures_trigger_runtime_window_stop) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 8, "failedIterations": 8, "droppedIterations": 0, "stopReasons": ["consecutive_errors_windows"]}
+ok
+test_slow_generator_drops_without_queue_or_retries (test_load.LoopbackTests.test_slow_generator_drops_without_queue_or_retries) ... {"runId": "replace-with-unique-run-id", "outcome": "COMPLETED_WITH_DROPS", "launchedIterations": 5, "failedIterations": 0, "droppedIterations": 15, "stopReasons": []}
+ok
+test_timed_out_write_not_retried_or_counted_success (test_load.LoopbackTests.test_timed_out_write_not_retried_or_counted_success) ... {"runId": "replace-with-unique-run-id", "outcome": "COMPLETED_WITH_FAILURES", "launchedIterations": 1, "failedIterations": 1, "droppedIterations": 0, "stopReasons": []}
+ok
+test_complete_samples_outside_target_are_distinct_from_valid_load (test_read_profile.AssertionMetricTests.test_complete_samples_outside_target_are_distinct_from_valid_load) ... ok
+test_cooldown_not_applicable_but_active_empty_is_missing_load (test_read_profile.AssertionMetricTests.test_cooldown_not_applicable_but_active_empty_is_missing_load) ... ok
+test_empty_tasks_legitimate_and_optional_count_frozen (test_read_profile.AssertionMetricTests.test_empty_tasks_legitimate_and_optional_count_frozen) ... ok
+test_first_checkin_boolean_version_is_not_an_integer (test_read_profile.AssertionMetricTests.test_first_checkin_boolean_version_is_not_an_integer) ... ok
+test_identity_rejects_bool_float_missing_roles_and_role_strings (test_read_profile.AssertionMetricTests.test_identity_rejects_bool_float_missing_roles_and_role_strings) ... ok
+test_partial_200_deadline_and_drain_not_double_counted (test_read_profile.AssertionMetricTests.test_partial_200_deadline_and_drain_not_double_counted) ... ok
+test_workpack_numeric_types_and_missing_structures_are_fatal (test_read_profile.AssertionMetricTests.test_workpack_numeric_types_and_missing_structures_are_fatal) ... ok
+test_budget_separates_business_setup_other_and_wire_shift (test_read_profile.BudgetTests.test_budget_separates_business_setup_other_and_wire_shift) ... ok
+test_exact_half_open_rolling_windows_match_brute_force (test_read_profile.BudgetTests.test_exact_half_open_rolling_windows_match_brute_force) ... ok
+test_fingerprints_ignore_runid_but_detect_data_workload_and_threshold_drift (test_read_profile.BudgetTests.test_fingerprints_ignore_runid_but_detect_data_workload_and_threshold_drift) ... ok
+test_offline_profile_never_resolves_or_opens (test_read_profile.BudgetTests.test_offline_profile_never_resolves_or_opens) ... ok
+test_old_8rps_higher_vus_and_caps_are_rejected (test_read_profile.BudgetTests.test_old_8rps_higher_vus_and_caps_are_rejected) ... ok
+test_optional_task_count_fixture_is_strict_integer (test_read_profile.BudgetTests.test_optional_task_count_fixture_is_strict_integer) ... ok
+test_profile_cannot_lower_minimum_sample_floor (test_read_profile.BudgetTests.test_profile_cannot_lower_minimum_sample_floor) ... ok
+test_remote_profile_requires_review_before_dns_or_worker (test_read_profile.BudgetTests.test_remote_profile_requires_review_before_dns_or_worker) ... ok
+test_template_exact_stages_counts_and_default_refusal (test_read_profile.BudgetTests.test_template_exact_stages_counts_and_default_refusal) ... ok
+test_waf_rule_and_other_request_budget_validation (test_read_profile.BudgetTests.test_waf_rule_and_other_request_budget_validation) ... ok
+test_cache_warmup_images_nodes_and_review_flags_must_match (test_read_profile.PairTests.test_cache_warmup_images_nodes_and_review_flags_must_match) ... ok
+test_comparison_has_no_network_or_subprocess (test_read_profile.PairTests.test_comparison_has_no_network_or_subprocess) ... ok
+test_malformed_comparison_fields_and_nonfinite_metrics_fail_closed (test_read_profile.PairTests.test_malformed_comparison_fields_and_nonfinite_metrics_fail_closed) ... ok
+test_matching_client_files_still_require_resource_review (test_read_profile.PairTests.test_matching_client_files_still_require_resource_review) ... ok
+test_matching_declarations_do_not_prove_hpa_or_performance (test_read_profile.PairTests.test_matching_declarations_do_not_prove_hpa_or_performance) ... ok
+test_missing_raw_samples_cleanup_or_markers_is_not_comparable (test_read_profile.PairTests.test_missing_raw_samples_cleanup_or_markers_is_not_comparable) ... ok
+test_stopped_dropped_and_insufficient_samples_not_hidden (test_read_profile.PairTests.test_stopped_dropped_and_insufficient_samples_not_hidden) ... ok
+test_version_data_workload_drift_and_same_runid_rejected (test_read_profile.PairTests.test_version_data_workload_drift_and_same_runid_rejected) ... ok
+test_b_task_materialization_not_mistaken_for_a_frozen_task_count (test_read_profile.ReadLoopbackTests.test_b_task_materialization_not_mistaken_for_a_frozen_task_count) ... {"runId": "replace-with-unique-run-id", "outcome": "COMPLETED", "launchedIterations": 1, "failedIterations": 0, "droppedIterations": 0, "stopReasons": []}
+ok
+test_bool_version_rejected_over_real_loopback_http (test_read_profile.ReadLoopbackTests.test_bool_version_rejected_over_real_loopback_http) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["wrong_visit_or_state", "setup_wrong_visit_or_state"]}
+ok
+test_incorrect_expected_task_count_stops_before_load (test_read_profile.ReadLoopbackTests.test_incorrect_expected_task_count_stops_before_load) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["wrong_task_count", "setup_wrong_task_count"]}
+ok
+test_invalid_json_content_type_200_stops_before_load (test_read_profile.ReadLoopbackTests.test_invalid_json_content_type_200_stops_before_load) ... {"runId": "replace-with-unique-run-id", "outcome": "STOPPED", "launchedIterations": 0, "failedIterations": 0, "droppedIterations": 0, "stopReasons": ["invalid_json", "setup_invalid_json"]}
+ok
+test_two_scaled_arms_exact_get_counts_and_low_sample_labels (test_read_profile.ReadLoopbackTests.test_two_scaled_arms_exact_get_counts_and_low_sample_labels) ... {"runId": "loopback-A0", "outcome": "COMPLETED", "launchedIterations": 17, "failedIterations": 0, "droppedIterations": 0, "stopReasons": []}
+{"runId": "loopback-A1", "outcome": "COMPLETED", "launchedIterations": 17, "failedIterations": 0, "droppedIterations": 0, "stopReasons": []}
+ok
+test_B_and_application_mismatch_refused (test_release_fixture.FixtureTests.test_B_and_application_mismatch_refused) ... ok
+test_boolean_and_float_ids_rejected (test_release_fixture.FixtureTests.test_boolean_and_float_ids_rejected) ... ok
+test_configuration_must_be_whitelisted (test_release_fixture.FixtureTests.test_configuration_must_be_whitelisted) ... ok
+test_example_structural_only_never_ready (test_release_fixture.FixtureTests.test_example_structural_only_never_ready) ... ok
+test_independent_accounts_and_entities_required (test_release_fixture.FixtureTests.test_independent_accounts_and_entities_required) ... ok
+test_malformed_config_containers_refused (test_release_fixture.FixtureTests.test_malformed_config_containers_refused) ... ok
+test_no_dns_or_socket_on_offline_validation (test_release_fixture.FixtureTests.test_no_dns_or_socket_on_offline_validation) ... ok
+test_not_enough_pairs_rejected (test_release_fixture.FixtureTests.test_not_enough_pairs_rejected) ... ok
+test_omitted_pairs_and_wrong_shape_refused (test_release_fixture.FixtureTests.test_omitted_pairs_and_wrong_shape_refused) ... ok
+test_operator_inputs_complete_still_not_online_approval (test_release_fixture.FixtureTests.test_operator_inputs_complete_still_not_online_approval) ... ok
+test_secrets_and_username_fields_refused (test_release_fixture.FixtureTests.test_secrets_and_username_fields_refused) ... ok
+test_stale_or_future_precheck_not_ready (test_release_fixture.FixtureTests.test_stale_or_future_precheck_not_ready) ... ok
+test_state_version_and_shape_must_match_profile (test_release_fixture.FixtureTests.test_state_version_and_shape_must_match_profile) ... ok
+test_visit_cannot_start_during_window (test_release_fixture.FixtureTests.test_visit_cannot_start_during_window) ... ok
+test_window_timezone_retention_and_expiry (test_release_fixture.FixtureTests.test_window_timezone_retention_and_expiry) ... ok
+test_wrong_actor_assignment_refused (test_release_fixture.FixtureTests.test_wrong_actor_assignment_refused) ... ok
+test_wrong_role_or_working_status_rejected (test_release_fixture.FixtureTests.test_wrong_role_or_working_status_rejected) ... ok
+test_four_pair_formal_candidate_preserves_budget_and_whitelist (test_release_fixture.HandoffTemplateTests.test_four_pair_formal_candidate_preserves_budget_and_whitelist) ... ok
+test_four_pair_remote_template_is_rejected_before_dns_or_worker (test_release_fixture.HandoffTemplateTests.test_four_pair_remote_template_is_rejected_before_dns_or_worker) ... ok
+test_application_and_untracked_source_changes_rejected (test_release_fixture.HistoryTests.test_application_and_untracked_source_changes_rejected) ... ok
+test_checksum_line_endings_bom_and_signed_crc (test_release_fixture.HistoryTests.test_checksum_line_endings_bom_and_signed_crc) ... ok
+test_engine_tamper_rejected (test_release_fixture.HistoryTests.test_engine_tamper_rejected) ... ok
+test_full_target_does_not_approve_deployment (test_release_fixture.HistoryTests.test_full_target_does_not_approve_deployment) ... ok
+test_history_gap_and_duplicate_stops (test_release_fixture.HistoryTests.test_history_gap_and_duplicate_stops) ... ok
+test_history_requires_provenance_and_metadata (test_release_fixture.HistoryTests.test_history_requires_provenance_and_metadata) ... ok
+test_history_schema_boolean_or_database_nonobject_rejected (test_release_fixture.HistoryTests.test_history_schema_boolean_or_database_nonobject_rejected) ... ok
+test_lock_has_all_41_migrations_and_version_limits (test_release_fixture.HistoryTests.test_lock_has_all_41_migrations_and_version_limits) ... ok
+test_main_report_v4_is_valid_upgrade_prefix (test_release_fixture.HistoryTests.test_main_report_v4_is_valid_upgrade_prefix) ... ok
+test_missing_and_duplicate_database_rejected (test_release_fixture.HistoryTests.test_missing_and_duplicate_database_rejected) ... ok
+test_old_evidence_v4_stops (test_release_fixture.HistoryTests.test_old_evidence_v4_stops) ... ok
+test_same_filename_wrong_checksum_stops (test_release_fixture.HistoryTests.test_same_filename_wrong_checksum_stops) ... ok
+test_success_bool_not_string_or_one (test_release_fixture.HistoryTests.test_success_bool_not_string_or_one) ... ok
+test_tampered_manifest_is_rejected (test_release_fixture.HistoryTests.test_tampered_manifest_is_rejected) ... ok
+test_unknown_version_and_baseline_require_review (test_release_fixture.HistoryTests.test_unknown_version_and_baseline_require_review) ... ok
+
+----------------------------------------------------------------------
+Ran 104 tests in 79.465s
+
+OK

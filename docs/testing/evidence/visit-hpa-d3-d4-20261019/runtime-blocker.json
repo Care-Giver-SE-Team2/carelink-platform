@@ -1,0 +1,17 @@
+{
+  "status": "BLOCKED",
+  "scope": "Real local core/visit/MySQL/Redis fixture verification",
+  "observedAtUtc": "2026-10-19T14:12:59.861457+00:00",
+  "dockerContext": "desktop-linux",
+  "observations": [
+    "Initial engine named pipe missing",
+    "Background Docker Desktop startup attempted",
+    "Subsequent docker info exceeded the explicit 12-second subprocess timeout",
+    "Docker Desktop error-dialog process observed; backend not verified"
+  ],
+  "javaDefaultShim": "Default java -version stalled; owned query ended; direct JDK25.0.4 works",
+  "applicationServicesStarted": false,
+  "databaseOrFixturesCreated": false,
+  "cloudContacted": false,
+  "pending": "Restore Docker Desktop locally; then run A-only future scheduled fixtures with the pinned baseline. Existing local_smoke mixes A/B and same-day scheduling, so it is not the first A-only acceptance."
+}

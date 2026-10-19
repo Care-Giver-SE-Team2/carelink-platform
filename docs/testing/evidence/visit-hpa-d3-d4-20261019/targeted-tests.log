@@ -1,0 +1,37 @@
+test_B_and_application_mismatch_refused (test_release_fixture.FixtureTests.test_B_and_application_mismatch_refused) ... ok
+test_boolean_and_float_ids_rejected (test_release_fixture.FixtureTests.test_boolean_and_float_ids_rejected) ... ok
+test_configuration_must_be_whitelisted (test_release_fixture.FixtureTests.test_configuration_must_be_whitelisted) ... ok
+test_example_structural_only_never_ready (test_release_fixture.FixtureTests.test_example_structural_only_never_ready) ... ok
+test_independent_accounts_and_entities_required (test_release_fixture.FixtureTests.test_independent_accounts_and_entities_required) ... ok
+test_malformed_config_containers_refused (test_release_fixture.FixtureTests.test_malformed_config_containers_refused) ... ok
+test_no_dns_or_socket_on_offline_validation (test_release_fixture.FixtureTests.test_no_dns_or_socket_on_offline_validation) ... ok
+test_not_enough_pairs_rejected (test_release_fixture.FixtureTests.test_not_enough_pairs_rejected) ... ok
+test_omitted_pairs_and_wrong_shape_refused (test_release_fixture.FixtureTests.test_omitted_pairs_and_wrong_shape_refused) ... ok
+test_operator_inputs_complete_still_not_online_approval (test_release_fixture.FixtureTests.test_operator_inputs_complete_still_not_online_approval) ... ok
+test_secrets_and_username_fields_refused (test_release_fixture.FixtureTests.test_secrets_and_username_fields_refused) ... ok
+test_stale_or_future_precheck_not_ready (test_release_fixture.FixtureTests.test_stale_or_future_precheck_not_ready) ... ok
+test_state_version_and_shape_must_match_profile (test_release_fixture.FixtureTests.test_state_version_and_shape_must_match_profile) ... ok
+test_visit_cannot_start_during_window (test_release_fixture.FixtureTests.test_visit_cannot_start_during_window) ... ok
+test_window_timezone_retention_and_expiry (test_release_fixture.FixtureTests.test_window_timezone_retention_and_expiry) ... ok
+test_wrong_actor_assignment_refused (test_release_fixture.FixtureTests.test_wrong_actor_assignment_refused) ... ok
+test_wrong_role_or_working_status_rejected (test_release_fixture.FixtureTests.test_wrong_role_or_working_status_rejected) ... ok
+test_application_and_untracked_source_changes_rejected (test_release_fixture.HistoryTests.test_application_and_untracked_source_changes_rejected) ... ok
+test_checksum_line_endings_bom_and_signed_crc (test_release_fixture.HistoryTests.test_checksum_line_endings_bom_and_signed_crc) ... ok
+test_engine_tamper_rejected (test_release_fixture.HistoryTests.test_engine_tamper_rejected) ... ok
+test_full_target_does_not_approve_deployment (test_release_fixture.HistoryTests.test_full_target_does_not_approve_deployment) ... ok
+test_history_gap_and_duplicate_stops (test_release_fixture.HistoryTests.test_history_gap_and_duplicate_stops) ... ok
+test_history_requires_provenance_and_metadata (test_release_fixture.HistoryTests.test_history_requires_provenance_and_metadata) ... ok
+test_history_schema_boolean_or_database_nonobject_rejected (test_release_fixture.HistoryTests.test_history_schema_boolean_or_database_nonobject_rejected) ... ok
+test_lock_has_all_41_migrations_and_version_limits (test_release_fixture.HistoryTests.test_lock_has_all_41_migrations_and_version_limits) ... ok
+test_main_report_v4_is_valid_upgrade_prefix (test_release_fixture.HistoryTests.test_main_report_v4_is_valid_upgrade_prefix) ... ok
+test_missing_and_duplicate_database_rejected (test_release_fixture.HistoryTests.test_missing_and_duplicate_database_rejected) ... ok
+test_old_evidence_v4_stops (test_release_fixture.HistoryTests.test_old_evidence_v4_stops) ... ok
+test_same_filename_wrong_checksum_stops (test_release_fixture.HistoryTests.test_same_filename_wrong_checksum_stops) ... ok
+test_success_bool_not_string_or_one (test_release_fixture.HistoryTests.test_success_bool_not_string_or_one) ... ok
+test_tampered_manifest_is_rejected (test_release_fixture.HistoryTests.test_tampered_manifest_is_rejected) ... ok
+test_unknown_version_and_baseline_require_review (test_release_fixture.HistoryTests.test_unknown_version_and_baseline_require_review) ... ok
+
+----------------------------------------------------------------------
+Ran 32 tests in 0.076s
+
+OK

@@ -1,0 +1,97 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "name": "four-pair-formal",
+      "exitCode": 0,
+      "plan": {
+        "status": "OFFLINE_VALID",
+        "plannedIterations": 2700,
+        "freshVisits": 4,
+        "localhost": false,
+        "remoteExecutionConfirmed": false,
+        "socketTimeoutSeconds": 8,
+        "requestDeadlineSeconds": 10,
+        "stopDrainSeconds": 12,
+        "readBudget": {
+          "profile": "visit-hpa-A-waf-v1",
+          "basis": "Zhili feedback 2026-10-19; not a live read",
+          "windowSeconds": 300,
+          "limitRequests": 2000,
+          "durationSeconds": 1260,
+          "plannedBusinessGets": 2700,
+          "twoArmBusinessGets": 5400,
+          "setupHttpRequests": 40,
+          "setupWorkPackGets": 8,
+          "plannedHttpRequestsIncludingSetup": 2740,
+          "plannedBusinessPeakPerWindow": 1500,
+          "nominalHeadroomBeforeSetup": 500,
+          "headroomAfterSetupBeforeOtherTraffic": 460,
+          "wireShiftModelSeconds": 10.22,
+          "shiftedBusinessPeakPerWindow": 1552,
+          "modeledRequestsBeforeOtherTraffic": 1592,
+          "modeledHeadroomBeforeOtherTraffic": 408,
+          "otherRequestsPerWindow": null,
+          "modeledRemainingRequests": null,
+          "inputsReviewed": false,
+          "extraProbeRps": 0,
+          "automaticRetries": 0,
+          "limitation": "Approximate WAF and OS/network timing are not bounded by this model; setup is conservatively charged in every window. Smoke/preparation/manual/background traffic must fit the separate other-request budget. No cloud approval."
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "four-pair-smoke-guide",
+      "exitCode": 0,
+      "plan": {
+        "status": "OFFLINE_VALID",
+        "plannedIterations": 4,
+        "freshVisits": 4,
+        "localhost": false,
+        "remoteExecutionConfirmed": false,
+        "socketTimeoutSeconds": 8,
+        "requestDeadlineSeconds": 10,
+        "stopDrainSeconds": 12,
+        "readBudget": {
+          "profile": "visit-hpa-A-waf-v1",
+          "basis": "Zhili feedback 2026-10-19; not a live read",
+          "windowSeconds": 300,
+          "limitRequests": 2000,
+          "durationSeconds": 4,
+          "plannedBusinessGets": 4,
+          "twoArmBusinessGets": 8,
+          "setupHttpRequests": 20,
+          "setupWorkPackGets": 4,
+          "plannedHttpRequestsIncludingSetup": 24,
+          "plannedBusinessPeakPerWindow": 4,
+          "nominalHeadroomBeforeSetup": 1996,
+          "headroomAfterSetupBeforeOtherTraffic": 1976,
+          "wireShiftModelSeconds": 10.22,
+          "shiftedBusinessPeakPerWindow": 4,
+          "modeledRequestsBeforeOtherTraffic": 24,
+          "modeledHeadroomBeforeOtherTraffic": 1976,
+          "otherRequestsPerWindow": null,
+          "modeledRemainingRequests": null,
+          "inputsReviewed": false,
+          "extraProbeRps": 0,
+          "automaticRetries": 0,
+          "limitation": "Approximate WAF and OS/network timing are not bounded by this model; setup is conservatively charged in every window. Smoke/preparation/manual/background traffic must fit the separate other-request budget. No cloud approval."
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "final-release-lock",
+      "exitCode": 0,
+      "result": {
+        "status": "PINNED_SOURCE_MATCH",
+        "applicationCommit": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+        "engineCommit": "c5b13e2d91b9e5daa8cb536b8427fa184f60d394",
+        "migrations": 41,
+        "cloudReleaseVerified": false
+      }
+    }
+  ],
+  "networkAccess": false
+}

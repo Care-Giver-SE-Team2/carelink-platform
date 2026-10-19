@@ -1,0 +1,271 @@
+{
+  "status": "PASS",
+  "scope": "Actual disposable local core/visit histories only; shared/report/notification histories not queried",
+  "migrationsCompared": 33,
+  "checks": [
+    {
+      "service": "core",
+      "version": "1",
+      "script": "V1__baseline.sql",
+      "checksum": -766878,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "2",
+      "script": "V2__care_domain.sql",
+      "checksum": -728354739,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "3",
+      "script": "V3__stop_care_plan.sql",
+      "checksum": 1176559857,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "4",
+      "script": "V4__flatten_care_plan_node.sql",
+      "checksum": -468232710,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "5",
+      "script": "V5__drop_care_plan_node_service_type.sql",
+      "checksum": -461535555,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "6",
+      "script": "V6__care_plan_start_date.sql",
+      "checksum": -879592470,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "7",
+      "script": "V7__elder_service_dispute_incident_source.sql",
+      "checksum": 457372633,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "8",
+      "script": "V8__report_amendment.sql",
+      "checksum": 1836072364,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "9",
+      "script": "V9__elder_primary_caregiver.sql",
+      "checksum": -512060905,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "10",
+      "script": "V10__care_plan_node_visit.sql",
+      "checksum": -561518148,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "11",
+      "script": "V11__credential_review.sql",
+      "checksum": -1043063645,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "12",
+      "script": "V12__absence_rerostering.sql",
+      "checksum": -276744204,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "13",
+      "script": "V13__spot_check_conclusion.sql",
+      "checksum": 462914158,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "14",
+      "script": "V14__seed_value_added_services.sql",
+      "checksum": -1677146032,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "15",
+      "script": "V15__family_alert_delivery.sql",
+      "checksum": 1833942631,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "16",
+      "script": "V16__caregiver_command_receipt.sql",
+      "checksum": 1295585224,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "17",
+      "script": "V17__visit_check_in_and_task_uniqueness.sql",
+      "checksum": -216226740,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "18",
+      "script": "V18__visit_missed_check_in_trigger.sql",
+      "checksum": -380969238,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "19",
+      "script": "V19__incident_description_and_report_basis.sql",
+      "checksum": -2116843670,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "20",
+      "script": "V20__visit_health_records.sql",
+      "checksum": 503757286,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "21",
+      "script": "V21__family_care_service_application.sql",
+      "checksum": 27408493,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "22",
+      "script": "V22__value_added_service_duration.sql",
+      "checksum": -568160987,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "23",
+      "script": "V23__visit_instructions.sql",
+      "checksum": -969942316,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "24",
+      "script": "V24__care_plan_node_activity_code.sql",
+      "checksum": -384056573,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "25",
+      "script": "V25__service_application_decline.sql",
+      "checksum": 993302770,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "26",
+      "script": "V26__caregiver_admission.sql",
+      "checksum": 1119888666,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "27",
+      "script": "V27__caregiver_credential_submission.sql",
+      "checksum": 1999752257,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "core",
+      "version": "28",
+      "script": "V28__caregiver_work_settings.sql",
+      "checksum": 740801175,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "visit",
+      "version": "1",
+      "script": "V1__visit_tables.sql",
+      "checksum": -1450296056,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "visit",
+      "version": "2",
+      "script": "V2__visit_request.sql",
+      "checksum": 556943074,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "visit",
+      "version": "3",
+      "script": "V3__caregiver_system_alert_index.sql",
+      "checksum": -1444325943,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "visit",
+      "version": "4",
+      "script": "V4__visit_evidence_file.sql",
+      "checksum": -597251045,
+      "success": true,
+      "matchesPinned": true
+    },
+    {
+      "service": "visit",
+      "version": "5",
+      "script": "V5__caregiver_history_index.sql",
+      "checksum": 1897602332,
+      "success": true,
+      "matchesPinned": true
+    }
+  ]
+}

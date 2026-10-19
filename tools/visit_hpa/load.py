@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import csv
 import datetime as dt
 import hashlib
+from fractions import Fraction
 import http.cookiejar
 import json
 import math
@@ -16,6 +17,8 @@ from pathlib import Path
 import queue
 import re
 import signal
+import subprocess
+import sys
 import threading
 import time
 import urllib.error
@@ -59,6 +62,94 @@ def origin(value):
     return f"{p.scheme}://{authority}", host in ("localhost", "127.0.0.1", "::1")
 
 
+def timing_settings(c):
+    """Legacy timeoutSeconds remains a socket setting, never a total deadline."""
+    legacy = "timeoutSeconds" in c
+    socket_timeout = c.get("socketTimeoutSeconds", c.get("timeoutSeconds", 8))
+    if legacy and "socketTimeoutSeconds" in c:
+        require(c["timeoutSeconds"] == socket_timeout, "conflicting_socket_timeouts")
+    request_deadline = c.get("requestDeadlineSeconds", max(1, socket_timeout + 2))
+    drain = c.get("stopDrainSeconds", request_deadline + 2)
+    require(number(socket_timeout, .1, 30), "invalid_socket_timeout")
+    require(number(request_deadline, .1, 60), "invalid_request_deadline")
+    require(number(drain, .1, 120), "invalid_stop_drain")
+    return {"socketTimeoutSeconds": socket_timeout, "requestDeadlineSeconds": request_deadline,
+            "stopDrainSeconds": drain}
+
+
+
+READ_PROFILE = "visit-hpa-A-waf-v1"
+
+
+def rolling_peak(arrivals, window):
+    """Exact half-open rolling window; arrival count is bounded by the A profile."""
+    left = peak = 0
+    for right, stamp in enumerate(arrivals):
+        while stamp - arrivals[left] >= window:
+            left += 1
+        peak = max(peak, right - left + 1)
+    return peak
+
+
+def read_budget(c):
+    """Offline model based on Zhili's dated feedback, not a live WAF query."""
+    require(c["scenario"] == "work-pack", "read_profile_requires_work_pack")
+    require(c["maxVUs"] <= 8 and c["maxIterations"] <= 2700, "read_profile_cap_exceeded")
+    require(max(p["rps"] for p in c["phases"]) <= 5, "read_profile_peak_exceeded")
+    budget = c["wafBudget"]
+    require(isinstance(budget, dict), "invalid_waf_budget")
+    require(c["targets"]["minSamplesPerEndpoint"] >= 100, "read_profile_requires_100_samples")
+    require(budget.get("windowSeconds") == 300 and type(budget["windowSeconds"]) is int
+            and budget.get("limitRequests") == 2000 and type(budget["limitRequests"]) is int,
+            "read_profile_waf_rule_mismatch")
+    other = budget.get("otherRequestsPerWindow")
+    require(other is None or type(other) is int and other >= 0, "invalid_other_request_budget")
+    require(type(budget.get("sourceIpReviewed")) is bool, "invalid_source_ip_review")
+    arrivals, epoch = [], Fraction(0)
+    for phase in c["phases"]:
+        rate, duration = Fraction(str(phase["rps"])), Fraction(str(phase["durationSeconds"]))
+        if rate:
+            arrivals.extend(epoch + n / rate for n in range(phase["iterations"]))
+        epoch += duration
+    require(len(arrivals) <= 2700, "read_profile_total_exceeded")
+    window = Fraction(300)
+    nominal = rolling_peak(arrivals, window)
+    shift = Fraction(str(c["requestDeadlineSeconds"])) + Fraction(str(c["maxLaunchLagMs"])) / 1000 + Fraction(str(POLL_SECONDS))
+    shifted = rolling_peak(arrivals, window + shift)
+    setup = 5 * c["maxVUs"]  # csrf, login, csrf, me, first work-pack; no retry/re-login.
+    conservative = shifted + setup
+    remaining = None if other is None else 2000 - conservative - other
+    if remaining is not None:
+        require(remaining > 0, "waf_modeled_budget_exhausted")
+    return {"profile": READ_PROFILE, "basis": "Zhili feedback 2026-10-19; not a live read",
+            "windowSeconds": 300, "limitRequests": 2000,
+            "durationSeconds": sum(p["durationSeconds"] for p in c["phases"]),
+            "plannedBusinessGets": len(arrivals), "twoArmBusinessGets": 2 * len(arrivals),
+            "setupHttpRequests": setup, "setupWorkPackGets": c["maxVUs"],
+            "plannedHttpRequestsIncludingSetup": len(arrivals) + setup,
+            "plannedBusinessPeakPerWindow": nominal, "nominalHeadroomBeforeSetup": 2000 - nominal,
+            "headroomAfterSetupBeforeOtherTraffic": 2000 - nominal - setup,
+            "wireShiftModelSeconds": float(shift), "shiftedBusinessPeakPerWindow": shifted,
+            "modeledRequestsBeforeOtherTraffic": conservative,
+            "modeledHeadroomBeforeOtherTraffic": 2000 - conservative,
+            "otherRequestsPerWindow": other, "modeledRemainingRequests": remaining,
+            "inputsReviewed": other is not None and budget["sourceIpReviewed"],
+            "extraProbeRps": 0, "automaticRetries": 0,
+            "limitation": "Approximate WAF and OS/network timing are not bounded by this model; setup is conservatively charged in every window. Smoke/preparation/manual/background traffic must fit the separate other-request budget. No cloud approval."}
+
+
+def comparison_inputs(c):
+    fixtures = [{"userId": a["userId"], "visits": a["visits"]} for a in c["actors"]]
+    workload = {k: c.get(k) for k in ("scenario", "coreBase", "visitBase", "maxVUs", "maxLaunchLagMs",
+                                     "socketTimeoutSeconds", "requestDeadlineSeconds", "stopDrainSeconds",
+                                     "targets", "stop", "readProfile")}
+    workload["phases"] = [{k: p[k] for k in ("name", "rps", "durationSeconds")} for p in c["phases"]]
+    def digest(value):
+        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return {"fixtureSha256": digest(fixtures), "workloadSha256": digest(workload),
+            "scope": "declared fixture/actor allocation and workload; not cloud state verification"}
+
+
 def validate(c, execute=False):
     require(c.get("schemaVersion") == 1, "unsupported_schema")
     require(re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", c.get("runId", "")), "invalid_run_id")
@@ -70,7 +161,7 @@ def validate(c, execute=False):
     if not (core_local and visit_local):
         require(core == visit and a.scheme == "https", "remote_requires_single_https_origin")
     require(type(c["maxVUs"]) is int and 1 <= c["maxVUs"] <= 200, "invalid_max_vus")
-    require(number(c["timeoutSeconds"], 0.1, 30), "invalid_timeout")
+    c.update(timing_settings(c))
     require(number(c["maxLaunchLagMs"], 1, 5000), "invalid_launch_lag")
     require(type(c["maxIterations"]) is int and 1 <= c["maxIterations"] <= 1000000, "invalid_iteration_cap")
     require(isinstance(c["phases"], list) and 1 <= len(c["phases"]) <= 20, "invalid_phases")
@@ -102,6 +193,9 @@ def validate(c, execute=False):
             visits.add(v["visitId"])
             require(type(v["expectedVersion"]) is int and v["expectedVersion"] >= 0, "invalid_expected_version")
             require(v["expectedStatus"] in ("SCHEDULED", "IN_PROGRESS", "COMPLETED"), "invalid_expected_state")
+            if "expectedTaskCount" in v:
+                require(type(v["expectedTaskCount"]) is int and v["expectedTaskCount"] >= 0,
+                        "invalid_expected_task_count")
             if c["scenario"] == "check-in":
                 require(v["expectedStatus"] == "SCHEDULED", "write_pool_must_be_scheduled")
     require(len(actors) <= c["maxVUs"], "max_vus_must_cover_all_actors")
@@ -118,6 +212,11 @@ def validate(c, execute=False):
     require(number(targets.get("checkinHttpP95Ms", targets["httpP95Ms"]), 1, 120000), "invalid_write_target_latency")
     require(number(targets["errorRate"], 0, 1), "invalid_target_error_rate")
     require(type(targets["minSamplesPerEndpoint"]) is int and targets["minSamplesPerEndpoint"] >= 1, "invalid_target_sample_count")
+    if c.get("readProfile") is not None:
+        require(c["readProfile"] == READ_PROFILE, "unknown_read_profile")
+        budget = read_budget(c)
+    else:
+        budget = None
     approval = c.get("approval", {})
     approved = (approval.get("confirmed") is True and approval.get("environment")
                 and approval.get("windowUtc") and approval.get("owner")
@@ -125,9 +224,14 @@ def validate(c, execute=False):
                 and set(approval.get("allowedOrigins", [])) == {core, visit})
     if execute and not (core_local and visit_local):
         require(bool(approved), "remote_target_not_confirmed")
+        if budget is not None:
+            require(budget["inputsReviewed"], "waf_source_and_other_traffic_not_reviewed")
     c["coreBase"], c["visitBase"] = core, visit
     return {"plannedIterations": total, "freshVisits": len(visits), "localhost": core_local and visit_local,
-            "remoteExecutionConfirmed": bool(approved), "maximumRequestSeconds": c["timeoutSeconds"]}
+              "remoteExecutionConfirmed": bool(approved), **timing_settings(c),
+            "readBudget": budget,
+            "warnings": (["timeoutSeconds is a deprecated socket setting; explicit total/drain deadlines apply."]
+                         if "timeoutSeconds" in c else [])}
 
 
 class Failure(Exception):
@@ -141,62 +245,256 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+POLL_SECONDS = .02
+WORKER_GRACE_SECONDS = .5
+WORKER_START_SECONDS = 10
+
+
+class StopControl:
+    """Operator polling also runs in request supervisors, including during setup."""
+    def __init__(self, out, drain_seconds):
+        self.path, self.drain_seconds = Path(out) / "STOP", drain_seconds
+        self.event, self.lock = threading.Event(), threading.RLock()
+        self.reasons, self.active = [], set()
+        self.signal_request = None
+        self.detected_mono = self.detected_utc = None
+        self.drain_deadline = self.drain_started_utc = None
+        self.in_flight_at_stop = self.in_flight_at_drain = 0
+        self.last_admitted_utc = None
+        self.sequence = 0
+
+    def halt(self, reason):
+        with self.lock:
+            if reason not in self.reasons:
+                self.reasons.append(reason)
+            if self.detected_mono is None:
+                self.detected_mono, self.detected_utc = time.monotonic(), utc()
+                self.in_flight_at_stop = len(self.active)
+            self.event.set()
+            self.begin_drain()
+
+    def poll(self):
+        if self.signal_request is not None:
+            self.halt("operator_interrupt")
+        if self.path.exists():
+            self.halt("operator_stop_file")
+        return self.event.is_set()
+
+    def is_set(self):
+        return self.poll()
+
+    def wait(self, seconds):
+        self.event.wait(seconds)
+        return self.poll()
+
+    def begin_drain(self):
+        with self.lock:
+            if self.drain_deadline is None:
+                self.drain_started_utc = utc()
+                self.drain_deadline = time.monotonic() + self.drain_seconds
+                self.in_flight_at_drain = len(self.active)
+
+    def admit(self):
+        self.poll()
+        with self.lock:
+            if self.event.is_set():
+                raise Failure("stopped_before_request", False)
+            if self.drain_deadline is not None and time.monotonic() >= self.drain_deadline:
+                raise Failure("stop_drain_deadline")
+            self.sequence += 1
+            self.active.add(self.sequence)
+            self.last_admitted_utc = utc()
+            return self.sequence, self.last_admitted_utc
+
+    def complete(self, token):
+        with self.lock:
+            self.active.discard(token)
+
+    def snapshot(self):
+        with self.lock:
+            return {"stopDetectedUtc": self.detected_utc,
+                    "signalReceivedUtc": self.signal_request[1] if self.signal_request else None,
+                    "drainStartedUtc": self.drain_started_utc,
+                    "inFlightAtStop": self.in_flight_at_stop,
+                    "inFlightAtDrain": self.in_flight_at_drain,
+                    "inFlightRemaining": len(self.active),
+                    "lastRequestAdmittedUtc": self.last_admitted_utc,
+                    "stopToSupervisorEndMs": (round((time.monotonic() - self.detected_mono) * 1000, 3)
+                                              if self.detected_mono is not None else None)}
+
+
+class HttpWorker:
+    """One persistent, privately piped HTTP session per VU; no thread owns I/O forever."""
+    def __init__(self, config):
+        options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
+        self.process = subprocess.Popen(
+            [sys.executable, "-u", str(Path(__file__).resolve()), "--http-worker"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, encoding="utf-8", **options)
+        self.messages, self.commands = queue.Queue(), queue.Queue()
+        self.closed = False
+        self.cleanup = None
+        self.reader = threading.Thread(target=self._read, daemon=True)
+        self.writer = threading.Thread(target=self._write, daemon=True)
+        self.reader.start(); self.writer.start()
+        self.commands.put({"op": "init", "config": config})
+
+    def _read(self):
+        try:
+            while True:
+                line = self.process.stdout.readline(32 * 1024 * 1024 + 1)
+                if not line:
+                    break
+                if len(line) > 32 * 1024 * 1024 or not line.endswith("\n"):
+                    raise ValueError("worker_protocol")
+                self.messages.put(json.loads(line))
+        except (OSError, ValueError):
+            pass
+        finally:
+            self.messages.put({"kind": "worker_eof"})
+
+    def _write(self):
+        try:
+            while True:
+                message = self.commands.get()
+                if message is None:
+                    break
+                self.process.stdin.write(json.dumps(message) + "\n")
+                self.process.stdin.flush()
+        except (OSError, ValueError):
+            self.messages.put({"kind": "worker_eof"})
+
+    def close(self, force=False):
+        if self.closed:
+            return self.cleanup
+        self.closed = True
+        begin = time.monotonic()
+        terminated = killed = False
+        if self.process.poll() is None:
+            if not force:
+                self.commands.put({"op": "close"})
+                try:
+                    self.process.wait(timeout=WORKER_GRACE_SECONDS)
+                except subprocess.TimeoutExpired:
+                    pass
+            if self.process.poll() is None:
+                terminated = True
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=WORKER_GRACE_SECONDS)
+                except subprocess.TimeoutExpired:
+                    killed = True
+                    self.process.kill()
+                    try:
+                        self.process.wait(timeout=WORKER_GRACE_SECONDS)
+                    except subprocess.TimeoutExpired:
+                        pass
+        self.commands.put(None)
+        self.reader.join(WORKER_GRACE_SECONDS)
+        self.writer.join(WORKER_GRACE_SECONDS)
+        # Do not close a pipe from underneath a reader/writer that failed to exit.
+        if not self.reader.is_alive():
+            self.process.stdout.close()
+        if not self.writer.is_alive():
+            self.process.stdin.close()
+        self.cleanup = {"pid": self.process.pid, "reaped": self.process.poll() is not None,
+                        "readerJoined": not self.reader.is_alive(), "writerJoined": not self.writer.is_alive(),
+                        "terminated": terminated, "killed": killed,
+                        "cleanupMs": round((time.monotonic() - begin) * 1000, 3)}
+        return self.cleanup
+
+
 class Client:
     def __init__(self, config, actor, record):
         self.c, self.actor, self.record = config, actor, record
-        self.jar = http.cookiejar.CookieJar()
-        self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
-                                                urllib.request.HTTPCookieProcessor(self.jar))
+        self.control = None
+        self.worker = None
+        self.worker_registered = None
+
+    def _ensure_worker(self):
+        if self.worker is not None:
+            if self.worker.closed:
+                raise Failure("http_session_terminated")
+            return
+        started = time.monotonic()
+        self.worker = HttpWorker(self.c)
+        if self.worker_registered:
+            self.worker_registered(self.worker)
+        try:
+            while True:
+                if self.control and self.control.is_set():
+                    raise Failure("stopped_during_worker_start", False)
+                if time.monotonic() - started >= WORKER_START_SECONDS:
+                    raise Failure("worker_start_deadline")
+                try:
+                    message = self.worker.messages.get(timeout=POLL_SECONDS)
+                except queue.Empty:
+                    continue
+                if message["kind"] == "initialized":
+                    return
+                if message["kind"] == "worker_eof":
+                    raise Failure("http_worker_exited")
+        except BaseException:
+            if self.control:
+                self.control.halt("worker_start_failed")
+            self.worker.close(force=True)
+            raise
 
     def request(self, base, path, phase, endpoint, body=None, check=None, csrf=False):
-        headers = {"Accept": "application/json"}
-        if body is not None:
-            token = next((x.value for x in self.jar if x.name == "XSRF-TOKEN"), None)
-            if not token:
-                raise Failure("missing_csrf")
-            headers.update({"Content-Type": "application/json", "X-XSRF-TOKEN": urllib.parse.unquote(token)})
-        request = urllib.request.Request(self.c[base] + path, headers=headers,
-                                         data=None if body is None else json.dumps(body).encode())
-        row = {"kind": "http", "phase": phase, "endpoint": endpoint, "method": request.get_method(),
-               "startedUtc": utc(), "status": 0, "httpPassed": False, "businessPassed": False}
-        begin = time.perf_counter()
+        self._ensure_worker()  # Bootstrap is separately bounded and precedes HTTP admission.
+        token, admitted_utc = self.control.admit() if self.control else (None, utc())
+        begin = time.monotonic()
+        row = {"kind": "http", "phase": phase, "endpoint": endpoint,
+               "method": "GET" if body is None else "POST", "startedUtc": admitted_utc,
+               "status": 0, "httpPassed": False, "businessPassed": False, "wireStartObserved": False}
+        self.worker.commands.put({"op": "request", "base": base, "path": path, "body": body,
+                                  "check": check, "csrf": csrf})
         try:
-            try:
-                response = self.http.open(request, timeout=self.c["timeoutSeconds"])
-            except urllib.error.HTTPError as e:
-                response = e
-            with response:
-                row["status"] = response.status
-                if response.status != 200:
-                    fatal = response.status in (401, 403) or 300 <= response.status < 400 or response.status < 500
-                    raise Failure("authentication_or_contract_http" if fatal else "server_http", fatal)
-                row["httpPassed"] = True
-                raw = response.read(8 * 1024 * 1024 + 1)
-                if len(raw) > 8 * 1024 * 1024:
-                    raise Failure("response_too_large")
-                if csrf:
-                    value = None
-                else:
-                    content_type = response.headers.get_content_type()
-                    if content_type != "application/json" and not content_type.endswith("+json"):
-                        raise Failure("non_json_response")
-                    try:
-                        value = json.loads(raw)
-                    except (ValueError, UnicodeError):
-                        raise Failure("invalid_json")
-                if check:
-                    check(value)
-                row["businessPassed"] = True
-                return value
-        except Failure as e:
-            row["error"] = e.code
+            while True:
+                if self.control:
+                    self.control.poll()
+                now = time.monotonic()
+                drain = self.control.drain_deadline if self.control else None
+                if drain is not None and now >= drain:
+                    raise Failure("stop_drain_deadline")
+                if now - begin >= self.c["requestDeadlineSeconds"]:
+                    raise Failure("request_deadline")
+                try:
+                    message = self.worker.messages.get(timeout=POLL_SECONDS)
+                except queue.Empty:
+                    continue
+                if message["kind"] == "started":
+                    row["wireStartObserved"] = True
+                elif message["kind"] == "headers":
+                    row["status"] = message["status"]
+                    row["httpPassed"] = message["status"] == 200
+                elif message["kind"] == "result":
+                    # IPC decode and business assertions are part of the supervised request.
+                    now = time.monotonic()
+                    if drain is not None and now >= drain:
+                        raise Failure("stop_drain_deadline")
+                    if now - begin >= self.c["requestDeadlineSeconds"]:
+                        raise Failure("request_deadline")
+                    row.update(message["row"])
+                    if "error" in row:
+                        raise Failure(row["error"], message["fatal"])
+                    return message["value"]
+                elif message["kind"] == "worker_eof":
+                    raise Failure("http_worker_exited")
+        except Failure as exc:
+            row["error"] = exc.code
+            if exc.fatal and self.control:
+                self.control.halt(exc.code)
+            if exc.code in ("request_deadline", "stop_drain_deadline", "http_worker_exited"):
+                row["businessPassed"] = False
+                row["deadlineObservedMs"] = round((time.monotonic() - begin) * 1000, 3)
+                self.worker.close(force=True)
             raise
-        except (OSError, urllib.error.URLError, TimeoutError):
-            row["error"] = "transport_error"
-            raise Failure("transport_error", False)
         finally:
-            row["elapsedMs"] = round((time.perf_counter() - begin) * 1000, 3)
+            row["elapsedMs"] = round((time.monotonic() - begin) * 1000, 3)
             self.record(row)
+            if self.control:
+                self.control.complete(token)
 
     def login(self):
         username = os.environ.get(self.actor["usernameEnv"])
@@ -205,34 +503,37 @@ class Client:
             raise Failure("missing_private_credential_env")
         self.request("coreBase", "/api/auth/csrf", "setup", "/api/auth/csrf", csrf=True)
         self.request("coreBase", "/api/auth/login", "setup", "/api/auth/login",
-                     {"username": username, "password": password}, self.identity)
+                     {"username": username, "password": password}, {"kind": "identity", "userId": self.actor["userId"]})
         self.request("coreBase", "/api/auth/csrf", "setup", "/api/auth/csrf", csrf=True)
-        self.request("coreBase", "/api/auth/me", "setup", "/api/auth/me", check=self.identity)
+        self.request("coreBase", "/api/auth/me", "setup", "/api/auth/me", check={"kind": "identity", "userId": self.actor["userId"]})
 
     def identity(self, value):
-        if not isinstance(value, dict) or value.get("id") != self.actor["userId"] or "CAREGIVER" not in value.get("roles", []):
-            raise Failure("wrong_identity")
+        assert_wire_response(value, {"kind": "identity", "userId": self.actor["userId"]})
 
     @staticmethod
     def pack(value, fixture):
         if not isinstance(value, dict):
             raise Failure("wrong_work_pack")
-        v = value.get("visit", {})
+        v = value.get("visit")
+        if not isinstance(v, dict) or any(type(v.get(k)) is not int for k in ("id", "elderId", "version")):
+            raise Failure("wrong_visit_or_state")
         if (v.get("id"), v.get("elderId"), v.get("status"), v.get("version")) != (
                 fixture["visitId"], fixture["elderId"], fixture["expectedStatus"], fixture["expectedVersion"]):
             raise Failure("wrong_visit_or_state")
-        if not isinstance(value.get("tasks"), list) or not isinstance(value.get("execution"), dict):
+        if (not isinstance(value.get("tasks"), list) or not all(isinstance(t, dict) for t in value["tasks"])
+                or not isinstance(value.get("execution"), dict)):
+            raise Failure("incomplete_work_pack")
+        if "expectedTaskCount" in fixture and len(value["tasks"]) != fixture["expectedTaskCount"]:
+            raise Failure("wrong_task_count")
+        actions = value["execution"].get("allowedActions")
+        if actions is not None and (not isinstance(actions, list) or not all(type(a) is str for a in actions)):
             raise Failure("incomplete_work_pack")
 
+
     def work_pack(self, fixture, phase, writing=False):
-        def check(value):
-            self.pack(value, fixture)
-            # Execution tasks are materialized by check-in. Before it, an empty tasks
-            # list is legitimate; the server's allowedActions validates plan/window.
-            if writing and "CHECK_IN" not in value["execution"].get("allowedActions", []):
-                raise Failure("visit_not_checkin_eligible")
         return self.request("visitBase", f"/api/visits/{fixture['visitId']}/work-pack", phase,
-                            "/api/visits/{id}/work-pack", check=check)
+                            "/api/visits/{id}/work-pack",
+                            check={"kind": "pack", "fixture": fixture, "writing": writing})
 
     def iteration(self, fixture, phase, writing, stop):
         self.work_pack(fixture, phase, writing)
@@ -240,15 +541,114 @@ class Client:
             return
         if stop.is_set():
             raise Failure("stopped_before_write", False)
-        def check(value):
-            if not isinstance(value, dict) or value.get("visitId") != fixture["visitId"] or value.get("replayed") is not False or value.get("savedState") != "IN_PROGRESS" or value.get("visitVersion") != fixture["expectedVersion"] + 1:
-                raise Failure("checkin_not_a_fresh_success")
         self.request("visitBase", f"/api/visits/{fixture['visitId']}/check-in", phase,
                      "/api/visits/{id}/check-in",
                      {"expectedVersion": fixture["expectedVersion"], "clientRequestId": str(uuid.uuid4()),
-                      "locationSource": "MANUAL_LOCATION_NOTE", "locationNote": "HPA-SYNTHETIC-" + self.c["runId"]}, check)
-        # A POST timeout is ambiguous: never retry it. On success, assert the saved state separately.
-        self.work_pack({**fixture, "expectedStatus": "IN_PROGRESS", "expectedVersion": fixture["expectedVersion"] + 1}, phase)
+                      "locationSource": "MANUAL_LOCATION_NOTE", "locationNote": "HPA-SYNTHETIC-" + self.c["runId"]},
+                     {"kind": "checkin", "fixture": fixture})
+        # A frozen task count describes the initial pack, not tasks materialized by a B write.
+        saved_fixture = {k: v for k, v in fixture.items() if k != "expectedTaskCount"}
+        self.work_pack({**saved_fixture, "expectedStatus": "IN_PROGRESS", "expectedVersion": fixture["expectedVersion"] + 1}, phase)
+
+
+def assert_wire_response(value, check):
+    if not check:
+        return
+    if check["kind"] == "identity":
+        if (not isinstance(value, dict) or type(value.get("id")) is not int or value["id"] != check["userId"]
+                or not isinstance(value.get("roles"), list) or not all(type(r) is str for r in value["roles"])
+                or "CAREGIVER" not in value["roles"]):
+            raise Failure("wrong_identity")
+    elif check["kind"] == "pack":
+        Client.pack(value, check["fixture"])
+        if check["writing"] and "CHECK_IN" not in value["execution"].get("allowedActions", []):
+            raise Failure("visit_not_checkin_eligible")
+    elif check["kind"] == "checkin":
+        fixture = check["fixture"]
+        if not isinstance(value, dict) or type(value.get("visitId")) is not int or type(value.get("visitVersion")) is not int or value.get("visitId") != fixture["visitId"] or value.get("replayed") is not False or value.get("savedState") != "IN_PROGRESS" or value.get("visitVersion") != fixture["expectedVersion"] + 1:
+            raise Failure("checkin_not_a_fresh_success")
+    else:
+        raise Failure("unknown_response_contract")
+
+
+def http_worker_main():
+    """Private stdin/stdout protocol only; never echo commands, Cookies or bodies."""
+    def emit(value):
+        sys.stdout.write(json.dumps(value) + "\n")
+        sys.stdout.flush()
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
+                                       urllib.request.HTTPCookieProcessor(jar))
+    config = None
+    incoming = queue.Queue()
+    def receive_commands():
+        try:
+            for line in sys.stdin:
+                incoming.put(json.loads(line))
+        except (OSError, ValueError):
+            pass
+        # A dead supervisor closes stdin even if urllib is blocked. The worker
+        # owns no other processes/resources, so exiting also closes its socket.
+        os._exit(2)
+    threading.Thread(target=receive_commands, daemon=True).start()
+    while True:
+        try:
+            command = incoming.get()
+            if command["op"] == "close":
+                return 0
+            if command["op"] == "init":
+                config = command["config"]
+                validate(config, execute=True)
+                emit({"kind": "initialized"})
+                continue
+            if command["op"] != "request" or config is None:
+                return 2
+            row = {"status": 0, "httpPassed": False, "businessPassed": False}
+            value, fatal = None, True
+            try:
+                headers = {"Accept": "application/json"}
+                if command["body"] is not None:
+                    token = next((x.value for x in jar if x.name == "XSRF-TOKEN"), None)
+                    if not token:
+                        raise Failure("missing_csrf")
+                    headers.update({"Content-Type": "application/json", "X-XSRF-TOKEN": urllib.parse.unquote(token)})
+                request = urllib.request.Request(config[command["base"]] + command["path"], headers=headers,
+                    data=None if command["body"] is None else json.dumps(command["body"]).encode())
+                emit({"kind": "started"})
+                try:
+                    response = opener.open(request, timeout=config["socketTimeoutSeconds"])
+                except urllib.error.HTTPError as exc:
+                    response = exc
+                with response:
+                    row["status"] = response.status
+                    row["httpPassed"] = response.status == 200
+                    emit({"kind": "headers", "status": response.status})
+                    if response.status != 200:
+                        fatal = response.status in (401, 403) or 300 <= response.status < 400 or response.status < 500
+                        raise Failure("authentication_or_contract_http" if fatal else "server_http", fatal)
+                    raw = response.read(8 * 1024 * 1024 + 1)
+                    if len(raw) > 8 * 1024 * 1024:
+                        raise Failure("response_too_large")
+                    if not command["csrf"]:
+                        content_type = response.headers.get_content_type()
+                        if content_type != "application/json" and not content_type.endswith("+json"):
+                            raise Failure("non_json_response")
+                        try:
+                            value = json.loads(raw)
+                        except (ValueError, UnicodeError):
+                            raise Failure("invalid_json")
+                    assert_wire_response(value, command["check"])
+                    row["businessPassed"] = True
+            except Failure as exc:
+                row["error"], fatal = exc.code, exc.fatal
+            except (OSError, urllib.error.URLError, TimeoutError):
+                row["error"], fatal = "transport_error", False
+            except Exception:
+                row["error"], fatal = "unexpected_worker_error", True
+            emit({"kind": "result", "row": row, "value": value if row["businessPassed"] else None, "fatal": fatal})
+        except (ValueError, KeyError, TypeError, OSError):
+            return 2
+    return 0
 
 
 def percentile(values, q=.95):
@@ -278,6 +678,14 @@ class WindowStop:
         return None
 
 
+def error_counts(rows):
+    counts = {}
+    for row in rows:
+        if "error" in row:
+            counts[row["error"]] = counts.get(row["error"], 0) + 1
+    return counts
+
+
 def summarize(http, iterations, phases, targets):
     result = []
     for phase in phases:
@@ -293,19 +701,31 @@ def summarize(http, iterations, phases, targets):
             endpoints.append({"method": method, "endpoint": path, "samples": len(rows),
                               "httpFailures": sum(not r["httpPassed"] for r in rows),
                               "businessFailures": sum(not r["businessPassed"] for r in rows), "errorRate": error_rate,
-                              "allP95Ms": percentile([r["elapsedMs"] for r in rows]), "successP95Ms": percentile(passed),
+                               "allP95Ms": percentile([r["elapsedMs"] for r in rows]), "successP95Ms": percentile(passed),
+                              "errorCategories": error_counts(rows),
+                              "cancelledRequests": sum(r.get("error") == "stop_drain_deadline" for r in rows),
+                              "requestDeadlineFailures": sum(r.get("error") == "request_deadline" for r in rows),
                               "targetObservation": "INSUFFICIENT_SAMPLES" if not enough else (
                                   "WITHIN_DRAFT_TARGET" if error_rate <= targets["errorRate"] and passed and percentile(passed) <= target_ms else "OUTSIDE_DRAFT_TARGET")})
         enough_iterations = len(it) >= targets["minSamplesPerEndpoint"]
         within_iteration_target = bool(it) and sum(not r["passed"] for r in it) / len(it) <= targets["errorRate"] and percentile([r["elapsedMs"] for r in it]) <= targets["iterationP95Ms"]
-        result.append({"phase": phase["name"], "targetRps": phase["rps"], "durationSeconds": phase["durationSeconds"],
+        inactive = phase["rps"] == 0 and phase["iterations"] == 0
+        complete = (len(it) == phase["iterations"] and phase.get("dropped", 0) == 0
+                    and phase.get("notScheduledAfterStop", 0) == 0)
+        evidence = ("NOT_APPLICABLE" if inactive else "INCOMPLETE_LOAD" if not complete
+                    else "INSUFFICIENT_SAMPLES" if not enough_iterations or not endpoints
+                         or any(e["samples"] < targets["minSamplesPerEndpoint"] for e in endpoints)
+                    else "COMPLETE_CLIENT_SAMPLES")
+        result.append({"phase": phase["name"], "clientEvidenceStatus": evidence, "targetRps": phase["rps"], "durationSeconds": phase["durationSeconds"],
                        "plannedIterations": phase["iterations"], "launchedIterations": len(it),
                        "droppedIterations": phase.get("dropped", 0), "notScheduledAfterStop": phase.get("notScheduledAfterStop", 0),
                        "actualLaunchRps": len(it) / phase.get("emissionSeconds", phase["durationSeconds"]) if phase.get("emissionSeconds", phase["durationSeconds"]) > 0 else None,
                        "emissionSeconds": phase.get("emissionSeconds"), "failedIterations": sum(not r["passed"] for r in it),
                        "iterationErrorRate": sum(not r["passed"] for r in it) / len(it) if it else None,
-                       "iterationP95Ms": percentile([r["elapsedMs"] for r in it]),
-                       "iterationTargetObservation": "INSUFFICIENT_SAMPLES" if not enough_iterations else "WITHIN_DRAFT_TARGET" if within_iteration_target else "OUTSIDE_DRAFT_TARGET",
+                        "iterationP95Ms": percentile([r["elapsedMs"] for r in it]),
+                       "iterationSuccessP95Ms": percentile([r["elapsedMs"] for r in it if r["passed"]]),
+                       "iterationErrorCategories": error_counts(it),
+                       "iterationTargetObservation": "NOT_APPLICABLE" if inactive else "INSUFFICIENT_SAMPLES" if not enough_iterations else "WITHIN_DRAFT_TARGET" if within_iteration_target else "OUTSIDE_DRAFT_TARGET",
                        "launchLagP95Ms": percentile([r["launchLagMs"] for r in it]), "endpoints": endpoints})
     return result
 
@@ -317,8 +737,9 @@ def run(c, output):
         phase.update(dropped=0, notScheduledAfterStop=phase["iterations"], emissionSeconds=0)
     out = Path(output)
     out.mkdir(parents=True, exist_ok=False)  # Preserve earlier evidence; never append across runs.
-    stop, lock = threading.Event(), threading.Lock()
-    http, iterations, reasons = [], [], []
+    stop, lock = StopControl(out, c["stopDrainSeconds"]), threading.Lock()
+    http, iterations, clients, workers = [], [], [], []
+    reasons = stop.reasons
     started = time.monotonic()
     window = WindowStop(c["stop"], started)
     samples = (out / "requests.jsonl").open("w", encoding="utf-8")
@@ -329,25 +750,20 @@ def run(c, output):
     def mark(name):
         writer.writerow([utc(), name]); markers.flush()
     def halt(code):
-        with lock:
-            if code not in reasons:
-                reasons.append(code)
-        stop.set()
+        stop.halt(code)
     previous_handler = None
     if threading.current_thread() is threading.main_thread():
         previous_handler = signal.getsignal(signal.SIGINT)
         def interrupt_handler(signum, frame):
-            # Avoid lock acquisition in a signal handler; an HTTP callback might hold it.
-            reasons.append("operator_interrupt")
-            stop.set()
+            # Only store a signal hint; do not acquire locks or perform I/O here.
+            stop.signal_request = (time.monotonic(), utc())
         signal.signal(signal.SIGINT, interrupt_handler)
     def record(row):
         with lock:
             http.append(row)
             samples.write(json.dumps(row) + "\n"); samples.flush()
     def check_stop():
-        if (out / "STOP").exists():
-            halt("operator_stop_file")
+        stop.poll()
         with lock:
             reason = window.evaluate(time.monotonic(), iterations)
         if reason:
@@ -363,9 +779,14 @@ def run(c, output):
                "scenario": c["scenario"], "codeBaseline": c.get("codeBaseline", "UNCONFIRMED"),
                "targetOrigins": [c["coreBase"], c["visitBase"]],
                "approval": {k: c.get("approval", {}).get(k) for k in ("confirmed", "environment", "windowUtc", "owner", "deploymentRef", "allowedOrigins")},
-               "plan": plan, "maxVUs": c["maxVUs"], "phases": c["phases"], "targets": c["targets"], "stop": c["stop"],
+                "plan": plan, "maxVUs": c["maxVUs"], "phases": c["phases"], "targets": c["targets"], "stop": c["stop"],
+               "comparisonInputs": comparison_inputs(c),
+               "maxLaunchLagMs": c["maxLaunchLagMs"],
                "configSha256": hashlib.sha256(json.dumps(c, sort_keys=True).encode()).hexdigest(),
                "toolSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+               "timing": {**timing_settings(c), "supervisorPollSeconds": POLL_SECONDS,
+                          "workerCleanupGraceSeconds": WORKER_GRACE_SECONDS,
+                          "workerStartDeadlineSeconds": WORKER_START_SECONDS},
                "formalAcceptance": False, "sensitiveBodiesAndCookiesRecorded": False})
     writing = c["scenario"] == "check-in"
     lanes = {}
@@ -399,6 +820,11 @@ def run(c, output):
                 iterations.append(row)
                 it_file.write(json.dumps({k: v for k, v in row.items() if k != "finishedMono"}) + "\n"); it_file.flush()
             lane_queue.put(client)
+    def registered(worker):
+        with lock:
+            workers.append(worker)
+            write_json(out / "worker-pids.json", {"workers": [{"pid": w.process.pid,
+                       "script": str(Path(__file__).resolve()), "argument": "--http-worker"} for w in workers]})
     mark("setup-start")
     try:
         for i, actor in enumerate(c["actors"]):
@@ -409,6 +835,8 @@ def run(c, output):
             if stop.is_set():
                 break
             client = Client(c, c["actors"][i], record)
+            client.control, client.worker_registered = stop, registered
+            clients.append(client)
             client.login()
             # Genuine visit authorization across the same Redis session, not a fabricated Cookie.
             client.work_pack(c["actors"][i]["visits"][0], "setup", writing)
@@ -456,6 +884,7 @@ def run(c, output):
                 phase["emissionSeconds"] = round(time.monotonic() - emission_start, 6)
                 mark(phase["name"] + "-end")
             mark("load-stopped-draining")
+            stop.begin_drain()
             for future in futures:
                 future.result()
             check_stop()
@@ -466,31 +895,57 @@ def run(c, output):
     except Exception:
         halt("unexpected_tool_error")
     finally:
+        stop.poll()
+        stop.begin_drain()
         mark("drain-complete")
+        cleanup_started = time.monotonic()
+        with ThreadPoolExecutor(max_workers=max(1, len(workers))) as cleanup_pool:
+            cleanup_rows = list(cleanup_pool.map(lambda w: w.close(), workers))
+        cleanup_ok = all(r and r["reaped"] and r["readerJoined"] and r["writerJoined"] for r in cleanup_rows)
+        if not cleanup_ok:
+            halt("http_worker_cleanup_incomplete")
+        write_json(out / "worker-cleanup.json", {"workers": cleanup_rows, "complete": cleanup_ok,
+                   "elapsedMs": round((time.monotonic() - cleanup_started) * 1000, 3)})
+        mark("worker-cleanup-complete" if cleanup_ok else "worker-cleanup-incomplete")
         phase_metrics = summarize(http, iterations, c["phases"], c["targets"])
         failed = sum(not r["passed"] for r in iterations)
         dropped = sum(p.get("dropped", 0) for p in c["phases"])
-        outcome = "STOPPED" if stop.is_set() else "COMPLETED_WITH_FAILURES" if failed else "COMPLETED_WITH_DROPS" if dropped else "COMPLETED"
+        outcome = "INCOMPLETE" if not cleanup_ok else "STOPPED" if stop.is_set() else "COMPLETED_WITH_FAILURES" if failed else "COMPLETED_WITH_DROPS" if dropped else "COMPLETED"
         summary = {"runId": c["runId"], "finishedUtc": utc(), "outcome": outcome, "stopReasons": reasons,
                    "scenario": c["scenario"], "plannedIterations": plan["plannedIterations"],
                    "launchedIterations": len(iterations), "failedIterations": failed, "droppedIterations": dropped,
                    "notScheduledAfterStop": sum(p.get("notScheduledAfterStop", p["iterations"]) for p in c["phases"]),
                    "httpRequestsDuringLoad": sum(r["phase"] != "setup" for r in http),
                    "httpRequestsDuringSetup": sum(r["phase"] == "setup" for r in http),
-                   "targetsAreDraft": not bool(c.get("approval", {}).get("confirmed")),
+                    "targetsAreDraft": True,  # Execution approval is not SLA/target acceptance.
+                   "httpErrorCategories": error_counts(http),
+                   "iterationErrorCategories": error_counts(iterations),
+                   "cancelledRequests": sum(r.get("error") == "stop_drain_deadline" for r in http),
+                   "requestDeadlineFailures": sum(r.get("error") == "request_deadline" for r in http),
+                   "clientEvidenceStatus": ("INCOMPLETE" if not cleanup_ok else "STOPPED" if stop.is_set()
+                       else "INCOMPLETE_LOAD" if any(p["clientEvidenceStatus"] == "INCOMPLETE_LOAD" for p in phase_metrics)
+                       else "INSUFFICIENT_SAMPLES" if any(p["clientEvidenceStatus"] == "INSUFFICIENT_SAMPLES" for p in phase_metrics)
+                       else "COMPLETE_CLIENT_SAMPLES"),
                    "formalAcceptance": False, "phases": phase_metrics,
+                   "timing": {**timing_settings(c), **stop.snapshot()},
+                   "workerCleanupComplete": cleanup_ok,
+                   "accountingValid": plan["plannedIterations"] == len(iterations) + dropped +
+                       sum(p.get("notScheduledAfterStop", p["iterations"]) for p in c["phases"]),
                    "limitations": ["Client-side elapsed time; no HPA/resource observations collected by this tool.",
                                    "No retry/logout/reset; timed-out writes require reconciliation before cleanup.",
                                    "Read work-pack endpoint also writes access audit records.",
                                    "Fixed-account backend test does not cover account switching, UI freshness or FM03 caching.",
-                                   "Threads/urllib: verify generator headroom and dropped iterations before increasing rate."]}
+                                   "Supervised per-VU HTTP processes: verify generator headroom and drops before increasing rate."]}
         write_json(out / "summary.json", summary)
         with (out / "summary.csv").open("w", newline="", encoding="utf-8") as f:
-            fields = ["phase", "method", "endpoint", "samples", "httpFailures", "businessFailures", "errorRate", "allP95Ms", "successP95Ms", "targetObservation"]
+            fields = ["phase", "method", "endpoint", "samples", "httpFailures", "businessFailures", "errorRate",
+                      "allP95Ms", "successP95Ms", "targetObservation", "errorCategories",
+                      "cancelledRequests", "requestDeadlineFailures"]
             w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
             for p in phase_metrics:
                 for endpoint in p["endpoints"]:
-                    w.writerow({"phase": p["phase"], **endpoint})
+                    w.writerow({"phase": p["phase"], **endpoint,
+                                "errorCategories": json.dumps(endpoint["errorCategories"], sort_keys=True)})
         samples.close(); it_file.close(); markers.close()
         if previous_handler is not None:
             signal.signal(signal.SIGINT, previous_handler)
@@ -519,4 +974,4 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(http_worker_main() if sys.argv[1:] == ["--http-worker"] else main())
