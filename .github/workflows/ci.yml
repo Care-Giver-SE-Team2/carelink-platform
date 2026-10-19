@@ -175,9 +175,44 @@ jobs:
       - name: Check release manifests and runtime configuration injection offline
         run: python3 -m unittest discover -s scripts/tests -v
 
+  iac-security:
+    name: Checkov IaC security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/checkov-requirements.txt
+
+      - name: Install the pinned scanner
+        run: python -m pip install --disable-pip-version-check -r .github/checkov-requirements.txt
+
+      - name: Scan tracked Terraform and reject new findings
+        run: python3 scripts/scan-iac.py --output "$RUNNER_TEMP/checkov-iac"
+
+      - name: Publish the scan summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/checkov-iac/summary.md" ]; then
+            cat "$RUNNER_TEMP/checkov-iac/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Keep full and differential reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: checkov-iac
+          path: ${{ runner.temp }}/checkov-iac/
+          retention-days: 14
+          if-no-files-found: warn
+
   gate:
     name: Quality gate
-    needs: [changes, service, frontend, secret-scan, deployment-config]
+    needs: [changes, service, frontend, secret-scan, deployment-config, iac-security]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -189,6 +224,7 @@ jobs:
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           SECRETS_RESULT: ${{ needs.secret-scan.result }}
           DEPLOYMENT_RESULT: ${{ needs.deployment-config.result }}
+          IAC_RESULT: ${{ needs.iac-security.result }}
         run: |
           {
             echo "### Quality gate"
@@ -199,10 +235,11 @@ jobs:
             echo "| Front end | $FRONTEND_RESULT |"
             echo "| Secret scanning | $SECRETS_RESULT |"
             echo "| Helm deployment configuration | $DEPLOYMENT_RESULT |"
+            echo "| Checkov IaC security (new findings gate) | $IAC_RESULT |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if anything that ran failed
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        if: needs.iac-security.result != 'success' || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
 
   publish:
