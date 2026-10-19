@@ -253,6 +253,19 @@ After this event the visit is IN_PROGRESS.
   publishes no `VisitClosed`: the visit stays COMPLETED.
 - The check-in and check-out times are unchanged, so they are not repeated.
 
+**`VisitEvidenceUpdated`**
+
+```json
+{ "visitId": 812, "elderId": 101, "scheduledStart": "2026-10-12T09:00:00+08:00",
+  "version": 7, "evidenceCount": 2, "verifiedEvidenceCount": 0 }
+```
+
+- A committed upload publishes a count snapshot in the same transaction as its command receipt.
+- Report orders this independent projection by `version`; duplicates and older snapshots are ignored.
+  It does not rewind the visit's execution status or version. Older copied counters are the fallback
+  until a snapshot exists. No file paths, image bytes, filenames or storage identifiers are sent.
+- This producer does not add a verification command: uploaded images remain UNVERIFIED.
+
 **`IncidentRaised`** (sensitive)
 
 ```json

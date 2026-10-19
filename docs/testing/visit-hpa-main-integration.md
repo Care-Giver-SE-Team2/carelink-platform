@@ -17,6 +17,8 @@ Use Python 3.10+, Java 25 and Maven. Build offline with previously cached depend
 
 `candidate_lock.py` is the new entry point. The old `release_lock.py` and `release-lock.json` retain their historical 09d meaning. Do not relabel old JARs or edit a legacy lock to claim a new application.
 
+The checked-in `candidate-release-lock.json` binds the tested application source. `example.joint.main-candidate.json` and `fixture-whitelist.main-candidate.example.json` bind that same source while retaining placeholder IDs and unconfirmed approvals. They are not ready-to-run cloud data. The sanitized execution evidence is in [the local evidence folder](evidence/visit-hpa-main-integration-20261020/README.md).
+
 From the repository root, after the application source has a real local commit:
 
 ```text
