@@ -1,5 +1,11 @@
 /* Placement only — every visual comes from shared/components/ui. */
 
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -17,7 +23,7 @@
 
 /* Column template shared by the header row and every ListRow below it. */
 .rows {
-  --list-row-columns: minmax(0, 1fr) 84px 132px 108px 96px;
+  --list-row-columns: minmax(0, 1fr) 132px 108px 96px;
 }
 
 .headerRow {
@@ -44,7 +50,7 @@
 /* When the list gets narrow, Primary caregiver and Next visit drop first. */
 @container (max-width: 760px) {
   .rows {
-    --list-row-columns: minmax(0, 1fr) 84px 132px;
+    --list-row-columns: minmax(0, 1fr) 132px;
   }
 
   .optional,

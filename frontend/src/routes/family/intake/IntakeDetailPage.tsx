@@ -92,8 +92,8 @@ function ApplicationDetails({ application: item }: { application: IntakeApplicat
             <dd>{item.postalCode}</dd>
           </div>
           <div>
-            <dt>Preferred dialects</dt>
-            <dd>{item.preferredDialects || 'Not provided'}</dd>
+            <dt>Preferred languages</dt>
+            <dd>{item.preferredDialects?.split(',').join(', ') || 'Not provided'}</dd>
           </div>
           <div className={styles.fullWidth}>
             <dt>Mobility</dt>

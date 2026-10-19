@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import sg.nus.carelink.profile.domain.model.IntakeApplication;
 import sg.nus.carelink.profile.domain.model.IntakeApplicationPage;
@@ -31,6 +33,14 @@ public class InMemoryIntakeApplicationRepository implements IntakeApplicationRep
 		return rows.values().stream()
 				.filter(row -> row.status() == IntakeApplication.Status.APPROVED && elderId.equals(row.elderId()))
 				.toList();
+	}
+
+	@Override
+	public Set<Long> findElderIdsWithApprovedApplication(Set<Long> elderIds) {
+		return rows.values().stream()
+				.filter(row -> row.status() == IntakeApplication.Status.APPROVED && elderIds.contains(row.elderId()))
+				.map(IntakeApplication::elderId)
+				.collect(Collectors.toSet());
 	}
 
 	@Override

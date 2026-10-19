@@ -2,6 +2,7 @@ package sg.nus.carelink.profile.domain.repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import sg.nus.carelink.profile.domain.model.IntakeApplication;
 import sg.nus.carelink.profile.domain.model.IntakeApplicationPage;
@@ -17,6 +18,9 @@ public interface IntakeApplicationRepository {
 
 	/** The approved application(s) that created this elder's record — what the family first asked for. */
 	List<IntakeApplication> findApprovedByElderId(Long elderId);
+
+	/** Which of these elders were created by an approved intake application. */
+	Set<Long> findElderIdsWithApprovedApplication(Set<Long> elderIds);
 
 	/**
 	 * Find applications after filtering by owner and optional status, ordered by creation time then id descending.

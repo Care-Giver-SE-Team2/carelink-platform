@@ -77,7 +77,7 @@ missed check-in, so a consumer sees gaps, never a repeat.
 | `VisitTaskRecorded` | `CaregiverVisitExecutionService.taskResult` | A task's result is recorded | report | published |
 | `VitalsRecorded` | `CaregiverHealthService.record` | A set of readings is recorded | report | published |
 | `ElderConfirmationSubmitted` | `VisitService.submitElderConfirmation` | The elder confirms or disputes a visit | report | published |
-| `VisitClosed` | No code sets VERIFIED or AUTO_CLOSED yet | The visit becomes VERIFIED or AUTO_CLOSED | report | reserved |
+| `VisitClosed` | `VisitService.submitElderConfirmation` (CONFIRMED); nothing sets AUTO_CLOSED yet | The visit becomes VERIFIED or AUTO_CLOSED | report | published |
 | `VisitEvidenceUpdated` | No code writes visit evidence yet | Evidence is added or verified | report | reserved |
 
 **The state a visit event leaves.** Each event says what the visit is after it, so a consumer that keeps visits
@@ -91,6 +91,7 @@ applies an event only when its `version` is higher than the one it holds, and ne
 | `VisitCheckedIn` | IN_PROGRESS | `caregiverId` |
 | `VisitCompleted` | COMPLETED | `caregiverId` |
 | `VisitExceptionRaised` | EXCEPTION | `caregiverId` (null when nobody covers it) |
+| `VisitClosed` | `status`: VERIFIED or AUTO_CLOSED | `caregiverId` |
 
 What never changes after `VisitScheduled` - the service, the plan and its task, the end time - comes only with
 it. When an update arrives first, keep its state and fill those fields in when `VisitScheduled` arrives, whatever
@@ -240,6 +241,18 @@ After this event the visit is IN_PROGRESS.
 - `rating` (1 to 5) may be null.
 - `incidentId` is set when the dispute raised an incident.
 
+**`VisitClosed`**
+
+```json
+{ "visitId": 812, "elderId": 101, "scheduledStart": "2026-10-12T09:00:00+08:00", "caregiverId": 9,
+  "status": "VERIFIED", "version": 5, "closedAt": "2026-10-12T19:30:00+08:00" }
+```
+
+- `status` is `VERIFIED` (the elder confirmed the visit) or `AUTO_CLOSED` (the elder never answered).
+- A confirmation publishes `VisitClosed` before `ElderConfirmationSubmitted`, in the same transaction. A dispute
+  publishes no `VisitClosed`: the visit stays COMPLETED.
+- The check-in and check-out times are unchanged, so they are not repeated.
+
 **`IncidentRaised`** (sensitive)
 
 ```json
@@ -377,7 +390,7 @@ is included and the end is not.
 These gaps already show in reports today. The events do not cause them. The owners of the code fix them, and the
 catalogue already reserves the events they will need.
 
-- **Nothing sets a visit to VERIFIED or AUTO_CLOSED.** So every week with a completed visit is marked incomplete (`data_complete`). `VisitClosed` is reserved for this.
+- **Nothing sets a visit to AUTO_CLOSED.** A visit the elder confirms becomes VERIFIED (`VisitClosed`), but one the elder never answers stays COMPLETED, so its week is marked incomplete (`data_complete`).
 - **Readings are stored with `out_of_range = false`.** The caregiver's own judgement is the health record's flag. `VitalsRecorded` carries both, so report can follow whichever rule the owners decide.
 - **Nothing writes visit evidence.** So evidence counts are 0, except what the first deployment copied. `VisitEvidenceUpdated` is reserved for this.
 - **The value-added availability check was 8 hours off.** It bound `LocalDateTime` straight into SQL, while visit times are written through JPA, so the overlap check was 8 hours off in a JVM running on UTC. It is the calls in section 4 now, and visit binds the times the way it writes them.

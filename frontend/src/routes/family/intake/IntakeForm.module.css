@@ -206,6 +206,10 @@
 .feedback {
   margin-bottom: 12px;
 }
+/* Inside a section card it follows other content, so space it from that and let the card's padding end it. */
+.section > .errorSummary {
+  margin: 12px 0 0;
+}
 .errorSummary h2 {
   font-size: 15px;
   margin-bottom: 6px;

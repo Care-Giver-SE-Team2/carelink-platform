@@ -1,6 +1,6 @@
 import { DayToggle, Select } from '../../../shared/components/ui'
 import type { SelectItem } from '../../../shared/components/ui'
-import { HALF_HOUR_START_TIMES, VISIT_DURATIONS, durationLabel, endsByMidnight, parseEditorTime } from '../lib/planTree'
+import { HALF_HOUR_START_TIMES, VISIT_DURATIONS, durationLabel, isOnHalfHour, parseEditorTime, withinVisitingHours } from '../lib/planTree'
 import { WEEKDAYS } from './weekdays'
 import type { DayKey, DayScheduleEntry, DayScheduleValue } from './weekdays'
 import styles from './DaySchedule.module.css'
@@ -67,25 +67,26 @@ export function DaySchedule({
 
 const HALF_HOURS: SelectItem[] = HALF_HOUR_START_TIMES.map((time) => ({ value: time, label: time }))
 
-/** The half hours, led by the day's current time when it is a time but not one of them. */
+/** The half hours in visiting hours, led by the day's current time when it is a time but not one of them. */
 function startTimeOptions(current: string): SelectItem[] {
   if (HALF_HOUR_START_TIMES.includes(current) || parseEditorTime(current) === null) return HALF_HOURS
-  return [{ value: current, label: `${current} – pick :00 or :30` }, ...HALF_HOURS]
+  const why = isOnHalfHour(current) ? 'outside 7 AM – 8 PM' : 'pick :00 or :30'
+  return [{ value: current, label: `${current} – ${why}` }, ...HALF_HOURS]
 }
 
 /**
- * The 30-minute blocks that end by midnight from this start, led by the day's current length when
+ * The 30-minute blocks that end by 8:00 PM from this start, led by the day's current length when
  * it is set but not one of them, labelled with why.
  */
 function durationOptions(current: number | null, startTime: string): SelectItem[] {
-  const fitting = VISIT_DURATIONS.filter((minutes) => endsByMidnight(startTime, minutes))
+  const fitting = VISIT_DURATIONS.filter((minutes) => withinVisitingHours(startTime, minutes))
   const options = (fitting.length > 0 ? fitting : VISIT_DURATIONS).map((minutes) => ({
     value: String(minutes),
     label: durationLabel(minutes),
   }))
   if (current === null || current <= 0 || options.some((o) => o.value === String(current))) return options
   const why = VISIT_DURATIONS.includes(current)
-    ? `${durationLabel(current)} – runs past midnight`
+    ? `${durationLabel(current)} – runs past 8 PM`
     : `${current} min – pick 30 min steps`
   return [{ value: String(current), label: why }, ...options]
 }

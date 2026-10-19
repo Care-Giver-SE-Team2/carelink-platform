@@ -6,6 +6,7 @@ import type { ElderBasicDetails } from '../../../features/family-elders/api'
 import { elderProfileKey, refreshFamilyElders, useFamilyElderProfile } from '../../../features/family-elders/queries'
 import { ApiError } from '../../../shared/api/client'
 import { serverFieldErrors } from '../../../shared/validation/serverErrors'
+import { dateOfBirthLabel } from '../../../features/schedule/presentation'
 import { formatSgPhone } from '../../../shared/validation/sg'
 import { useSelectedElder } from '../components/selectedElder'
 import { ElderProfileForm } from './ElderProfileForm'
@@ -67,9 +68,10 @@ function ElderProfile({ id }: { id: number }) {
 
   const elder = profile.data
   const mobility = { INDEPENDENT: 'Independent', ASSISTIVE_CANE: 'Uses a walking aid', WHEELCHAIR_BEDBOUND: 'Wheelchair / bedbound' }
+  const gender = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other' }
   const rows = [
-    ['Full name', elder.fullName], ['Date of birth', elder.dateOfBirth],
-    ['Gender', elder.gender?.toLowerCase()], ['Phone', elder.phone && formatSgPhone(elder.phone)], ['Home address', elder.address],
+    ['Full name', elder.fullName], ['Date of birth', dateOfBirthLabel(elder.dateOfBirth)],
+    ['Gender', elder.gender ? gender[elder.gender] : null], ['Phone', elder.phone && formatSgPhone(elder.phone)], ['Home address', elder.address],
     ['Postal code', elder.postalCode], ['Preferred languages', elder.preferredDialects?.split(',').join(', ')],
     ['Lives alone', elder.livesAlone === null ? null : elder.livesAlone ? 'Yes' : 'No'],
     ['Mobility', elder.mobilityLevel ? mobility[elder.mobilityLevel] : null],

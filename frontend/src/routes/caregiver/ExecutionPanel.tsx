@@ -20,9 +20,10 @@ export default function ExecutionPanel({ pack, command }: { pack: WorkPack; comm
       {check ? <form onSubmit={e => { e.preventDefault(); command.start(pack.visit.id, pack.visit.version) }}>
         <fieldset disabled={command.blocked}><legend>Record arrival location</legend>
           <label>Location source<select value={command.mode} onChange={e => command.setMode(e.target.value as 'GPS' | 'MANUAL_LOCATION_NOTE')}><option value="GPS">GPS</option><option value="MANUAL_LOCATION_NOTE">Manual location note (not GPS verified)</option></select></label>
-          {command.mode === 'GPS' ? <><button type="button" className={styles.button} onClick={command.locate}>Get GPS location</button>{command.fix && <p role="status">Device location obtained. Accuracy: {Math.round(command.fix.accuracy)} m.</p>}</>
+          {command.mode === 'GPS' ? <button type="button" className={styles.button} onClick={command.locate}>Get GPS location</button>
             : <label>Manual location note<textarea value={command.note} maxLength={500} rows={3} onChange={e => command.setNote(e.target.value)} required /></label>}
           <button className={styles.button}>Check in and start service</button>
+          {command.mode === 'GPS' && command.fix && <p role="status">Device location obtained. Accuracy: {Math.round(command.fix.accuracy)} m.</p>}
         </fieldset>
       </form> : <p>Check-in is blocked: {state.blockedReason === 'VISIT_CHECK_IN_WINDOW' ? 'outside the time window' : state.blockedReason === 'VISIT_TASKS_REQUIRED' ? 'no valid plan task assigned — contact your manager' : 'current visit state or service strategy does not permit check-in'}.</p>}
     </>}

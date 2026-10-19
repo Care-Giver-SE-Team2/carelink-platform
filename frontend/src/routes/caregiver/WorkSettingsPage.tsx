@@ -23,18 +23,18 @@ export default function WorkSettingsPage({ mode }: { mode: 'availability' | 'pre
   const { result, reload, retainedData } = useCaregiverQuery(`work-settings:${mode}:${date}`, load, !editing)
   const view = result.status === 'success' ? result.data : result.status === 'loading' ? retainedData : undefined
   return <div className={styles.page}>
-    <div className={styles.heading}><h1>{mode === 'availability' ? 'My availability' : 'Work preferences'}</h1><button className={styles.button} disabled={!!editing || result.status === 'loading'} onClick={reload}>Refresh</button></div>
-    <p className={styles.readOnly}>Saved settings are not yet applied to automatic rostering. Your manager assigns actual visits and may schedule outside your preferred hours. Updating settings never cancels an assigned visit.</p>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>{mode === 'availability' ? 'My availability' : 'Work preferences'}</h1><p className={styles.muted}>{mode === 'availability' ? 'Declare when you can work on a given day.' : 'The services, areas and hours you prefer to work.'}</p></div></div><div className={styles.toolbar}><button className={styles.refresh} disabled={!!editing || result.status === 'loading'} onClick={reload}>Refresh</button></div>
+    <div className={styles.readOnly}><p>Saved settings are not yet applied to automatic rostering. Your manager assigns actual visits and may schedule outside your preferred hours. Updating settings never cancels an assigned visit.</p>
     <p>Approved leave takes precedence over preferences. Pending leave is not approval. For an existing shift you cannot attend, use <Link to="/caregiver/absences">My leave</Link> after admission or contact your manager.</p>
-    <p>All dates and times are Singapore time. No declaration means Unspecified, not Unavailable. Same-day windows use [start, end); overnight windows and 24:00 are not supported.</p>
+    <p>All dates and times are Singapore time. No declaration means Unspecified, not Unavailable. Same-day windows use [start, end); overnight windows and 24:00 are not supported.</p></div>
     {mode === 'availability' && <form className={styles.dateForm} onSubmit={event => { event.preventDefault(); if (!editing && /^\d{4}-\d{2}-\d{2}$/.test(draftDate)) { setDate(draftDate); setNotice('') } }}>
       <fieldset disabled={!!editing}><EnglishDateField label="Availability date" value={draftDate} onChange={setDraftDate} /><button className={styles.button}>Load date</button></fieldset>
     </form>}
     {result.status === 'loading' && <p role="status">Loading work settings…</p>}
     {result.status === 'error' && <SelfServiceError error={result.error} retry={reload} subject="your work settings" />}
     {notice && <p role="status">{notice}</p>}
-    {view && <>
-      <p>Settings version {view.settings.version} · Changes allowed from {view.today} to {view.editableUntil}.</p>
+    {view && <><section className={styles.card} aria-label={mode === 'availability' ? 'Saved availability' : 'Saved preferences'}>
+      <p className={styles.muted}>Settings version {view.settings.version} · Changes allowed from {view.today} to {view.editableUntil}.</p>
       {view.settings.dataIssues.length > 0 && <p role="alert">Some existing settings need review: {view.settings.dataIssues.join(', ')}. They have not been silently cleared. Review all selections before replacing them.</p>}
       {mode === 'availability' ? <>
         <h2>{date}</h2>
@@ -49,6 +49,7 @@ export default function WorkSettingsPage({ mode }: { mode: 'availability' | 'pre
         {!view.catalog.serviceCatalogConfigured && <p>Service choices await an agreed service-code directory. Other preferences can still be saved.</p>}
       </>}
       {!editing && view.canEdit && (mode === 'preferences' || date >= view.today && date <= view.editableUntil) && <button className={styles.button} onClick={() => { setEditing(view); setNotice('') }}>Edit {mode === 'availability' ? 'availability' : 'preferences'}</button>}
+      </section>
       {editing && <SettingsEditor mode={mode} date={date} source={editing} close={() => setEditing(null)} saved={() => { setEditing(null); setNotice('Settings saved. They are not yet applied to automatic rostering.'); reload() }} />}
     </>}
   </div>

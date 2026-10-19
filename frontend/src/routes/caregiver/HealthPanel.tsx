@@ -52,8 +52,8 @@ export default function HealthPanel({ pack, command, revision }: { pack: WorkPac
         {record.readings.length ? <ul>{record.readings.map(reading => <li key={reading.metric}>{metrics[reading.metric] ?? reading.metric}: {reading.value} {reading.unit}</li>)}</ul> : <p>No readings measured.</p>}
         {record.healthNote && <p>{record.healthNote}</p>}
       </article>)}
-      <div className={styles.quick}><button className={styles.button} disabled={page === 0} onClick={() => setPage(old => old - 1)}>Previous health records</button>
-        <span>Page {page + 1}</span><button className={styles.button} disabled={(page + 1) * result.data.size >= result.data.total} onClick={() => setPage(old => old + 1)}>Next health records</button></div>
+      <div className={styles.pager}><button className={styles.button} aria-label="Previous health records" disabled={page === 0} onClick={() => setPage(old => old - 1)}>Previous</button>
+        <span>Page {page + 1}</span><button className={styles.button} disabled={(page + 1) * result.data.size >= result.data.total} aria-label="Next health records" onClick={() => setPage(old => old + 1)}>Next</button></div>
     </>}
   </section>
 }

@@ -1,12 +1,11 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
-import { RoleShell } from '../../shared/components/RoleShell'
 import { getMyProfile } from '../../features/caregiver/api'
 import { useCaregiverQuery } from '../../features/caregiver/useCaregiverQuery'
 import { QueryError } from './components'
 import SchedulePage from './SchedulePage'
 import WorkPackPage from './WorkPackPage'
 import AbsencesPage from './AbsencesPage'
-import CaregiverNavigation from './CaregiverNavigation'
+import CaregiverLayout from './CaregiverLayout'
 import SpotChecksPage from './SpotChecksPage'
 import IncidentsPage, { IncidentDetailPage } from './IncidentsPage'
 import ReportIncidentPage from './ReportIncidentPage'
@@ -23,10 +22,7 @@ export default function CaregiverHome() {
   const profile = result.status === 'success' ? result.data : result.status === 'loading' ? retainedData : undefined
   const workAllowed = profile !== undefined && ['AVAILABLE', 'BUSY'].includes(profile.status)
   return (
-    <div className={styles.shell}><RoleShell title="Caregiver" theme="standard">
-      {result.status === 'loading' && <p role="status">Checking caregiver access…</p>}
-      {result.status === 'error' && <QueryError error={result.error} retry={reload} profile />}
-      {profile && <div key={profile.userId ?? profile.id}><CaregiverNavigation workAllowed={workAllowed} /><Routes>
+    profile ? <CaregiverLayout key={profile.userId ?? profile.id} workAllowed={workAllowed} name={profile.fullName}><Routes>
         <Route index element={workAllowed ? <SchedulePage /> : <Navigate to="/caregiver/application" replace />} />
         <Route path="application" element={<ApplicationPage profile={profile} refreshProfile={reload} />} />
         <Route path="availability" element={<WorkSettingsPage key="availability" mode="availability" />} />
@@ -45,8 +41,11 @@ export default function CaregiverHome() {
         <Route path="visits/:visitId" element={workAllowed ? <WorkPackPage /> : <AdmissionRequired />} />
         <Route path="visits/:visitId/evidence" element={workAllowed ? <EvidencePage /> : <AdmissionRequired />} />
         <Route path="*" element={<p>Page not found. <Link to="/caregiver">My schedule</Link></p>} />
-      </Routes></div>}
-    </RoleShell></div>
+      </Routes></CaregiverLayout>
+      : <div className={styles.shell}><main className={styles.bare}>
+        {result.status === 'loading' && <p role="status">Checking caregiver access…</p>}
+        {result.status === 'error' && <QueryError error={result.error} retry={reload} profile />}
+      </main></div>
   )
 }
 

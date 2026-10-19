@@ -15,9 +15,17 @@
   margin: 16px 20px 0;
 }
 
-.directory {
-  margin-top: 12px;
-  border-top: 1px solid var(--border);
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 14px;
+}
+
+.search {
+  flex: 0 1 280px;
 }
 
 .pagination {

@@ -37,6 +37,7 @@ import sg.nus.carelink.eventtypes.SingaporeTime;
 import sg.nus.carelink.eventtypes.SpotCheckUpdated;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitScheduled;
 import sg.nus.carelink.eventtypes.VisitTaskRecorded;
@@ -194,6 +195,31 @@ class ReportFactsFromEventsIT {
 			assertThat(fact.plannedMinutes()).isEqualTo(60);
 			assertThat(fact.workedMinutes()).as("the check-in of version 3, not of version 1").isEqualTo(55);
 		});
+	}
+
+	/** A visit the elder confirmed is closed, so it no longer leaves the week incomplete. */
+	@Test
+	void aVisitTheElderConfirmedIsClosedAndKeepsItsTimes() {
+		long visit = IDS.incrementAndGet();
+		VisitCompleted completed = new VisitCompleted(visit, elder, at(TUESDAY_NINE), caregiver,
+				at(TUESDAY_NINE.plusMinutes(5)), at(TUESDAY_NINE.plusHours(1)), 3);
+		deliver(new VisitScheduled(visit, elder, caregiver, 21L, 40L, "Bathing", at(TUESDAY_NINE),
+				at(TUESDAY_NINE.plusHours(1)), "PLAN", null, 0));
+		deliver(completed);
+
+		assertThat(facts.gather(elder, WEEK).orElseThrow().unclosedVisits()).as("awaiting the elder")
+				.extracting(VisitFact::id).containsExactly(visit);
+
+		deliver(new VisitClosed(visit, elder, at(TUESDAY_NINE), caregiver, "VERIFIED", 4,
+				at(TUESDAY_NINE.plusHours(10))));
+		deliver(completed);
+
+		ReportFacts week = facts.gather(elder, WEEK).orElseThrow();
+		assertThat(week.visits()).singleElement().satisfies(fact -> {
+			assertThat(fact.status()).as("not reopened by the older VisitCompleted").isEqualTo(VisitFact.Status.VERIFIED);
+			assertThat(fact.workedMinutes()).as("closing keeps the check-in and check-out").isEqualTo(55);
+		});
+		assertThat(week.unclosedVisits()).isEmpty();
 	}
 
 	@Test

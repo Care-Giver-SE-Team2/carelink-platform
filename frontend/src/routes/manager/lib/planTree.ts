@@ -76,9 +76,16 @@ export function toEditorTime(startTime: string): string {
   return `${time} ${meridiem}`
 }
 
-/** The start times a visit may take, as the editor shows them: every half hour, 12:00 AM to 11:30 PM. */
-export const HALF_HOUR_START_TIMES: string[] = Array.from({ length: 48 }, (_, i) =>
-  toEditorTime(`${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 === 0 ? '00' : '30'}`),
+/** Visits happen between 7:00 AM and 8:00 PM: none starts earlier, and each is over by 8:00 PM. */
+const VISITING_HOURS = { from: 7 * 60, until: 20 * 60 }
+
+/** The start times a visit may take, as the editor shows them: every half hour, 7:00 AM to 7:30 PM. */
+export const HALF_HOUR_START_TIMES: string[] = Array.from(
+  { length: (VISITING_HOURS.until - VISITING_HOURS.from) / 30 },
+  (_, i) => {
+    const minutes = VISITING_HOURS.from + i * 30
+    return toEditorTime(`${String(Math.floor(minutes / 60)).padStart(2, '0')}:${minutes % 60 === 0 ? '00' : '30'}`)
+  },
 )
 
 /** The lengths a visit may take, in minutes: 30-minute blocks up to 4 hours, matching the server's rule. */
@@ -89,10 +96,12 @@ export function isAllowedDuration(minutes: number | null): boolean {
   return minutes !== null && VISIT_DURATIONS.includes(minutes)
 }
 
-/** True when a visit starting at this editor time is over by midnight; ending exactly at midnight is fine. */
-export function endsByMidnight(startTime: string, minutes: number): boolean {
+/** True when a visit at this editor time falls within visiting hours; ending exactly at 8:00 PM is fine. */
+export function withinVisitingHours(startTime: string, minutes: number): boolean {
   const parsed = parseEditorTime(startTime)
-  return parsed !== null && minutesOfDay(parsed) + minutes <= 24 * 60
+  if (parsed === null) return false
+  const start = minutesOfDay(parsed)
+  return start >= VISITING_HOURS.from && start + minutes <= VISITING_HOURS.until
 }
 
 /** 30 -> "30 min", 60 -> "1 h", 90 -> "1 h 30 min". */
@@ -273,7 +282,7 @@ export function visitsFromDaySchedule(schedule: DayScheduleValue): DayVisit[] {
 
 /**
  * A schedule can be saved once at least one day is on and every day that's on starts on the hour
- * or half hour and lasts one of the VISIT_DURATIONS, over by midnight.
+ * or half hour and lasts one of the VISIT_DURATIONS, within visiting hours.
  */
 export function isScheduleComplete(schedule: DayScheduleValue): boolean {
   const active = WEEKDAYS.filter((d) => schedule[d.key].active)
@@ -281,7 +290,7 @@ export function isScheduleComplete(schedule: DayScheduleValue): boolean {
     active.length > 0 &&
     active.every((d) => {
       const { startTime, minutes } = schedule[d.key]
-      return isAllowedDuration(minutes) && isOnHalfHour(startTime) && endsByMidnight(startTime, minutes ?? 0)
+      return isAllowedDuration(minutes) && isOnHalfHour(startTime) && withinVisitingHours(startTime, minutes ?? 0)
     })
   )
 }

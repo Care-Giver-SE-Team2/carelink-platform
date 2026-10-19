@@ -43,22 +43,3 @@ export function IconHeart() {
     </svg>
   )
 }
-
-export function IconClock() {
-  return (
-    <svg {...common} aria-hidden="true">
-      <circle cx="12" cy="12" r="9.5" />
-      <path d="M12 6.5V12l4 2.2" />
-    </svg>
-  )
-}
-
-export function IconDocCheck() {
-  return (
-    <svg {...common} aria-hidden="true">
-      <path d="M13.5 2.5H6.8A1.8 1.8 0 0 0 5 4.3v15.4A1.8 1.8 0 0 0 6.8 21.5h10.4a1.8 1.8 0 0 0 1.8-1.8V8z" />
-      <path d="M13.5 2.5V8h5.5" />
-      <path d="M9 14.3l2.2 2.2 4-4.3" />
-    </svg>
-  )
-}

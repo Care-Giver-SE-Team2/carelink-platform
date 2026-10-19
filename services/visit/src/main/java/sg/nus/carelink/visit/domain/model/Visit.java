@@ -226,6 +226,12 @@ public record Visit(
         return new Visit(id, elderId, caregiverId, carePlanNodeId, absenceId, serviceType, scheduledStart, scheduledEnd,
                 checkedInAt, now, Status.COMPLETED, null, carePlanId, version, createdAt, updatedAt, healthFlag, healthNote);
     }
+    /** EL01: the elder confirmed a checked-out visit took place. A dispute leaves it COMPLETED instead. */
+    public Visit verifiedByElder() {
+        if (status != Status.COMPLETED)
+            throw new sg.nus.carelink.shared.error.BusinessRuleViolation("VISIT_NOT_AWAITING_ELDER_CONFIRMATION", "Only a completed visit can be confirmed by the elder.");
+        return withAssignmentAndStatus(caregiverId, Status.VERIFIED);
+    }
     /** CG04: operational reports pause open work, never undo a completed visit. */
     public Visit reportedException(LocalDateTime now) {
         if (status == Status.CANCELLED || (status == Status.SCHEDULED && now.isBefore(scheduledStart))) {

@@ -49,6 +49,11 @@ final class RecordingVisitEvents implements VisitEvents {
 	}
 
 	@Override
+	public void closed(Visit visit) {
+		add("VisitClosed", visit, visit.status().name());
+	}
+
+	@Override
 	public void exceptionRaised(Visit visit, String cause, Long incidentId) {
 		add("VisitExceptionRaised", visit, incidentId == null ? cause : cause + " #" + incidentId);
 	}

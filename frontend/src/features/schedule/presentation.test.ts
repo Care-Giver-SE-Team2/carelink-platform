@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  dateOfBirthLabel,
   isScheduleDate,
   serviceLabel,
   shiftDays,
@@ -119,5 +120,14 @@ describe('family visit labels', () => {
       EXCEPTION: 'Exception',
       CANCELLED: 'Cancelled',
     })
+  })
+})
+
+describe('dateOfBirthLabel', () => {
+  it('spells out a recorded date and leaves anything else readable', () => {
+    expect(dateOfBirthLabel('1950-07-30')).toBe('30 Jul 1950')
+    expect(dateOfBirthLabel('1948-01-05')).toBe('5 Jan 1948')
+    expect(dateOfBirthLabel(null)).toBeNull()
+    expect(dateOfBirthLabel('unknown')).toBe('unknown')
   })
 })

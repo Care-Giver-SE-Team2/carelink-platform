@@ -23,7 +23,7 @@ export default function HistoryPage() {
   const [invalid, setInvalid] = useState('')
   const load = useCallback((signal: AbortSignal) => api<Month>(`/caregivers/me/history?month=${encodeURIComponent(month)}&page=${page}&size=20${status ? '&status=' + status : ''}`, { signal }), [month, page, status])
   const { result, reload } = useCaregiverQuery(`history:${month}:${status}:${page}`, load, true)
-  return <div className={styles.page}><div className={styles.heading}><h1>My execution history</h1><button className={styles.button} onClick={reload}>Refresh</button></div>
+  return <div className={styles.page}><div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My execution history</h1><p className={styles.muted}>Your own submitted actions, grouped by visit.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} onClick={reload}>Refresh</button></div>
     <p>Read-only records of your own submitted actions, grouped by Visit. The month uses actual action times in Singapore, not the current schedule. No export or access to another caregiver's work is provided.</p>
     <form className={styles.dateForm} onSubmit={event => { event.preventDefault(); if (!/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(draft)) { setInvalid('Enter a month as YYYY-MM.'); return } setInvalid(''); setMonth(draft); setPage(0) }}>
       <label>Month (YYYY-MM)<input inputMode="numeric" placeholder="YYYY-MM" value={draft} onChange={event => setDraft(event.target.value)} /></label><button className={styles.button}>Apply month</button>
@@ -44,7 +44,7 @@ export function HistoryDetailPage() {
   const [page, setPage] = useState(0)
   const load = useCallback((signal: AbortSignal) => api<History>(`/caregivers/me/history/${encodeURIComponent(visitId)}?page=${page}&size=20`, { signal }), [visitId, page])
   const { result, reload } = useCaregiverQuery(`history-detail:${visitId}:${page}`, load, true)
-  return <div className={styles.page}><Link to="/caregiver/history">← My execution history</Link><div className={styles.heading}><h1>My recorded facts · Visit {visitId}</h1><button className={styles.button} onClick={reload}>Refresh</button></div>
+  return <div className={styles.page}><Link className={styles.back} to="/caregiver/history">← My execution history</Link><div className={styles.heading}><h1>My recorded facts · Visit {visitId}</h1></div><div className={styles.toolbar}><button className={styles.refresh} onClick={reload}>Refresh</button></div>
     <p>This history does not grant access to the current work pack. Only your own submissions and your concluded spot checks are shown; missing older provenance is not reconstructed.</p>
     {result.status === 'loading' && <p role="status">Loading recorded facts…</p>}
     {result.status === 'error' && <SelfServiceError error={result.error} retry={reload} subject="your recorded facts" />}
@@ -61,5 +61,5 @@ export function HistoryDetailPage() {
   </div>
 }
 function Pager({ page, total, change }: { page: number; total: number; change: (page: number) => void }) {
-  return <div><button disabled={page === 0} onClick={() => change(page - 1)}>Previous</button><span> Page {page + 1} </span><button disabled={(page + 1) * 20 >= total} onClick={() => change(page + 1)}>Next</button></div>
+  return <div className={styles.pager}><button disabled={page === 0} onClick={() => change(page - 1)}>Previous</button><span> Page {page + 1} </span><button disabled={(page + 1) * 20 >= total} onClick={() => change(page + 1)}>Next</button></div>
 }

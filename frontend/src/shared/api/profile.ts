@@ -66,7 +66,8 @@ export function declineServiceApplication(applicationId: number, reason: string)
 
 /**
  * Row shape for GET /api/elders — profile.controller.dto.ElderListItemResponse. The three
- * primaryCaregiver fields are all null while the elder has no primary caregiver.
+ * primaryCaregiver fields are all null while the elder has no primary caregiver. hasPublishedPlan
+ * stays true while a newer version of a published plan is still a draft.
  */
 export type ElderListItem = {
   id: number
@@ -80,6 +81,9 @@ export type ElderListItem = {
   primaryCaregiverId: number | null
   primaryCaregiverName: string | null
   primaryCaregiverAssignedAt: string | null
+  hasPublishedPlan: boolean
+  /** The family has applied for care: the approved intake application or a service application. */
+  hasCareRequest: boolean
 }
 
 /**
@@ -194,6 +198,97 @@ export function publishCredential(id: number): Promise<void> {
 /** Rejects a submitted certificate; the caregiver is told `reason`. */
 export function rejectCredential(id: number, reason: string): Promise<void> {
   return api<void>(`/credentials/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) })
+}
+
+/** One uploaded file of a certificate — CaregiverCredentialService.DocumentView. */
+export type CredentialDocument = {
+  id: number
+  credentialId: number
+  fileName: string
+  contentType: string
+  byteSize: number
+  uploadedAt: string
+  /** False when the stored file can't be found; `contentUrl` then won't load. */
+  contentAvailable: boolean
+  /** The file itself, served by the backend after its access check (e.g. /api/credentials/7/documents/3/content). */
+  contentUrl: string
+}
+
+/** The files uploaded with a certificate, in upload order (GET /api/credentials/{id}/documents). */
+export function fetchCredentialDocuments(id: number, signal?: AbortSignal): Promise<CredentialDocument[]> {
+  return api<CredentialDocument[]>(`/credentials/${id}/documents`, { signal })
+}
+
+/** One certificate an applicant uploaded — CaregiverApplicationReviewService.Certificate. */
+export type CaregiverApplicationCertificate = {
+  /** Its row in the certification register, where it is published or rejected. */
+  id: number
+  credentialTypeName: string
+  state: CertificationState
+  certificateNo: string | null
+  issuingBody: string | null
+  validFrom: string | null
+  /** "Valid until"; null when it never expires. */
+  expiryDate: string | null
+  /** The first uploaded scan's file name; null when no file was uploaded. */
+  fileName: string | null
+  /** Where the scan can be fetched from; null when there is no readable file. */
+  scanUrl: string | null
+  /** An image type or application/pdf. */
+  scanContentType: string | null
+}
+
+/** A pending caregiver application — CaregiverApplicationReviewService.Item (manager only). */
+export type CaregiverApplication = {
+  id: number
+  caregiverId: number
+  /** The login the applicant chose at sign-up. */
+  username: string
+  fullName: string
+  phone: string | null
+  /** Comma-separated ("Malay,English"). */
+  dialects: string | null
+  /** The sector they asked for; not an assignment. */
+  requestedSector: string | null
+  submittedAt: string
+  /** 1 for a first application, more after each resubmission. */
+  roundNumber: number
+  /** Quoted back with a decision, so one made on a stale screen is refused. */
+  version: number
+  certificates: CaregiverApplicationCertificate[]
+}
+
+export type CaregiverApplicationPage = { items: CaregiverApplication[]; page: number; size: number; total: number }
+
+export type CaregiverApplicationDecision = { applicationId: number; caregiverId: number; status: 'APPROVED' | 'REJECTED' }
+
+/** Pending caregiver applications, newest first. 100 is the most the endpoint returns in one page. */
+export function fetchCaregiverApplications(signal?: AbortSignal): Promise<CaregiverApplicationPage> {
+  return api<CaregiverApplicationPage>('/caregiver-applications?page=0&size=100', { signal })
+}
+
+/** Admits the applicant; their certificates stay as they are, for review in Certifications. */
+export function approveCaregiverApplication(
+  id: number,
+  expectedVersion: number,
+  message: string | null,
+): Promise<CaregiverApplicationDecision> {
+  return api<CaregiverApplicationDecision>(`/caregiver-applications/${id}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ message, expectedVersion, clientRequestId: crypto.randomUUID() }),
+  })
+}
+
+/** Turns the application down; the applicant sees `reason` and may edit and resubmit. */
+export function rejectCaregiverApplication(
+  id: number,
+  expectedVersion: number,
+  reason: string,
+): Promise<CaregiverApplicationDecision> {
+  return api<CaregiverApplicationDecision>(`/caregiver-applications/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, expectedVersion, clientRequestId: crypto.randomUUID() }),
+  })
 }
 
 /** Body of POST /api/family-registrations — profile.controller.dto.FamilyRegistrationRequest. */

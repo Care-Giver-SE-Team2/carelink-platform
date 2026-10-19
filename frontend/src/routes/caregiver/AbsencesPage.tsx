@@ -40,7 +40,7 @@ export default function AbsencesPage() {
   }
 
   return <div className={styles.page}>
-    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My leave</h1><p className={styles.muted}>Request whole-day leave and check your manager's decision.</p></div><button className={styles.button} onClick={reload}>Refresh</button></div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My leave</h1><p className={styles.muted}>Request whole-day leave and check your manager's decision.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} onClick={reload}>Refresh</button></div>
     <p className={styles.readOnly}>Both dates are included, in Singapore time. Submission requests approval. Your manager approves or rejects it, then arranges any roster changes separately.</p>
     <form className={styles.formPanel} onSubmit={submit} aria-label="Request leave" noValidate>
       <h2>Request leave</h2>

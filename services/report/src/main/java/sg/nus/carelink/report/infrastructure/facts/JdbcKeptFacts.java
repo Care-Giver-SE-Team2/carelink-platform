@@ -16,6 +16,7 @@ import sg.nus.carelink.eventtypes.SpotCheckUpdated;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCaregiverChanged;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitExceptionRaised;
 import sg.nus.carelink.eventtypes.VisitScheduled;
@@ -194,6 +195,12 @@ class JdbcKeptFacts implements KeptFacts {
 	@Override
 	public void keep(VisitExceptionRaised event) {
 		visitState(event.visitId(), event.elderId(), event.scheduledStart(), event.version(), "EXCEPTION",
+				event.caregiverId(), null, null);
+	}
+
+	@Override
+	public void keep(VisitClosed event) {
+		visitState(event.visitId(), event.elderId(), event.scheduledStart(), event.version(), event.status(),
 				event.caregiverId(), null, null);
 	}
 

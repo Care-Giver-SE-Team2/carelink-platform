@@ -43,7 +43,7 @@ function ReportForm({ id }: { id: string }) {
     setAttempt(payload)
     void write.send(signal => reportIncident(payload, signal), saved => navigate('/caregiver/incidents/' + saved.report.id))
   }
-  return <><h1>Report incident</h1><p className={styles.readOnly}>Record observed facts and actions, not a diagnosis. For an emergency, follow your organisation's emergency contact procedure now. Online submission does not mean someone has taken over.</p>
+  return <><div className={styles.heading}><h1>Report incident</h1></div><p className={styles.readOnly}>Record observed facts and actions, not a diagnosis. For an emergency, follow your organisation's emergency contact procedure now. Online submission does not mean someone has taken over.</p>
     {result.status === 'loading' && <p role="status">Checking assigned visit…</p>}
     {result.status === 'error' && <QueryError error={result.error} retry={reload} back="/caregiver" />}
     {validation && <p role="alert">{validation}</p>}{write.error != null && <p role="alert">{commandError(write.error)}</p>}

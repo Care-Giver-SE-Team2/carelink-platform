@@ -1,6 +1,7 @@
 package sg.nus.carelink.profile.infrastructure.persistence.repository;
 
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,4 +30,11 @@ public interface IntakeApplicationJpaRepository extends JpaRepository<IntakeAppl
 			@Param("status") IntakeApplicationJpaEntity.Status status);
 
 	List<IntakeApplicationJpaEntity> findByElderIdAndStatus(Long elderId, IntakeApplicationJpaEntity.Status status);
+
+	@Query("""
+			SELECT DISTINCT application.elderId FROM IntakeApplicationJpaEntity application
+			WHERE application.elderId IN :elderIds AND application.status = :status
+			""")
+	List<Long> findElderIdsInWithStatus(@Param("elderIds") Set<Long> elderIds,
+			@Param("status") IntakeApplicationJpaEntity.Status status);
 }

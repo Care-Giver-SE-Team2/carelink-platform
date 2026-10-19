@@ -27,17 +27,19 @@ export default function ApplicationPage({ profile, refreshProfile }: { profile: 
   const application = data.application
   const message = mutation.error instanceof ApiError ? mutation.error.message : 'The result could not be confirmed. Refresh before retrying; keep the same request key.'
   return <div className={styles.page}>
-    <div className={styles.heading}><h1>My application</h1><button className={styles.button} disabled={!!editing || !!contactEditing || mutation.pending || result.status === 'loading'} onClick={() => { reload(); refreshProfile(); setResubmission(null) }}>Refresh</button></div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My application</h1><p className={styles.muted}>Your admission status and application details.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} disabled={!!editing || !!contactEditing || mutation.pending || result.status === 'loading'} onClick={() => { reload(); refreshProfile(); setResubmission(null) }}>Refresh</button></div>
     <p className={styles.readOnly}>Admission and certificate review are independent. No certificate is required for your manager to approve admission. Individual services may still require particular qualifications.</p>
+    <section className={styles.card} aria-label="Admission status">
     <p>Account: {data.username} · Work status: {data.workStatus}</p>
     <p role="status">{application ? `Application ${application.id} · ${application.status} · Submission ${application.roundNumber}` : data.compatibility === 'LEGACY_ACTIVE' ? 'Existing active caregiver — no application history recorded.' : 'Existing onboarding profile — contact your manager.'}</p>
     {!data.canWork && <p>Work access is restricted. You may check your application, upload optional certificates and prepare work preferences.</p>}
+    <Link to="/caregiver/credentials">Optional certificates</Link>
+    </section>
     {application && <article className={styles.card}><h2>{application.details.fullName}</h2><p>Submitted: {application.submittedAt.replace('T', ' ')} (SGT)</p>
       <p>Mobile: {application.details.phone} · Preferred area: {application.details.requestedSector || 'Not specified'}</p>
       {application.reviewReason && <p>Manager's reason: {application.reviewReason}</p>}
       {application.reviewedAt && <p>Reviewed: {application.reviewedAt.replace('T', ' ')} (SGT)</p>}
     </article>}
-    <Link to="/caregiver/credentials">Optional certificates</Link>
     {notice && <p role="status">{notice}</p>}
     {data.canEdit && !editing && <button className={styles.button} onClick={() => { setEditing(data); setNotice('') }}>Edit application</button>}
     {editing && data.canEdit && <EditForm source={editing} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); setNotice('Application details saved.'); reload(); refreshProfile() }} />}

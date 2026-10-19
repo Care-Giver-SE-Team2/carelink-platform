@@ -68,6 +68,27 @@ class CarePlanLookupServiceTest {
 	}
 
 	@Test
+	void findsThePublishedPlanWhileANewerVersionIsStillADraft() {
+		CarePlan published = repository.save(publishedPlan(11L, 51L, LocalDate.of(2026, 9, 1)));
+		repository.save(new CarePlan(
+				12L, 51L, 7L, published.id(), 2, CarePlan.Status.DRAFT, null,
+				null, LocalDateTime.of(2026, 9, 10, 10, 8), LocalDateTime.of(2026, 9, 10, 10, 9)));
+		nodeRepository.save(node(published.id(), "FRI"));
+
+		assertThat(lookup.findPublishedByElderId(51L)).contains(published);
+		assertThat(lookup.findNextVisitDate(51L, LocalDate.of(2026, 9, 23))) // a Wednesday
+				.contains(LocalDate.of(2026, 9, 25));
+	}
+
+	@Test
+	void hasNoPublishedPlanOnceItIsStopped() {
+		CarePlan published = publishedPlan(13L, 52L, LocalDate.of(2026, 9, 1));
+		repository.save(published.stop(LocalDate.of(2026, 9, 20), "moved away", 7L));
+
+		assertThat(lookup.findPublishedByElderId(52L)).isEmpty();
+	}
+
+	@Test
 	void nextVisitDateIsEmptyWhenNoNodeHasASchedule() {
 		CarePlan plan = publishedPlan(5L, 45L, LocalDate.of(2026, 9, 1));
 		repository.save(plan);

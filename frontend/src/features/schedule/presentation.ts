@@ -125,6 +125,21 @@ export function ageOn(dateOfBirth: string | null, today: string): number | null 
   return Number.isFinite(age) && age >= 0 ? age : null
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * A date of birth as people read it, "30 Jul 1950". Read from the text rather than through Date,
+ * so the browser's own time zone cannot move it.
+ * @param dateOfBirth Date in YYYY-MM-DD format, or null when not recorded
+ * @return The date spelled out, the text unchanged when it is not a date, or null when not recorded
+ */
+export function dateOfBirthLabel(dateOfBirth: string | null): string | null {
+  if (!dateOfBirth) return null
+  const [year, month, day] = dateOfBirth.split('-').map(Number)
+  if (!year || !MONTHS[month - 1] || !day) return dateOfBirth
+  return `${day} ${MONTHS[month - 1]} ${year}`
+}
+
 /**
  * Short weekday of a visit in Singapore, for compact day columns.
  * @param timestamp API timestamp with a UTC offset

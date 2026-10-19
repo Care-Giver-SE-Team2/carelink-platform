@@ -1,351 +1,356 @@
 /*
- * The app's front door (screen 5a in the design handoff). This page is the
- * only marketing surface CareLink has, so it does not use the shared
- * standard/elder theme in shared/theme/theme.css — it is its own design
- * language (ink + one indigo accent, zero border radius, Instrument Sans /
- * IBM Plex Mono) per the handoff README. Tokens are local to this module
- * rather than promoted to shared/theme.css until the rest of the app is
- * restyled to match.
+ * The app's front door: sign-in here, and the public sign-up pages that render the same canvas.
+ * It is laid out like the family home: a white header band, then labelled white cards in two
+ * columns on the tinted page, one green accent, no shadows. Those pages declare their palette as --fm-* properties on the family portal,
+ * which these routes sit outside of, so the same values are declared here on .page.
  */
 
 .page {
-  --ink: #111111;
-  --muted: #6b6b6b;
-  --muted-light: #9a9a9a;
-  --rule: #e5e3de;
-  --accent: #5b5fa8;
-  --accent-hover: #4b4f96;
-  --accent-tint: #f4f4fa;
-  --green: #2f6f52;
-  --danger: #c2503f;
-  --danger-text: #a13f30;
-  --danger-tint: #fbf1ef;
+  --fm-page: #f3f7f5;
+  --fm-card: #fff;
+  --fm-accent: #1a6b5a;
+  --fm-accent-strong: #145446;
+  --fm-accent-tint: #e6f0ec;
+  --fm-ink: #1f3a33;
+  --fm-secondary: #3a4f48;
+  --fm-muted: #5c6e68;
+  --fm-faint: #7d8f89;
+  --fm-disabled: #b5c4be;
+  --fm-line-card: #e2e9e6;
+  --fm-line-control: #d5e2dc;
+  --fm-line-row: #e8eeeb;
+  --fm-note: #eef4f1;
+  --fm-urgent: var(--danger);
+  --fm-urgent-text: var(--danger-text);
+  --fm-urgent-tint: var(--danger-tint);
+  --fm-urgent-line: #f0d6d1;
 
   height: 100dvh;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #fff;
-  font-family: 'Instrument Sans', sans-serif;
+  background: var(--fm-page);
+  color: var(--fm-ink);
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
+.page *,
+.page *::before,
+.page *::after {
+  box-sizing: border-box;
+}
+
+.page a:focus-visible,
+.page button:focus-visible,
+.page input:focus-visible {
+  outline: 3px solid var(--fm-accent);
+  outline-offset: 3px;
+}
+
+/*
+ * Desktop: the header band spans the top, then the pitch (or sign-up intro) and the form sit side by
+ * side, filling the screen's width up to 1680px and running to its bottom edge. leftCol unwraps so
+ * its children join that grid.
+ */
 .canvas {
-  width: 100%;
-  height: 100%;
-  background: #fff;
-  color: var(--ink);
   display: grid;
-  grid-template-columns: 1fr 500px;
-  grid-template-rows: 100%;
+  grid-template-columns: minmax(0, 1.5fr) minmax(420px, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: 28px;
+  width: 100%;
+  max-width: 1680px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 0 40px 40px;
 }
-
-/* ---- tints for icon circles ---- */
-
-.tint-blue {
-  background: #dbe8fd;
-  color: #2f5fb0;
-}
-
-.tint-green {
-  background: #dcf1e4;
-  color: var(--green);
-}
-
-.tint-pink {
-  background: #fbdedd;
-  color: #c2503f;
-}
-
-/* ---- left column: pitch ---- */
 
 .leftCol {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--rule);
+  display: contents;
 }
 
+/* ---- icon circles: the one accent, on its tint ---- */
+
+.tint-blue,
+.tint-green,
+.tint-pink {
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+}
+
+/*
+ * The family pages' white header band. The background bleeds to the viewport edges without widening
+ * the page (border-image outsets are not scrollable overflow); its bottom 1px is the card line.
+ */
 .header {
+  grid-column: 1 / -1;
   display: flex;
   align-items: baseline;
-  gap: 16px;
-  padding: 52px 56px 0;
-}
-
-.pitch {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  flex: 1;
-  min-height: 0;
-  padding: 76px 56px 56px;
+  gap: 14px;
+  margin-bottom: 26px;
+  padding: calc(env(safe-area-inset-top) + 22px) 0 20px;
+  border-image: linear-gradient(to top, var(--fm-line-card) 1px, var(--fm-card) 1px) fill 0 / / 0 100vmax;
 }
 
 .wordmark {
-  font: 700 29px/1 'Instrument Sans', sans-serif;
-  letter-spacing: -0.03em;
+  color: var(--fm-accent);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
 .eyebrow {
-  font: 500 11px/1 'IBM Plex Mono', monospace;
-  letter-spacing: 0.1em;
-  color: var(--muted-light);
+  color: var(--fm-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
+/* ---- left column: hero, then the features card ---- */
+
+/* Hero and features stay together, centred beside the sign-in card however tall it runs. */
+.pitch {
+  grid-column: 1;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+}
+
+/* Hero: headline, dek, then the illustration centred under them, straight on the page. */
 .pitchMain {
-  display: flex;
-  gap: 40px;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 24px 0 8px;
 }
 
 .pitchText {
-  flex: 1 1 380px;
-  min-width: 0;
-  max-width: 420px;
+  display: contents;
 }
 
 .headline {
   margin: 0;
-  font: 800 52px/1.15 'Instrument Sans', sans-serif;
+  color: var(--fm-ink);
+  font-size: clamp(40px, 3.4vw, 58px);
+  font-weight: 700;
   letter-spacing: -0.03em;
+  line-height: 1.1;
   text-wrap: pretty;
 }
 
 .headlineAccent {
-  color: var(--green);
+  color: var(--fm-accent);
 }
 
 .dek {
-  margin: 22px 0 0;
-  font: 400 17px/1.65 'Instrument Sans', sans-serif;
-  color: #3a3a3a;
+  margin: 16px 0 0;
+  color: var(--fm-secondary);
+  max-width: 680px;
+  font-size: clamp(15.5px, 1.15vw, 18px);
+  line-height: 1.6;
   text-wrap: pretty;
 }
 
-.features {
-  list-style: none;
-  margin: 32px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.feature {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.featureIcon {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-
-.featureTitle {
-  font: 600 17px/1.3 'Instrument Sans', sans-serif;
-  color: var(--ink);
-}
-
-.featureDescription {
-  margin-top: 4px;
-  font: 400 14.5px/1.5 'Instrument Sans', sans-serif;
-  color: var(--muted);
-}
-
 .illustration {
-  flex: 1.4 1 480px;
   min-width: 0;
-  align-self: center;
+  margin-top: 28px;
 }
 
 .illustration img {
   display: block;
-  width: auto;
+  width: 100%;
   height: auto;
-  max-width: 100%;
-  max-height: 500px;
-  margin: 0 auto;
+  max-height: 300px;
+  object-fit: contain;
+  object-position: center;
 }
 
-.proof {
-  margin-top: 48px;
-  padding-top: 32px;
+/* Features: a white card under the illustration, three columns split by lines. */
+.features {
+  order: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  border-top: 1px solid var(--rule);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 24px 0 0;
+  padding: 0;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  list-style: none;
 }
 
-.proofCell {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-width: 0;
+.feature {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
 }
 
-.proofText {
-  min-width: 0;
+.feature + .feature {
+  border-left: 1px solid var(--fm-line-row);
 }
 
-.proofIcon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.featureIcon {
+  display: grid;
   flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
 }
 
-.proofIcon svg {
-  width: 17px;
-  height: 17px;
+.featureIcon svg {
+  width: 19px;
+  height: 19px;
 }
 
-.proofValue {
-  font: 500 30px/1.1 'IBM Plex Mono', monospace;
+.featureTitle {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.proofUnit {
-  font-size: 18px;
+.featureDescription {
+  margin-top: 3px;
+  color: var(--fm-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.proofCaption {
-  font: 400 13px/1.5 'IBM Plex Mono', monospace;
-  color: var(--muted);
-  margin-top: 8px;
-}
-
-.footerRow {
-  margin-top: 34px;
-  display: flex;
-  gap: 22px;
-  flex-wrap: wrap;
-  font: 400 11px/1 'IBM Plex Mono', monospace;
-  color: var(--muted-light);
-}
-
-/* ---- right column: sign-in form ---- */
+/* ---- right column: the form as a white card; "No account yet?" is its tinted foot ---- */
 
 .formColumn {
-  background: #f8f8f6;
-  padding: 76px 48px 56px;
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  padding: 36px 32px 32px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 22px;
+  background: var(--fm-card);
 }
 
 .formTitle {
   margin: 0;
-  font: 600 24px/1.15 'Instrument Sans', sans-serif;
-  letter-spacing: -0.015em;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .formSubtitle {
-  font: 400 12.5px/1.5 'IBM Plex Mono', monospace;
-  color: var(--muted);
-  margin-top: 8px;
-}
-
-.formError {
-  margin: 14px 0 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #fdecea;
-  color: #b3261e;
-  font: 400 13px/1.4 'IBM Plex Mono', monospace;
+  margin: 8px 0 0;
+  color: var(--fm-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
 }
 
 .fields {
   margin-top: 26px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .fieldLabel {
   display: block;
-  font: 400 12px/1 'IBM Plex Mono', monospace;
-  color: var(--muted);
+  color: var(--fm-secondary);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.textInput,
+.passwordBox {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 7px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 14px;
+  background: var(--fm-card);
+  color: var(--fm-ink);
+  font: inherit;
+  font-size: 15px;
 }
 
 .textInput {
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 7px;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  background: #fff;
-  padding: 13px;
-  font: 400 15px/1 'Instrument Sans', sans-serif;
-  color: var(--ink);
+  padding: 12px 14px;
 }
 
-.textInput:focus {
+.textInput:hover,
+.passwordBox:hover {
+  border-color: var(--fm-faint);
+}
+
+.page .textInput:focus,
+.passwordBox:focus-within {
   outline: none;
-  border-color: var(--ink);
+  border-color: var(--fm-accent);
+  box-shadow: 0 0 0 3px var(--fm-accent-tint);
 }
 
-.textInput::placeholder {
-  color: var(--muted-light);
+.textInput[aria-invalid='true'],
+.passwordBox:has([aria-invalid='true']) {
+  border-color: var(--fm-urgent);
+}
+
+.textInput::placeholder,
+.passwordInput::placeholder {
+  color: var(--fm-disabled);
+}
+
+.textInput:disabled,
+.passwordBox:has(:disabled) {
+  background: var(--fm-note);
 }
 
 .passwordBox {
-  margin-top: 7px;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  background: #fff;
-  padding: 13px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  padding: 0 6px 0 14px;
 }
 
-.passwordBox:focus-within {
-  border-color: var(--ink);
-}
-
-.passwordInput {
+/* The box draws the focus ring, so the bare input inside it doesn't; .page outranks the page-wide
+   input:focus-visible outline. */
+.passwordInput,
+.page .passwordInput:focus-visible {
   flex: 1;
   min-width: 0;
   border: none;
   outline: none;
   background: transparent;
-  padding: 0;
-  font: 400 15px/1 'Instrument Sans', sans-serif;
-  color: var(--ink);
-}
-
-.passwordInput::placeholder {
-  color: #c8c8c4;
+  padding: 12px 0;
+  color: var(--fm-ink);
+  font: inherit;
 }
 
 .showToggle {
   flex: none;
-  min-height: 0;
-  margin: 0 0 0 12px;
-  padding: 0;
+  min-height: 36px;
+  margin-left: 8px;
+  padding: 0 12px;
   border: none;
-  border-radius: 0;
+  border-radius: 999px;
   background: none;
-  font: 400 11px/1 'IBM Plex Mono', monospace;
-  color: var(--accent);
+  color: var(--fm-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
+.showToggle:not(:disabled):hover {
+  background: var(--fm-accent-tint);
+}
+
 .checkboxRow {
-  margin-top: 15px;
+  margin-top: 16px;
   display: flex;
-  gap: 9px;
+  gap: 10px;
   align-items: center;
-  cursor: pointer;
   width: fit-content;
+  cursor: pointer;
 }
 
 .checkboxInput {
@@ -357,90 +362,102 @@
 }
 
 .checkboxBox {
-  width: 15px;
-  height: 15px;
-  border: 1px solid var(--ink);
-  border-radius: 4px;
-  background: #fff;
-  flex: none;
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--fm-line-control);
+  border-radius: 6px;
+  background: var(--fm-card);
+}
+
+.checkboxRow:hover .checkboxBox {
+  border-color: var(--fm-accent);
 }
 
 .checkboxInput:checked + .checkboxBox {
-  background: var(--ink);
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
 }
 
 .checkboxInput:checked + .checkboxBox::after {
   content: '';
-  width: 3px;
-  height: 6px;
+  width: 4px;
+  height: 9px;
   border: solid #fff;
-  border-width: 0 1.5px 1.5px 0;
+  border-width: 0 2px 2px 0;
   transform: rotate(45deg) translate(-1px, -1px);
 }
 
 .checkboxInput:focus-visible + .checkboxBox {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--fm-accent);
   outline-offset: 2px;
 }
 
 .checkboxLabel {
-  font: 400 13.5px/1 'Instrument Sans', sans-serif;
-  color: #444;
+  color: var(--fm-secondary);
+  font-size: 14px;
+  line-height: 1.2;
 }
 
-/* Sits between the checkbox and the submit button; .submit's margin-top spaces it below. */
+/* Sits between the last field (or checkbox) and the submit button; .submit's margin-top spaces it below. */
 .signInError {
-  margin-top: 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--danger);
-  border-radius: 8px;
-  background: var(--danger-tint);
-  color: var(--danger-text);
-  font: 400 13.5px/1.4 'Instrument Sans', sans-serif;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--fm-urgent-line);
+  border-radius: 14px;
+  background: var(--fm-urgent-tint);
+  color: var(--fm-urgent-text);
+  font-size: 13.5px;
+  line-height: 1.4;
 }
 
+/* Primary action: the accent, full width, the family pages' 16px corners. */
 .submit {
   width: 100%;
-  min-height: 0;
-  margin-top: 20px;
+  min-height: 52px;
+  margin-top: 22px;
   padding: 15px 0;
-  border: 1px solid var(--ink);
-  border-radius: 10px;
-  background: var(--ink);
+  border: none;
+  border-radius: 16px;
+  background: var(--fm-accent);
   color: #fff;
-  font: 600 15px/1 'Instrument Sans', sans-serif;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
 }
 
-.submit:hover {
-  background: #333;
+.submit:not(:disabled):hover {
+  background: var(--fm-accent-strong);
 }
 
 .submit:disabled {
   cursor: not-allowed;
-  opacity: 0.65;
+  opacity: 0.6;
 }
 
 .belowSubmit {
-  margin-top: 14px;
+  margin: 14px 0 28px;
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: center;
+  gap: 6px;
   flex-wrap: wrap;
-  font: 400 12px/1 'IBM Plex Mono', monospace;
+  font-size: 13.5px;
 }
 
 .forgotLink {
   min-height: 0;
   padding: 0;
   border: none;
-  border-radius: 0;
   background: none;
-  color: var(--accent);
+  color: var(--fm-accent);
   font: inherit;
+  font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -449,34 +466,44 @@
 }
 
 .forgotNote {
-  color: var(--muted);
+  color: var(--fm-muted);
 }
 
+/* Sign-up choices sit on the card's own white, below a divider, pushed to the card's foot. */
 .noAccount {
-  margin-top: 34px;
-  padding-top: 26px;
-  border-top: 1px solid var(--rule);
+  margin-top: auto;
+  padding-top: 24px;
+  border-top: 1px solid var(--fm-line-row);
 }
 
 .noAccountEyebrow {
-  font: 500 10px/1 'IBM Plex Mono', monospace;
-  letter-spacing: 0.1em;
-  color: var(--muted-light);
+  margin-bottom: 12px;
+  color: var(--fm-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
+/* One outlined row per account type; hovering edges it in the accent and fills its arrow. */
 .applyCard {
   display: block;
-  margin-top: 13px;
-  border: 1px solid var(--accent);
-  border-radius: 12px;
-  background: #fff;
-  padding: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 16px;
+  background: var(--fm-card);
+  color: var(--fm-ink);
   text-decoration: none;
+  transition: border-color 120ms ease;
+}
+
+.applyCard + .applyCard {
+  margin-top: 10px;
 }
 
 .applyCard:hover {
-  background: var(--accent-tint);
+  border-color: var(--fm-accent);
 }
 
 .applyCardRow {
@@ -487,31 +514,49 @@
 }
 
 .applyCardLabel {
-  font: 600 15px/1.3 'Instrument Sans', sans-serif;
-  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .applyCardArrow {
-  font: 500 16px/1 'IBM Plex Mono', monospace;
-  color: var(--accent);
+  display: grid;
   flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.applyCard:hover .applyCardArrow {
+  background: var(--fm-accent);
+  color: #fff;
 }
 
 .applyCardCaption {
-  font: 400 12.5px/1.5 'IBM Plex Mono', monospace;
-  color: var(--muted);
-  margin-top: 8px;
+  margin-top: 3px;
+  padding-right: 42px;
+  color: var(--fm-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .providerLine {
   margin: 16px 0 0;
-  font: 400 13px/1.5 'Instrument Sans', sans-serif;
-  color: #6d6d6d;
+  color: var(--fm-muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .providerLink {
   font-weight: 600;
-  color: #5b5fa8;
+  color: var(--fm-accent);
   text-decoration: none;
 }
 
@@ -519,106 +564,108 @@
   text-decoration: underline;
 }
 
-.elderNote {
-  margin-top: 16px;
-  font: 400 12px/1.6 'Instrument Sans', sans-serif;
-  color: var(--muted);
-  text-wrap: pretty;
-}
-
-.elderNote a {
-  color: var(--accent);
-}
-
-.baseline {
-  margin-top: auto;
-  padding-top: 30px;
-  font: 400 10.5px/1.7 'IBM Plex Mono', monospace;
-  color: var(--muted-light);
-}
-
 /* ==========================================================================
    Responsive overrides
    ========================================================================== */
 
-/* ---- tablet: 861–1300px ---- */
-@media (min-width: 861px) and (max-width: 1300px) {
-  .pitchMain {
-    flex-direction: column;
-    align-items: stretch;
+/* ---- narrow desktop / tablet: the illustration drops under the text, features stack ---- */
+@media (min-width: 861px) and (max-width: 1180px) {
+  .canvas {
+    grid-template-columns: minmax(0, 1fr) 400px;
+    padding: 0 24px 32px;
   }
 
-  .pitchText {
-    flex: none;
-    max-width: none;
+  .formColumn {
+    padding: 28px 24px 24px;
   }
 
-  .illustration {
-    flex: none;
-    width: 100%;
-    max-width: 480px;
-    align-self: center;
-  }
 
   .illustration img {
-    max-height: 500px;
+    max-height: 260px;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+  }
+
+  .feature {
+    display: flex;
+    gap: 14px;
+  }
+
+  .feature + .feature {
+    border-left: none;
+    border-top: 1px solid var(--fm-line-row);
   }
 }
 
-/* ---- mobile: ≤860px ---- */
+/* ---- phone: ≤860px — header band, the form card, then the pitch, all one column ---- */
 @media (max-width: 860px) {
   .page {
     height: auto;
+    min-height: 100dvh;
     overflow: visible;
   }
 
   .canvas {
-    height: auto;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    row-gap: 18px;
+    padding: 0 16px 24px;
   }
 
   .header {
-    padding: 24px;
-    border-bottom: 1px solid var(--rule);
-  }
-
-  /* Unwrap leftCol so header, form and pitch become independently orderable. */
-  .leftCol {
-    display: contents;
-  }
-
-  .pitch {
-    padding: 40px 24px 24px;
-    border-top: 1px solid var(--rule);
-    order: 3;
-  }
-
-  .pitchMain {
-    flex-direction: column;
-  }
-
-  .pitchText {
-    max-width: none;
-    flex: none;
-  }
-
-  .illustration {
-    flex: none;
-  }
-
-  .illustration img {
-    max-height: none;
-  }
-
-  .proof {
-    grid-template-columns: 1fr;
-    gap: 18px;
+    margin-bottom: 0;
+    padding: calc(env(safe-area-inset-top) + 20px) 0 18px;
   }
 
   /* Sign-in comes right after the header since it's the task. */
   .formColumn {
-    padding: 40px 24px 24px;
+    grid-column: 1;
+    grid-row: auto;
+    position: static;
     order: 2;
+    padding: 22px 18px 18px;
+  }
+
+  .belowSubmit {
+    margin-bottom: 22px;
+  }
+
+
+  .pitch {
+    order: 3;
+    margin-top: 10px;
+  }
+
+  .pitchMain {
+    padding: 8px 0 0;
+  }
+
+  .headline {
+    font-size: 32px;
+  }
+
+  .illustration {
+    margin-top: 18px;
+  }
+
+  .illustration img {
+    max-height: 260px;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+  }
+
+  .feature {
+    display: flex;
+    gap: 14px;
+    padding: 14px 16px;
+  }
+
+  .feature + .feature {
+    border-left: none;
+    border-top: 1px solid var(--fm-line-row);
   }
 }

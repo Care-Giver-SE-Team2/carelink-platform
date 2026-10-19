@@ -40,6 +40,7 @@ beforeEach(() => {
   vi.spyOn(incidentsApi, 'listIncidentQueue').mockImplementation(async ({ size }) => ({ items: [], page: 0, size, totalElements: 0 }))
   vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue({ id: 1, username: 'tml', displayName: 'Tan Mei Ling', roles: ['MANAGER'] })
   vi.spyOn(profileApi, 'fetchCredentialRegister').mockImplementation(async () => register)
+  vi.spyOn(profileApi, 'fetchCredentialDocuments').mockResolvedValue([])
   vi.spyOn(rosteringApi, 'fetchVisitsAtRisk').mockResolvedValue([
     { credentialId: 1, visitsAtRisk: 18 },
     { credentialId: 2, visitsAtRisk: 0 },
@@ -90,6 +91,39 @@ it('opens on the review queue with the first submission in the panel', async () 
   expect(within(panel).getByText('cleared')).toBeInTheDocument()
   expect(within(panel).getByText('retained')).toBeInTheDocument()
   expect(within(panel).getByText('28 Jul 2028')).toBeInTheDocument()
+})
+
+it('shows every uploaded file of the submission and opens one full size', async () => {
+  const file = (id: number, fileName: string, contentType: string, contentAvailable = true) => ({
+    id, credentialId: 1, fileName, contentType, byteSize: 1024, uploadedAt: '2026-08-27T21:04:00', contentAvailable,
+    contentUrl: `/api/credentials/1/documents/${id}/content`,
+  })
+  const documents = vi.spyOn(profileApi, 'fetchCredentialDocuments').mockResolvedValue([
+    file(7, 'front.png', 'image/png'),
+    file(8, 'back.pdf', 'application/pdf'),
+    file(9, 'lost.jpg', 'image/jpeg', false),
+  ])
+  renderAt('/manager/certifications')
+
+  const panel = await panelShowing('Devi Raman — first aid renewal')
+  await userEvent.click(await within(panel).findByRole('button', { name: 'Open scan front.png' }))
+  expect(documents).toHaveBeenCalledWith(1, expect.anything())
+  expect(within(panel).getByRole('button', { name: 'Open scan back.pdf' })).toBeInTheDocument()
+  // A file the store can't find is shown, but can't be opened.
+  expect(within(panel).getByRole('img', { name: 'No scan for lost.jpg' })).toBeInTheDocument()
+
+  const viewer = screen.getByRole('dialog')
+  expect(within(viewer).getByRole('img', { name: 'Devi Raman — first aid renewal — front.png' })).toHaveAttribute(
+    'src',
+    '/api/credentials/1/documents/7/content',
+  )
+})
+
+it('keeps the striped stand-in when no file was uploaded', async () => {
+  renderAt('/manager/certifications')
+
+  const panel = await panelShowing('Devi Raman — first aid renewal')
+  expect(within(panel).getByRole('img', { name: 'Certificate scan not available' })).toBeInTheDocument()
 })
 
 it('shows a published row read-only, without the review actions', async () => {
