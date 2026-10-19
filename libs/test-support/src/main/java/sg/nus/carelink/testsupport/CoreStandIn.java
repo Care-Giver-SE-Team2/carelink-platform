@@ -60,6 +60,8 @@ public class CoreStandIn implements CoreApi {
 
 	private final Map<Long, CredentialAlerts> alerts = new HashMap<>();
 
+	private final Map<String, List<SpotCheckConclusion>> spotChecks = new HashMap<>();
+
 	/** Ids well clear of MySQL's, so an incident id that visit took from somewhere else stands out. */
 	private long lastIncidentId = 700_000;
 
@@ -108,11 +110,17 @@ public class CoreStandIn implements CoreApi {
 		alerts.put(caregiverId, answer);
 	}
 
-	/** Forgets every incident and alert: each test starts with none. */
+	/** A spot check core has concluded on the caregiver's visit, which their history shows from now on. */
+	public synchronized void spotCheck(String username, SpotCheckConclusion check) {
+		spotChecks.computeIfAbsent(username, ignored -> new ArrayList<>()).add(check);
+	}
+
+	/** Forgets every incident, alert and spot check: each test starts with none. */
 	public synchronized void clear() {
 		incidents.clear();
 		raisedByKey.clear();
 		alerts.clear();
+		spotChecks.clear();
 	}
 
 	// ---------- Accounts ----------
@@ -363,6 +371,12 @@ public class CoreStandIn implements CoreApi {
 	public synchronized IncidentRef raiseServiceDispute(ServiceDisputeRequest request) {
 		return new IncidentRef(raise(request.elderId(), request.visitId(), "ELDER_SERVICE_DISPUTE",
 				request.reportedByUserId(), "SERVICE", "MEDIUM", request.description(), request.requestKey()).id());
+	}
+
+	@Override
+	public synchronized List<SpotCheckConclusion> caregiverSpotChecks(String username, Long visitId) {
+		return spotChecks.getOrDefault(username, List.of()).stream()
+				.filter(check -> visitId.equals(check.visitId())).toList();
 	}
 
 	/** core's MissedCheckInPauseEvidence: the visit's one incident, the missed check-in the system raised. */

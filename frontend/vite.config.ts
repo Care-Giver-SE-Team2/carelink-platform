@@ -32,6 +32,8 @@ export default defineConfig({
       '^/api/caregivers/me([?].*)?$': 'http://localhost:8081',
       '/api/caregivers/me/schedule': 'http://localhost:8081',
       '/api/caregivers/me/incidents': 'http://localhost:8081',
+      '/api/caregivers/me/history': 'http://localhost:8081',
+      '/api/caregivers/me/system-alerts': 'http://localhost:8081',
       '^/api/caregivers/[0-9]+(/credentials)?([?].*)?$': 'http://localhost:8081',
       '/api': 'http://localhost:8080',
     },

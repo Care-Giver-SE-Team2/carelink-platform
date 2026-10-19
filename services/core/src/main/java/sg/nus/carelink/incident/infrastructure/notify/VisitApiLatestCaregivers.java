@@ -20,4 +20,9 @@ class VisitApiLatestCaregivers implements LatestCaregivers {
 		return visit.findLatestCaregiverId(elderId);
 	}
 
+	@Override
+	public Optional<Long> assignedCaregiverId(Long visitId) {
+		return visit.findVisit(visitId).map(VisitApi.VisitSlot::caregiverId);
+	}
+
 }

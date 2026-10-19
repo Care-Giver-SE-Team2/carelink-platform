@@ -11,7 +11,8 @@ public final class ServiceTables {
 
 	public static final Set<String> VISIT = Set.of("caregiver_command_receipt", "elder_confirmation", "visit",
 			"visit_assignment", "visit_check_in_record", "visit_evidence", "visit_health_record",
-			"visit_missed_check_in_trigger", "visit_request", "visit_state_transition", "visit_task", "vital_sign");
+			"visit_missed_check_in_trigger", "visit_request", "visit_state_transition", "visit_task", "vital_sign",
+			"visit_evidence_file");
 
 	public static final Set<String> REPORT = Set.of("caregiver_review", "report", "report_amendment", "report_basis",
 			"value_added_service", "value_added_service_request", "report_visit", "report_visit_task",
@@ -34,7 +35,10 @@ public final class ServiceTables {
 			"spot_check", "care_service_application", "caregiver", "credential", "credential_type", "elder",
 			"elder_family_binding", "elder_primary_caregiver", "family_member", "intake_application", "absence_report",
 			"caregiver_availability", "caregiver_preference", "roster_change", "rostering_candidate",
-			"rostering_candidate_check", "rostering_constraint", "rostering_run", "visit_change_step");
+			"rostering_candidate_check", "rostering_constraint", "rostering_run", "visit_change_step",
+			"caregiver_credential_submission_guard", "credential_document", "credential_submission",
+			"caregiver_admission_state", "caregiver_application", "caregiver_application_history",
+			"caregiver_admission_receipt", "caregiver_work_settings_state", "caregiver_work_settings_receipt");
 
 	/** Every table a service's code could name. */
 	public static final Set<String> KNOWN = union(ALL, CORE);

@@ -1,9 +1,12 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render as renderPage, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { CredentialAlert, CredentialAlertContext, RenewalState } from '../../features/caregiver/api'
 import CredentialReminders from './CredentialReminders'
 
 afterEach(cleanup)
+const render = (element: ReactElement) => renderPage(<MemoryRouter>{element}</MemoryRouter>)
 const context: CredentialAlertContext = { asOfDate: '2026-09-25', warningDays: 30, reviewRequired: false }
 const base: CredentialAlert = { id: 1, name: 'First aid', certificateNo: 'DEMO-1', expiryDate: '2026-09-25',
   status: 'PUBLISHED', warning: 'EXPIRING', daysUntilExpiry: 0, renewalState: 'NONE', renewalValidFrom: null }

@@ -28,7 +28,7 @@ public interface RosteringProfiles {
 	 * A caregiver as rostering needs them.
 	 *
 	 * @param dialects as profile stores them, comma separated
-	 * @param onboarding no published certificate yet, so not assignable
+	 * @param onboarding admission has not been approved, so not assignable
 	 */
 	record Candidate(Long caregiverId, Long userId, String fullName, String sector, String dialects,
 			boolean onboarding) {

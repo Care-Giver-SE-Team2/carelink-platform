@@ -43,6 +43,38 @@ tags:
   - name: Spot checks
     description: Home service spot checks with the family's consent and the caregiver's answer (UC-MG08, with the former UC-FM07).
 paths:
+  /caregiver-registrations:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregiver-registrations'
+  /caregivers/me/application:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1application'
+  /caregivers/me/application/resubmissions:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1application~1resubmissions'
+  /caregivers/me/profile:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1profile'
+  /caregivers/me/contact:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1contact'
+  /caregivers/me/work-settings:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1work-settings'
+  /caregivers/me/availability:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1availability'
+  /caregivers/me/availability/{date}:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1availability~1{date}'
+  /caregivers/me/work-preferences:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1work-preferences'
+  /caregivers/me/system-alerts:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1system-alerts'
+  /caregivers/me/system-alerts/{incidentId}:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1system-alerts~1{incidentId}'
+  /visits/{visitId}/evidence:
+    $ref: './caregiver-self-service.yaml#/paths/~1visits~1{visitId}~1evidence'
+  /visits/{visitId}/evidence/{evidenceId}/content:
+    $ref: './caregiver-self-service.yaml#/paths/~1visits~1{visitId}~1evidence~1{evidenceId}~1content'
+  /caregivers/me/history:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1history'
+  /caregivers/me/history/{visitId}:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1history~1{visitId}'
+  /caregivers/me/history/{visitId}/evidence/{evidenceId}/content:
+    $ref: './caregiver-self-service.yaml#/paths/~1caregivers~1me~1history~1{visitId}~1evidence~1{evidenceId}~1content'
   /family/service-applications:
     post:
       tags: [Intake]
@@ -72,9 +104,9 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/FamilyServiceApplication'}
-        '400': {description: Invalid JSON types, unexpected fields or invalid input limits.}
+        '400': {description: 'Invalid JSON types, unexpected fields or invalid input limits.'}
         '401': {description: Authentication required.}
-        '403': {description: CSRF failure, disabled family account or no current FULL binding.}
+        '403': {description: 'CSRF failure, disabled family account or no current FULL binding.'}
         '404': {description: Elder profile missing.}
         '409': {description: 'ELDER_PROFILE_INCOMPLETE; complete the saved name, address and six-digit postal code first.'}
         '500': {description: Persistence failed; submission success is not reported.}
@@ -182,7 +214,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/FamilyElderProfile'}
-        '400': {description: Invalid name, field length, date, postcode or enum value.}
+        '400': {description: 'Invalid name, field length, date, postcode or enum value.'}
         '401': {description: Authentication required.}
         '403': {description: CSRF failure or no current writable FULL binding.}
         '404': {description: Elder profile missing; no record is created.}
@@ -304,9 +336,9 @@ paths:
               schema: {$ref: '#/components/schemas/CaregiverHealthResult'}
         '400': {description: Invalid measurement format or incomplete observation.}
         '401': {description: Authentication required.}
-        '403': {description: Wrong role, assignment or CSRF token.}
+        '403': {description: 'Wrong role, assignment or CSRF token.'}
         '404': {description: Visit not found.}
-        '409': {description: State, version or command key conflict.}
+        '409': {description: 'State, version or command key conflict.'}
         '503': {description: Storage unavailable; check saved results before retrying the original command.}
     get:
       tags: [Visits]
@@ -3116,8 +3148,219 @@ paths:
                   $ref: '#/components/schemas/SpotCheckView'
       security:
         - sessionCookie: []
+  /caregivers/me/credential-types:
+    get:
+      tags: [Caregivers]
+      operationId: listOwnCredentialTypes
+      summary: Real institution credential catalogue for an enabled caregiver
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Empty array means no catalogue is configured; demo types are not added automatically.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: integer, format: int64}
+                    name: {type: string}
+                    createdAt: {type: string, format: date-time, description: SGT local timestamp without offset}
+        '401': {description: No session}
+        '403': {description: Not an enabled caregiver}
+  /caregivers/me/credentials:
+    get:
+      tags: [Caregivers]
+      operationId: listOwnCredentialSubmissions
+      summary: All own credentials, including immutable rejected attempts and legacy records
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      parameters:
+        - {in: query, name: page, schema: {type: integer, minimum: 0, default: 0}}
+        - {in: query, name: size, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        '200':
+          description: Newest IDs first; history remains readable. No public file paths.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/OwnCredentialSubmission'}}
+                  page: {type: integer}
+                  size: {type: integer}
+                  total: {type: integer, format: int64}
+        '400': {description: Invalid pagination}
+        '401': {description: No session}
+        '403': {description: Not an enabled caregiver}
+    post:
+      tags: [Caregivers]
+      operationId: createOwnCredentialSubmission
+      summary: Submit a new qualification with private documents; does not approve or enable rostering
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: >-
+        Requires the existing X-XSRF-TOKEN CSRF header. Caller identity, SUBMITTED status and SGT
+        submission time are server-assigned. ONBOARDING can submit; INACTIVE cannot write.
+        At most one pending submission per caregiver/type. Existing approved credentials require renewal.
+        Canonical UUID request key is scoped to the actor. Same key/identical payload returns the original
+        receipt even after review; another payload conflicts. Session and active profile are rechecked.
+      requestBody: &credentialSubmissionBody
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/CredentialUploadRequest'}
+      responses: &credentialSubmissionResponses
+        '200':
+          description: Original committed submission receipt, not today's review state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CredentialSubmissionReceipt'}
+        '400': {description: 'Invalid fields, filename, unsupported or damaged files, dates or source type'}
+        '401': {description: No session}
+        '403': {description: 'Disabled account, inactive caregiver, wrong role or missing CSRF'}
+        '404': {description: Source not owned or not found}
+        '409': {description: 'Pending submission, request-key conflict, invalid renewal or ambiguous legacy chain'}
+        '413': {description: Multipart file/request limit exceeded}
+        '503': {description: Validation or private storage unavailable; retain the same request key when outcome is unknown}
+  /caregivers/me/credentials/{credentialId}:
+    parameters:
+      - {in: path, name: credentialId, required: true, schema: {type: integer, format: int64}}
+    get:
+      tags: [Caregivers]
+      operationId: getOwnCredentialSubmission
+      summary: Own current review state, immutable submission metadata and private attachment summaries
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Null expiry represents explicitly permanent or legacy permanent qualification
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OwnCredentialSubmission'}
+        '401': {description: No session}
+        '403': {description: Not an enabled caregiver}
+        '404': {description: Not owned or not found}
+  /caregivers/me/credentials/{credentialId}/renewals:
+    parameters:
+      - {in: path, name: credentialId, required: true, schema: {type: integer, format: int64}}
+    post:
+      tags: [Caregivers]
+      operationId: renewOwnCredential
+      summary: New immutable submission linked to a same-owner approved credential
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: Type is inferred from source; supplied type must match. Source and existing review are unchanged. Pending or future-effective renewals do not clear the old CG01 reminder.
+      requestBody: *credentialSubmissionBody
+      responses: *credentialSubmissionResponses
+  /caregivers/me/credentials/{credentialId}/resubmissions:
+    parameters:
+      - {in: path, name: credentialId, required: true, schema: {type: integer, format: int64}}
+    post:
+      tags: [Caregivers]
+      operationId: resubmitOwnRejectedCredential
+      summary: New submission preserving the rejected record, review reason and old documents
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      description: Only an own rejected record with no existing retry is accepted; a renewal retry keeps the original approved renewal parent. Does not overwrite rejected material.
+      requestBody: *credentialSubmissionBody
+      responses: *credentialSubmissionResponses
+  /credentials/{credentialId}/documents:
+    parameters:
+      - {in: path, name: credentialId, required: true, schema: {type: integer, format: int64}}
+    get:
+      tags: [Caregivers]
+      operationId: listPrivateCredentialDocuments
+      summary: Narrow attachment-read contract for owner caregiver or existing MG06 manager role
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Legacy records legitimately return an empty array
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/PrivateCredentialDocument'}}
+        '401': {description: No session}
+        '403': {description: Disabled or disallowed role; never FAMILY or ELDER}
+        '404': {description: Not owned or not found}
+  /credentials/{credentialId}/documents/{documentId}/content:
+    parameters:
+      - {in: path, name: credentialId, required: true, schema: {type: integer, format: int64}}
+      - {in: path, name: documentId, required: true, schema: {type: integer, format: int64}}
+    get:
+      tags: [Caregivers]
+      operationId: downloadPrivateCredentialDocument
+      summary: Authenticated private attachment download; no permanent public URL
+      x-status: implemented
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: attachment disposition, Cache-Control no-store and nosniff; stored hash/size verified
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            application/pdf: {schema: {type: string, format: binary}}
+        '401': {description: No session}
+        '403': {description: Disabled account or disallowed role}
+        '404': {description: 'Not owned, missing metadata or document/credential mismatch'}
+        '503': {description: 'Missing, damaged or unavailable private file; no approval change'}
 components:
   schemas:
+    CredentialUploadRequest:
+      type: object
+      required: [issuingBody, validFrom, clientRequestId, files]
+      properties:
+        credentialTypeId: {type: integer, format: int64, description: Required for NEW; inferred and locked for renewal/resubmission}
+        certificateNo: {type: string, maxLength: 100}
+        issuingBody: {type: string, minLength: 1, maxLength: 150}
+        validFrom: {type: string, format: date, description: MySQL year 1000-9999; future start allowed}
+        expiryDate: {type: string, format: date, description: "Required unless noExpiry; on/after validFrom and today's SGT date, cannot be the permanent sentinel"}
+        noExpiry: {type: boolean, default: false, description: Must omit expiryDate when true}
+        clientRequestId: {type: string, format: uuid, description: Canonical lowercase UUID; retain identical payload/files for retries}
+        files:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: {type: string, format: binary}
+          description: Repeated files parts; JPEG/PNG/PDF, 5 MiB each, up to 15 MiB combined. Images at most 20 MP; simple unencrypted PDF at most 20 pages, downloads only. Not a virus or authenticity certification.
+    CredentialSubmissionReceipt:
+      type: object
+      properties:
+        credentialId: {type: integer, format: int64}
+        status: {type: string, enum: [SUBMITTED]}
+        submittedAt: {type: string, format: date-time, description: Original SGT local timestamp without offset}
+        documentIds: {type: array, items: {type: integer, format: int64}}
+    PrivateCredentialDocument:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        credentialId: {type: integer, format: int64}
+        fileName: {type: string}
+        contentType: {type: string, enum: [image/jpeg, image/png, application/pdf]}
+        byteSize: {type: integer, format: int64}
+        uploadedAt: {type: string, format: date-time, description: SGT local timestamp without offset}
+        contentAvailable: {type: boolean, description: File existence check; actual download also verifies size/hash}
+        contentUrl: {type: string, description: 'Authenticated relative endpoint, never a storage key or public URL'}
+    OwnCredentialSubmission:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        credentialTypeId: {type: integer, format: int64}
+        credentialTypeName: {type: string}
+        certificateNo: {type: string, nullable: true}
+        issuingBody: {type: string, nullable: true}
+        validFrom: {type: string, format: date, nullable: true}
+        expiryDate: {type: string, format: date, nullable: true}
+        status: {type: string, enum: [SUBMITTED, PUBLISHED, EXPIRING, EXPIRED, REJECTED, REVOKED]}
+        submittedAt: {type: string, format: date-time, nullable: true}
+        reviewNote: {type: string, nullable: true}
+        reviewedAt: {type: string, format: date-time, nullable: true}
+        renewsCredentialId: {type: integer, format: int64, nullable: true}
+        resubmitsCredentialId: {type: integer, format: int64, nullable: true}
+        historical: {type: boolean, description: Presentation hint only; history stays readable and is not deleted}
+        documents: {type: array, items: {$ref: '#/components/schemas/PrivateCredentialDocument'}}
     FamilyServiceApplicationCreate:
       type: object
       additionalProperties: false
@@ -3262,7 +3505,7 @@ components:
             systolic: {type: integer, nullable: true, minimum: 1, maximum: 999999, description: mmHg; supply together with diastolic.}
             diastolic: {type: integer, nullable: true, minimum: 1, maximum: 999999, description: mmHg; supply together with systolic.}
             pulse: {type: integer, nullable: true, minimum: 1, maximum: 999999, description: bpm.}
-            temperature: {type: number, nullable: true, minimum: 0.01, maximum: 999999.99, multipleOf: 0.01, description: Celsius; bounds are storage limits, not clinical limits.}
+            temperature: {type: number, nullable: true, minimum: 0.01, maximum: 999999.99, multipleOf: 0.01, description: 'Celsius; bounds are storage limits, not clinical limits.'}
             healthFlag: {$ref: '#/components/schemas/CaregiverHealthFlag'}
             healthNote: {type: string, nullable: true, maxLength: 1000, description: Nonblank for a concern or when no reading was measured.}
     CaregiverHealthRecord:

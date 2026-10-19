@@ -13,6 +13,12 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 16MB
+      # Deployment must set a private directory; the local default stays under the git-ignored target/.
+      location: ${CARELINK_MULTIPART_TEMP:target/private/multipart}
 
 # UC-MG05 / UC-SYS02. The response countdown is institution policy, not a code constant,
 # so it is set here; the defaults below match EscalationPolicy.defaults(). Countdowns are
@@ -29,6 +35,7 @@ carelink:
     batch-size: 200
   caregiver:
     credential-warning-days: 30
+    credential-storage: ${CARELINK_CREDENTIAL_STORAGE:target/private/credentials}
     # SYS01. When the daily scan moves certificates to EXPIRING/EXPIRED and sends the alerts
     # (Spring cron, read in expiry-scan-zone; "-" switches it off).
     expiry-scan-cron: "0 0 0 * * *"

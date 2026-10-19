@@ -16,7 +16,7 @@ beforeEach(() => {
   read = async () => reply(records)
   write = async () => { records = [{ id: 1, type: 'ANNUAL', startDate: today, endDate: today, reason: 'Family time', status: 'PENDING' }]; return reply(records[0], 201) }
   vi.stubGlobal('fetch', vi.fn((url: string, options?: RequestInit) => {
-    if (url === '/api/caregivers/me') return Promise.resolve(reply({ id: 1, userId: 10, fullName: 'Caregiver A' }))
+    if (url === '/api/caregivers/me') return Promise.resolve(reply({ id: 1, userId: 10, fullName: 'Caregiver A', status: 'AVAILABLE' }))
     if (url === '/api/auth/csrf') return Promise.resolve(new Response(null, { status: 200 }))
     if (url === '/api/caregivers/me/absences') return options?.method === 'POST' ? write() : read()
     if (url.startsWith('/api/caregivers/me/schedule')) return Promise.resolve(reply({ upcomingVisits: [], certificationAlerts: [], dateFrom: today, dateTo: today, timeZone: 'Asia/Singapore' }))

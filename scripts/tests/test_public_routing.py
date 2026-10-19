@@ -21,6 +21,8 @@ class PublicRoutingTest(unittest.TestCase):
             "/api/caregivers/42/spot-checks": "core", "/api/family/elders": "core",
             "/api/caregivers/me": "visit", "/api/caregivers/me/schedule": "visit",
             "/api/caregivers/me/incidents/7": "visit", "/api/caregivers/42": "visit",
+            "/api/caregivers/me/history/7/evidence/8/content": "visit", "/api/caregivers/me/system-alerts": "visit",
+            "/api/caregivers/me/credentials": "core", "/api/caregivers/me/application": "core",
             "/api/caregivers/42/credentials": "visit", "/api/visits/7": "visit",
             "/api/elders/me/visits": "visit", "/api/reports/7": "report",
             "/api/elders/7/weekly-summary": "report", "/api/family/caregiver-reviews": "report",

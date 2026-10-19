@@ -59,7 +59,7 @@ public class CaregiverJpaEntity {
 	@Column(name = "dialects", length = 100)
 	private String dialects;
 
-	/** ONBOARDING until the first credential is PUBLISHED; the CERTIFICATION_VALID rostering rule excludes ONBOARDING caregivers */
+	/** Admission is independent of credentials; ONBOARDING cannot perform assigned work. */
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false)
 	private Status status = Status.ONBOARDING;

@@ -14,8 +14,17 @@ spring:
   flyway:
     # db/migration here, then the platform's tables (shared.config.PlatformMigrationsAutoConfiguration)
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 16MB
+      # Deployment must set a private directory; the local default stays under the git-ignored target/.
+      location: ${CARELINK_MULTIPART_TEMP:target/private/multipart}
 
 carelink:
+  caregiver:
+    # Private visit evidence images (CG05); never served from the static web root. Deployments must persist it.
+    evidence-storage: ${CARELINK_EVIDENCE_STORAGE:target/private/evidence}
   # SYS03: assigned but not checked in, once per visit; does NOT close late check-in.
   missed-check-in:
     enabled: true

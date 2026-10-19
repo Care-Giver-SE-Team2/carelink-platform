@@ -38,6 +38,7 @@ export async function api<T>(
   if (
     options.body !== undefined &&
     options.body !== null &&
+    !(options.body instanceof FormData) &&
     !headers.has('Content-Type')
   ) {
     headers.set('Content-Type', 'application/json')

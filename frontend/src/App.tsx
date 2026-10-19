@@ -7,6 +7,7 @@ import ElderHome from './routes/elder'
 import LandingHome from './routes/landing'
 import FamilySignUp from './routes/landing/FamilySignUp'
 import ElderSignUp from './routes/landing/ElderSignUp'
+import CaregiverSignUp from './routes/landing/CaregiverSignUp'
 import ProviderWorkbench from './routes/provider'
 import NotFound from './routes/not-found'
 import { RequireRole } from './shared/components/RequireRole'
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/" element={<LandingHome />} />
         <Route path="/apply" element={<FamilySignUp />} />
         <Route path="/elder/register" element={<ElderSignUp />} />
+        <Route path="/caregiver/register" element={<CaregiverSignUp />} />
         <Route path="/provider/*" element={<ProviderWorkbench />} />
         <Route path="/manager/*" element={<RequireRole role="MANAGER"><ManagerHome /></RequireRole>} />
         <Route path="/caregiver/*" element={<RequireRole role="CAREGIVER"><CaregiverHome /></RequireRole>} />

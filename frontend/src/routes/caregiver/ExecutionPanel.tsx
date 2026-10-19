@@ -36,7 +36,7 @@ export default function ExecutionPanel({ pack, command }: { pack: WorkPack; comm
     </>}
     {pack.visit.status === 'EXCEPTION' && !check && <p className={styles.readOnly}>Execution paused. Reporting or resolving an incident does not automatically resume this visit.</p>}
     {pack.visit.status === 'EXCEPTION' && check && <p className={styles.readOnly}>This previous missed-check-in alert does not prevent check-in. The alert remains recorded.</p>}
-    <p className={styles.readOnly}>Task results are not check-out. Evidence upload is not included here; elder confirmation is a separate step after service completion.</p>
+    <p className={styles.readOnly}>Task results are not check-out. Use the evidence images page to upload PHOTO or SIGNATURE material; elder confirmation is a separate step after service completion.</p>
   </section>
 }
 export function ExecutionTasks({ pack, command }: { pack: WorkPack; command: ReturnType<typeof useExecutionCommands> }) {

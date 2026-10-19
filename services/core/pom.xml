@@ -14,6 +14,12 @@
 	<description>CareLink core service</description>
 
 	<dependencies>
+		<!-- Untrusted certificate PDFs are checked in a bounded child JVM, never rendered. -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.8</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
@@ -195,6 +201,7 @@
 				<includes>
 					<include>openapi.yaml</include>
 					<include>openapi-draft.yaml</include>
+					<include>caregiver-self-service.yaml</include>
 				</includes>
 			</resource>
 		</resources>

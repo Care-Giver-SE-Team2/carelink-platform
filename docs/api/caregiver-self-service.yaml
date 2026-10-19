@@ -1,0 +1,584 @@
+# Path/schema fragment referenced by openapi.yaml. All dates/times use Asia/Singapore.
+# Manager admission operations are application ports, not HTTP endpoints in this slice.
+paths:
+  /caregiver-registrations:
+    post:
+      tags: [Caregivers]
+      operationId: registerCaregiverApplicant
+      summary: Register an enabled but work-restricted caregiver applicant
+      security: []
+      description: CSRF required. Fixed CAREGIVER role and ONBOARDING profile. No certificate required. No automatic login or approval. Unknown fields are rejected. Password is 8+ characters and at most 72 UTF-8 bytes; never returned or stored in a command receipt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/ApplicationDetails'}
+                - type: object
+                  required: [username, password]
+                  properties:
+                    username: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$'}
+                    password: {type: string, format: password, minLength: 8, writeOnly: true}
+      responses:
+        '201': {$ref: '#/components/responses/Admission'}
+        '400': {description: 'Invalid fields, password byte length or injected privilege fields.'}
+        '403': {description: Missing or invalid CSRF.}
+        '409': {description: USERNAME_TAKEN including concurrent registrations.}
+  /caregivers/me/application:
+    get:
+      tags: [Caregivers]
+      operationId: getOwnCaregiverApplication
+      summary: Current admission facts and immutable decision history
+      security: [{sessionCookie: []}]
+      responses:
+        '200': {$ref: '#/components/responses/Admission'}
+        '403': {description: Not an enabled caregiver.}
+    put:
+      tags: [Caregivers]
+      operationId: editOwnCaregiverApplication
+      summary: Edit a pending or rejected application without automatically resubmitting
+      security: [{sessionCookie: []}]
+      description: CSRF, expectedVersion and UUID clientRequestId required. Approval and editing serialize on the caregiver. Existing decision snapshots are retained.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf: [{$ref: '#/components/schemas/ApplicationDetails'}, {$ref: '#/components/schemas/AdmissionCommand'}]
+      responses:
+        '200': {$ref: '#/components/responses/Admission'}
+        '403': {description: Inactive or unauthorized account.}
+        '409': {description: 'APPLICATION_VERSION_CONFLICT, APPLICATION_REQUEST_CONFLICT or not editable.'}
+  /caregivers/me/application/resubmissions:
+    post:
+      tags: [Caregivers]
+      operationId: resubmitOwnCaregiverApplication
+      summary: Explicitly resubmit a rejected application as a new round
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AdmissionCommand'}
+      responses:
+        '200': {$ref: '#/components/responses/Admission'}
+        '403': {description: CSRF or account restriction.}
+        '409': {description: 'Invalid state, stale version or changed payload for the same key.'}
+  /caregivers/me/profile:
+    get:
+      tags: [Caregivers]
+      operationId: getOwnCaregiverAdmissionProfile
+      summary: Current enabled caregiver profile, including ONBOARDING
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Profile status does not imply certificate approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer, format: int64}
+                  userId: {type: integer, format: int64}
+                  fullName: {type: string}
+                  phone: {type: string, nullable: true}
+                  sector: {type: string, nullable: true}
+                  dialects: {type: string, nullable: true}
+                  status: {type: string, enum: [ONBOARDING, AVAILABLE, BUSY, INACTIVE]}
+        '403': {description: Account is disabled or not a caregiver.}
+  /caregivers/me/contact:
+    put:
+      tags: [Caregivers]
+      operationId: updateOwnCaregiverContact
+      summary: Update phone for an admitted active caregiver
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/AdmissionCommand'}
+                - type: object
+                  required: [phone]
+                  properties:
+                    phone: {type: string, description: Valid Singapore mobile number.}
+      responses:
+        '200': {$ref: '#/components/responses/Admission'}
+        '403': {description: Not an admitted active caregiver or invalid CSRF.}
+        '409': {description: Stale version or conflicting request key.}
+  /caregivers/me/work-settings:
+    get:
+      tags: [Caregivers]
+      operationId: getOwnCaregiverWorkSettings
+      summary: Work declarations, catalog, existing bookings and leave for today through day 30
+      security: [{sessionCookie: []}]
+      responses:
+        '200': {$ref: '#/components/responses/WorkSettings'}
+  /caregivers/me/availability:
+    get:
+      tags: [Caregivers]
+      operationId: getOwnCaregiverAvailability
+      summary: Query at most 31 inclusive days of work declarations
+      security: [{sessionCookie: []}]
+      parameters:
+        - {name: dateFrom, in: query, required: true, schema: {type: string, format: date}}
+        - {name: dateTo, in: query, required: true, schema: {type: string, format: date}}
+      responses:
+        '200': {$ref: '#/components/responses/WorkSettings'}
+        '409': {description: Invalid date range.}
+  /caregivers/me/availability/{date}:
+    put:
+      tags: [Caregivers]
+      operationId: replaceOwnCaregiverDay
+      summary: Replace all declared windows for one date, not assigned shifts
+      security: [{sessionCookie: []}]
+      description: Today through 90 days ahead in Singapore. Empty list means UNSPECIFIED. Maximum eight non-overlapping same-day windows. Manager roster consumption is not implemented by this endpoint. CSRF required.
+      parameters:
+        - {name: date, in: path, required: true, schema: {type: string, format: date}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/SettingsCommand'}
+                - type: object
+                  required: [windows]
+                  properties:
+                    windows: {type: array, maxItems: 8, items: {$ref: '#/components/schemas/Window'}}
+      responses:
+        '200': {$ref: '#/components/responses/SettingsSnapshot'}
+        '403': {description: 'Disabled or inactive account, or invalid CSRF.'}
+        '409': {description: 'Invalid windows, version conflict or request-key conflict.'}
+  /caregivers/me/work-preferences:
+    put:
+      tags: [Caregivers]
+      operationId: replaceOwnCaregiverPreferences
+      summary: Save soft preferences without modifying visits or approved leave
+      security: [{sessionCookie: []}]
+      description: ONBOARDING may prefill. Codes must come from returned catalog; an unconfigured service catalog offers no service codes. All fields replace the previous preferences. CSRF required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/SettingsCommand'}
+                - type: object
+                  required: [preferences]
+                  properties:
+                    preferences: {$ref: '#/components/schemas/Preferences'}
+      responses:
+        '200': {$ref: '#/components/responses/SettingsSnapshot'}
+        '403': {description: 'Disabled or inactive account, or invalid CSRF.'}
+        '409': {description: 'Invalid catalog value, limits, version or request key.'}
+  /caregivers/me/system-alerts:
+    get:
+      tags: [Caregivers]
+      operationId: listOwnCaregiverSystemAlerts
+      summary: Minimal SYS03 summaries attributed to the caregiver at trigger time
+      security: [{sessionCookie: []}]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'}]
+      responses:
+        '200':
+          description: No elder identity, manager-only incident content or replacement caregiver data.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Pagination'}
+                  - type: object
+                    properties:
+                      items: {type: array, items: {$ref: '#/components/schemas/SystemAlert'}}
+  /caregivers/me/system-alerts/{incidentId}:
+    get:
+      tags: [Caregivers]
+      operationId: getOwnCaregiverSystemAlert
+      summary: Read a SYS03 summary without granting current work-pack access
+      security: [{sessionCookie: []}]
+      parameters:
+        - {name: incidentId, in: path, required: true, schema: {type: integer, format: int64}}
+      responses:
+        '200':
+          description: Original trigger caregiver only, even after reassignment.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemAlert'}
+        '404': {description: No readable own system alert.}
+  /visits/{visitId}/evidence:
+    parameters: [{$ref: '#/components/parameters/VisitId'}]
+    get:
+      tags: [Visits]
+      operationId: listCaregiverVisitEvidence
+      summary: List evidence metadata for the currently assigned non-cancelled visit
+      security: [{sessionCookie: []}]
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'}]
+      responses:
+        '200':
+          description: Legacy references without private file metadata are unavailable, never interpreted as paths.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Pagination'}
+                  - type: object
+                    properties:
+                      items: {type: array, items: {$ref: '#/components/schemas/Evidence'}}
+                      maxFiles: {type: integer, maximum: 20}
+    post:
+      tags: [Visits]
+      operationId: uploadCaregiverVisitEvidence
+      summary: Upload an unverified JPEG or PNG after check-in and before check-out
+      security: [{sessionCookie: []}]
+      description: CSRF and current active assignment required. Maximum 5 MiB and 20 megapixels, re-encoded to discard embedded metadata. Count, visit version, file metadata and receipt commit under the visit lock; rollback removes the newly written file. Same key and identical content replay. Evidence neither completes a task nor gates check-out.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, kind, expectedVersion, clientRequestId]
+              properties:
+                file: {type: string, format: binary}
+                kind: {type: string, enum: [PHOTO, SIGNATURE]}
+                taskId: {type: integer, format: int64}
+                expectedVersion: {type: integer, minimum: 0}
+                clientRequestId: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Persisted or idempotently replayed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  evidence: {$ref: '#/components/schemas/Evidence'}
+                  visitVersion: {type: integer}
+                  replayed: {type: boolean}
+        '400': {description: 'Invalid image, type, filename, size or foreign task.'}
+        '403': {description: 'Unauthorized, not assigned, or CSRF failure.'}
+        '409': {description: 'Visit state, version, request-key or file-count conflict.'}
+        '413': {description: Servlet multipart size limit exceeded.}
+  /visits/{visitId}/evidence/{evidenceId}/content:
+    get:
+      tags: [Visits]
+      operationId: downloadCurrentCaregiverEvidence
+      summary: Authorized attachment download under current assignment
+      security: [{sessionCookie: []}]
+      parameters: [{$ref: '#/components/parameters/VisitId'}, {$ref: '#/components/parameters/EvidenceId'}]
+      responses:
+        '200': {$ref: '#/components/responses/Image'}
+        '403': {description: Current assignment does not belong to this caregiver.}
+        '404': {description: No safe private file metadata.}
+        '409': {description: Visit is cancelled.}
+        '503': {description: Missing or corrupt file; metadata does not imply download success.}
+  /caregivers/me/history:
+    get:
+      tags: [Caregivers]
+      operationId: listOwnCaregiverExecutionHistory
+      summary: Read-only monthly history based on actual submitting identity
+      security: [{sessionCookie: []}]
+      description: Active AVAILABLE/BUSY accounts only. Month selects visits with a recorded own action in that Singapore month; timestamps and counts include all own actions on those visits. Current Visit status is not a performance assessment. No export. Older unattributed records are not invented.
+      parameters:
+        - {name: month, in: query, required: true, schema: {type: string, pattern: '^(20[0-9]{2}|2100)-(0[1-9]|1[0-2])$'}}
+        - {name: status, in: query, schema: {type: string}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses:
+        '200':
+          description: Own attributable summaries without elder identity.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Pagination'}
+                  - type: object
+                    properties:
+                      month: {type: string}
+                      timeZone: {type: string, example: Asia/Singapore}
+                      coverageNote: {type: string}
+                      items: {type: array, items: {$ref: '#/components/schemas/HistorySummary'}}
+        '403': {description: 'Pending, rejected, inactive or disabled caregiver.'}
+        '409': {description: 'Invalid month, status or pagination.'}
+  /caregivers/me/history/{visitId}:
+    get:
+      tags: [Caregivers]
+      operationId: getOwnCaregiverExecutionFacts
+      summary: Minimum own task, health, evidence and incident facts plus concluded own spot checks
+      security: [{sessionCookie: []}]
+      parameters: [{$ref: '#/components/parameters/VisitId'}, {$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'}]
+      responses:
+        '200':
+          description: Reassignment does not grant access to another caregiver's submissions or the new work pack.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Pagination'}
+                  - type: object
+                    properties:
+                      visitId: {type: integer, format: int64}
+                      timeZone: {type: string}
+                      facts: {type: array, items: {$ref: '#/components/schemas/HistoryFact'}}
+                      spotChecks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: {type: integer, format: int64}
+                            result: {type: string, nullable: true}
+                            checkedAt: {type: string, nullable: true}
+                            ownResponse: {type: string, nullable: true}
+        '403': {description: Not an active admitted caregiver.}
+        '404': {description: No attributable own command on this visit.}
+  /caregivers/me/history/{visitId}/evidence/{evidenceId}/content:
+    get:
+      tags: [Caregivers]
+      operationId: downloadOwnHistoricalCaregiverEvidence
+      summary: Download only the active account's immutable own uploaded image
+      security: [{sessionCookie: []}]
+      description: Uses uploader_user_id, not current assignment. Survives reassignment or cancellation for this specific image only; no other materials or work-pack access. Offboard access is not included.
+      parameters: [{$ref: '#/components/parameters/VisitId'}, {$ref: '#/components/parameters/EvidenceId'}]
+      responses:
+        '200': {$ref: '#/components/responses/Image'}
+        '403': {description: Not an active admitted caregiver.}
+        '404': {description: Image not uploaded by this account.}
+        '503': {description: Missing or corrupt private file.}
+components:
+  parameters:
+    Page: {name: page, in: query, schema: {type: integer, minimum: 0, maximum: 10000, default: 0}}
+    Size: {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+    VisitId: {name: visitId, in: path, required: true, schema: {type: integer, format: int64}}
+    EvidenceId: {name: evidenceId, in: path, required: true, schema: {type: integer, format: int64}}
+  responses:
+    Admission:
+      description: Current or original idempotent admission response; never password or certificate content.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Admission'}
+    WorkSettings:
+      description: Own declarations; consumptionStatus explicitly NOT_APPLIED_TO_ROSTERING.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/WorkSettings'}
+    SettingsSnapshot:
+      description: Committed snapshot with the new independent settings version, or original replay result.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/SettingsSnapshot'}
+    Image:
+      description: Attachment only. Cache-Control no-store and X-Content-Type-Options nosniff. Content hash and byte length verified before serving.
+      content:
+        image/png:
+          schema: {type: string, format: binary}
+        image/jpeg:
+          schema: {type: string, format: binary}
+  schemas:
+    ApplicationDetails:
+      type: object
+      required: [fullName, phone]
+      properties:
+        fullName: {type: string, maxLength: 100}
+        phone: {type: string, description: 'Singapore mobile number, normalized to +65.'}
+        declaredDialects: {type: string, nullable: true, description: Valid supported language codes separated by commas.}
+        requestedSector: {type: string, nullable: true, maxLength: 50, description: Intention only; does not self-assign authoritative sector.}
+    AdmissionCommand:
+      type: object
+      required: [expectedVersion, clientRequestId]
+      properties:
+        expectedVersion: {type: integer, format: int64, minimum: 0}
+        clientRequestId: {type: string, format: uuid}
+    Application:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        caregiverId: {type: integer, format: int64}
+        status: {type: string, enum: [PENDING, APPROVED, REJECTED]}
+        roundNumber: {type: integer}
+        details: {$ref: '#/components/schemas/ApplicationDetails'}
+        submittedAt: {type: string}
+        reviewedByUserId: {type: integer, format: int64, nullable: true}
+        reviewedAt: {type: string, nullable: true}
+        reviewReason: {type: string, nullable: true}
+    Admission:
+      type: object
+      properties:
+        caregiverId: {type: integer, format: int64}
+        userId: {type: integer, format: int64}
+        username: {type: string}
+        workStatus: {type: string}
+        phone: {type: string, nullable: true}
+        version: {type: integer, format: int64}
+        application: {allOf: [{$ref: '#/components/schemas/Application'}], nullable: true}
+        canWork: {type: boolean}
+        canEdit: {type: boolean}
+        canResubmit: {type: boolean}
+        compatibility: {type: string, nullable: true}
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              actorUserId: {type: integer, format: int64}
+              action: {type: string}
+              version: {type: integer, format: int64}
+              occurredAt: {type: string}
+              snapshot: {$ref: '#/components/schemas/Application'}
+    SettingsCommand:
+      type: object
+      required: [expectedSettingsVersion, clientRequestId]
+      properties:
+        expectedSettingsVersion: {type: integer, format: int64, minimum: 0}
+        clientRequestId: {type: string, format: uuid}
+    Window:
+      type: object
+      required: [start, end, status]
+      properties:
+        start: {type: string, example: '09:00'}
+        end: {type: string, example: '12:00'}
+        status: {type: string, enum: [AVAILABLE, UNAVAILABLE]}
+    Preferences:
+      type: object
+      properties:
+        serviceCodes: {type: array, items: {type: string}}
+        sectors: {type: array, items: {type: string}}
+        maxVisitsPerDay: {type: integer, nullable: true, minimum: 1, maximum: 8}
+        maxHoursPerDay: {type: number, nullable: true, minimum: 0.5, maximum: 8, multipleOf: 0.5}
+        weeklyWindows:
+          type: array
+          maxItems: 14
+          items:
+            type: object
+            required: [weekday, start, end]
+            properties:
+              weekday: {type: string, enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]}
+              start: {type: string}
+              end: {type: string}
+    SettingsSnapshot:
+      type: object
+      properties:
+        caregiverId: {type: integer, format: int64}
+        version: {type: integer, format: int64}
+        updatedAt: {type: string, nullable: true}
+        dateFrom: {type: string, format: date}
+        dateTo: {type: string, format: date}
+        timeZone: {type: string, example: Asia/Singapore}
+        uncoveredTimeMeaning: {type: string, enum: [UNSPECIFIED]}
+        consumptionStatus: {type: string, enum: [NOT_APPLIED_TO_ROSTERING]}
+        preferences: {$ref: '#/components/schemas/Preferences'}
+        dataIssues: {type: array, items: {type: string}}
+        availability:
+          type: array
+          items:
+            type: object
+            properties:
+              date: {type: string, format: date}
+              windows: {type: array, items: {$ref: '#/components/schemas/Window'}}
+    WorkSettings:
+      type: object
+      properties:
+        settings: {$ref: '#/components/schemas/SettingsSnapshot'}
+        today: {type: string, format: date}
+        editableUntil: {type: string, format: date}
+        canEdit: {type: boolean}
+        catalog:
+          type: object
+          properties:
+            serviceCodes: {type: array, items: {type: string}}
+            sectors: {type: array, items: {type: string}}
+            maxVisitsPerDay: {type: integer}
+            maxHoursPerDay: {type: number}
+            serviceCatalogConfigured: {type: boolean}
+        bookings:
+          type: array
+          items:
+            type: object
+            properties:
+              visitId: {type: integer, format: int64}
+              start: {type: string}
+              end: {type: string, nullable: true}
+        leave:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: integer, format: int64}
+              startDate: {type: string, format: date}
+              endDate: {type: string, format: date}
+              status: {type: string}
+    Pagination:
+      type: object
+      properties:
+        page: {type: integer}
+        size: {type: integer}
+        total: {type: integer, format: int64}
+    SystemAlert:
+      type: object
+      properties:
+        incidentId: {type: integer, format: int64}
+        visitId: {type: integer, format: int64}
+        source: {type: string}
+        scheduledStart: {type: string}
+        checkInDueAt: {type: string}
+        triggeredAt: {type: string}
+        timeZone: {type: string, example: Asia/Singapore}
+        workPackAvailable: {type: boolean}
+    Evidence:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        visitId: {type: integer, format: int64}
+        kind: {type: string}
+        verificationStatus: {type: string}
+        capturedAt: {type: string, nullable: true}
+        taskId: {type: integer, format: int64, nullable: true}
+        fileName: {type: string, nullable: true}
+        contentType: {type: string, nullable: true}
+        byteSize: {type: integer, format: int64, nullable: true}
+        available: {type: boolean}
+        downloadPath: {type: string, nullable: true}
+    HistorySummary:
+      type: object
+      properties:
+        visitId: {type: integer, format: int64}
+        currentVisitStatus: {type: string}
+        firstOwnActionAt: {type: string}
+        lastOwnActionAt: {type: string}
+        ownCheckInAt: {type: string, nullable: true}
+        ownCheckOutAt: {type: string, nullable: true}
+        commandCount: {type: integer, format: int64}
+    HistoryFact:
+      type: object
+      properties:
+        action: {type: string}
+        sourceId: {type: integer, format: int64}
+        visitVersion: {type: integer}
+        recordedAt: {type: string}
+        task:
+          type: object
+          nullable: true
+          properties:
+            taskId: {type: integer, format: int64}
+            status: {type: string}
+            outcome: {type: string, nullable: true}
+            caregiverNote: {type: string, nullable: true}
+        health:
+          allOf: [{$ref: './openapi.yaml#/components/schemas/CaregiverHealthRecord'}]
+          nullable: true
+          description: Own immutable HealthRecord including readings of metric, value and unit, plus healthFlag and healthNote.
+        evidence:
+          type: object
+          nullable: true
+          properties:
+            evidenceId: {type: integer, format: int64}
+            kind: {type: string}
+            verificationStatus: {type: string}
+            fileName: {type: string}
+            submittedAt: {type: string}
+            downloadPath: {type: string, description: Uploader-scoped history download route.}
+        report:
+          allOf: [{$ref: './openapi.yaml#/components/schemas/CaregiverIncidentView'}]
+          nullable: true
+          description: Existing CaregiverIncidentGateway own report projection; no manager-only timeline.

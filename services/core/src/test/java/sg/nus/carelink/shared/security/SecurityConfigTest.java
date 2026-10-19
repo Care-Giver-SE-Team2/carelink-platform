@@ -64,6 +64,7 @@ class SecurityConfigTest {
 	@Test
 	void permitsAnonymousAccessToTheDraftOpenApiContract() throws Exception {
 		mockMvc.perform(get("/openapi-draft.yaml")).andExpect(status().isOk());
+		mockMvc.perform(get("/caregiver-self-service.yaml")).andExpect(status().isOk());
 	}
 
 	@Test

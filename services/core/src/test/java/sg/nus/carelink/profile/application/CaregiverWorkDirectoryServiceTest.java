@@ -16,7 +16,8 @@ class CaregiverWorkDirectoryServiceTest {
     final ElderRepository elders = mock(ElderRepository.class);
     final CredentialRepository credentials = mock(CredentialRepository.class);
     final CredentialTypeRepository types = mock(CredentialTypeRepository.class);
-    final CaregiverWorkDirectoryService service = new CaregiverWorkDirectoryService(users,caregivers,elders,credentials,types,30);
+    final CredentialSubmissionStore submissions = mock(CredentialSubmissionStore.class);
+    final CaregiverWorkDirectoryService service = new CaregiverWorkDirectoryService(users,caregivers,elders,credentials,types,30,submissions);
     final LocalDate day = LocalDate.of(2026,9,24);
     Credential credential(long id, int offset, Credential.Status status) {
         return new Credential(id,1L,2L,null,"CERT-" + id,null,null,
