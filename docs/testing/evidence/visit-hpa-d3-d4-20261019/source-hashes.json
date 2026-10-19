@@ -1,0 +1,12 @@
+{
+  "tools/visit_hpa/release_lock.py": "0fab507f0ff400f073b8c47100a071e60745e65c326a205a09ce9a04816b1054",
+  "tools/visit_hpa/release-lock.json": "054755d3c31556ff1797aa23c6aa4865e95feccd43f1bdc18fba9913c5a33aa2",
+  "tools/visit_hpa/fixture_guard.py": "c3c27b9d8712f669d0fbe27a56375e704be232fa3bda0fc74b8676c6100c182d",
+  "tools/visit_hpa/fixture-whitelist.example.json": "91a4557d0ff30f960f2e01d29c5594fb328cbb78eaa363ff9b873d66015b5021",
+  "tools/visit_hpa/tests/test_release_fixture.py": "e0129afff31e24c8e7e2559a50ce19573490b1930605313ed455cd7e51ce14ea",
+  "tools/visit_hpa/load.py": "5ab58bcf9c061ce7f63c767a736fe6a92a240741bbd34e00196e6c507192b321",
+  "tools/visit_hpa/compare_read.py": "fd8af7fd2abdc336cad504fc203adc93b7cf212c1fe47590ac5c66c8ef6a16f3",
+  "tools/visit_hpa/example.joint.json": "b4edf49c809177f170747d250a77c7c6fbe27c1e628021a216daee22b7d0d7ee",
+  "docs/testing/visit-hpa-release-prerequisites.md": "9b749945f9a3638b1514e6dfed2878f81a9983e5917007e916d5ad6c9d75480c",
+  "docs/testing/visit-hpa-fixture-runbook.md": "86df62d0843c23a2ec1a8eb90dca32bdceeed6b11278a4dccc2eee010198fd35"
+}

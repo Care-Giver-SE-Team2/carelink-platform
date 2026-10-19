@@ -1,0 +1,225 @@
+{
+  "scope": "OFFLINE; all histories/fixtures synthetic unit input only",
+  "cases": [
+    {
+      "name": "source-lock-cli",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "passed": true,
+      "output": {
+        "status": "PINNED_SOURCE_MATCH",
+        "applicationCommit": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+        "engineCommit": "c5b13e2d91b9e5daa8cb536b8427fa184f60d394",
+        "migrations": 41,
+        "cloudReleaseVerified": false
+      }
+    },
+    {
+      "name": "example-structural-cli",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "passed": true,
+      "output": {
+        "status": "STRUCTURALLY_VALID",
+        "pairs": 4,
+        "profile": "scheduled-small-v1",
+        "pending": [
+          "syntheticOnly",
+          "assignmentVerified",
+          "auditBudgetAccepted",
+          "freezeAccepted",
+          "profileAccepted",
+          "environment",
+          "dataApprovalOwner",
+          "retention",
+          "fresh_precheck_required",
+          "window_not_current"
+        ],
+        "offlineInputsComplete": false,
+        "onlineStateVerified": false,
+        "executionApproved": false
+      }
+    },
+    {
+      "name": "unprepared-example-ready-refusal",
+      "exitCode": 2,
+      "expectedExitCode": 2,
+      "passed": true,
+      "output": {
+        "status": "FAIL",
+        "detail": "Invalid or incomplete private whitelist/config; no network used."
+      }
+    },
+    {
+      "name": "four-pair-budget-dryrun",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "passed": true,
+      "output": {
+        "status": "OFFLINE_VALID",
+        "plannedIterations": 2700,
+        "freshVisits": 4,
+        "localhost": false,
+        "remoteExecutionConfirmed": false,
+        "socketTimeoutSeconds": 8,
+        "requestDeadlineSeconds": 10,
+        "stopDrainSeconds": 12,
+        "readBudget": {
+          "profile": "visit-hpa-A-waf-v1",
+          "basis": "Zhili feedback 2026-10-19; not a live read",
+          "windowSeconds": 300,
+          "limitRequests": 2000,
+          "durationSeconds": 1260,
+          "plannedBusinessGets": 2700,
+          "twoArmBusinessGets": 5400,
+          "setupHttpRequests": 40,
+          "setupWorkPackGets": 8,
+          "plannedHttpRequestsIncludingSetup": 2740,
+          "plannedBusinessPeakPerWindow": 1500,
+          "nominalHeadroomBeforeSetup": 500,
+          "headroomAfterSetupBeforeOtherTraffic": 460,
+          "wireShiftModelSeconds": 10.22,
+          "shiftedBusinessPeakPerWindow": 1552,
+          "modeledRequestsBeforeOtherTraffic": 1592,
+          "modeledHeadroomBeforeOtherTraffic": 408,
+          "otherRequestsPerWindow": null,
+          "modeledRemainingRequests": null,
+          "inputsReviewed": false,
+          "extraProbeRps": 0,
+          "automaticRetries": 0,
+          "limitation": "Approximate WAF and OS/network timing are not bounded by this model; setup is conservatively charged in every window. Smoke/preparation/manual/background traffic must fit the separate other-request budget. No cloud approval."
+        },
+        "warnings": []
+      }
+    },
+    {
+      "name": "four-pair-config-whitelist",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "passed": true,
+      "output": {
+        "status": "STRUCTURALLY_VALID",
+        "pairs": 4,
+        "profile": "scheduled-small-v1",
+        "pending": [
+          "syntheticOnly",
+          "assignmentVerified",
+          "auditBudgetAccepted",
+          "freezeAccepted",
+          "profileAccepted",
+          "environment",
+          "dataApprovalOwner",
+          "retention",
+          "fresh_precheck_required",
+          "window_not_current"
+        ],
+        "offlineInputsComplete": false,
+        "onlineStateVerified": false,
+        "executionApproved": false
+      }
+    },
+    {
+      "name": "outside-whitelist-cli-refusal",
+      "exitCode": 2,
+      "expectedExitCode": 2,
+      "passed": true,
+      "output": {
+        "status": "FAIL",
+        "detail": "Invalid or incomplete private whitelist/config; no network used."
+      }
+    },
+    {
+      "name": "synthetic-history-cli",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "passed": true,
+      "output": {
+        "status": "PINNED_SOURCE_MATCH",
+        "applicationCommit": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+        "engineCommit": "c5b13e2d91b9e5daa8cb536b8427fa184f60d394",
+        "migrations": 41,
+        "cloudReleaseVerified": false,
+        "history": {
+          "status": "SOURCE_HISTORY_COMPATIBLE",
+          "services": [
+            {
+              "service": "core",
+              "status": "TARGET_MATCH",
+              "issues": [],
+              "pendingVersions": []
+            },
+            {
+              "service": "visit",
+              "status": "TARGET_MATCH",
+              "issues": [],
+              "pendingVersions": []
+            },
+            {
+              "service": "report",
+              "status": "TARGET_MATCH",
+              "issues": [],
+              "pendingVersions": []
+            },
+            {
+              "service": "notification",
+              "status": "TARGET_MATCH",
+              "issues": [],
+              "pendingVersions": []
+            }
+          ],
+          "deploymentApproved": false,
+          "note": "Offline history consistency only; provenance, actual schema, Flyway validate and deployment remain operator checks."
+        }
+      }
+    },
+    {
+      "name": "synthetic-old-v4-cli-refusal",
+      "exitCode": 2,
+      "expectedExitCode": 2,
+      "passed": true,
+      "output": {
+        "status": "PINNED_SOURCE_MATCH",
+        "applicationCommit": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+        "engineCommit": "c5b13e2d91b9e5daa8cb536b8427fa184f60d394",
+        "migrations": 41,
+        "cloudReleaseVerified": false,
+        "history": {
+          "status": "STOP_REVIEW",
+          "services": [
+            {
+              "service": "core",
+              "status": "TARGET_MATCH",
+              "issues": [],
+              "pendingVersions": []
+            },
+            {
+              "service": "visit",
+              "status": "TARGET_MATCH",
+              "issues": [],
+              "pendingVersions": []
+            },
+            {
+              "service": "report",
+              "status": "STOP_REVIEW",
+              "issues": [
+                "OLD_REPORT_EVIDENCE_V4_STOP",
+                "checksum_mismatch",
+                "script_mismatch"
+              ],
+              "pendingVersions": []
+            },
+            {
+              "service": "notification",
+              "status": "TARGET_MATCH",
+              "issues": [],
+              "pendingVersions": []
+            }
+          ],
+          "deploymentApproved": false,
+          "note": "Offline history consistency only; provenance, actual schema, Flyway validate and deployment remain operator checks."
+        }
+      }
+    }
+  ],
+  "status": "PASS"
+}

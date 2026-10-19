@@ -1,6 +1,6 @@
 # Visit HPA 对接包：Chenyu → Zhili
 
-D1 + D2/D5 更新（2026-10-19）：D1总deadline/排空保留；joint已改候选5RPS/2700业务GET每组，完整[预算、断言和可比性契约](visit-hpa-read-contract.md)及[本轮证据](visit-hpa-d2-d5-local-validation.md)优先。D3/D4/D6仍待完成，本说明不放行云端。后续由Zhili独立执行，不要求Chenyu在线陪跑。
+D1 + D2/D5 更新（2026-10-19）：D1总deadline/排空保留；joint已改候选5RPS/2700业务GET每组，完整[预算、断言和可比性契约](visit-hpa-read-contract.md)及[本轮证据](visit-hpa-d2-d5-local-validation.md)优先。D3源码锁定与D4材料/离线验证现已补齐，见[版本及迁移前提](visit-hpa-release-prerequisites.md)、[合成数据步骤](visit-hpa-fixture-runbook.md)和[本轮验证](visit-hpa-d3-d4-local-validation.md)。真实本地A因Docker不可用阻塞，D6未完成；本说明不放行云端。后续由Zhili独立执行，不要求Chenyu在线陪跑。
 
 日期：2026-10-19。交付范围：CG03/visit 后端工作包读取与首次签到的负载工具、数据约定、指标和联合确认表。**本地验证与线上验收分开记录；未进行云端请求、部署、HPA/KEDA 启用或故障注入。**
 
@@ -94,3 +94,8 @@ Zhili提供容量和环境结论后，填写私有joint config的approval与参�
 ## 7 建议执行顺序
 
 评审本包和H01～H09 → 指定环境/数据Owner → 准备与核验fixture → 1～数次业务烟测 → 固定2副本A0 → 板块二按评审配置启用HPA → 相同负载A1 → 停压观察缩容 → 联合核对业务/资源/发生器有效性 → 审阅后清理/保留数据并恢复实验配置。FM03缓存对比和原身份缺口继续独立跟进。
+
+
+## D3/D4 更新（2026-10-19）
+
+应用09d6a3f与引擎c5b13e2分开固定，41份迁移及旧report证据V4停点见版本清单。4组合成未来visit的白名单、准备/核验和保留步骤已补齐；离线工具不造数、不查共享库。32项测试与8项CLI通过，真实本地A阻塞。Chenyu为A业务Owner；Zhili在批准环境执行，并安排具名历史查询人与共享数据/审计保留审批人。所有审批/云端历史仍待回签，D6未完成。

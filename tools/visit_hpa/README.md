@@ -1,6 +1,6 @@
 # Visit HPA business workload
 
-**D1 + D2/D5 local update (2026-10-19).** The joint A template is now the candidate 5 RPS / 2700 business GETs per arm. See the [read budget and evidence contract](../../docs/testing/visit-hpa-read-contract.md). D3/D4/D6, operator review and cloud conditions remain open; this branch is not cloud-test approval.
+**D1–D5 local preparation update (2026-10-19).** The joint A template is now the candidate 5 RPS / 2700 business GETs per arm. See the [read budget and evidence contract](../../docs/testing/visit-hpa-read-contract.md). D3/D4 source lock and fixture instructions are now available; real local fixture validation is blocked by the Docker engine, and D6/operator review/cloud conditions remain open; this branch is not cloud-test approval.
 
 Python **3.10+**, standard library only. No package install, k6, Maven, Docker or cluster credentials are required on the load generator. Windows, Linux and macOS use the same `load.py`. Docker and production JARs are needed **only** for the optional disposable local smoke test.
 
@@ -94,3 +94,8 @@ Use Java's actual platform path (`java.exe` on Windows). The helper binds only 1
 It runs scheduled work-pack reads → four unique first check-ins → saved-state/receipt/control SQL checks → repeatable IN_PROGRESS reads. Original containers are snapshotted. Cleanup terminates only its child Java processes and removes only exact-ID/name/ownership-label-matched containers and network. MySQL uses tmpfs. Output records port closure and unchanged original containers. It does not perform broad Docker cleanup or delete a filesystem tree. Keep all logs/config/SQL fixtures under the private output directory. Share only reviewed summaries.
 
 On a hard process kill, `runtime-private/owned-resources.json` and `child-pids.json` identify resources. Verify container label `carelink.visit-hpa=<runId>`, exact name and Java command/config path before manual cleanup. Never use `docker system prune`, wildcard deletion or a stale PID blindly. Shared/cloud fixture cleanup follows the separately approved inventory, not this local teardown.
+
+
+## D3/D4 update (2026-10-19)
+
+See the [fixed release/migration prerequisites](../../docs/testing/visit-hpa-release-prerequisites.md) and [synthetic A fixture runbook](../../docs/testing/visit-hpa-fixture-runbook.md). The release-lock.json pins application 09d6a3f separately from engine c5b13e2, all 41 migrations and the old report evidence V4 stop condition. fixture_guard.py checks a private four-pair scheduled-small-v1 whitelist/config offline; it does not prepare or query shared data. All approvals and cloud history remain operator checks. Current real local A validation is BLOCKED (Docker unavailable); offline checks are separate evidence.
