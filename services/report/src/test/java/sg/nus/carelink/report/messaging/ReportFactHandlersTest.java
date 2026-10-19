@@ -23,6 +23,7 @@ import sg.nus.carelink.eventtypes.SpotCheckUpdated;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCaregiverChanged;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitExceptionRaised;
 import sg.nus.carelink.eventtypes.VisitScheduled;
@@ -41,7 +42,7 @@ class ReportFactHandlersTest {
 	private final Map<String, EventHandler<?>> handlers = List.<EventHandler<?>>of(
 			config.visitScheduledHandler(facts), config.visitCaregiverChangedHandler(facts),
 			config.visitCancelledHandler(facts), config.visitCheckedInHandler(facts),
-			config.visitCompletedHandler(facts), config.visitExceptionRaisedHandler(facts),
+			config.visitCompletedHandler(facts), config.visitExceptionRaisedHandler(facts), config.visitClosedHandler(facts),
 			config.visitTaskRecordedHandler(facts), config.vitalsRecordedHandler(facts),
 			config.elderConfirmationSubmittedHandler(facts), config.incidentRaisedHandler(facts),
 			config.incidentUpdatedHandler(facts), config.spotCheckUpdatedHandler(facts),
@@ -51,7 +52,7 @@ class ReportFactHandlersTest {
 	@Test
 	void everyEventTheCatalogueRoutesToReportHasItsHandler() {
 		assertThat(handlers.keySet()).containsExactlyInAnyOrder("VisitScheduled", "VisitCaregiverChanged",
-				"VisitCancelled", "VisitCheckedIn", "VisitCompleted", "VisitExceptionRaised", "VisitTaskRecorded",
+				"VisitCancelled", "VisitCheckedIn", "VisitCompleted", "VisitExceptionRaised", "VisitClosed", "VisitTaskRecorded",
 				"VitalsRecorded", "ElderConfirmationSubmitted", "IncidentRaised", "IncidentUpdated",
 				"SpotCheckUpdated", "RosterChangeUpdated");
 		assertThat(handlers.get("VitalsRecorded").payloadType()).isEqualTo(VitalsRecorded.class);
@@ -67,8 +68,9 @@ class ReportFactHandlersTest {
 		var exception = new VisitExceptionRaised(812L, 101L, NINE, 9L, "CAREGIVER_REPORT", null, 601L, true, 5);
 		var vitals = new VitalsRecorded(77L, 812L, 101L, NINE, NINE, "ATTENTION", null, List.of());
 		var answer = new ElderConfirmationSubmitted(812L, 101L, NINE, "CONFIRMED", 5, null, NINE, null);
+		var closed = new VisitClosed(812L, 101L, NINE, 9L, "VERIFIED", 6, NINE);
 
-		for (Object event : List.of(scheduled, changed, cancelled, checkedIn, completed, exception, vitals, answer)) {
+		for (Object event : List.of(scheduled, changed, cancelled, checkedIn, completed, exception, vitals, answer, closed)) {
 			handle(event, 900L);
 		}
 
@@ -78,6 +80,7 @@ class ReportFactHandlersTest {
 		verify(facts).keep(checkedIn);
 		verify(facts).keep(completed);
 		verify(facts).keep(exception);
+		verify(facts).keep(closed);
 		verify(facts).keep(vitals);
 		verify(facts).keep(answer);
 	}

@@ -14,7 +14,7 @@ type Evidence = { id: number; visitId: number; kind: string; verificationStatus:
 type EvidenceList = { items: Evidence[]; page: number; size: number; total: number; maxFiles: number }
 export default function EvidencePage() {
   const { visitId = '' } = useParams()
-  return <div className={styles.page}><Link to={`/caregiver/visits/${encodeURIComponent(visitId)}`}>← Visit work pack</Link><h1>Visit evidence</h1>
+  return <div className={styles.page}><Link className={styles.back} to={`/caregiver/visits/${encodeURIComponent(visitId)}`}>← Visit work pack</Link><div className={styles.heading}><h1>Visit evidence</h1></div>
     <p>PHOTO and SIGNATURE support JPEG/PNG only, up to 5 MiB and 20 megapixels. A signature image is not elder confirmation or identity verification. Uploaded evidence remains Unverified and does not complete a task.</p>
     <p>Captured time means server submission time, not the camera's timestamp. Do not include unnecessary personal information. Evidence is not required to check out.</p>
     {/^[1-9]\d*$/.test(visitId) ? <EvidenceWorkspace key={visitId} visitId={visitId} /> : <p role="alert">Invalid visit.</p>}
@@ -41,7 +41,7 @@ function EvidenceWorkspace({ visitId }: { visitId: string }) {
       {data.files.items.map(file => <article className={styles.card} key={file.id}><h2>{file.kind} · {file.verificationStatus}</h2><p>{file.fileName || 'Legacy evidence without safe file metadata'} · {file.capturedAt?.replace('T', ' ') || 'Submission time unavailable'} (SGT)</p>
         {file.available && file.downloadPath ? <a href={file.downloadPath} download>Download evidence {file.id}</a> : <p>File unavailable. Legacy references are not treated as local paths.</p>}
       </article>)}
-      <button disabled={!!editing || page === 0} onClick={() => setPage(page - 1)}>Previous</button><span> Page {page + 1} </span><button disabled={!!editing || (page + 1) * 20 >= data.files.total} onClick={() => setPage(page + 1)}>Next</button>
+      <div className={styles.pager}><button disabled={!!editing || page === 0} onClick={() => setPage(page - 1)}>Previous</button><span> Page {page + 1} </span><button disabled={!!editing || (page + 1) * 20 >= data.files.total} onClick={() => setPage(page + 1)}>Next</button></div>
       {data.pack.visit.status === 'IN_PROGRESS' && !editing && <button className={styles.button} onClick={() => { setEditing(data.pack); setNotice('') }}>Add evidence image</button>}
       {data.pack.visit.status !== 'IN_PROGRESS' && <p>Uploads are available only after check-in and before check-out. Existing evidence is read-only.</p>}
       {editing && <EvidenceUpload pack={editing} close={() => setEditing(null)} saved={() => { setEditing(null); setNotice('Evidence saved — Unverified. Your visit version has changed; refresh the work pack before another command.'); reload() }} />}

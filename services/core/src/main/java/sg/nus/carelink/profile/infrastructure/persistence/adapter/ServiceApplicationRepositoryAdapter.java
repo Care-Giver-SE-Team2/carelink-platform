@@ -58,6 +58,12 @@ class ServiceApplicationRepositoryAdapter implements ServiceApplicationRepositor
         return jpa.findByElderIdOrderByCreatedAtDescIdDesc(elderId).stream().map(this::toDomain).toList();
     }
 
+    @Override
+    public Set<Long> findElderIdsWithApplications(Set<Long> elderIds) {
+        if (elderIds.isEmpty()) return Set.of();
+        return Set.copyOf(jpa.findElderIdsIn(elderIds));
+    }
+
     private ServiceApplication toDomain(ServiceApplicationJpaEntity entity) {
         return new ServiceApplication(entity.getId(), entity.getApplicantFamilyMemberId(), entity.getElderId(),
                 JSON.readValue(entity.getElderSnapshot(), ElderBasicDetails.class), entity.getCareNeeds(), entity.getNotes(),

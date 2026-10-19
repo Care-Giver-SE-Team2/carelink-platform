@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { CaregiverOption } from '../../../shared/api/profile'
-import type { ApprovedApplicant } from '../data/caregiverApplications'
 import { certRow } from './certRow.fixture'
-import { certificateSummary, directoryRows, languagesLabel, nextApplicationId } from './caregivers'
+import { certificateSummary, directoryRows, languagesLabel, matchesCaregiverQuery, nextApplicationId } from './caregivers'
 import type { CertificateLine } from './caregivers'
-
-const TODAY = new Date(2026, 9, 9)
 
 function caregiver(overrides: Partial<CaregiverOption>): CaregiverOption {
   return { id: 114, fullName: 'Devi Raman', sector: 'AMK', dialects: 'Tamil,English', status: 'AVAILABLE', assignable: true, ...overrides }
@@ -13,31 +10,6 @@ function caregiver(overrides: Partial<CaregiverOption>): CaregiverOption {
 
 function line(state: CertificateLine['state']): CertificateLine {
   return { key: state, name: 'First aid', state, expiryDate: null, daysUntilExpiry: null, registerId: 1 }
-}
-
-const approvedApplicant: ApprovedApplicant = {
-  id: 7,
-  caregiverId: 9007,
-  fullName: 'Lim Hui Min',
-  username: 'lim.huimin',
-  phone: null,
-  sector: 'AMK',
-  dialects: 'Hokkien',
-  submittedAt: '2026-10-09T01:00:00Z',
-  approvedAt: '2026-10-09T05:00:00Z',
-  certificates: [
-    {
-      id: 71,
-      credentialTypeName: 'First aid',
-      certificateNo: 'SRC-FA-73310',
-      issuingBody: 'Singapore Red Cross',
-      validFrom: null,
-      expiryDate: '2026-10-29',
-      fileName: 'first-aid.pdf',
-      scanUrl: null,
-      scanContentType: null,
-    },
-  ],
 }
 
 describe('directoryRows', () => {
@@ -50,35 +22,11 @@ describe('directoryRows', () => {
         certRow({ id: 3, caregiverId: 114, state: 'REVOKED' }),
         certRow({ id: 4, caregiverId: 120, state: 'SUBMITTED', credentialTypeName: 'Dementia care' }),
       ],
-      [],
-      TODAY,
     )
 
     expect(rows.map((r) => r.fullName)).toEqual(['Devi Raman', 'Ong Wei Jie'])
     expect(rows[0].certificates.map((c) => c.registerId)).toEqual([1])
     expect(rows[1].certificates).toMatchObject([{ name: 'Dementia care', state: 'SUBMITTED', registerId: 4 }])
-  })
-
-  it('adds approved applicants, by name, with every uploaded certificate published', () => {
-    const rows = directoryRows([caregiver({}), caregiver({ id: 120, fullName: 'Ong Wei Jie' })], [], [approvedApplicant], TODAY)
-
-    expect(rows.map((r) => r.fullName)).toEqual(['Devi Raman', 'Lim Hui Min', 'Ong Wei Jie'])
-    expect(rows[1]).toMatchObject({ id: 9007, status: 'AVAILABLE', approvedAt: '2026-10-09T05:00:00Z' })
-    expect(rows[1].certificates).toEqual([
-      {
-        key: 'application-71',
-        name: 'First aid',
-        state: 'PUBLISHED',
-        expiryDate: '2026-10-29',
-        daysUntilExpiry: 20,
-        registerId: null,
-      },
-    ])
-  })
-
-  it('leaves an applicant approved without certificates onboarding', () => {
-    const [row] = directoryRows([], [], [{ ...approvedApplicant, certificates: [] }], TODAY)
-    expect(row.status).toBe('ONBOARDING')
   })
 })
 
@@ -106,5 +54,25 @@ describe('nextApplicationId', () => {
     expect(nextApplicationId(rows, 7)).toBe(6)
     expect(nextApplicationId(rows, 5)).toBe(6)
     expect(nextApplicationId([{ id: 7 }], 7)).toBeNull()
+  })
+})
+
+describe('matchesCaregiverQuery', () => {
+  const devi = { id: 114, fullName: 'Devi Raman' }
+
+  it('matches part of the name in any case, ignoring surrounding spaces', () => {
+    expect(matchesCaregiverQuery(devi, 'raman')).toBe(true)
+    expect(matchesCaregiverQuery(devi, '  DEVI ')).toBe(true)
+    expect(matchesCaregiverQuery(devi, 'ong')).toBe(false)
+  })
+
+  it('matches the CGV id, with or without its prefix', () => {
+    expect(matchesCaregiverQuery(devi, 'cgv-0114')).toBe(true)
+    expect(matchesCaregiverQuery(devi, '114')).toBe(true)
+    expect(matchesCaregiverQuery(devi, '120')).toBe(false)
+  })
+
+  it('matches everyone when the search is blank', () => {
+    expect(matchesCaregiverQuery(devi, '   ')).toBe(true)
   })
 })

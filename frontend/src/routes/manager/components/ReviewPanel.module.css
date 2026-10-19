@@ -27,7 +27,15 @@
   gap: 14px;
 }
 
-/* No scan is stored yet; this stands in for the uploaded image until the caregiver app sends one. */
+/* Up to three uploaded files, stacked in the scan's column. */
+.scans {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Stands in for the scan while the files load, or when none were uploaded. */
 .scan {
   box-sizing: border-box;
   display: flex;

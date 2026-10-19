@@ -6,10 +6,6 @@
 
 .header {
   composes: band from '../components/FamilyScreen.module.css';
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 /* Outranks the composed band's own bottom margin. */
@@ -31,8 +27,36 @@
   margin-bottom: 8px !important;
 }
 
+/* Whose care this page is about: a white card leading the content, not the screen title. */
+.elder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  padding: 14px 16px;
+}
+
+.elderLabel {
+  color: var(--fm-muted);
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase;
+}
+
+.elderName {
+  margin: 4px 0 0 !important;
+  font-size: 19px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+}
+
 .meta {
-  margin-top: 6px !important;
+  margin-top: 2px !important;
   color: var(--fm-muted);
   font-size: 13.5px;
   font-variant-numeric: tabular-nums;
@@ -57,8 +81,10 @@
 /* Phone: the first section sits 18px under the header (or the elder picker). */
 @media (max-width: 899px) {
   .header + .columns > .column:first-child > section:first-child .sectionLabel,
+  .elder + .columns > .column:first-child > section:first-child .sectionLabel,
   .picker + .columns > .column:first-child > section:first-child .sectionLabel,
   .header + .answer .sectionLabel,
+  .elder + .answer .sectionLabel,
   .picker + .answer .sectionLabel {
     margin-top: 18px !important;
   }
@@ -406,6 +432,21 @@ p.card {
 @media (min-width: 900px) {
   .home > .header {
     margin-bottom: 26px;
+  }
+
+  /* Same centred 1120px block as the two columns below it. */
+  .home > .elder {
+    width: 100%;
+    max-width: 1120px;
+    margin-inline: auto;
+    margin-top: 0;
+    margin-bottom: 26px;
+    padding: 18px 22px;
+  }
+
+  .elderName {
+    font-size: 22px !important;
+    font-weight: 600 !important;
   }
 
   /* A lone message keeps the 640px reading width of the single-column tabs, centred under the header. */

@@ -17,6 +17,7 @@ import sg.nus.carelink.eventtypes.ElderConfirmationSubmitted;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCaregiverChanged;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitExceptionRaised;
 import sg.nus.carelink.eventtypes.VisitScheduled;
@@ -100,6 +101,19 @@ class OutboxVisitEventsTest {
 		assertThat(completed.checkedOutAt()).isEqualTo(OffsetDateTime.of(NINE.plusMinutes(61), SINGAPORE));
 		assertThat(completed.version()).isEqualTo(4);
 		assertThat(published).extracting(entry -> entry[0]).containsExactly(VisitCheckedIn.TYPE, VisitCompleted.TYPE);
+	}
+
+	@Test
+	void aClosedVisitSaysHowItClosedAndIsDatedWhenItIsPublished() {
+		outbox.closed(visit(Visit.Status.VERIFIED, 7L, null, 5, NINE.plusMinutes(3), NINE.plusMinutes(61)));
+
+		VisitClosed event = only(VisitClosed.TYPE, VisitClosed.class);
+		assertThat(event.visitId()).isEqualTo(812L);
+		assertThat(event.caregiverId()).isEqualTo(7L);
+		assertThat(event.status()).isEqualTo("VERIFIED");
+		assertThat(event.scheduledStart()).isEqualTo(OffsetDateTime.of(NINE, SINGAPORE));
+		assertThat(event.version()).isEqualTo(5);
+		assertThat(event.closedAt()).isEqualTo(OffsetDateTime.of(2026, 10, 11, 15, 20, 0, 0, SINGAPORE));
 	}
 
 	@Test

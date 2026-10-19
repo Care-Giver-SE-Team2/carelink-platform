@@ -139,6 +139,8 @@ class EventTypesTest {
 		fields.put(new ElderConfirmationSubmitted(812L, 101L, start, "CONFIRMED", 5, "Very kind", later, null),
 				List.of("visitId", "elderId", "visitScheduledStart", "status", "rating", "comment", "confirmedAt",
 						"incidentId"));
+		fields.put(new VisitClosed(812L, 101L, start, 9L, "VERIFIED", 5, later),
+				List.of("visitId", "elderId", "scheduledStart", "caregiverId", "status", "version", "closedAt"));
 
 		fields.forEach((event, names) -> {
 			JsonNode written = json.readTree(json.writeValueAsString(event));
@@ -154,10 +156,10 @@ class EventTypesTest {
 		assertThat(vitals.get("visitScheduledStart").asString()).isEqualTo("2026-10-12T09:35:00+08:00");
 		assertThat(List.of(VisitScheduled.TYPE, VisitCaregiverChanged.TYPE, VisitCancelled.TYPE, VisitCheckedIn.TYPE,
 				VisitCompleted.TYPE, VisitExceptionRaised.TYPE, VisitTaskRecorded.TYPE, VitalsRecorded.TYPE,
-				ElderConfirmationSubmitted.TYPE))
+				ElderConfirmationSubmitted.TYPE, VisitClosed.TYPE))
 				.containsExactly("VisitScheduled", "VisitCaregiverChanged", "VisitCancelled", "VisitCheckedIn",
 						"VisitCompleted", "VisitExceptionRaised", "VisitTaskRecorded", "VitalsRecorded",
-						"ElderConfirmationSubmitted");
+						"ElderConfirmationSubmitted", "VisitClosed");
 	}
 
 	@Test

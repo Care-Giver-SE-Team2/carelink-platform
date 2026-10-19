@@ -1,6 +1,6 @@
 import type { CaregiverOption, CredentialRegisterRow } from '../../../shared/api/profile'
 import type { CertificationTagState, TagTone } from '../../../shared/components/ui'
-import type { ApprovedApplicant } from '../data/caregiverApplications'
+import { caregiverRef } from './certifications'
 
 export const CAREGIVER_PAGE_SIZE = 10
 
@@ -15,7 +15,7 @@ export const STATUS_TAG: Record<CaregiverStatus, { label: string; tone: TagTone 
 
 /** One line of the status, for the caregiver panel's header. */
 export const STATUS_MEANING: Record<CaregiverStatus, string> = {
-  ONBOARDING: 'not rostered until a certificate is published',
+  ONBOARDING: 'application not approved yet; not rostered',
   AVAILABLE: 'can be rostered',
   BUSY: 'fully booked today; can still be rostered',
   INACTIVE: 'has left; not rostered',
@@ -29,8 +29,8 @@ export type CertificateLine = {
   /** "Valid until"; null when it never expires. */
   expiryDate: string | null
   daysUntilExpiry: number | null
-  /** The register row it opens in Certifications; null for one approved from a mock application. */
-  registerId: number | null
+  /** The register row it opens in Certifications. */
+  registerId: number
 }
 
 export type DirectoryCaregiver = {
@@ -40,30 +40,17 @@ export type DirectoryCaregiver = {
   dialects: string | null
   status: CaregiverStatus
   certificates: CertificateLine[]
-  /** Set while the caregiver exists only in the mock application store. */
-  approvedAt: string | null
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
-/** Whole days from `today` to the "yyyy-MM-dd" date, by calendar date. */
-function daysUntil(date: string, today: Date): number {
-  const start = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-  const [year, month, day] = date.split('-').map(Number)
-  return Math.round((Date.UTC(year, month - 1, day) - start) / DAY_MS)
+/** Whether a caregiver matches the search box: part of their name or of their CGV-0114 id, any case. */
+export function matchesCaregiverQuery(caregiver: { id: number; fullName: string }, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return caregiver.fullName.toLowerCase().includes(q) || caregiverRef(caregiver.id).toLowerCase().includes(q)
 }
 
-/**
- * Every caregiver with their certificates, by name: the real caregivers with their register
- * rows (rejected and revoked ones left out), plus applicants approved in the mock store, whose
- * uploaded certificates were all published on approval.
- */
-export function directoryRows(
-  caregivers: CaregiverOption[],
-  register: CredentialRegisterRow[],
-  approved: ApprovedApplicant[],
-  today: Date,
-): DirectoryCaregiver[] {
+/** Every caregiver with their register rows (rejected and revoked ones left out), by name. */
+export function directoryRows(caregivers: CaregiverOption[], register: CredentialRegisterRow[]): DirectoryCaregiver[] {
   const byCaregiver = new Map<number, CertificateLine[]>()
   for (const row of register) {
     if (row.state === 'REJECTED' || row.state === 'REVOKED') continue
@@ -79,33 +66,16 @@ export function directoryRows(
     byCaregiver.set(row.caregiverId, lines)
   }
 
-  const real: DirectoryCaregiver[] = caregivers.map((c) => ({
-    id: c.id,
-    fullName: c.fullName,
-    sector: c.sector,
-    dialects: c.dialects ?? null,
-    status: c.status,
-    certificates: byCaregiver.get(c.id) ?? [],
-    approvedAt: null,
-  }))
-  const fromApplications: DirectoryCaregiver[] = approved.map((a) => ({
-    id: a.caregiverId,
-    fullName: a.fullName,
-    sector: a.sector,
-    dialects: a.dialects,
-    status: a.certificates.length ? 'AVAILABLE' : 'ONBOARDING',
-    certificates: a.certificates.map((cert) => ({
-      key: `application-${cert.id}`,
-      name: cert.credentialTypeName,
-      state: 'PUBLISHED',
-      expiryDate: cert.expiryDate,
-      daysUntilExpiry: cert.expiryDate ? daysUntil(cert.expiryDate, today) : null,
-      registerId: null,
-    })),
-    approvedAt: a.approvedAt,
-  }))
-
-  return [...real, ...fromApplications].sort((a, b) => a.fullName.localeCompare(b.fullName))
+  return caregivers
+    .map((c) => ({
+      id: c.id,
+      fullName: c.fullName,
+      sector: c.sector,
+      dialects: c.dialects ?? null,
+      status: c.status,
+      certificates: byCaregiver.get(c.id) ?? [],
+    }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
 /** The list's certificate column: "2 valid · 1 expiring · 1 to review", or "none". */

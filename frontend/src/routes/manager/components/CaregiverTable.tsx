@@ -13,9 +13,12 @@ export function CaregiverTable({
   rows,
   selectedId,
   onSelect,
+  empty = 'No caregivers yet. Approved applications appear here.',
 }: {
   rows: DirectoryCaregiver[]
   selectedId: number | null
+  /** What an empty list says; a search with no matches says so instead. */
+  empty?: string
   onSelect: (row: DirectoryCaregiver) => void
 }) {
   const columns: DataTableColumn<DirectoryCaregiver>[] = [
@@ -67,7 +70,7 @@ export function CaregiverTable({
       rowKey={(row) => String(row.id)}
       onRowClick={onSelect}
       selectedKey={selectedId === null ? null : String(selectedId)}
-      empty="No caregivers yet. Approved applications appear here."
+      empty={empty}
     />
   )
 }

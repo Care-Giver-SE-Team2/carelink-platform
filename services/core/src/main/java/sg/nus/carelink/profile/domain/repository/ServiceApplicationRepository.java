@@ -13,4 +13,6 @@ public interface ServiceApplicationRepository {
     ServiceApplicationPage findForApplicant(Long familyId, Set<Long> readableElderIds, int page, int size);
     /** Every service application made for this elder, by any family member, newest first. */
     List<ServiceApplication> findByElderId(Long elderId);
+    /** Which of these elders any family member has made a service application for, in any status. */
+    Set<Long> findElderIdsWithApplications(Set<Long> elderIds);
 }

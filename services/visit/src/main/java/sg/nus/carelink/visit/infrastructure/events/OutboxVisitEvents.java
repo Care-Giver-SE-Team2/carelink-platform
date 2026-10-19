@@ -13,6 +13,7 @@ import sg.nus.carelink.eventtypes.SingaporeTime;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCaregiverChanged;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitExceptionRaised;
 import sg.nus.carelink.eventtypes.VisitScheduled;
@@ -72,6 +73,12 @@ class OutboxVisitEvents implements VisitEvents {
 	public void completed(Visit visit) {
 		events.publish(VisitCompleted.TYPE, new VisitCompleted(visit.id(), visit.elderId(), time(visit.scheduledStart()),
 				visit.caregiverId(), time(visit.checkedInAt()), time(visit.checkedOutAt()), visit.version()));
+	}
+
+	@Override
+	public void closed(Visit visit) {
+		events.publish(VisitClosed.TYPE, new VisitClosed(visit.id(), visit.elderId(), time(visit.scheduledStart()),
+				visit.caregiverId(), visit.status().name(), visit.version(), now()));
 	}
 
 	@Override

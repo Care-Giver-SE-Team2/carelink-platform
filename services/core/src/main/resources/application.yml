@@ -36,6 +36,14 @@ carelink:
   caregiver:
     credential-warning-days: 30
     credential-storage: ${CARELINK_CREDENTIAL_STORAGE:target/private/credentials}
+    # When enabled, new certificate files go to private ImageKit files instead of credential-storage
+    # (files already saved there stay readable). The private key is a secret: set it from the
+    # environment, never in this file.
+    imagekit:
+      enabled: ${CARELINK_IMAGEKIT_ENABLED:false}
+      url-endpoint: ${CARELINK_IMAGEKIT_URL_ENDPOINT:}
+      private-key: ${CARELINK_IMAGEKIT_PRIVATE_KEY:}
+      folder: ${CARELINK_IMAGEKIT_FOLDER:carelink/credentials}
     # SYS01. When the daily scan moves certificates to EXPIRING/EXPIRED and sends the alerts
     # (Spring cron, read in expiry-scan-zone; "-" switches it off).
     expiry-scan-cron: "0 0 0 * * *"

@@ -149,12 +149,12 @@ the tests lay out in core's tables. Each is in place of the client for every tes
 Done. Nine classes wrote into `notification` directly; each now publishes one `NotificationRequested` event per
 recipient, in the transaction that decided to send it, and notification's `NotificationRequestedHandler` keeps
 the message. Eight implement a port, so only the adapter changed and the business code that raises the alert
-stayed as it was; the ninth listens for careplan's `CarePlanPublished` after the publish commits, and writes its
-events in a transaction of its own. `NotificationRequested.inApp` cuts titles and bodies to what the inbox keeps.
+stayed as it was; the ninth and tenth listen for careplan's `CarePlanPublished` and profile's
+`FamilyBindingRequested` after the change commits, and write their events in a transaction of their own. `NotificationRequested.inApp` cuts titles and bodies to what the inbox keeps.
 
 | Module | Class |
 |---|---|
-| profile | `NotificationRequestedCredentialAlert` (the worked example), `CarePlanPublishedFamilyNotifier` |
+| profile | `NotificationRequestedCredentialAlert` (the worked example), `CarePlanPublishedFamilyNotifier`, `FamilyBindingRequestedNotifier` |
 | incident | `NotificationRequestedIncidentAlert`, `NotificationRequestedSpotCheckAlert`, `JdbcFamilyAlertDeliveryStore` |
 | rostering | `NotificationRequestedAbsenceAlert`, `NotificationRequestedRosterAlert` |
 | report | `NotificationRequestedValueAddedManagerAlert`, `NotificationRequestedValueAddedNotifier` |

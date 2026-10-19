@@ -133,6 +133,15 @@
   font-weight: 400;
   color-scheme: light;
 }
+/* Own chevron, inset like the text, so the arrow doesn't sit against the rounded border. Stroke is --fm-muted. */
+.field select {
+  appearance: none;
+  padding-right: 40px;
+  background: var(--fm-card)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 7.5l5 5 5-5' fill='none' stroke='%235c6e68' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    right 10px center / 18px no-repeat;
+  cursor: pointer;
+}
 .field input[aria-invalid='true'] {
   border-color: var(--fm-urgent);
 }

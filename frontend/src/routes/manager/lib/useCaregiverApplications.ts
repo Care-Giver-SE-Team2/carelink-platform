@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchApprovedApplicants, fetchCaregiverApplications } from '../data/caregiverApplications'
+import { fetchCaregiverApplications } from '../../../shared/api/profile'
 
 /**
- * Pending caregiver applications, newest first. Shared by the Caregivers screen and its nav
- * count, so both always agree. Served by the mock store in data/caregiverApplications.ts.
+ * Pending caregiver applications, newest first. Shares one cached query with the nav count, so
+ * both always agree.
  */
 export function useCaregiverApplications() {
   return useQuery({
     queryKey: ['caregiverApplications', 'pending'],
-    queryFn: fetchCaregiverApplications,
+    queryFn: ({ signal }) => fetchCaregiverApplications(signal),
+    select: (page) => page.items,
   })
 }
 
@@ -16,15 +17,7 @@ export function useCaregiverApplications() {
 export function usePendingCaregiverApplicationCount() {
   return useQuery({
     queryKey: ['caregiverApplications', 'pending'],
-    queryFn: fetchCaregiverApplications,
-    select: (rows) => rows.length,
-  })
-}
-
-/** Applicants approved in the mock store, until approving creates a real caregiver. */
-export function useApprovedApplicants() {
-  return useQuery({
-    queryKey: ['caregiverApplications', 'approved'],
-    queryFn: fetchApprovedApplicants,
+    queryFn: ({ signal }) => fetchCaregiverApplications(signal),
+    select: (page) => page.total,
   })
 }

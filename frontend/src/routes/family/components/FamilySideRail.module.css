@@ -164,6 +164,12 @@
   line-height: 1;
 }
 
+/* On the Account page the card takes the tint, so the avatar inverts to stay visible against it. */
+.account[aria-current='page'] .avatar {
+  background: var(--fm-accent);
+  color: #fff;
+}
+
 .accountName {
   display: block;
   font-size: 14px;

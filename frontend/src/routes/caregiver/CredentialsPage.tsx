@@ -34,7 +34,7 @@ export default function CredentialsPage() {
   if (accessError?.status === 'error') return <SelfServiceError error={accessError.error} retry={() => { reload(); types.reload() }} subject="your credentials" />
 
   return <div className={styles.page}>
-    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My credentials</h1><p className={styles.muted}>Submit certificates and follow your manager's review.</p></div><button className={styles.button} onClick={() => { reload(); types.reload() }}>Refresh</button></div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My credentials</h1><p className={styles.muted}>Submit certificates and follow your manager's review.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} onClick={() => { reload(); types.reload() }}>Refresh</button></div>
     {credentialId && <Link to="/caregiver/credentials">All my credentials</Link>}
     <p className={styles.readOnly}>Uploading does not approve a certificate or grant rostering eligibility. Pending renewals do not clear expiry reminders. Your manager reviews certificates separately.</p>
     {result.status === 'loading' && <p role="status">Loading your credentials…</p>}
@@ -69,7 +69,7 @@ export default function CredentialsPage() {
         {!source && types.result.status === 'success' && approved(row.status) && <button className={styles.button} onClick={() => setSource({ action: 'RENEWAL', credential: row, catalogue: types.result.status === 'success' ? types.result.data : [] })}>Renew certificate</button>}
         {!source && types.result.status === 'success' && row.status === 'REJECTED' && <button className={styles.button} onClick={() => setSource({ action: 'RESUBMIT', credential: row, catalogue: types.result.status === 'success' ? types.result.data : [] })}>Resubmit certificate</button>}
       </article></details>)}
-      {!credentialId && <div className={styles.heading}><button disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button><span>Page {page + 1} · {result.data.total} records (including history)</span><button disabled={(page + 1) * 20 >= result.data.total} onClick={() => setPage(p => p + 1)}>Next</button></div>}
+      {!credentialId && <div className={styles.pager}><button disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button><span>Page {page + 1} · {result.data.total} records (including history)</span><button disabled={(page + 1) * 20 >= result.data.total} onClick={() => setPage(p => p + 1)}>Next</button></div>}
     </>}
   </div>
 }

@@ -100,7 +100,7 @@ describe('caregiver leave self-service', () => {
     mount(); await fill(); fireEvent.click(screen.getByRole('button', { name: 'Submit leave request' }))
     const sending = await screen.findByRole('button', { name: 'Submitting…' })
     expect(sending).toBeDisabled(); fireEvent.click(sending)
-    fireEvent.click(screen.getByRole('link', { name: 'My schedule' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Schedule' }))
     await screen.findByRole('heading', { name: 'My schedule' })
     await act(async () => resolve(reply({ id: 1 }, 201)))
     expect(screen.queryByText(/Leave request submitted/)).not.toBeInTheDocument()

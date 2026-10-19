@@ -1,13 +1,13 @@
+import type { CaregiverApplication } from '../../../shared/api/profile'
 import { DataTable, Tag } from '../../../shared/components/ui'
 import type { DataTableColumn } from '../../../shared/components/ui'
-import type { CaregiverApplication } from '../data/caregiverApplications'
 import { formatReceived } from '../lib/applications'
 import { languagesLabel } from '../lib/caregivers'
 import styles from './CaregiverApplicationTable.module.css'
 
 /**
  * Caregiver applications waiting for an answer: who applied and with which login, the sector
- * they'll work in, their languages, when it came in and how many certificates they uploaded.
+ * they asked for, their languages, when it came in and how many certificates they uploaded.
  * A row opens in the application panel.
  */
 export function CaregiverApplicationTable({
@@ -37,7 +37,7 @@ export function CaregiverApplicationTable({
       width: 'minmax(0, 1fr)',
       render: (row) => <span className={styles.languages}>{languagesLabel(row.dialects) ?? '—'}</span>,
     },
-    { key: 'sector', label: 'Sector', width: '68px', render: (row) => <span className={styles.mono}>{row.sector ?? '—'}</span> },
+    { key: 'sector', label: 'Sector', width: '68px', render: (row) => <span className={styles.mono}>{row.requestedSector ?? '—'}</span> },
     {
       key: 'received',
       label: 'Received',
@@ -68,7 +68,7 @@ export function CaregiverApplicationTable({
       rowKey={(row) => String(row.id)}
       onRowClick={onSelect}
       selectedKey={selectedId === null ? null : String(selectedId)}
-      empty="No applications waiting. New ones from the caregiver app appear here."
+      empty="No pending applications."
     />
   )
 }

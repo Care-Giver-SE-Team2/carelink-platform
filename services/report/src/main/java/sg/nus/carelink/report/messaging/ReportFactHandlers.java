@@ -16,6 +16,7 @@ import sg.nus.carelink.eventtypes.SpotCheckUpdated;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCaregiverChanged;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitExceptionRaised;
 import sg.nus.carelink.eventtypes.VisitScheduled;
@@ -24,7 +25,7 @@ import sg.nus.carelink.eventtypes.VitalsRecorded;
 import sg.nus.carelink.report.domain.repository.KeptFacts;
 
 /**
- * Takes the facts a report is made from off report's queue: visit's nine events and core's four
+ * Takes the facts a report is made from off report's queue: visit's ten events and core's four
  * (docs/platform/event-catalogue.md, section 3). Each handler is one call to {@link KeptFacts}:
  * keeping a fact is a projection with no rule of its own, so there is no application service in
  * between, as there is for a message ({@code NotificationRequestedHandler} in notification). The
@@ -62,6 +63,11 @@ class ReportFactHandlers {
 	@Bean
 	EventHandler<VisitExceptionRaised> visitExceptionRaisedHandler(KeptFacts facts) {
 		return on(VisitExceptionRaised.TYPE, VisitExceptionRaised.class, (event, sequence) -> facts.keep(event));
+	}
+
+	@Bean
+	EventHandler<VisitClosed> visitClosedHandler(KeptFacts facts) {
+		return on(VisitClosed.TYPE, VisitClosed.class, (event, sequence) -> facts.keep(event));
 	}
 
 	@Bean

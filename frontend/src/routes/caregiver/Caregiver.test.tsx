@@ -121,6 +121,7 @@ describe('caregiver read workflow', () => {
   it('sign out removes the work pack', async () => {
     mount('/caregiver/visits/41')
     await screen.findByText('Demo address')
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     expect(screen.queryByText('Demo address')).not.toBeInTheDocument()

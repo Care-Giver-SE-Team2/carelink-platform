@@ -38,6 +38,8 @@ export function linkFor(item: Pick<NotificationItem, 'resourceType' | 'resourceI
     VALUE_ADDED_REQUEST: { family: '/family/extra-services', manager: '/manager/extra-services' },
     // A newly published care plan version, read on the family's Care plan page.
     CARE_PLAN: { family: '/family/care-plan' },
+    // An elder asking to link with the family member, answered on Family bindings.
+    FAMILY_BINDING: { family: '/family/family-bindings' },
   }
   return (item.resourceType && routes[item.resourceType]?.[portal]) || null
 }

@@ -1,33 +1,37 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { Callout, MetaText, Pagination, SectionHeader } from '../../../shared/components/ui'
+import { approveCaregiverApplication, rejectCaregiverApplication } from '../../../shared/api/profile'
+import type { CaregiverApplication } from '../../../shared/api/profile'
+import { Callout, FilterChips, MetaText, Pagination, SearchField } from '../../../shared/components/ui'
 import { CaregiverApplicationPanel } from '../components/CaregiverApplicationPanel'
 import { CaregiverApplicationTable } from '../components/CaregiverApplicationTable'
 import { CaregiverPanel } from '../components/CaregiverPanel'
 import { CaregiverTable } from '../components/CaregiverTable'
 import { ManagerShell } from '../components/ManagerShell'
-import { approveCaregiverApplication, declineCaregiverApplication } from '../data/caregiverApplications'
-import type { CaregiverApplication } from '../data/caregiverApplications'
-import { CAREGIVER_PAGE_SIZE, directoryRows, nextApplicationId } from '../lib/caregivers'
-import { useApprovedApplicants, useCaregiverApplications } from '../lib/useCaregiverApplications'
+import { CAREGIVER_PAGE_SIZE, directoryRows, matchesCaregiverQuery, nextApplicationId } from '../lib/caregivers'
+import { useCaregiverApplications } from '../lib/useCaregiverApplications'
 import { useCaregivers } from '../lib/useCaregivers'
 import { useCredentialRegister } from '../lib/useCertifications'
 import { useElders } from '../lib/useElders'
 import styles from './Caregivers.module.css'
 
+type View = 'applications' | 'caregivers'
+
 /**
- * Caregivers — MG02. Caregivers apply from the caregiver app with their details and
- * certificates; the applications wait at the top until the manager approves (which enables the
- * login and publishes every certificate) or declines with a reason. Below is every caregiver,
- * with their certificates and status. Either kind of row opens in the panel on the right.
- * The open row and the caregiver page live in the URL (?application=7, ?caregiver=12&page=2).
+ * Caregivers — MG02. Two lists behind a view switch, each paged on its own. Applications:
+ * caregivers apply from the caregiver app with their details and certificates, and wait until
+ * the manager approves (which makes them available for rostering; their certificates are still
+ * reviewed in Certifications) or declines with a reason. Caregivers: everyone on record, with their certificates and status. A row
+ * opens in the panel on the right, and the caregivers can be searched by name or id. The view,
+ * the open row, the page and the search live in the URL (?view=applications&application=7,
+ * ?view=caregivers&caregiver=12&page=2&q=devi). Without a view it opens on caregivers, unless
+ * the URL names an application.
  */
 export default function Caregivers() {
   const [params, setParams] = useSearchParams()
   const queryClient = useQueryClient()
   const applications = useCaregiverApplications()
-  const approved = useApprovedApplicants()
   const caregivers = useCaregivers()
   const register = useCredentialRegister()
   const elders = useElders()
@@ -39,33 +43,60 @@ export default function Caregivers() {
 
   const pending = useMemo(() => applications.data ?? [], [applications.data])
   const directory = useMemo(
-    () => directoryRows(caregivers.data ?? [], register.data ?? [], approved.data ?? [], new Date()),
-    [caregivers.data, register.data, approved.data],
+    () => directoryRows(caregivers.data ?? [], register.data ?? []),
+    [caregivers.data, register.data],
   )
 
-  const page = Math.max(1, Number(params.get('page')) || 1)
-  const pageCount = Math.max(1, Math.ceil(directory.length / CAREGIVER_PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const pageRows = directory.slice((currentPage - 1) * CAREGIVER_PAGE_SIZE, currentPage * CAREGIVER_PAGE_SIZE)
-
-  // An explicit choice wins; otherwise the newest application, else the first caregiver shown.
   const applicationParam = Number(params.get('application')) || null
   const caregiverParam = Number(params.get('caregiver')) || null
-  const chosenApplication = pending.find((a) => a.id === applicationParam) ?? null
-  const chosenCaregiver = directory.find((c) => c.id === caregiverParam) ?? null
-  const stillDeciding = deciding !== null && deciding.params === params.toString() ? deciding.row : null
-  const selectedApplication = stillDeciding ?? chosenApplication ?? (caregiverParam ? null : (pending[0] ?? null))
-  const selectedCaregiver = selectedApplication ? null : (chosenCaregiver ?? pageRows[0] ?? null)
+  const query = params.get('q') ?? ''
+  const viewParam = params.get('view')
+  const view: View =
+    viewParam === 'applications' || viewParam === 'caregivers'
+      ? viewParam
+      : applicationParam
+        ? 'applications'
+        : 'caregivers'
 
-  const go = (next: { page?: number; application?: number | null; caregiver?: number | null }) => {
-    const query: Record<string, string> = { page: String(next.page ?? currentPage) }
-    if (next.application) query.application = String(next.application)
-    if (next.caregiver) query.caregiver = String(next.caregiver)
-    setParams(query, { replace: true })
+  const matching = useMemo(() => directory.filter((c) => matchesCaregiverQuery(c, query)), [directory, query])
+
+  // The page holding the open row, so a row opened by id is always on screen; else ?page.
+  const listRows: { id: number }[] = view === 'applications' ? pending : matching
+  const chosenId = view === 'applications' ? applicationParam : caregiverParam
+  const chosenIndex = chosenId ? listRows.findIndex((row) => row.id === chosenId) : -1
+  const pageCount = Math.max(1, Math.ceil(listRows.length / CAREGIVER_PAGE_SIZE))
+  const currentPage =
+    chosenIndex >= 0
+      ? Math.floor(chosenIndex / CAREGIVER_PAGE_SIZE) + 1
+      : Math.min(Math.max(1, Number(params.get('page')) || 1), pageCount)
+  const pageStart = (currentPage - 1) * CAREGIVER_PAGE_SIZE
+  const applicationRows = pending.slice(pageStart, pageStart + CAREGIVER_PAGE_SIZE)
+  const caregiverRows = matching.slice(pageStart, pageStart + CAREGIVER_PAGE_SIZE)
+
+  // An explicit choice wins; otherwise the first row on the page shown.
+  const chosenApplication = pending.find((a) => a.id === applicationParam) ?? null
+  const chosenCaregiver = matching.find((c) => c.id === caregiverParam) ?? null
+  const stillDeciding = deciding !== null && deciding.params === params.toString() ? deciding.row : null
+  const selectedApplication =
+    view === 'applications' ? (stillDeciding ?? chosenApplication ?? applicationRows[0] ?? null) : null
+  const selectedCaregiver = view === 'caregivers' ? (chosenCaregiver ?? caregiverRows[0] ?? null) : null
+
+  type Target = { view?: View; page?: number; application?: number | null; caregiver?: number | null; query?: string }
+
+  /** Another view starts on its first page. The search is kept across views. */
+  const go = (next: Target) => {
+    const nextView = next.view ?? view
+    const page = next.page ?? (nextView === view ? currentPage : 1)
+    const q = next.query ?? query
+    const search: Record<string, string> = { view: nextView, page: String(page) }
+    if (next.application) search.application = String(next.application)
+    if (next.caregiver) search.caregiver = String(next.caregiver)
+    if (q) search.q = q
+    setParams(search, { replace: true })
   }
 
   /** Opens a row the manager clicked; the last decision's notice goes with the row it was about. */
-  const open = (next: { page?: number; application?: number | null; caregiver?: number | null }) => {
+  const open = (next: Target) => {
     setNotice(null)
     setDeciding(null)
     go(next)
@@ -73,7 +104,8 @@ export default function Caregivers() {
 
   /**
    * Answers the application, then opens the next one waiting — or, once none are left, the
-   * caregiver an approval just created (`action` resolves to its id; null for a decline).
+   * caregiver an approval just created (`action` resolves to its id; null for a decline, which
+   * leaves the emptied applications list on screen).
    */
   async function decide(row: CaregiverApplication, action: () => Promise<number | null>, done: string) {
     const nextId = nextApplicationId(pending, row.id)
@@ -91,7 +123,11 @@ export default function Caregivers() {
       queryClient.invalidateQueries({ queryKey: ['credentials'] }),
     ])
     setNotice(done)
-    go(nextId !== null ? { application: nextId } : { caregiver: caregiverId })
+    go(
+      nextId !== null || caregiverId === null
+        ? { view: 'applications', application: nextId }
+        : { view: 'caregivers', caregiver: caregiverId },
+    )
   }
 
   const primaryFor = (caregiverId: number) =>
@@ -99,7 +135,8 @@ export default function Caregivers() {
       ?.filter((elder) => elder.primaryCaregiverId === String(caregiverId))
       .map((elder) => elder.name)
 
-  const directoryLoading = caregivers.isPending || register.isPending || approved.isPending
+  const directoryLoading = caregivers.isPending || register.isPending
+  const viewLoading = view === 'applications' ? applications.isPending : directoryLoading
 
   return (
     <ManagerShell headerContext="Caregivers">
@@ -111,56 +148,83 @@ export default function Caregivers() {
             </Callout>
           )}
 
-          <section aria-labelledby="caregiver-applications-heading">
-            <SectionHeader
-              id="caregiver-applications-heading"
-              title="Applications"
-              meta={applications.isSuccess ? `${pending.length} waiting` : undefined}
+          <div className={styles.toolbar}>
+            <FilterChips
+              label="Caregivers view"
+              options={[
+                { value: 'caregivers', label: 'Caregivers', count: directory.length },
+                { value: 'applications', label: 'Applications', count: pending.length },
+              ]}
+              value={view}
+              onChange={(next) => open({ view: next })}
             />
-            {applications.isError ? (
-              <p className={styles.status}>Could not load applications.</p>
-            ) : applications.isPending ? (
-              <p className={styles.status}>Loading applications…</p>
-            ) : (
-              <CaregiverApplicationTable
-                rows={pending}
-                selectedId={selectedApplication?.id ?? null}
-                onSelect={(row) => open({ application: row.id })}
+            {view === 'caregivers' && (
+              <SearchField
+                className={styles.search}
+                placeholder="Search caregivers by name or ID"
+                value={query}
+                // A new search starts from the first page, on its first match.
+                onChange={(next) => open({ query: next, page: 1 })}
               />
             )}
-          </section>
+          </div>
 
-          <section aria-labelledby="caregiver-list-heading" className={styles.directory}>
-            <SectionHeader
-              id="caregiver-list-heading"
-              title="All caregivers"
-              meta={directoryLoading ? undefined : `${directory.length} on record`}
-            />
-            {caregivers.isError ? (
-              <p className={styles.status}>Could not load caregivers.</p>
-            ) : directoryLoading ? (
-              <p className={styles.status}>Loading caregivers…</p>
-            ) : (
-              <>
-                <CaregiverTable
-                  rows={pageRows}
-                  selectedId={selectedCaregiver?.id ?? null}
-                  onSelect={(row) => open({ caregiver: row.id })}
-                />
-                {directory.length > CAREGIVER_PAGE_SIZE && (
-                  <div className={styles.pagination}>
-                    <Pagination
-                      page={currentPage}
-                      pageSize={CAREGIVER_PAGE_SIZE}
-                      total={directory.length}
-                      noun="caregivers"
-                      onPageChange={(next) => open({ page: next })}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </section>
+          {view === 'applications' ? (
+            <section aria-label="Applications">
+              {applications.isError ? (
+                <p className={styles.status}>Could not load applications.</p>
+              ) : applications.isPending ? (
+                <p className={styles.status}>Loading applications…</p>
+              ) : (
+                <>
+                  <CaregiverApplicationTable
+                    rows={applicationRows}
+                    selectedId={selectedApplication?.id ?? null}
+                    onSelect={(row) => open({ application: row.id })}
+                  />
+                  {pending.length > CAREGIVER_PAGE_SIZE && (
+                    <div className={styles.pagination}>
+                      <Pagination
+                        page={currentPage}
+                        pageSize={CAREGIVER_PAGE_SIZE}
+                        total={pending.length}
+                        noun="applications"
+                        onPageChange={(next) => open({ page: next })}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          ) : (
+            <section aria-label="All caregivers">
+              {caregivers.isError ? (
+                <p className={styles.status}>Could not load caregivers.</p>
+              ) : directoryLoading ? (
+                <p className={styles.status}>Loading caregivers…</p>
+              ) : (
+                <>
+                  <CaregiverTable
+                    rows={caregiverRows}
+                    selectedId={selectedCaregiver?.id ?? null}
+                    onSelect={(row) => open({ caregiver: row.id })}
+                    empty={query.trim() ? `No caregivers match “${query.trim()}”.` : undefined}
+                  />
+                  {matching.length > CAREGIVER_PAGE_SIZE && (
+                    <div className={styles.pagination}>
+                      <Pagination
+                        page={currentPage}
+                        pageSize={CAREGIVER_PAGE_SIZE}
+                        total={matching.length}
+                        noun="caregivers"
+                        onPageChange={(next) => open({ page: next })}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          )}
         </div>
 
         {selectedApplication ? (
@@ -170,15 +234,17 @@ export default function Caregivers() {
             onApprove={(message) =>
               decide(
                 selectedApplication,
-                async () => (await approveCaregiverApplication(selectedApplication.id, message)).caregiverId,
-                `${selectedApplication.fullName} approved. Their login is active and their certificates are published.`,
+                async () =>
+                  (await approveCaregiverApplication(selectedApplication.id, selectedApplication.version, message))
+                    .caregiverId,
+                `${selectedApplication.fullName} approved and available for rostering.`,
               )
             }
             onDecline={(message) =>
               decide(
                 selectedApplication,
                 async () => {
-                  await declineCaregiverApplication(selectedApplication.id, message)
+                  await rejectCaregiverApplication(selectedApplication.id, selectedApplication.version, message)
                   return null
                 },
                 `${selectedApplication.fullName}'s application declined. They'll see your reason in the caregiver app.`,
@@ -193,7 +259,7 @@ export default function Caregivers() {
           />
         ) : (
           <aside className={styles.emptyPanel} aria-label="Caregiver detail">
-            {!directoryLoading && applications.isSuccess && <MetaText tone="faint">Nothing to show yet.</MetaText>}
+            {!viewLoading && <MetaText tone="faint">Nothing to show yet.</MetaText>}
           </aside>
         )}
       </div>

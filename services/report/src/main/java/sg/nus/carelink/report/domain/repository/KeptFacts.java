@@ -8,6 +8,7 @@ import sg.nus.carelink.eventtypes.SpotCheckUpdated;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCaregiverChanged;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitExceptionRaised;
 import sg.nus.carelink.eventtypes.VisitScheduled;
@@ -38,6 +39,8 @@ public interface KeptFacts {
 	void keep(VisitCompleted event);
 
 	void keep(VisitExceptionRaised event);
+
+	void keep(VisitClosed event);
 
 	/** @param sequence the envelope's sequence: a task has no version of its own */
 	void keep(VisitTaskRecorded event, long sequence);

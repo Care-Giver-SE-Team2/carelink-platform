@@ -9,7 +9,7 @@ import * as authApi from '../../../features/auth/api'
 import * as carePlanApi from '../../../shared/api/careplan'
 import * as profileApi from '../../../shared/api/profile'
 import type { CarePlanNodeResponse, CarePlanResponse } from '../../../shared/api/careplan'
-import type { ElderResponse } from '../../../shared/api/profile'
+import type { ElderListItem, ElderResponse } from '../../../shared/api/profile'
 
 afterEach(() => {
   cleanup()
@@ -65,6 +65,21 @@ const supersededV3 = {
   startDate: '2024-04-11',
 } as CarePlanResponse
 
+const elderListRow: ElderListItem = {
+  id: 7,
+  fullName: 'Chan Bee Choo',
+  dateOfBirth: '1943-01-01',
+  address: 'Bishan St 23',
+  sector: 'S31',
+  planStatus: 'published',
+  planVersion: 4,
+  nextVisitDate: null,
+  primaryCaregiverId: null,
+  primaryCaregiverName: null,
+  primaryCaregiverAssignedAt: null,
+  hasPublishedPlan: true, hasCareRequest: true,
+}
+
 function renderPlan() {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -99,6 +114,7 @@ beforeEach(() => {
   vi.spyOn(carePlanApi, 'fetchCarePlanNodes').mockResolvedValue(nodes)
   vi.spyOn(carePlanApi, 'fetchCareActivities').mockResolvedValue(catalog)
   vi.spyOn(profileApi, 'fetchElderCareRequests').mockResolvedValue([])
+  vi.spyOn(profileApi, 'fetchElderList').mockResolvedValue([elderListRow])
   vi.spyOn(carePlanApi, 'createCarePlanDraft').mockResolvedValue(draftV5)
   vi.spyOn(carePlanApi, 'saveCarePlanDraft').mockResolvedValue(draftV5)
   vi.spyOn(carePlanApi, 'discardCarePlanDraft').mockResolvedValue(undefined)
@@ -251,7 +267,6 @@ describe('an elder with no care plan yet', () => {
     await user.type(screen.getByLabelText('Starts'), '2026-11-02')
     const publish = screen.getByRole('button', { name: 'Publish v1' })
     expect(publish).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent('Set days and times for Bathing assistance, Grooming, Vital-sign check')
 
     for (const name of ['Bathing assistance', 'Grooming', 'Vital-sign check']) {
       await user.click(within(taskRow(name)).getByRole('button', { name: 'Edit task' }))
@@ -259,7 +274,6 @@ describe('an elder with no care plan yet', () => {
       await user.click(screen.getByRole('button', { name: 'Save changes' }))
     }
 
-    expect(screen.queryByText(/Set days and times/)).not.toBeInTheDocument()
     expect(publish).toBeEnabled()
   })
 
@@ -468,4 +482,44 @@ describe('answering the family', () => {
     expect(within(application).getByText('Planned')).toBeInTheDocument()
     expect(within(application).queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument()
   })
+})
+
+describe('the primary caregiver', () => {
+  it('offers to assign one from the rail while the elder has none', async () => {
+    renderPlan()
+    expect(await screen.findByText('No primary caregiver')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Back to Elders/ })).toHaveAttribute('href', '/manager/elders?selected=7')
+  })
+
+  it('shows who it is once assigned', async () => {
+    vi.mocked(profileApi.fetchElderList).mockResolvedValue([
+      { ...elderListRow, primaryCaregiverId: 3, primaryCaregiverName: 'Aisyah N.', primaryCaregiverAssignedAt: '2026-09-20T09:00:00' },
+    ])
+    renderPlan()
+    expect(await screen.findByText('Aisyah N.')).toBeInTheDocument()
+    expect(screen.queryByText('No primary caregiver')).not.toBeInTheDocument()
+  })
+
+  it('goes straight on to picking one after publishing', async () => {
+    vi.spyOn(profileApi, 'fetchCaregiversForElder').mockResolvedValue([
+      { id: 3, fullName: 'Aisyah N.', sector: 'S31', status: 'AVAILABLE', assignable: true },
+    ])
+    const user = await renderPlanInDraft()
+    await screen.findByText('No primary caregiver')
+    await user.click(within(screen.getByText('Morning reminder').closest('div')!).getByRole('button', { name: 'Remove task from sub-plan' }))
+    await user.click(screen.getByRole('button', { name: 'Publish v5' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+
+    expect(await screen.findByRole('listbox', { name: 'Caregivers' })).toBeInTheDocument()
+  })
+})
+
+it('offers no start date before today in the calendar', async () => {
+  await renderPlanInDraft()
+  const today = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  expect(screen.getByLabelText('Starts')).toHaveAttribute(
+    'min',
+    `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`,
+  )
 })

@@ -109,12 +109,12 @@ describe('Family desktop layout', () => {
     expect(screen.queryByRole('combobox', { name: 'Care for' })).not.toBeInTheDocument()
   })
 
-  it('shows Home as two columns, with the date in the title and the rest of today listed', async () => {
+  it('shows Home as two columns, with the elder in the content and the rest of today listed', async () => {
     installApi()
     openFamily('/family/home')
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Tan Mei, Monday 28 September' })).toBeInTheDocument()
-    expect(screen.getByText('Home', { selector: 'p' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Tan Mei' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Happening now' })).toBeInTheDocument()
     const later = screen.getByRole('heading', { name: 'Later today' }).parentElement!
     expect(within(later).getAllByRole('listitem')).toHaveLength(1)
@@ -128,9 +128,9 @@ describe('Family desktop layout', () => {
     const fetchMock = installApi()
     openFamily('/family/home')
 
-    await screen.findByRole('heading', { level: 1, name: /^Tan Mei/ })
+    await screen.findByRole('heading', { level: 2, name: 'Tan Mei' })
     await user.selectOptions(screen.getByRole('combobox', { name: 'Following' }), '22')
-    expect(await screen.findByRole('heading', { level: 1, name: /^Lim Wei/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Lim Wei' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Schedule' }))
     expect(await screen.findByText('Schedule · Lim Wei')).toBeInTheDocument()

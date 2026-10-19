@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { CertificationStateTag, Eyebrow, MetaText, Tag } from '../../../shared/components/ui'
-import { formatReceived } from '../lib/applications'
 import { STATUS_MEANING, STATUS_TAG, languagesLabel } from '../lib/caregivers'
 import type { DirectoryCaregiver } from '../lib/caregivers'
 import { caregiverRef, expiryLabel, formatDate } from '../lib/certifications'
@@ -34,11 +33,6 @@ export function CaregiverPanel({
           </Tag>
           <MetaText>{STATUS_MEANING[caregiver.status]}</MetaText>
         </div>
-        {caregiver.approvedAt && (
-          <MetaText tone="faint" className={styles.meta}>
-            approved from an application {formatReceived(caregiver.approvedAt)}
-          </MetaText>
-        )}
       </header>
 
       <section className={styles.section} aria-label="Profile">
@@ -61,13 +55,9 @@ export function CaregiverPanel({
               return (
                 <li key={cert.key} className={styles.certificate}>
                   <div className={styles.certMain}>
-                    {cert.registerId === null ? (
-                      <span className={styles.certName}>{cert.name}</span>
-                    ) : (
-                      <Link className={styles.certLink} to={`/manager/certifications?filter=all&id=${cert.registerId}`}>
-                        {cert.name}
-                      </Link>
-                    )}
+                    <Link className={styles.certLink} to={`/manager/certifications?filter=all&id=${cert.registerId}`}>
+                      {cert.name}
+                    </Link>
                     <span className={styles.certMeta}>
                       {cert.expiryDate ? `valid until ${formatDate(cert.expiryDate)}` : 'no expiry'}
                       {cert.daysUntilExpiry !== null && (expiry.tone === 'danger' || expiry.tone === 'ink') && (

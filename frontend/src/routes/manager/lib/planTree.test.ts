@@ -3,7 +3,6 @@ import {
   HALF_HOUR_START_TIMES,
   VISIT_DURATIONS,
   durationLabel,
-  endsByMidnight,
   isAllowedDuration,
   isOnHalfHour,
   dayScheduleFromVisits,
@@ -13,6 +12,7 @@ import {
   timeRange,
   visitsFromDaySchedule,
   weeklyHours,
+  withinVisitingHours,
 } from './planTree'
 import type { DayVisit, TaskNode } from '../data/carePlans'
 
@@ -139,16 +139,18 @@ describe('visit lengths', () => {
   })
 })
 
-describe('ending by midnight', () => {
-  it('allows a visit that ends exactly at midnight but not one that runs past it', () => {
-    expect(endsByMidnight('11:30 PM', 30)).toBe(true)
-    expect(endsByMidnight('8:00 PM', 240)).toBe(true)
-    expect(endsByMidnight('11:30 PM', 60)).toBe(false)
-    expect(endsByMidnight('soon', 30)).toBe(false)
+describe('visiting hours', () => {
+  it('allows a visit from 7:00 AM that ends by 8:00 PM, and nothing outside that', () => {
+    expect(withinVisitingHours('7:00 AM', 30)).toBe(true)
+    expect(withinVisitingHours('7:30 PM', 30)).toBe(true)
+    expect(withinVisitingHours('4:00 PM', 240)).toBe(true)
+    expect(withinVisitingHours('6:30 AM', 30)).toBe(false)
+    expect(withinVisitingHours('7:30 PM', 60)).toBe(false)
+    expect(withinVisitingHours('soon', 30)).toBe(false)
   })
 
-  it('leaves a schedule incomplete while a day that’s on runs past midnight', () => {
-    const schedule = dayScheduleFromVisits([{ day: 'Sat', startTime: '22:00', minutes: 180 }])
+  it('leaves a schedule incomplete while a day that’s on runs past 8:00 PM', () => {
+    const schedule = dayScheduleFromVisits([{ day: 'Sat', startTime: '18:00', minutes: 180 }])
     expect(isScheduleComplete(schedule)).toBe(false)
     schedule.sat = { ...schedule.sat, minutes: 120 }
     expect(isScheduleComplete(schedule)).toBe(true)
@@ -156,10 +158,10 @@ describe('ending by midnight', () => {
 })
 
 describe('half-hour start times', () => {
-  it('offers every half hour of the day, midnight first', () => {
-    expect(HALF_HOUR_START_TIMES).toHaveLength(48)
-    expect(HALF_HOUR_START_TIMES.slice(0, 3)).toEqual(['12:00 AM', '12:30 AM', '1:00 AM'])
-    expect(HALF_HOUR_START_TIMES.at(-1)).toBe('11:30 PM')
+  it('offers every half hour in visiting hours, 7:00 AM to 7:30 PM', () => {
+    expect(HALF_HOUR_START_TIMES).toHaveLength(26)
+    expect(HALF_HOUR_START_TIMES.slice(0, 3)).toEqual(['7:00 AM', '7:30 AM', '8:00 AM'])
+    expect(HALF_HOUR_START_TIMES.at(-1)).toBe('7:30 PM')
     expect(HALF_HOUR_START_TIMES.every(isOnHalfHour)).toBe(true)
   })
 

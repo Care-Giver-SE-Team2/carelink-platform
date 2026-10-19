@@ -6,7 +6,7 @@ import caregiverImage from '../../assets/Caregiver.png'
 import { signInWithSession } from '../../features/auth/api'
 import { homePathFor } from '../../features/auth/roles'
 import { ApiError } from '../../shared/api/client'
-import { IconCalendar, IconClock, IconDocCheck, IconHeart, IconUsers } from './icons'
+import { IconCalendar, IconHeart, IconUsers } from './icons'
 import styles from './Landing.module.css'
 
 const FEATURES = [
@@ -38,7 +38,6 @@ export default function LandingHome() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [keepSignedIn, setKeepSignedIn] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -143,60 +142,6 @@ export default function LandingHome() {
                 />
               </div>
             </div>
-
-            <div className={styles.proof}>
-              <div className={styles.proofCell}>
-                <span
-                  className={`${styles.proofIcon} ${styles['tint-green']}`}
-                >
-                  <IconUsers />
-                </span>
-
-                <div className={styles.proofText}>
-                  <div className={styles.proofValue}>86</div>
-
-                  <div className={styles.proofCaption}>
-                    visits coordinated today across two sectors
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.proofCell}>
-                <span
-                  className={`${styles.proofIcon} ${styles['tint-green']}`}
-                >
-                  <IconClock />
-                </span>
-
-                <div className={styles.proofText}>
-                  <div className={styles.proofValue}>
-                    10<span className={styles.proofUnit}>m</span>
-                  </div>
-
-                  <div className={styles.proofCaption}>
-                    from a missed check-in to a care manager seeing it
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.proofCell}>
-                <span
-                  className={`${styles.proofIcon} ${styles['tint-green']}`}
-                >
-                  <IconDocCheck />
-                </span>
-
-                <div className={styles.proofText}>
-                  <div className={styles.proofValue}>
-                    100<span className={styles.proofUnit}>%</span>
-                  </div>
-
-                  <div className={styles.proofCaption}>
-                    of visit records signed by the caregiver who made them
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -272,27 +217,6 @@ export default function LandingHome() {
               </div>
             </div>
           </div>
-
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkboxInput}
-              checked={keepSignedIn}
-              onChange={(event) =>
-                setKeepSignedIn(event.target.checked)
-              }
-              disabled={busy}
-            />
-
-            <span
-              className={styles.checkboxBox}
-              aria-hidden="true"
-            />
-
-            <span className={styles.checkboxLabel}>
-              Keep me signed in on this device
-            </span>
-          </label>
 
           {error && (
             <div

@@ -25,14 +25,6 @@ function pickVisit(visits: FamilyVisit[], now: number) {
   return { live, visit: live ?? next }
 }
 
-/** "Tuesday 6 October" for a Singapore calendar date. */
-function longDate(date: string) {
-  const parts = new Intl.DateTimeFormat('en-SG', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
-    .formatToParts(new Date(`${date}T00:00:00Z`))
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value
-  return `${part('weekday')} ${part('day')} ${part('month')}`
-}
-
 /**
  * The family member's landing screen: anything waiting on their answer, the visit under way (or the
  * next one), and how this week is going.
@@ -50,19 +42,23 @@ export function FamilyHomePage() {
 
   return <div className={styles.home}>
     <header className={styles.header}>
-      <div>
-        <p className={styles.eyebrow}>{desktop ? 'Home' : 'Family'}</p>
-        <h1>{elder?.fullName ?? 'Your family'}{desktop && elder && `, ${longDate(today)}`}</h1>
-        {elder && !desktop && <p className={styles.meta}>{[age === null ? null : `${age}`, elder.sector].filter(Boolean).join(' · ') || 'Linked elder'}</p>}
-      </div>
-      {elder && !desktop && <span className={styles.tag}>Linked</span>}
+      {!desktop && <p className={styles.eyebrow}>Family</p>}
+      <h1>Home</h1>
     </header>
     {resource.status === 'loading' && <p className={styles.loading} role="status">Loading today's care…</p>}
     {resource.status === 'error' && <ScheduleFeedback error={resource.error} onRetry={refresh}
       onResetAccess={() => { setElderId(null); refresh() }} />}
+    {elder && <section className={styles.elder} aria-labelledby="home-elder">
+      <div>
+        <p className={styles.elderLabel}>Caring for</p>
+        <h2 id="home-elder" className={styles.elderName}>{elder.fullName}</h2>
+        <p className={styles.meta}>{[age === null ? null : `Age ${age}`, elder.sector].filter(Boolean).join(' · ') || 'Linked elder'}</p>
+      </div>
+      <span className={styles.tag}>Linked</span>
+    </section>}
     {data && data.elders.length > 1 && !desktop && <div className={styles.picker}>
-      <label htmlFor="home-elder">Care for</label>
-      <select id="home-elder" value={data.selectedElderId ?? ''} onChange={(event) => setElderId(Number(event.target.value))}>
+      <label htmlFor="home-elder-picker">Care for</label>
+      <select id="home-elder-picker" value={data.selectedElderId ?? ''} onChange={(event) => setElderId(Number(event.target.value))}>
         {data.elders.map((item) => <option key={item.id} value={item.id}>{item.fullName}</option>)}
       </select>
     </div>}

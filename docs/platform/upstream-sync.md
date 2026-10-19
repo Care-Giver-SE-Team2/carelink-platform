@@ -6,7 +6,7 @@ services of their own, shared code is in `libs/`, the services talk through inte
 database of its own ([service-boundaries.md](service-boundaries.md), section 9). So upstream's changes can no longer
 be taken by merging the whole tree. They are ported, a batch at a time.
 
-**Last synced:** upstream `f9bc4f1` (2026-10-10, this repository's PR #18). Update this line in every sync pull
+**Last synced:** upstream `d6f3656` (2026-10-16, upstream #100–#110). Update this line in every sync pull
 request.
 
 ## 1. What has changed upstream

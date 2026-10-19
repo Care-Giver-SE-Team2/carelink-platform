@@ -126,6 +126,24 @@ class NotificationInboxIT {
 	}
 
 	@Test
+	void aBindingRequestReachesTheFamilyMemberBeforeTheyMayReadTheElder() throws Exception {
+		long gwen = account("it-inbox-gwen", "FAMILY");
+		long elder = elder();
+		long familyMember = familyMember(gwen);
+		jdbc.update("insert into elder_family_binding (elder_id, family_member_id, status) values (?, ?, 'PENDING_CONFIRMATION')",
+				elder, familyMember);
+		long binding = jdbc.queryForObject("select id from elder_family_binding where elder_id = ? and family_member_id = ?",
+				Long.class, elder, familyMember);
+		write(gwen, "Inbox Elder wants to link with you", NINE, "FAMILY_BINDING", binding, elder);
+		write(gwen, "About the elder", NINE.plusHours(1), "SPOT_CHECK", 47L, elder);
+
+		String inbox = read("it-inbox-gwen", "FAMILY", "/api/notifications/me");
+		assertThat(JsonPath.<List<String>>read(inbox, "$.items[*].title"))
+				.as("the request waits on their answer; care content waits until the binding is active")
+				.containsExactly("Inbox Elder wants to link with you");
+	}
+
+	@Test
 	void withoutASessionThereIsNoInbox() throws Exception {
 		mvc.perform(get("/api/notifications/me/unread-count")).andExpect(status().isUnauthorized());
 	}
