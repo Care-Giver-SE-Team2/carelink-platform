@@ -28,10 +28,8 @@ import type {
  * the client credentials, and state-changing ones take an Idempotency-Key, which a retry must
  * re-send unchanged. The Partner Portal makes job calls only from its Sandbox.
  *
- * The portal's calls go to the Open API that notification serves (liveApi.ts). The job calls stay on
- * the mock (mockPlatform.ts) until report serves the job API: a token from the real token endpoint is
- * handed to the mock, which gives its client the demo's jobs. Under Vitest, or with
- * VITE_OPEN_PLATFORM_MOCK=true, every call is the mock's, after a short delay, failing like a dropped
+ * Every call goes to the Open API (liveApi.ts): the portal's to notification, the job calls to report.
+ * Under Vitest, or with VITE_OPEN_PLATFORM_MOCK=true, every call is the mock's (mockPlatform.ts), after a short delay, failing like a dropped
  * request while the browser is offline. Each function names the endpoint it stands for; the pages see
  * the same signatures either way.
  */
@@ -90,46 +88,47 @@ export function collectCredentials(session: PortalSession): Promise<IssuedCreden
 
 /** POST /oauth2/token (grant_type=client_credentials) */
 export async function requestToken(clientId: string, clientSecret: string): Promise<AccessToken> {
-  if (LIVE) {
-    const token = await live.requestToken(clientId, clientSecret)
-    platform.adoptAccessToken(token.accessToken, clientId.trim(), token.expiresAt)
-    return token
-  }
+  if (LIVE) return live.requestToken(clientId, clientSecret)
   return call(() => platform.requestToken(clientId, clientSecret))
 }
 
-/** GET /v1/jobs?status=new|accepted|completed|closed&page= */
+/** GET /api/open/v1/jobs?status=…&page= */
 export function listJobs(token: string, tab: JobTab, page: number): Promise<JobPage> {
+  if (LIVE) return live.listJobs(token, tab, page)
   return call(() => platform.listJobs(token, tab, page))
 }
 
-/** GET /v1/jobs/{id} */
+/** GET /api/open/v1/jobs/{jobId} */
 export function getJob(token: string, jobId: string): Promise<Job> {
+  if (LIVE) return live.getJob(token, jobId)
   return call(() => platform.getJob(token, jobId))
 }
 
-/** POST /v1/jobs/{id}/accept */
+/** POST /api/open/v1/jobs/{jobId}/accept */
 export function acceptJob(token: string, jobId: string, idempotencyKey: string): Promise<Job> {
+  if (LIVE) return live.acceptJob(token, jobId, idempotencyKey)
   return call(() => platform.acceptJob(token, jobId, idempotencyKey))
 }
 
-/** POST /v1/jobs/{id}/decline {reason, note} */
+/** POST /api/open/v1/jobs/{jobId}/decline {reason, note} */
 export function declineJob(
   token: string,
   jobId: string,
   body: { reason: DeclineReason; note: string | null },
   idempotencyKey: string,
 ): Promise<Job> {
+  if (LIVE) return live.declineJob(token, jobId, body, idempotencyKey)
   return call(() => platform.declineJob(token, jobId, body, idempotencyKey))
 }
 
-/** POST /v1/jobs/{id}/complete {actual_start, actual_end, note} */
+/** POST /api/open/v1/jobs/{jobId}/complete {actualStart, actualEnd, note} */
 export function completeJob(
   token: string,
   jobId: string,
   body: { actualStart: string; actualEnd: string; note: string },
   idempotencyKey: string,
 ): Promise<Job> {
+  if (LIVE) return live.completeJob(token, jobId, body, idempotencyKey)
   return call(() => platform.completeJob(token, jobId, body, idempotencyKey))
 }
 

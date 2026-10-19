@@ -22,3 +22,9 @@ carelink:
   visit-api:
     # For a run outside Docker, where visit listens on 8081; overridden by CARELINK_VISITAPI_BASEURL
     base-url: http://localhost:8081
+  open-platform:
+    # The job API (/api/open/v1/jobs) checks the tokens notification issues, against notification's keys
+    # (docs/section5/decisions.md, D15 and D16). For a run outside Docker, where notification listens on
+    # 8083; overridden by CARELINK_OPENPLATFORM_JWKSETURI
+    jwk-set-uri: http://localhost:8083/api/open/v1/.well-known/jwks.json
+    issuer: carelink-open-platform

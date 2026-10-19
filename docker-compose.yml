@@ -161,6 +161,8 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       CARELINK_COREAPI_BASEURL: http://core:8080
       CARELINK_VISITAPI_BASEURL: http://visit:8080
+      # The job API checks the Open Platform's tokens against notification's keys
+      CARELINK_OPENPLATFORM_JWKSETURI: http://notification:8080/api/open/v1/.well-known/jwks.json
       # report's messages go out as events to the topic, and it keeps the facts its reports are made
       # from off its queue (visit's and core's events, docs/platform/event-catalogue.md)
       CARELINK_EVENTS_TOPICARN: arn:aws:sns:ap-southeast-1:000000000000:carelink-events

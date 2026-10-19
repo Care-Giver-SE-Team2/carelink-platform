@@ -1,6 +1,6 @@
 import { ApiError } from './errors'
 import { districtName } from './format'
-import { MIN_PASSWORD_LENGTH, PROVIDER_SERVICES, WEBHOOK_EVENTS } from './types'
+import { MIN_PASSWORD_LENGTH, WEBHOOK_EVENTS } from './types'
 import type {
   AccessToken,
   Application,
@@ -677,34 +677,6 @@ export function requestToken(clientId: string, clientSecret: string, now = Date.
   state.tokens = [...state.tokens.filter((t) => t.expiresAt > now), token]
   save(state)
   return { accessToken: token.token, scope: SCOPE, issuedAt: now, expiresAt: token.expiresAt }
-}
-
-/**
- * A token from the real token endpoint, for the job calls this mock still serves until report has the
- * job API. Its client is given the demo's first jobs the first time, as an approved provider was here.
- * Webhooks for them are not shown: the delivery log is notification's.
- */
-export function adoptAccessToken(accessToken: string, clientId: string, expiresAt: number, now = Date.now()) {
-  const state = load()
-  state.tokens = [...state.tokens.filter((t) => t.expiresAt > now && t.token !== accessToken), { token: accessToken, clientId, expiresAt }]
-  if (!state.jobs.some((j) => j.clientId === clientId)) {
-    const details = {
-      organisationName: '',
-      contactName: '',
-      contactEmail: '',
-      contactPhone: '',
-      services: [...PROVIDER_SERVICES],
-      webhookUrl: 'https://sandbox.invalid/',
-    }
-    const provider: StoredApplication = {
-      ...application(state, now, details, 0),
-      status: 'approved',
-      events: [],
-      credentials: { clientId, clientSecret: '', webhookSecret: '', collected: true, secretIssuedAt: iso(now), webhookSecretIssuedAt: iso(now) },
-    }
-    firstJobs(state, provider, now)
-  }
-  save(state)
 }
 
 function authorise(state: PlatformState, accessToken: string, now: number): string {

@@ -29,7 +29,8 @@ class PublicRoutingTest(unittest.TestCase):
             "/api/provider-applications/417/approve": "notification", "/api/providers": "notification",
             "/api/providers/509/suspend": "notification",
             "/api/open/v1/applications": "notification", "/api/open/v1/portal/sessions": "notification",
-            "/api/open/v1/oauth2/token": "notification",
+            "/api/open/v1/oauth2/token": "notification", "/api/open/v1/jobs": "report",
+            "/api/open/v1/jobs/JOB-24081/accept": "report", "/api/open/v1/jobsite": "notification",
             "/actuator/health": None, "/internal/v1/users": None,
         }
         for path, expected in cases.items():

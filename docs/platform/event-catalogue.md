@@ -69,7 +69,7 @@ missed check-in, so a consumer sees gaps, never a repeat.
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
 | `VisitScheduled` | `VisitSchedulingService.schedule`, `StandaloneVisitsService.schedule`, `VisitReassignmentService.moveTo` | A visit is created | report | published |
-| `VisitCaregiverChanged` | `VisitSchedulingService.schedule` (when it covers an existing visit), `VisitReassignmentService.reassign` | A caregiver takes the visit over | report | published |
+| `VisitCaregiverChanged` | `VisitSchedulingService.schedule` (when it covers an existing visit), `VisitSchedulingService.releaseUntouchedFrom`, `VisitReassignmentService.reassign` | A caregiver takes the visit over, or a removed primary caregiver is taken off it | report | published |
 | `VisitCancelled` | `VisitSchedulingService.cancelUntouchedFrom`, `VisitReassignmentService.callOff`, `moveTo` (the visit it replaces) | The visit becomes CANCELLED | report | published |
 | `VisitCheckedIn` | `CaregiverVisitExecutionService.checkIn` | A caregiver checks in, including a check-in that resumes after a missed one | report | published |
 | `VisitCompleted` | `CaregiverVisitExecutionService.checkOut` | The visit becomes COMPLETED | report: the weekly report and value-added settlement | published |
@@ -86,7 +86,7 @@ applies an event only when its `version` is higher than the one it holds, and ne
 | Event | Status after it | Caregiver after it |
 |---|---|---|
 | `VisitScheduled` | SCHEDULED | `caregiverId` (may be null) |
-| `VisitCaregiverChanged` | SCHEDULED | `caregiverId` |
+| `VisitCaregiverChanged` | SCHEDULED | `caregiverId` (null when a removed primary caregiver is taken off it) |
 | `VisitCancelled` | CANCELLED | `caregiverId` (unchanged by the cancellation) |
 | `VisitCheckedIn` | IN_PROGRESS | `caregiverId` |
 | `VisitCompleted` | COMPLETED | `caregiverId` |
@@ -121,8 +121,8 @@ transaction, so every method listed publishes it.
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
-| `ProviderUpdated` | notification (openplatform): approving, suspending or reinstating a provider, and rotating its client secret | An approved provider is added or changes | report: whom it can dispatch to, and whose token is whose (not built yet) | published |
-| `ProviderJobUpdated` | report: dispatching a request to a provider, the provider's answers through the job API, and calling the job off | A provider job is created or changes | notification: the provider's webhooks | draft |
+| `ProviderUpdated` | notification (openplatform): approving, suspending or reinstating a provider, and rotating its client secret | An approved provider is added or changes | report: whom it can dispatch to, and whose token is whose (`ProviderUpdatedHandler`) | published |
+| `ProviderJobUpdated` | report: dispatching a request to a provider, the provider's answers through the job API, and calling the job off | A provider job is created or changes | notification: the provider's webhooks (`ProviderJobUpdatedHandler`) | published |
 
 **Not built.**
 
@@ -322,14 +322,14 @@ EventBridge Scheduler puts the envelope on report's queue directly.
 - `services` are names from report's value-added catalogue.
 - Ordering: `version`, which increases with every change to the provider.
 
-**`ProviderJobUpdated`** (draft)
+**`ProviderJobUpdated`**
 
 ```json
 { "jobId": 24081, "providerId": 509, "valueAddedServiceRequestId": 812, "status": "NEW",
-  "serviceName": "Hospital escort", "district": "19", "areaName": "Hougang",
+  "serviceName": "Hospital escort", "district": "19", "areaName": "Hougang, Punggol, Serangoon Gardens",
   "scheduledStart": "2026-10-17T10:00:00+08:00", "durationMinutes": 180,
-  "respondBy": "2026-10-16T10:00:00+08:00", "cancelReason": null, "version": 0,
-  "changedAt": "2026-10-15T09:02:11+08:00" }
+  "respondBy": "2026-10-16T10:00:00+08:00", "receivedAt": "2026-10-15T09:02:11+08:00", "cancelReason": null,
+  "version": 0, "changedAt": "2026-10-15T09:02:11+08:00" }
 ```
 
 - `status` is `NEW`, `ACCEPTED`, `DECLINED`, `COMPLETED` or `CANCELLED`, as the job API has it. The job API shows
@@ -338,7 +338,9 @@ EventBridge Scheduler puts the envelope on report's queue directly.
   ([webhooks.md](../api/webhooks.md)); it does nothing with the other states, which are the provider's own answers.
 - It carries no elder's name, address or care details: notification does not need them, and the provider reads
   them through the job API.
-- `respondBy` is null once the job is not `NEW`. `cancelReason` is set for `CANCELLED`.
+- `respondBy` is null once the job is not `NEW`. `receivedAt` is when report dispatched the job. `cancelReason` is
+  set for `CANCELLED`.
+- `district` is empty when the elder's address has no postal code; `areaName` is then core's locality band.
 - Ordering: `version`, which increases with every change to the job, as the webhooks carry it.
 
 ## 4. Asked when needed, not sent as events

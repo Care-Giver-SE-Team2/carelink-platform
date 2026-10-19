@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './errors'
 import * as live from './liveApi'
-import { adoptAccessToken, listJobs, resetMockPlatform } from './mockPlatform'
 
 /** A token whose payload carries `claims`; unsigned, as only CareLink checks tokens. */
 function tokenWith(claims: Record<string, unknown>): string {
@@ -211,15 +210,95 @@ describe('a server token from the client credentials', () => {
 
     await expect(live.requestToken('client-1', 'wrong')).rejects.toMatchObject({ status: 401, code: 'invalid_client' })
   })
+})
 
-  it('opens the mock’s demo jobs to a real token until report serves the job API', () => {
-    resetMockPlatform()
-    adoptAccessToken('real-token', 'client-real', Date.now() + 3600_000)
-    adoptAccessToken('real-token', 'client-real', Date.now() + 3600_000)
+describe('the job calls, which report serves', () => {
+  const wireJob = {
+    id: 'JOB-24081',
+    version: 1,
+    status: 'ACCEPTED',
+    serviceName: 'Hospital escort',
+    district: '19',
+    areaName: 'Hougang, Punggol, Serangoon Gardens',
+    scheduledStart: '2026-10-17T10:00:00+08:00',
+    durationMinutes: 180,
+    respondBy: null,
+    receivedAt: '2026-10-16T09:02:11+08:00',
+    cancelReason: null,
+    elderSummary: 'Male, 81 · uses a walking aid',
+    languages: 'Hokkien, English',
+    bookedBy: 'Family member',
+    instructions: null,
+    address: { text: 'Blk 123 Hougang Ave 1, #05-67, Singapore 530123', accessNotes: null },
+    timeline: [
+      { step: 'DISPATCHED', at: '2026-10-16T09:02:11+08:00' },
+      { step: 'ACCEPTED', at: '2026-10-16T09:30:00+08:00' },
+    ],
+    completion: null,
+    decline: null,
+  }
 
-    const page = listJobs('real-token', 'new', 1)
+  it('asks for a tab as the job API’s states, from page 0, and adds the closed states’ counts', async () => {
+    fetchMock.mockResolvedValue(
+      answer(200, {
+        items: [{ ...wireJob, status: 'DECLINED' }],
+        page: 1,
+        size: 5,
+        totalElements: 6,
+        counts: { NEW: 2, ACCEPTED: 1, DECLINED: 4, COMPLETED: 3, CANCELLED: 2 },
+      }),
+    )
 
-    expect(page.total).toBe(4)
-    expect(page.counts.new).toBe(4)
+    const page = await live.listJobs('server-token', 'closed', 2)
+
+    const { url, headers } = lastRequest()
+    expect(url).toBe('/api/open/v1/jobs?status=DECLINED&status=CANCELLED&page=1&size=5')
+    expect(headers.get('Authorization')).toBe('Bearer server-token')
+    expect(page).toMatchObject({ page: 2, pageSize: 5, total: 6 })
+    expect(page.counts).toEqual({ new: 2, accepted: 1, completed: 3, closed: 6 })
+    expect(page.items[0]).toMatchObject({ id: 'JOB-24081', service: 'Hospital escort', durationMin: 180, status: 'declined' })
+  })
+
+  it('accepts with the Idempotency-Key and shows the address as the Sandbox does', async () => {
+    fetchMock.mockResolvedValue(answer(200, wireJob))
+
+    const job = await live.acceptJob('server-token', 'JOB-24081', 'key-1')
+
+    const { url, init, headers } = lastRequest()
+    expect(url).toBe('/api/open/v1/jobs/JOB-24081/accept')
+    expect(init.method).toBe('POST')
+    expect(headers.get('Idempotency-Key')).toBe('key-1')
+    expect(job.address).toEqual({ line1: 'Blk 123 Hougang Ave 1, #05-67, Singapore 530123', line2: '' })
+    expect(job.timeline.map((step) => step.step)).toEqual(['dispatched', 'accepted'])
+    expect(job.instructions).toBe('')
+  })
+
+  it('completes with the contract’s field names, and no empty note', async () => {
+    fetchMock.mockResolvedValue(answer(200, { ...wireJob, status: 'COMPLETED' }))
+
+    await live.completeJob(
+      'server-token',
+      'JOB-24081',
+      { actualStart: '2026-10-17T10:05:00+08:00', actualEnd: '2026-10-17T13:00:00+08:00', note: ' ' },
+      'key-2',
+    )
+
+    const { url, init } = lastRequest()
+    expect(url).toBe('/api/open/v1/jobs/JOB-24081/complete')
+    expect(JSON.parse(String(init.body))).toEqual({
+      actualStart: '2026-10-17T10:05:00+08:00',
+      actualEnd: '2026-10-17T13:00:00+08:00',
+      note: null,
+    })
+  })
+
+  it('passes on a cancelled job’s refusal with its code', async () => {
+    fetchMock.mockResolvedValue(answer(409, { status: 409, code: 'JOB_CANCELLED', detail: 'The elder withdrew it.' }))
+
+    await expect(live.acceptJob('server-token', 'JOB-24081', 'key-3')).rejects.toMatchObject({
+      status: 409,
+      code: 'job_cancelled',
+      message: 'The elder withdrew it.',
+    })
   })
 })

@@ -16,7 +16,8 @@ public final class ServiceTables {
 	public static final Set<String> REPORT = Set.of("caregiver_review", "report", "report_amendment", "report_basis",
 			"value_added_service", "value_added_service_request", "report_visit", "report_visit_task",
 			"report_vital_sign", "report_elder_confirmation", "report_incident", "report_incident_log",
-			"report_spot_check", "report_roster_change");
+			"report_spot_check", "report_roster_change", "report_provider", "report_provider_service",
+			"report_provider_job", "report_provider_job_key");
 
 	public static final Set<String> NOTIFICATION = Set.of("notification", "notification_subscription",
 			"provider_webhook_endpoint", "webhook_delivery", "webhook_delivery_attempt", "provider_application",

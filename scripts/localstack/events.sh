@@ -44,7 +44,7 @@ subscribe() {
 }
 
 subscribe report-worker '{"type":["ReportRequested"]}'
-subscribe notification '{"type":["NotificationRequested"]}'
-subscribe report '{"type":["IncidentRaised","IncidentUpdated","SpotCheckUpdated","RosterChangeUpdated","VisitScheduled","VisitCaregiverChanged","VisitCancelled","VisitCheckedIn","VisitCompleted","VisitExceptionRaised","VisitTaskRecorded","VitalsRecorded","ElderConfirmationSubmitted","VisitClosed","VisitEvidenceUpdated"]}'
+subscribe notification '{"type":["NotificationRequested","ProviderJobUpdated"]}'
+subscribe report '{"type":["IncidentRaised","IncidentUpdated","SpotCheckUpdated","RosterChangeUpdated","VisitScheduled","VisitCaregiverChanged","VisitCancelled","VisitCheckedIn","VisitCompleted","VisitExceptionRaised","VisitTaskRecorded","VitalsRecorded","ElderConfirmationSubmitted","VisitClosed","VisitEvidenceUpdated","ProviderUpdated"]}'
 
 echo "events: topic $topic_arn; queues carelink-{core,visit,report,report-worker,notification} with dead-letter queues; notification, report and report-worker subscribed"

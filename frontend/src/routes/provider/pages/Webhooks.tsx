@@ -11,6 +11,7 @@ import {
 } from '../../../features/provider-platform/api'
 import { formatLong, formatShortSeconds } from '../../../features/provider-platform/format'
 import { WEBHOOK_EVENTS } from '../../../features/provider-platform/types'
+import { ALLOW_HTTP_WEBHOOKS } from '../../../features/provider-platform/validation'
 import type { Delivery, DeliveryAttempt, WebhookEvent, WebhookSettings } from '../../../features/provider-platform/types'
 import { MAX_ATTEMPTS, retryScheduleLabel } from '../../../features/provider-platform/webhooks'
 import { cx } from '../../../shared/components/ui/cx'
@@ -201,7 +202,7 @@ function Settings({ settings, onTest, testing }: { settings: WebhookSettings; on
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!/^https:\/\/[^/\s]+\.[^/\s]+/i.test(url.trim())) {
+    if (ALLOW_HTTP_WEBHOOKS ? !/^https?:\/\/[^/\s]+/i.test(url.trim()) : !/^https:\/\/[^/\s]+\.[^/\s]+/i.test(url.trim())) {
       setError('Must be a full HTTPS URL, for example https://hooks.example.sg/carelink.')
       return
     }

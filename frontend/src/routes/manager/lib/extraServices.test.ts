@@ -41,6 +41,13 @@ describe('extra services', () => {
     expect(stateTag(row({ visitStatus: 'IN_PROGRESS' })).label).toBe('IN VISIT')
     expect(stateTag(row({ visitStatus: 'VERIFIED' })).label).toBe('COMPLETED')
     expect(stateTag(row({})).label).toBe('SCHEDULED')
+    // An open offer leaves the visit the manager's to staff; an accepted one is the provider's
+    expect(stateTag(row({ caregiverId: null, needsCaregiver: true, providerJobStatus: 'NEW' })).label).toBe('NEEDS CAREGIVER')
+    expect(stateTag(row({ visitStatus: 'CANCELLED', providerJobStatus: 'ACCEPTED' }))).toEqual({
+      label: 'PROVIDER ACCEPTED',
+      tone: 'accent',
+    })
+    expect(stateTag(row({ providerJobStatus: 'DECLINED' })).label).toBe('SCHEDULED')
   })
 
   it('allows cancelling only before the visit starts', () => {
