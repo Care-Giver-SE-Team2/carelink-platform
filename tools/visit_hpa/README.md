@@ -1,6 +1,6 @@
 # Visit HPA business workload
 
-**D1 update only (2026-10-19).** The request/stop contract below supersedes the old socket-only wording. The joint example still has the historical 8 RPS stages: D2 must replace that with the reviewed WAF-budgeted A template before cloud use. This branch is not cloud-test approval.
+**D1 + D2/D5 local update (2026-10-19).** The joint A template is now the candidate 5 RPS / 2700 business GETs per arm. See the [read budget and evidence contract](../../docs/testing/visit-hpa-read-contract.md). D3/D4/D6, operator review and cloud conditions remain open; this branch is not cloud-test approval.
 
 Python **3.10+**, standard library only. No package install, k6, Maven, Docker or cluster credentials are required on the load generator. Windows, Linux and macOS use the same `load.py`. Docker and production JARs are needed **only** for the optional disposable local smoke test.
 
@@ -20,7 +20,7 @@ Without `--execute` there is **no network access**, not even login or DNS lookup
 
 ## Data and credentials
 
-Each actor has a private fixture list: numeric `userId`, `visitId`, `elderId`, `expectedStatus`, `expectedVersion`. The actor must be the assigned caregiver. Supply its username/password in the environment variables named by `usernameEnv`/`passwordEnv`; the tool never loads browser Cookies or sends credentials to another host. Use a secure prompt or secret manager; keep passwords out of command arguments, source control and chat. Every VU logs in independently, using a genuine CSRF token and shared-session Cookie. No logout or account switch occurs.
+Each actor has a private fixture list: numeric `userId`, `visitId`, `elderId`, `expectedStatus`, `expectedVersion`. The actor must be the assigned caregiver. Supply its username/password in the environment variables named by `usernameEnv`/`passwordEnv`; the tool never loads browser Cookies or sends credentials to another host. Use a secure prompt or secret manager; keep passwords out of command arguments, source control and chat. Every VU logs in independently, using a genuine CSRF token and shared-session Cookie. No logout or account switch occurs. Optional expectedTaskCount freezes the task count of a read fixture; an empty SCHEDULED pack is valid but does not establish representative data.
 
 `coreBase` and `visitBase` must use the **same hostname and scheme** (different local ports are allowed). Remote use requires a single HTTPS origin, exact `approval.allowedOrigins`, `confirmed: true`, owner, environment, agreed window and deployment reference. The check is an operator-filled guard, **not verification of human approval or the deployed image**. Zhili must independently confirm both. Do not set it merely to bypass a refusal. No supplied file authorizes remote execution; this delivery was tested only locally.
 
@@ -31,6 +31,14 @@ python tools/visit_hpa/load.py --config /private/run-config.json --output /priva
 ```
 
 PowerShell accepts Windows paths for both arguments. Output must be a new directory. `runId` must be unique. `approval.deploymentRef` records the **actual deployment**, and `codeBaseline` records source; the script does not deploy or verify `/actuator/info` automatically.
+
+## Candidate A profile and offline comparison
+
+example.joint.json preserves readProfile=visit-hpa-A-waf-v1: 1/2/4/5 RPS for 180/120/120/120 seconds, hold 5 RPS for 240 seconds, then 480 seconds at zero. That is 21 minutes and 2700 business GETs; 8 VUs add 40 setup HTTP requests, so 2740 planned requests per arm before preparation/smoke/manual/background traffic.
+
+The dated WAF model is 2000 requests / 300 seconds / source IP. Nominal business peak=1500, headroom after setup=460. A request-deadline/launch-lag/20ms-poll shift model gives 1552 business + 40 setup =1592, leaving 408 before other traffic. This is not a hard traffic bound or WAF allowance. Keep otherRequestsPerWindow null and sourceIpReviewed false until Zhili fills the private budget; remote execution of this profile rejects unreviewed inputs before DNS/login. No extra probe, retry or WAF bypass. The profile enforces peak<=5, VUs<=8, cap<=2700 and sample floor>=100; legacy configs without the profile do not inherit this model and are not the formal A handoff.
+
+Use compare_read.py only on saved local result files, with compare.context.example.json copied and completed privately. It checks versions, fixture/workload fingerprints, raw counts, sample coverage, cleanup and declared same-condition references. Known differences are NOT_COMPARABLE; incomplete rows/samples are INSUFFICIENT_CLIENT_EVIDENCE; missing resource declarations are AWAITING_RESOURCE_REVIEW. Even CLIENT_AND_DECLARED_CONDITIONS_MATCH/exit0 is only a consistency check: HPA and performance benefit remain NOT_EVALUATED, formalAcceptance=false. Full commands/conditions are in the contract linked above.
 
 ## Scenarios
 
@@ -46,11 +54,11 @@ The open-loop scheduler never queues arrivals behind busy VUs. A busy lane or la
 * `manifest.json`: origins, code/deployment references, exact phases, bounds, thresholds, config/tool hashes. No passwords, actor names, fixture IDs, Cookies or response bodies are recorded.
 * `requests.jsonl`: per HTTP operation, UTC start, method, endpoint template, elapsed milliseconds, status, HTTP/business checks. `setup` is separate from workload.
 * `iterations.jsonl`: per business iteration, UTC, launch delay, latency, pass/error category. No visit IDs or bodies.
-* `summary.json` / `summary.csv`: per phase/endpoint, all-response and successful-response p95, actual counts and failure rate; iteration p95/error rate, launch rate/delay, drops and unscheduled arrivals are separate. `phases.csv` uses `timestamp,phase` and timezone-aware ISO8601, compatible with Zhili's scaling report markers. Generation is local; no uploads.
+* `summary.json` / `summary.csv`: per phase/endpoint, all-response and successful-response p95, actual counts and failure rate; iteration all/success p95/error rate, launch rate/delay, drops and unscheduled arrivals are separate. HTTP/iteration errorCategories, cancelledRequests and requestDeadlineFailures explain subsets of failures without double counting; CSV errorCategories is a JSON string. `phases.csv` uses `timestamp,phase` and timezone-aware ISO8601, compatible with Zhili's scaling report markers. Generation is local; no uploads.
 
 `httpPassed` means HTTP 200; `businessPassed` additionally requires JSON and the endpoint assertions. A JSON 200 with wrong visit/state is a failure. Setup is excluded from measured load. The GET summary in a write scenario includes before/after reads. Percentiles use nearest-rank, client-observed elapsed time; they include transport/HTTP checks and exclude scheduler wait. Success-only p95 never hides the all-response p95 and failure counts. `businessFailures` includes HTTP failures; do not add the two failure counters together. `actualLaunchRps` uses the measured emission interval, not just completed throughput. Some requests can finish during the next phase/drain; assignment stays with the originating iteration. Deadline/forced-drain attempts are failures. A partial HTTP 200 may have httpPassed=true and businessPassed=false. wireStartObserved only means the worker's start message was observed; its absence does not prove the server received nothing.
 
-Under 100 observations/endpoint/phase the default target label is `INSUFFICIENT_SAMPLES`; defaults remain proposed until confirmed. Even `COMPLETED` / `WITHIN_DRAFT_TARGET` is **not HPA, formal SLA, cache, or complete 6b acceptance**. Check generator CPU/network, drops, missing samples and test validity, then combine with Zhili's resource/replica observations. A standalone threaded urllib tool should be replaced or calibrated against a larger generator if its own overhead becomes material.
+Under 100 observations/endpoint/phase the label is `INSUFFICIENT_SAMPLES`; zero-RPS cooldown is `NOT_APPLICABLE`. clientEvidenceStatus separately records complete client samples or missing load/samples. Targets stay draft even when execution approval is true. Even `COMPLETED` / `WITHIN_DRAFT_TARGET` is **not HPA, formal SLA, cache, or complete 6b acceptance**. Check generator CPU/network, drops, missing samples and test validity, then combine with Zhili's resource/replica observations. A standalone threaded urllib tool should be replaced or calibrated against a larger generator if its own overhead becomes material.
 
 Exit 0: completed with no failed or dropped iterations and complete worker cleanup. Exit 2: rejected config, stopped, failures, drops or incomplete cleanup. Inspect summary for the exact category; a successful tiny pilot still lacks a capacity conclusion.
 

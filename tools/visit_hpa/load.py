@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import csv
 import datetime as dt
 import hashlib
+from fractions import Fraction
 import http.cookiejar
 import json
 import math
@@ -77,6 +78,78 @@ def timing_settings(c):
 
 
 
+READ_PROFILE = "visit-hpa-A-waf-v1"
+
+
+def rolling_peak(arrivals, window):
+    """Exact half-open rolling window; arrival count is bounded by the A profile."""
+    left = peak = 0
+    for right, stamp in enumerate(arrivals):
+        while stamp - arrivals[left] >= window:
+            left += 1
+        peak = max(peak, right - left + 1)
+    return peak
+
+
+def read_budget(c):
+    """Offline model based on Zhili's dated feedback, not a live WAF query."""
+    require(c["scenario"] == "work-pack", "read_profile_requires_work_pack")
+    require(c["maxVUs"] <= 8 and c["maxIterations"] <= 2700, "read_profile_cap_exceeded")
+    require(max(p["rps"] for p in c["phases"]) <= 5, "read_profile_peak_exceeded")
+    budget = c["wafBudget"]
+    require(isinstance(budget, dict), "invalid_waf_budget")
+    require(c["targets"]["minSamplesPerEndpoint"] >= 100, "read_profile_requires_100_samples")
+    require(budget.get("windowSeconds") == 300 and type(budget["windowSeconds"]) is int
+            and budget.get("limitRequests") == 2000 and type(budget["limitRequests"]) is int,
+            "read_profile_waf_rule_mismatch")
+    other = budget.get("otherRequestsPerWindow")
+    require(other is None or type(other) is int and other >= 0, "invalid_other_request_budget")
+    require(type(budget.get("sourceIpReviewed")) is bool, "invalid_source_ip_review")
+    arrivals, epoch = [], Fraction(0)
+    for phase in c["phases"]:
+        rate, duration = Fraction(str(phase["rps"])), Fraction(str(phase["durationSeconds"]))
+        if rate:
+            arrivals.extend(epoch + n / rate for n in range(phase["iterations"]))
+        epoch += duration
+    require(len(arrivals) <= 2700, "read_profile_total_exceeded")
+    window = Fraction(300)
+    nominal = rolling_peak(arrivals, window)
+    shift = Fraction(str(c["requestDeadlineSeconds"])) + Fraction(str(c["maxLaunchLagMs"])) / 1000 + Fraction(str(POLL_SECONDS))
+    shifted = rolling_peak(arrivals, window + shift)
+    setup = 5 * c["maxVUs"]  # csrf, login, csrf, me, first work-pack; no retry/re-login.
+    conservative = shifted + setup
+    remaining = None if other is None else 2000 - conservative - other
+    if remaining is not None:
+        require(remaining > 0, "waf_modeled_budget_exhausted")
+    return {"profile": READ_PROFILE, "basis": "Zhili feedback 2026-10-19; not a live read",
+            "windowSeconds": 300, "limitRequests": 2000,
+            "durationSeconds": sum(p["durationSeconds"] for p in c["phases"]),
+            "plannedBusinessGets": len(arrivals), "twoArmBusinessGets": 2 * len(arrivals),
+            "setupHttpRequests": setup, "setupWorkPackGets": c["maxVUs"],
+            "plannedHttpRequestsIncludingSetup": len(arrivals) + setup,
+            "plannedBusinessPeakPerWindow": nominal, "nominalHeadroomBeforeSetup": 2000 - nominal,
+            "headroomAfterSetupBeforeOtherTraffic": 2000 - nominal - setup,
+            "wireShiftModelSeconds": float(shift), "shiftedBusinessPeakPerWindow": shifted,
+            "modeledRequestsBeforeOtherTraffic": conservative,
+            "modeledHeadroomBeforeOtherTraffic": 2000 - conservative,
+            "otherRequestsPerWindow": other, "modeledRemainingRequests": remaining,
+            "inputsReviewed": other is not None and budget["sourceIpReviewed"],
+            "extraProbeRps": 0, "automaticRetries": 0,
+            "limitation": "Approximate WAF and OS/network timing are not bounded by this model; setup is conservatively charged in every window. Smoke/preparation/manual/background traffic must fit the separate other-request budget. No cloud approval."}
+
+
+def comparison_inputs(c):
+    fixtures = [{"userId": a["userId"], "visits": a["visits"]} for a in c["actors"]]
+    workload = {k: c.get(k) for k in ("scenario", "coreBase", "visitBase", "maxVUs", "maxLaunchLagMs",
+                                     "socketTimeoutSeconds", "requestDeadlineSeconds", "stopDrainSeconds",
+                                     "targets", "stop", "readProfile")}
+    workload["phases"] = [{k: p[k] for k in ("name", "rps", "durationSeconds")} for p in c["phases"]]
+    def digest(value):
+        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return {"fixtureSha256": digest(fixtures), "workloadSha256": digest(workload),
+            "scope": "declared fixture/actor allocation and workload; not cloud state verification"}
+
+
 def validate(c, execute=False):
     require(c.get("schemaVersion") == 1, "unsupported_schema")
     require(re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", c.get("runId", "")), "invalid_run_id")
@@ -120,6 +193,9 @@ def validate(c, execute=False):
             visits.add(v["visitId"])
             require(type(v["expectedVersion"]) is int and v["expectedVersion"] >= 0, "invalid_expected_version")
             require(v["expectedStatus"] in ("SCHEDULED", "IN_PROGRESS", "COMPLETED"), "invalid_expected_state")
+            if "expectedTaskCount" in v:
+                require(type(v["expectedTaskCount"]) is int and v["expectedTaskCount"] >= 0,
+                        "invalid_expected_task_count")
             if c["scenario"] == "check-in":
                 require(v["expectedStatus"] == "SCHEDULED", "write_pool_must_be_scheduled")
     require(len(actors) <= c["maxVUs"], "max_vus_must_cover_all_actors")
@@ -136,6 +212,11 @@ def validate(c, execute=False):
     require(number(targets.get("checkinHttpP95Ms", targets["httpP95Ms"]), 1, 120000), "invalid_write_target_latency")
     require(number(targets["errorRate"], 0, 1), "invalid_target_error_rate")
     require(type(targets["minSamplesPerEndpoint"]) is int and targets["minSamplesPerEndpoint"] >= 1, "invalid_target_sample_count")
+    if c.get("readProfile") is not None:
+        require(c["readProfile"] == READ_PROFILE, "unknown_read_profile")
+        budget = read_budget(c)
+    else:
+        budget = None
     approval = c.get("approval", {})
     approved = (approval.get("confirmed") is True and approval.get("environment")
                 and approval.get("windowUtc") and approval.get("owner")
@@ -143,9 +224,12 @@ def validate(c, execute=False):
                 and set(approval.get("allowedOrigins", [])) == {core, visit})
     if execute and not (core_local and visit_local):
         require(bool(approved), "remote_target_not_confirmed")
+        if budget is not None:
+            require(budget["inputsReviewed"], "waf_source_and_other_traffic_not_reviewed")
     c["coreBase"], c["visitBase"] = core, visit
     return {"plannedIterations": total, "freshVisits": len(visits), "localhost": core_local and visit_local,
-             "remoteExecutionConfirmed": bool(approved), **timing_settings(c),
+              "remoteExecutionConfirmed": bool(approved), **timing_settings(c),
+            "readBudget": budget,
             "warnings": (["timeoutSeconds is a deprecated socket setting; explicit total/drain deadlines apply."]
                          if "timeoutSeconds" in c else [])}
 
@@ -424,18 +508,25 @@ class Client:
         self.request("coreBase", "/api/auth/me", "setup", "/api/auth/me", check={"kind": "identity", "userId": self.actor["userId"]})
 
     def identity(self, value):
-        if not isinstance(value, dict) or value.get("id") != self.actor["userId"] or "CAREGIVER" not in value.get("roles", []):
-            raise Failure("wrong_identity")
+        assert_wire_response(value, {"kind": "identity", "userId": self.actor["userId"]})
 
     @staticmethod
     def pack(value, fixture):
         if not isinstance(value, dict):
             raise Failure("wrong_work_pack")
-        v = value.get("visit", {})
+        v = value.get("visit")
+        if not isinstance(v, dict) or any(type(v.get(k)) is not int for k in ("id", "elderId", "version")):
+            raise Failure("wrong_visit_or_state")
         if (v.get("id"), v.get("elderId"), v.get("status"), v.get("version")) != (
                 fixture["visitId"], fixture["elderId"], fixture["expectedStatus"], fixture["expectedVersion"]):
             raise Failure("wrong_visit_or_state")
-        if not isinstance(value.get("tasks"), list) or not isinstance(value.get("execution"), dict):
+        if (not isinstance(value.get("tasks"), list) or not all(isinstance(t, dict) for t in value["tasks"])
+                or not isinstance(value.get("execution"), dict)):
+            raise Failure("incomplete_work_pack")
+        if "expectedTaskCount" in fixture and len(value["tasks"]) != fixture["expectedTaskCount"]:
+            raise Failure("wrong_task_count")
+        actions = value["execution"].get("allowedActions")
+        if actions is not None and (not isinstance(actions, list) or not all(type(a) is str for a in actions)):
             raise Failure("incomplete_work_pack")
 
 
@@ -455,14 +546,18 @@ class Client:
                      {"expectedVersion": fixture["expectedVersion"], "clientRequestId": str(uuid.uuid4()),
                       "locationSource": "MANUAL_LOCATION_NOTE", "locationNote": "HPA-SYNTHETIC-" + self.c["runId"]},
                      {"kind": "checkin", "fixture": fixture})
-        self.work_pack({**fixture, "expectedStatus": "IN_PROGRESS", "expectedVersion": fixture["expectedVersion"] + 1}, phase)
+        # A frozen task count describes the initial pack, not tasks materialized by a B write.
+        saved_fixture = {k: v for k, v in fixture.items() if k != "expectedTaskCount"}
+        self.work_pack({**saved_fixture, "expectedStatus": "IN_PROGRESS", "expectedVersion": fixture["expectedVersion"] + 1}, phase)
 
 
 def assert_wire_response(value, check):
     if not check:
         return
     if check["kind"] == "identity":
-        if not isinstance(value, dict) or value.get("id") != check["userId"] or "CAREGIVER" not in value.get("roles", []):
+        if (not isinstance(value, dict) or type(value.get("id")) is not int or value["id"] != check["userId"]
+                or not isinstance(value.get("roles"), list) or not all(type(r) is str for r in value["roles"])
+                or "CAREGIVER" not in value["roles"]):
             raise Failure("wrong_identity")
     elif check["kind"] == "pack":
         Client.pack(value, check["fixture"])
@@ -470,7 +565,7 @@ def assert_wire_response(value, check):
             raise Failure("visit_not_checkin_eligible")
     elif check["kind"] == "checkin":
         fixture = check["fixture"]
-        if not isinstance(value, dict) or value.get("visitId") != fixture["visitId"] or value.get("replayed") is not False or value.get("savedState") != "IN_PROGRESS" or value.get("visitVersion") != fixture["expectedVersion"] + 1:
+        if not isinstance(value, dict) or type(value.get("visitId")) is not int or type(value.get("visitVersion")) is not int or value.get("visitId") != fixture["visitId"] or value.get("replayed") is not False or value.get("savedState") != "IN_PROGRESS" or value.get("visitVersion") != fixture["expectedVersion"] + 1:
             raise Failure("checkin_not_a_fresh_success")
     else:
         raise Failure("unknown_response_contract")
@@ -583,6 +678,14 @@ class WindowStop:
         return None
 
 
+def error_counts(rows):
+    counts = {}
+    for row in rows:
+        if "error" in row:
+            counts[row["error"]] = counts.get(row["error"], 0) + 1
+    return counts
+
+
 def summarize(http, iterations, phases, targets):
     result = []
     for phase in phases:
@@ -598,19 +701,31 @@ def summarize(http, iterations, phases, targets):
             endpoints.append({"method": method, "endpoint": path, "samples": len(rows),
                               "httpFailures": sum(not r["httpPassed"] for r in rows),
                               "businessFailures": sum(not r["businessPassed"] for r in rows), "errorRate": error_rate,
-                              "allP95Ms": percentile([r["elapsedMs"] for r in rows]), "successP95Ms": percentile(passed),
+                               "allP95Ms": percentile([r["elapsedMs"] for r in rows]), "successP95Ms": percentile(passed),
+                              "errorCategories": error_counts(rows),
+                              "cancelledRequests": sum(r.get("error") == "stop_drain_deadline" for r in rows),
+                              "requestDeadlineFailures": sum(r.get("error") == "request_deadline" for r in rows),
                               "targetObservation": "INSUFFICIENT_SAMPLES" if not enough else (
                                   "WITHIN_DRAFT_TARGET" if error_rate <= targets["errorRate"] and passed and percentile(passed) <= target_ms else "OUTSIDE_DRAFT_TARGET")})
         enough_iterations = len(it) >= targets["minSamplesPerEndpoint"]
         within_iteration_target = bool(it) and sum(not r["passed"] for r in it) / len(it) <= targets["errorRate"] and percentile([r["elapsedMs"] for r in it]) <= targets["iterationP95Ms"]
-        result.append({"phase": phase["name"], "targetRps": phase["rps"], "durationSeconds": phase["durationSeconds"],
+        inactive = phase["rps"] == 0 and phase["iterations"] == 0
+        complete = (len(it) == phase["iterations"] and phase.get("dropped", 0) == 0
+                    and phase.get("notScheduledAfterStop", 0) == 0)
+        evidence = ("NOT_APPLICABLE" if inactive else "INCOMPLETE_LOAD" if not complete
+                    else "INSUFFICIENT_SAMPLES" if not enough_iterations or not endpoints
+                         or any(e["samples"] < targets["minSamplesPerEndpoint"] for e in endpoints)
+                    else "COMPLETE_CLIENT_SAMPLES")
+        result.append({"phase": phase["name"], "clientEvidenceStatus": evidence, "targetRps": phase["rps"], "durationSeconds": phase["durationSeconds"],
                        "plannedIterations": phase["iterations"], "launchedIterations": len(it),
                        "droppedIterations": phase.get("dropped", 0), "notScheduledAfterStop": phase.get("notScheduledAfterStop", 0),
                        "actualLaunchRps": len(it) / phase.get("emissionSeconds", phase["durationSeconds"]) if phase.get("emissionSeconds", phase["durationSeconds"]) > 0 else None,
                        "emissionSeconds": phase.get("emissionSeconds"), "failedIterations": sum(not r["passed"] for r in it),
                        "iterationErrorRate": sum(not r["passed"] for r in it) / len(it) if it else None,
-                       "iterationP95Ms": percentile([r["elapsedMs"] for r in it]),
-                       "iterationTargetObservation": "INSUFFICIENT_SAMPLES" if not enough_iterations else "WITHIN_DRAFT_TARGET" if within_iteration_target else "OUTSIDE_DRAFT_TARGET",
+                        "iterationP95Ms": percentile([r["elapsedMs"] for r in it]),
+                       "iterationSuccessP95Ms": percentile([r["elapsedMs"] for r in it if r["passed"]]),
+                       "iterationErrorCategories": error_counts(it),
+                       "iterationTargetObservation": "NOT_APPLICABLE" if inactive else "INSUFFICIENT_SAMPLES" if not enough_iterations else "WITHIN_DRAFT_TARGET" if within_iteration_target else "OUTSIDE_DRAFT_TARGET",
                        "launchLagP95Ms": percentile([r["launchLagMs"] for r in it]), "endpoints": endpoints})
     return result
 
@@ -664,7 +779,9 @@ def run(c, output):
                "scenario": c["scenario"], "codeBaseline": c.get("codeBaseline", "UNCONFIRMED"),
                "targetOrigins": [c["coreBase"], c["visitBase"]],
                "approval": {k: c.get("approval", {}).get(k) for k in ("confirmed", "environment", "windowUtc", "owner", "deploymentRef", "allowedOrigins")},
-               "plan": plan, "maxVUs": c["maxVUs"], "phases": c["phases"], "targets": c["targets"], "stop": c["stop"],
+                "plan": plan, "maxVUs": c["maxVUs"], "phases": c["phases"], "targets": c["targets"], "stop": c["stop"],
+               "comparisonInputs": comparison_inputs(c),
+               "maxLaunchLagMs": c["maxLaunchLagMs"],
                "configSha256": hashlib.sha256(json.dumps(c, sort_keys=True).encode()).hexdigest(),
                "toolSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                "timing": {**timing_settings(c), "supervisorPollSeconds": POLL_SECONDS,
@@ -800,7 +917,15 @@ def run(c, output):
                    "notScheduledAfterStop": sum(p.get("notScheduledAfterStop", p["iterations"]) for p in c["phases"]),
                    "httpRequestsDuringLoad": sum(r["phase"] != "setup" for r in http),
                    "httpRequestsDuringSetup": sum(r["phase"] == "setup" for r in http),
-                   "targetsAreDraft": not bool(c.get("approval", {}).get("confirmed")),
+                    "targetsAreDraft": True,  # Execution approval is not SLA/target acceptance.
+                   "httpErrorCategories": error_counts(http),
+                   "iterationErrorCategories": error_counts(iterations),
+                   "cancelledRequests": sum(r.get("error") == "stop_drain_deadline" for r in http),
+                   "requestDeadlineFailures": sum(r.get("error") == "request_deadline" for r in http),
+                   "clientEvidenceStatus": ("INCOMPLETE" if not cleanup_ok else "STOPPED" if stop.is_set()
+                       else "INCOMPLETE_LOAD" if any(p["clientEvidenceStatus"] == "INCOMPLETE_LOAD" for p in phase_metrics)
+                       else "INSUFFICIENT_SAMPLES" if any(p["clientEvidenceStatus"] == "INSUFFICIENT_SAMPLES" for p in phase_metrics)
+                       else "COMPLETE_CLIENT_SAMPLES"),
                    "formalAcceptance": False, "phases": phase_metrics,
                    "timing": {**timing_settings(c), **stop.snapshot()},
                    "workerCleanupComplete": cleanup_ok,
@@ -813,11 +938,14 @@ def run(c, output):
                                    "Supervised per-VU HTTP processes: verify generator headroom and drops before increasing rate."]}
         write_json(out / "summary.json", summary)
         with (out / "summary.csv").open("w", newline="", encoding="utf-8") as f:
-            fields = ["phase", "method", "endpoint", "samples", "httpFailures", "businessFailures", "errorRate", "allP95Ms", "successP95Ms", "targetObservation"]
+            fields = ["phase", "method", "endpoint", "samples", "httpFailures", "businessFailures", "errorRate",
+                      "allP95Ms", "successP95Ms", "targetObservation", "errorCategories",
+                      "cancelledRequests", "requestDeadlineFailures"]
             w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
             for p in phase_metrics:
                 for endpoint in p["endpoints"]:
-                    w.writerow({"phase": p["phase"], **endpoint})
+                    w.writerow({"phase": p["phase"], **endpoint,
+                                "errorCategories": json.dumps(endpoint["errorCategories"], sort_keys=True)})
         samples.close(); it_file.close(); markers.close()
         if previous_handler is not None:
             signal.signal(signal.SIGINT, previous_handler)
