@@ -53,7 +53,13 @@ export function ExtraServiceTable({
       width: 'minmax(0, 1fr)',
       render: (row) =>
         row.caregiverId === null ? (
-          <span className={styles.none}>—</span>
+          row.providerName && (row.providerJobStatus === 'ACCEPTED' || row.providerJobStatus === 'COMPLETED') ? (
+            <span className={styles.person}>{row.providerName}</span>
+          ) : row.providerName && row.providerJobStatus === 'NEW' ? (
+            <span className={styles.none}>Offered to {row.providerName}</span>
+          ) : (
+            <span className={styles.none}>—</span>
+          )
         ) : (
           <span className={styles.person}>{caregiverName(row.caregiverId)}</span>
         ),

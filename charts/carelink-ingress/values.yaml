@@ -6,7 +6,8 @@ routes:
   - {path: "/^/api/notifications(/.*)?$", service: notification}
   - {path: "/^/api/provider-applications(/.*)?$", service: notification}
   - {path: "/^/api/providers(/.*)?$", service: notification}
-  # The Open Platform's public API; its job calls will go to report, listed before this, once report serves them
+  # The Open Platform's public API: the job calls to report, the rest to notification
+  - {path: "/^/api/open/v1/jobs(/.*)?$", service: report}
   - {path: "/^/api/open(/.*)?$", service: notification}
   - {path: "/^/api/reports(/.*)?$", service: report}
   - {path: "/^/api/value-added-service-requests(/.*)?$", service: report}

@@ -26,7 +26,7 @@ Each schema is now a database of its own (section 9): `carelink`, `carelink_visi
 |---|---|---|
 | `core` | 31 | **careplan**: `care_plan`, `care_plan_node`, `care_plan_node_visit`, `care_plan_required_credential`<br>**identity**: `app_user`, `user_role`<br>**incident**: `family_alert_delivery`, `family_alert_event`, `family_alert_window`, `incident`, `incident_acknowledgement`, `incident_log`, `spot_check`<br>**profile**: `care_service_application`, `caregiver`, `credential`, `credential_type`, `elder`, `elder_family_binding`, `elder_primary_caregiver`, `family_member`, `intake_application`<br>**rostering**: `absence_report`, `caregiver_availability`, `caregiver_preference`, `roster_change`, `rostering_candidate`, `rostering_candidate_check`, `rostering_constraint`, `rostering_run`<br>**shared**: `audit_log` |
 | `visit` | 11 | `caregiver_command_receipt`, `elder_confirmation`, `visit`, `visit_assignment`, `visit_check_in_record`, `visit_evidence`, `visit_health_record`, `visit_missed_check_in_trigger`, `visit_state_transition`, `visit_task`, `vital_sign` |
-| `report` | 6 | `caregiver_review`, `report`, `report_amendment`, `report_basis`, `value_added_service`, `value_added_service_request` |
+| `report` | 10 | `caregiver_review`, `report`, `report_amendment`, `report_basis`, `value_added_service`, `value_added_service_request`<br>**provider jobs** (report's V3): `report_provider`, `report_provider_service` (kept from `ProviderUpdated`), `report_provider_job`, `report_provider_job_key` |
 | `notification` | 10 | **inbox**: `notification`, `notification_subscription`<br>**openplatform** (notification's V2 and V3): `provider_application`, `provider`, `provider_webhook_endpoint`, `webhook_delivery`, `webhook_delivery_attempt`, and who may call the Open Platform: `provider_portal_user`, `provider_client`, `provider_token_key` |
 
 Seven tables have no JPA entity and are assigned by the code that writes them: `user_role` (identity),
@@ -122,6 +122,7 @@ needs against MySQL).
 | `VisitReassignment.moveTo` | rostering | `POST /internal/v1/visits/{visitId}/move` → `{ visitId }` of the new visit; the same one again for the same `Idempotency-Key` |
 | `VisitScheduling.schedule` | rostering | `POST /internal/v1/visits/schedule` → `{ created, covered }` |
 | `VisitScheduling.cancelUntouchedFrom` | rostering | `POST /internal/v1/visits/cancel-untouched` → `{ count }` |
+| `VisitScheduling.releaseUntouchedFrom` | rostering | `POST /internal/v1/visits/release-untouched` `{ elderId, caregiverId, from }` → `{ count }` |
 | `VisitScheduling.findUncoveredStarted`, `markUncoveredAsException` | rostering | `GET /internal/v1/visits/uncovered-started?since=&now=`; `POST /internal/v1/visits/{visitId}/uncovered-exception` → `{ marked }` |
 | `UpcomingAssignments.unstartedBetween` | rostering | `GET /internal/v1/visits/upcoming-assignments?from=&until=`. Done: rostering's `BookedVisits` port has both adapters, the worked example |
 | `StandaloneVisits.schedule`, `find` | report | `POST /internal/v1/visits/standalone` → `{ visitId }`; `GET /internal/v1/visits/{visitId}/state`, or 404 |

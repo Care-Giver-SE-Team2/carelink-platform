@@ -13,7 +13,9 @@ resources:
   limits:
     memory: 768Mi
 
-# core's and visit's internal APIs, at the Services the chart creates for their releases
+# core's and visit's internal APIs, and notification's token keys for the job API, at the Services the
+# chart creates for their releases
 env:
   CARELINK_COREAPI_BASEURL: http://core
   CARELINK_VISITAPI_BASEURL: http://visit
+  CARELINK_OPENPLATFORM_JWKSETURI: http://notification/api/open/v1/.well-known/jwks.json

@@ -50,6 +50,7 @@ public class ValueAddedServiceDispatchService {
     private final Accounts accounts;
     private final Elders elders;
     private final ValueAddedNotifier notifier;
+    private final ProviderJobDispatch providerJobs;
     private final Clock clock;
 
     @SuppressWarnings("java:S107") // one collaborator per module the request's life reaches
@@ -62,6 +63,7 @@ public class ValueAddedServiceDispatchService {
             Accounts accounts,
             Elders elders,
             ValueAddedNotifier notifier,
+            ProviderJobDispatch providerJobs,
             Clock clock) {
         this.requests = requests;
         this.services = services;
@@ -71,6 +73,7 @@ public class ValueAddedServiceDispatchService {
         this.accounts = accounts;
         this.elders = elders;
         this.notifier = notifier;
+        this.providerJobs = providerJobs;
         this.clock = clock;
     }
 
@@ -90,9 +93,14 @@ public class ValueAddedServiceDispatchService {
         return cover.options(dispatchedVisitId(requireRequest(requestId)));
     }
 
-    /** Puts a caregiver on a dispatched visit that has none, and tells them and the family. */
+    /**
+     * Puts a caregiver on a dispatched visit that has none, and tells them and the family. An offer to
+     * a provider still unanswered is withdrawn; one the provider accepted refuses this.
+     */
     public ManagedRequest assignCaregiver(Long requestId, Long caregiverId, String username) {
         ValueAddedServiceRequest request = requireRequest(requestId);
+        // First to act wins: an offer still open is withdrawn, one a provider took refuses this
+        providerJobs.withdrawForStaffing(request.id(), LocalDateTime.now(clock).withNano(0));
         cover.cover(dispatchedVisitId(request), caregiverId, accounts.idOf(username));
         String name = serviceName(request);
         notifier.caregiverAssigned(request, name, caregiverId);
@@ -130,6 +138,8 @@ public class ValueAddedServiceDispatchService {
             }
             visits.callOff(request.visitId(), new VisitReassignment.Change(null, byUserId, null, reason));
         }
+        // A job still with its provider is called off with it, and the provider sent job.cancelled
+        providerJobs.cancelFor(request.id(), reason, LocalDateTime.now(clock).withNano(0));
         ValueAddedServiceRequest saved = requests.save(cancelled);
         notifier.cancelled(saved, serviceName(request), visit.map(StandaloneVisits.State::caregiverId).orElse(null), why);
         return saved;
@@ -137,7 +147,8 @@ public class ValueAddedServiceDispatchService {
 
     /**
      * Brings every dispatched request into line with its visit: carried out means completed;
-     * called off (for an absence, say) means cancelled; and an exception before anybody checked
+     * called off (for an absence, say) means cancelled, unless a provider took the request on, which
+     * called it off and settles the request itself; and an exception before anybody checked
      * in - nobody was staffed in time, or the caregiver never arrived - means the service will not
      * happen on that visit, so the request is closed and the family told. An exception after
      * check-in is left for the incident: some of the service may have been given.
@@ -156,7 +167,7 @@ public class ValueAddedServiceDispatchService {
                 requests.save(request.completed());
                 settled++;
             }
-            else if ("CANCELLED".equals(status)) {
+            else if ("CANCELLED".equals(status) && !providerJobs.heldByProvider(request.id())) {
                 requests.save(request.cancelled());
                 settled++;
             }
@@ -198,7 +209,8 @@ public class ValueAddedServiceDispatchService {
         Optional<StandaloneVisits.State> visit = visit(request);
         return new ManagedRequest(request, serviceName,
                 visit.map(StandaloneVisits.State::status).orElse(null),
-                visit.map(StandaloneVisits.State::caregiverId).orElse(null));
+                visit.map(StandaloneVisits.State::caregiverId).orElse(null),
+                providerJobs.findFor(request.id()).orElse(null));
     }
 
     private Optional<StandaloneVisits.State> visit(ValueAddedServiceRequest request) {
@@ -229,9 +241,15 @@ public class ValueAddedServiceDispatchService {
      *
      * @param visitStatus the work order's visit state, e.g. SCHEDULED; null before dispatch
      * @param caregiverId who is on the visit; null when nobody is yet
+     * @param providerOffer the job it was offered to a provider as; null when it was not
      */
     public record ManagedRequest(ValueAddedServiceRequest request, String serviceName, String visitStatus,
-            Long caregiverId) {
+            Long caregiverId, ProviderJobDispatch.Offer providerOffer) {
+
+        public ManagedRequest(ValueAddedServiceRequest request, String serviceName, String visitStatus,
+                Long caregiverId) {
+            this(request, serviceName, visitStatus, caregiverId, null);
+        }
 
         /** Dispatched, but its visit has nobody on it and has not started: the manager's to staff. */
         public boolean needsCaregiver() {

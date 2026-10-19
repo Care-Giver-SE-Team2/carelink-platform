@@ -23,7 +23,9 @@ public record ManagedValueAddedServiceRequestResponse(
         Long visitId,
         String visitStatus,
         Long caregiverId,
-        boolean needsCaregiver) {
+        boolean needsCaregiver,
+        String providerName,
+        String providerJobStatus) {
 
     public static ManagedValueAddedServiceRequestResponse from(ManagedRequest managed) {
         ValueAddedServiceRequest request = managed.request();
@@ -31,6 +33,8 @@ public record ManagedValueAddedServiceRequestResponse(
                 request.id(), request.elderId(), request.valueAddedServiceId(), managed.serviceName(),
                 request.requestedSchedule(), request.specialInstructions(), request.status(),
                 request.decidedAt(), request.createdAt(), request.visitId(), managed.visitStatus(),
-                managed.caregiverId(), managed.needsCaregiver());
+                managed.caregiverId(), managed.needsCaregiver(),
+                managed.providerOffer() == null ? null : managed.providerOffer().providerName(),
+                managed.providerOffer() == null ? null : managed.providerOffer().job().status().name());
     }
 }

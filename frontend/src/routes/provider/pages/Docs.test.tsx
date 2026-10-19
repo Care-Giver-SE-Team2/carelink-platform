@@ -16,7 +16,7 @@ it('explains the integration to anyone, before applying', () => {
   expect(screen.getByText(/Refuse anything older than 5 minutes/)).toBeInTheDocument()
   expect(screen.getByText(/retried after 1 min, 5 min, 30 min, 2 h, 6 h/)).toBeInTheDocument()
   expect(screen.getByText(/createHmac\('sha256'/)).toBeInTheDocument()
-  expect(screen.getByText('/v1/jobs/{id}/accept')).toBeInTheDocument()
+  expect(screen.getByText('/api/open/v1/jobs/{id}/accept')).toBeInTheDocument()
 })
 
 it('goes back to the CareLink home page', async () => {

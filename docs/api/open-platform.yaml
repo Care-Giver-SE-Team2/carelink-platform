@@ -9,7 +9,7 @@ info:
     to them (PT04). The webhooks CareLink sends are in `webhooks` below, and their rules in
     [webhooks.md](webhooks.md).
 
-    **Status: draft** until Section 4 has agreed the job endpoints and events. Owner: Section 5 (notification).
+    **Status:** built; the job endpoints are served by report (decisions D1 and D16). Owner: Section 5 (notification).
     The design decisions behind it are in `docs/section5/decisions.md`. This is not the CareLink app's own API
     (`openapi.yaml`); it follows that API's conventions.
 
@@ -575,8 +575,9 @@ paths:
         The provider takes the job on: it becomes ACCEPTED, and the answer carries the address. Only a NEW job can
         be accepted, and only until `respondBy`.
 
-        If the family cancelled the booking before the acceptance was recorded, the answer is 409 `JOB_CANCELLED`
-        with CareLink's reason, and the job is CANCELLED; `job.cancelled` is sent too.
+        CareLink's own staff may take the same booking while the job is NEW: the first to act has it. If the family
+        cancelled the booking, or CareLink staffed it, before the acceptance was recorded, the answer is 409
+        `JOB_CANCELLED` with CareLink's reason, and the job is CANCELLED; `job.cancelled` is sent too.
       security:
         - clientCredentials: [open-platform/jobs.write]
       parameters:
