@@ -10,3 +10,11 @@ useDefault = true
 description = "notification test-only webhook encryption key"
 regexTarget = "match"
 regexes = ['''dGVzdC1vbmx5LWtleS1uZXZlci11c2UtZm9yLXJlYWw=''']
+
+# Exact Git commit object recorded under an auth-named protected-ref key in
+# protection-qa.json. It is not a credential. Keep all default rules and reject
+# different values, including credentials added alongside this metadata.
+[[allowlists]]
+description = "Preserved C05 Git commit object (not a credential)"
+regexTarget = "secret"
+regexes = ['''^a106286224669cc9660ca1a47b0d107ae89f09f8$''']

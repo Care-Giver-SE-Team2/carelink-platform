@@ -147,4 +147,6 @@ python tools/visit_hpa/candidate_lock.py --manifest tools/visit_hpa/candidate-re
 - 当前后端/前端自动发布开关均为true，保持原样。因此本次只提交评审，不合并、不启用自动合并、不部署。
 - PR71的CI正在产生检查记录，准确结论见[PR检查](https://github.com/Care-Giver-SE-Team2/carelink-platform/pull/71/checks)；不得沿用PR68“无CI”描述，也不得把本地通过写成GitHub CI通过。
 
+首次CI扫描将`protection-qa.json`中的C05保全Git提交号误判为generic-api-key。已确认它是Git commit对象，并在既有`.gitleaks.toml`中仅豁免这个完整、确切的值；默认规则、其他值和其他疑似key仍拦截。本地全历史扫描通过，两项不同值/新key负向对照均正确拒绝；没有更改workflow、业务代码或扫描目录范围。详见[误报及验证记录](evidence/visit-hpa-main-integration-20261020/secret-scan-review.md)。该修正随PR71推送，GitHub CI仍以最新head的检查结果为准。
+
 共享历史、监控/容量、HPA加载恢复、数据审批和窗口仍是开放项。请按第7节节点回一份可更新文档，出现业务缺陷时附去敏最小复现。本文已提供到GitHub PR，Chenyu没有用工具向你发送聊天消息，由用户自行转发提醒。
