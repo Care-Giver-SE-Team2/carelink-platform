@@ -1,0 +1,21 @@
+# Only visit/staging includes this file. Keep the CPU denominator at 100m.
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+# Bound Java startup CPU and total database connections as replicas increase.
+resources:
+  limits:
+    cpu: 400m
+
+env:
+  SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "3"
+  SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "1"
+
+probes:
+  startupFailureThreshold: 60
