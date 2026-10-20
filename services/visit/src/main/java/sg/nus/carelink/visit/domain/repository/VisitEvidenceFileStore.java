@@ -9,6 +9,7 @@ public interface VisitEvidenceFileStore {
     List<Entry> list(Long visitId,int offset,int size);
     Optional<Entry> find(Long visitId,Long evidenceId);
     long count(Long visitId);
+    long verifiedCount(Long visitId);
     long fileCount(Long visitId);
     void save(VisitEvidenceFile file);
 }

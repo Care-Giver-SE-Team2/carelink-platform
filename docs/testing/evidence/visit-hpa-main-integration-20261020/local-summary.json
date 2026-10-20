@@ -1,0 +1,3901 @@
+{
+  "status": "LOCAL_CANDIDATE_VERIFIED",
+  "applicationCommit": "65b9c6ac2d3b6fbb0882b3418dd0be377cb3394b",
+  "mainBaseCommit": "bfad2c7a3a8bbd03123389f9c6be7688b1864ce4",
+  "tests": {
+    "baselineBeforeRedisFix": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 3,
+      "skipped": 0,
+      "suites": [
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.platform.SessionStoreIT",
+          "tests": 5,
+          "failures": 0,
+          "errors": 3,
+          "skipped": 0
+        }
+      ]
+    },
+    "combinedIntegration": {
+      "tests": 150,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.platform.MainMigrationLineageIT",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.platform.SessionStoreIT",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.CaregiverAdmissionIT",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.CaregiverCredentialSubmissionIT",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.ManagerCaregiverApplicationIT",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.controller.CaregiverWorkSettingsIT",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.ReportTaskProducerIT",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.messaging.ReportFactsFromEventsIT",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.messaging.ReportWorkerEvidenceCompatibilityIT",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.messaging.VisitEvidenceProjectionIT",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.ReportFlowIT",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.ReportSchemaUpgradeIT",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.CaregiverEvidenceIT",
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.CaregiverWorkIT",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.FamilyVisitTaskIT",
+          "tests": 32,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "expandedLegacyFactPreservation": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.platform.MainMigrationLineageIT",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "unitRegression": {
+      "tests": 2034,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "module": [
+            "libs",
+            "core-api"
+          ],
+          "name": "sg.nus.carelink.coreapi.CoreApiAutoConfigurationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "core-api"
+          ],
+          "name": "sg.nus.carelink.coreapi.CoreApiClientTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "event-types"
+          ],
+          "name": "sg.nus.carelink.eventtypes.EventTypesTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "events"
+          ],
+          "name": "sg.nus.carelink.events.EnvelopeTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "events"
+          ],
+          "name": "sg.nus.carelink.events.QueueConsumerLifecycleTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "events"
+          ],
+          "name": "sg.nus.carelink.events.QueueConsumerRedeliveryTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "events"
+          ],
+          "name": "sg.nus.carelink.events.QueueConsumerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "events"
+          ],
+          "name": "sg.nus.carelink.events.VisibilityHeartbeatTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "platform-security"
+          ],
+          "name": "sg.nus.carelink.platform.security.OpenPlatformSecurityTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "platform-security"
+          ],
+          "name": "sg.nus.carelink.platform.security.ServiceSecurityBackOffTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "platform-security"
+          ],
+          "name": "sg.nus.carelink.platform.security.ServiceSecurityTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "platform-security"
+          ],
+          "name": "sg.nus.carelink.platform.security.SignedInUsersTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "platform-security"
+          ],
+          "name": "sg.nus.carelink.platform.security.slice.ServiceSecuritySliceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "shared"
+          ],
+          "name": "sg.nus.carelink.shared.audit.persistence.adapter.JpaAccessAuditTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "shared"
+          ],
+          "name": "sg.nus.carelink.shared.audit.persistence.WorkPackAccessAuditTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "shared"
+          ],
+          "name": "sg.nus.carelink.shared.validation.SingaporeFormatsTest",
+          "tests": 52,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "shared"
+          ],
+          "name": "sg.nus.carelink.shared.web.OptimisticConflictTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "shared"
+          ],
+          "name": "sg.nus.carelink.shared.web.RequestContextInterceptorTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "visit-api"
+          ],
+          "name": "sg.nus.carelink.visitapi.VisitApiAutoConfigurationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "libs",
+            "visit-api"
+          ],
+          "name": "sg.nus.carelink.visitapi.VisitApiClientTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.architecture.LayerDependencyTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.architecture.OwnTablesTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.architecture.ScheduledJobLockTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.application.CarePlanLookupServiceTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.application.CarePlanSchedulesServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.application.CarePlanServiceTest",
+          "tests": 33,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.application.VisitPlanReaderServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.controller.CareActivityControllerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.controller.CarePlanControllerTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.domain.CarePlanTest",
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.domain.ScheduledVisitTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.infrastructure.persistence.adapter.CarePlanMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.infrastructure.persistence.adapter.CarePlanNodeMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.infrastructure.persistence.adapter.CarePlanNodeRepositoryAdapterTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.infrastructure.persistence.adapter.CarePlanRepositoryAdapterTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.infrastructure.persistence.adapter.CarePlanRequiredCredentialMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.careplan.infrastructure.persistence.adapter.CarePlanRequiredCredentialRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.identity.application.AccountIssuerServiceTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.identity.application.UserDirectoryServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.identity.controller.AuthControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.identity.domain.AppUserTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.identity.domain.UsernameRuleTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.identity.infrastructure.persistence.adapter.DevUserSeederTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.ElderServiceDisputeIncidentServiceTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.EscalationScanServiceTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.IncidentServiceTest",
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.LeaveVisitIncidentServiceTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.MissedCheckInEntryTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.MissedCheckInPauseEvidenceTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.SpotCheckServiceTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.UncoveredVisitIncidentServiceTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.application.UnfilledAbsenceIncidentServiceTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.controller.EmergencyCallControllerTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.controller.IncidentControllerTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.controller.SpotCheckControllerTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.ElderServiceDisputeIncidentTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.EscalationChainTest",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.EscalationPolicyTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.IncidentTest",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.IncidentTimelineTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.MissedCheckInIncidentTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.model.IncidentAcknowledgementTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.service.IncidentEventSubjectTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.domain.SpotCheckTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.lookup.VisitApiSpotCheckVisitsTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.notify.VisitApiLatestCaregiversTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.IncidentAcknowledgementMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.IncidentAcknowledgementRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.IncidentLogMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.IncidentLogRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.IncidentMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.IncidentRepositoryAdapterTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.SpotCheckMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.persistence.adapter.SpotCheckRepositoryAdapterTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.incident.infrastructure.schedule.SpotCheckReminderSchedulerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.platform.CoreApiContractTest",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.CaregiverApplicationReviewServiceTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.CaregiverCredentialQueryTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.CaregiverDirectoryServiceTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.CaregiverWorkDirectoryServiceTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.CredentialExpiryServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.CredentialReviewServiceTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.ElderAccountRegistrationServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.ElderCareRequestServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.ElderFamilyContactServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyAccessQueryServiceTest",
+          "tests": 31,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyAlertRecipientsServiceTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyBindingDecisionServiceTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyBindingServiceTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyCarePlanServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyElderProfileServiceTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyElderQueryServiceTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyReadAuditServiceTest",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyRegistrationServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.FamilyServiceApplicationServiceTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.IntakeQueryServiceTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.PrimaryCaregiverServiceTest",
+          "tests": 23,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.ProfileServiceTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.RosteringProfilesServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.application.ServiceApplicationDeclineServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.CredentialDocumentControllerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.CredentialReviewControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.CredentialUploadExceptionHandlerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.dto.FamilyBindingCreateRequestTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.dto.FamilyElderUpdateRequestTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.ElderAccountRegistrationControllerTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.FamilyBindingControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.FamilyBindingDecisionControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.FamilyRegistrationControllerTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.IntakeApplicationControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.ManagerCaregiverApplicationControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.ManagerServiceApplicationControllerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.PrimaryCaregiverControllerTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.controller.ProfileControllerTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.IntakeApplicationTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.CaregiverApplicationTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.CaregiverAssignableTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.CredentialLapseTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.CredentialPublicStatusTest",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.CredentialReviewTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.ElderFamilyBindingAccessTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.ElderFamilyBindingDecisionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.ElderFamilyBindingTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.model.ServiceApplicationTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.service.CaregiverCredentialAlertPolicyTest",
+          "tests": 24,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.service.CredentialBinaryValueTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.service.CredentialExpiryScanTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.service.CredentialRegisterPolicyTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.service.CredentialResubmissionHistoryTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.service.PrimaryCaregiverClashTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.domain.ServiceApplicationProgressTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.notify.FamilyBindingRequestedNotifierTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.CaregiverMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.CaregiverRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.CredentialMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.CredentialRepositoryAdapterTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.CredentialTypeMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.CredentialTypeRepositoryAdapterTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.DevElderSeederTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.ElderFamilyBindingMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.ElderFamilyBindingRepositoryAdapterTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.ElderMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.ElderRepositoryAdapterTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.FamilyMemberMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.FamilyMemberRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.IntakeApplicationMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.IntakeApplicationRepositoryAdapterTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.PrimaryCaregiverAssignmentMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.persistence.adapter.PrimaryCaregiverAssignmentRepositoryAdapterTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.schedule.CredentialExpirySchedulerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.storage.CredentialPdfCheckTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.storage.ImageKitCredentialStorageTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.profile.infrastructure.storage.PrivateCredentialStorageTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.AbsenceCoverageServiceTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.AbsenceQueryServiceTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.AbsenceReRosteringServiceTest",
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.AbsenceServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.LeaveCoverServiceTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.LeaveReminderServiceTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.RecurringRosterServiceTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.RosterChangeScanServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.RosteringServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.RosterSnapshotLoaderTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.UncoveredVisitServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.VisitChangeSagaTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.VisitChangeStepScanServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.application.VisitCoverServiceTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.controller.AbsenceControllerTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.controller.RosterChangeControllerTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.controller.RosteringControllerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.AbsenceReportTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.RecurringScheduleTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.RosterChangeTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.RosteringRecordTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.service.ReplacementFinderTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.service.WorkSettingsRulesTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.VisitChangeStepTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.domain.VisitsAtRiskTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.AbsenceReportMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.AbsenceReportRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.CaregiverAvailabilityMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.CaregiverAvailabilityRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.CaregiverPreferenceMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.CaregiverPreferenceRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.ReRosteringAdaptersTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringCandidateCheckMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringCandidateCheckRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringCandidateMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringCandidateRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringConstraintMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringConstraintRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringRunMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.persistence.adapter.RosteringRunRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.schedule.RosterChangeSchedulerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.schedule.VisitChangeStepSchedulerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.visit.VisitApiBookedVisitsTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.rostering.infrastructure.visit.VisitApiRosteringAdaptersTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.shared.security.FamilyElderProfileHttpTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "core"
+          ],
+          "name": "sg.nus.carelink.shared.security.SecurityConfigTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.architecture.LayerDependencyTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.architecture.OwnTablesTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.architecture.ScheduledJobLockTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.application.NotificationRequestsTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.application.NotificationServiceTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.controller.NotificationControllerTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.domain.model.NotificationTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.infrastructure.persistence.adapter.NotificationMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.infrastructure.persistence.adapter.NotificationRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.infrastructure.persistence.adapter.NotificationSubscriptionMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.infrastructure.persistence.adapter.NotificationSubscriptionRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.notification.messaging.NotificationRequestedHandlerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.application.OnboardingAndReviewTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.application.PortalServiceTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.application.WebhookDeliveryServiceTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.domain.model.DeliveryTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.domain.model.ProviderTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.domain.model.WebhookEndpointTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.domain.model.WebhookSignatureTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.infrastructure.http.JdkWebhookTransportTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.infrastructure.http.PublicAddressesTest",
+          "tests": 31,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.infrastructure.schedule.WebhookDeliverySchedulerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "notification"
+          ],
+          "name": "sg.nus.carelink.openplatform.infrastructure.secrets.EncryptedSigningSecretsTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.architecture.LayerDependencyTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.architecture.OwnTablesTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.architecture.ScheduledJobLockTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.CaregiverReviewServiceTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.ReportAiEnricherTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.ReportPreparedBatchTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.ReportServiceTest",
+          "tests": 23,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.ReportTaskProducerTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.ValueAddedServiceDispatchServiceTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.application.ValueAddedServiceRequestServiceTest",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.controller.CaregiverReviewControllerTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.controller.dto.CaregiverReviewCreateRequestTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.controller.ManagerValueAddedServiceControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.controller.ReportControllerTest",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.controller.ValueAddedServiceControllerTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.model.CaregiverReviewTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.model.ValueAddedServiceRequestTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.model.ValueAddedServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.ReportAssemblerTest",
+          "tests": 52,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.ReportContentBuilderTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.ReportFactsTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.ReportMetricsTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.ReportPeriodTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.ReportTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.domain.ReportValuesTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.ai.BedrockSummaryAdapterTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.ApiValueAddedVisitAssignmentTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.audit.AuditedFamilyReadsTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.core.CoreAdaptersTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.facts.KeptFactsSourceTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.NotificationRequestedValueAddedManagerAlertTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.NotificationRequestedValueAddedNotifierTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.CaregiverReviewMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.CaregiverReviewRepositoryAdapterTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.ReportBasisMapperTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.ReportMapperTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.ReportRepositoryAdapterTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.ValueAddedServiceMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.ValueAddedServiceRepositoryAdapterTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.ValueAddedServiceRequestMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.persistence.adapter.ValueAddedServiceRequestRepositoryAdapterTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.schedule.ReportSchedulerTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.security.SessionAccountsTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.infrastructure.visit.VisitAdaptersTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.messaging.ReportFactHandlersTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "report"
+          ],
+          "name": "sg.nus.carelink.report.messaging.ReportRequestedHandlerTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.architecture.LayerDependencyTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.architecture.OwnTablesTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.architecture.ScheduledJobLockTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.platform.VisitApiContractTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.CaregiverVisitExecutionServiceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.CaregiverWorkServiceTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.EvidenceBinaryValuesTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.FamilyCaregiverQueryServiceTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.FamilyVisitQueryServiceTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.MissedCheckInScanServiceTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.StandaloneVisitsServiceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.VisitReassignmentServiceTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.VisitRequestsTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.VisitSchedulingServiceTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.application.VisitServiceTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.CaregiverWorkControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.ElderVisitConfirmationControllerTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.FamilyCaregiverControllerTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.FamilyVisitControllerTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.InternalVisitPlanningControllerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.controller.VisitControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.ElderConfirmationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.model.CaregiverCommandRulesTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.model.HealthMeasurementTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.model.VisitAbsenceChangeTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.model.VisitExecutionRulesTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.model.VisitReleaseTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.model.VisitScheduleFilterTest",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.service.MissedCheckInPolicyTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.domain.service.MissedCheckInResumePolicyTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.config.MissedCheckInPropertiesTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.core.CoreIncidentsTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.events.OutboxVisitEventsTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.ElderConfirmationMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.ElderConfirmationRepositoryAdapterTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitAssignmentMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitAssignmentRepositoryAdapterTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitCommandRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitEvidenceMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitEvidenceRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitRepositoryAdapterTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitScheduleQueryAdapterTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitStateTransitionMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitStateTransitionRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitTaskMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VisitTaskRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VitalSignMapperTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.persistence.adapter.VitalSignRepositoryAdapterTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.schedule.MissedCheckInSchedulerTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": [
+            "services",
+            "visit"
+          ],
+          "name": "sg.nus.carelink.visit.infrastructure.storage.PrivateEvidenceImagesTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "toolSuite": {
+      "tests": 110,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 87.953,
+      "status": "PASS"
+    },
+    "finalCandidateTests": {
+      "tests": 8,
+      "exitCode": 0
+    },
+    "applicationCommit": "65b9c6ac2d3b6fbb0882b3418dd0be377cb3394b",
+    "mainBaseCommit": "bfad2c7a3a8bbd03123389f9c6be7688b1864ce4"
+  },
+  "primaryMigrations": 41,
+  "platformMigrationEntries": 17,
+  "fixtures": [
+    {
+      "batch": 1,
+      "runId": "hpa-20261019t173326-b43a2a",
+      "status": "PASS",
+      "sourceApplicationCommit": "65b9c6ac2d3b6fbb0882b3418dd0be377cb3394b",
+      "groups": 4,
+      "independentSessions": 8,
+      "coreProcesses": 2,
+      "visitProcesses": 2,
+      "concurrentReads": 16,
+      "crossActorDenials": 8,
+      "perActorSingleSessionLogoutIsolation": true,
+      "businessStateUnchanged": true,
+      "smoke": {
+        "status": "PASS",
+        "businessGets": 4,
+        "setupHttp": 20,
+        "auditDelta": 8,
+        "pairs": 4,
+        "generatedVisits": 8,
+        "userAccounts": 9,
+        "executionTasks": 0,
+        "serviceInstructions": 1,
+        "observedResponseBytesRange": [
+          814,
+          816
+        ]
+      },
+      "preparedData": {
+        "pairs": 4,
+        "scheduledStatus": "SCHEDULED:0",
+        "executionTasksPerVisit": 0,
+        "instructionsPerVisit": 1,
+        "totalGeneratedVisits": 8,
+        "successfulWhitelistedReadAudits": 48
+      },
+      "cleanup": {
+        "ownedContainersRemoved": true,
+        "ownedNetworkRemoved": true,
+        "originalContainersUnchanged": true,
+        "temporaryPortsClosed": true
+      },
+      "rawSummarySha256": "80bbb8086a35e97c757d9bd2b72485eeaf2a545d69897c783bb4d2ed00c49a42"
+    },
+    {
+      "batch": 2,
+      "runId": "hpa-20261019t173603-e6ac82",
+      "status": "PASS",
+      "sourceApplicationCommit": "65b9c6ac2d3b6fbb0882b3418dd0be377cb3394b",
+      "groups": 4,
+      "independentSessions": 8,
+      "coreProcesses": 2,
+      "visitProcesses": 2,
+      "concurrentReads": 16,
+      "crossActorDenials": 8,
+      "perActorSingleSessionLogoutIsolation": true,
+      "businessStateUnchanged": true,
+      "smoke": {
+        "status": "PASS",
+        "businessGets": 4,
+        "setupHttp": 20,
+        "auditDelta": 8,
+        "pairs": 4,
+        "generatedVisits": 8,
+        "userAccounts": 9,
+        "executionTasks": 0,
+        "serviceInstructions": 1,
+        "observedResponseBytesRange": [
+          814,
+          816
+        ]
+      },
+      "preparedData": {
+        "pairs": 4,
+        "scheduledStatus": "SCHEDULED:0",
+        "executionTasksPerVisit": 0,
+        "instructionsPerVisit": 1,
+        "totalGeneratedVisits": 8,
+        "successfulWhitelistedReadAudits": 48
+      },
+      "cleanup": {
+        "ownedContainersRemoved": true,
+        "ownedNetworkRemoved": true,
+        "originalContainersUnchanged": true,
+        "temporaryPortsClosed": true
+      },
+      "rawSummarySha256": "0d2be3c3e95db6d029f70f6c87770980adef899e1ddc1e5a11ee2178f48b7665"
+    }
+  ],
+  "sessions": [
+    {
+      "batch": 1,
+      "status": "PASS",
+      "runId": "r20261020-013915-d617a8",
+      "checks": 80,
+      "caseCounts": {
+        "C00-serial-control": 20,
+        "C01-delete-before-atomic-save": 20,
+        "C02-delete-after-session-read": 20,
+        "C03-delete-after-atomic-save": 20
+      },
+      "actualConcurrencyInterleavings": 60,
+      "serialControls": 20,
+      "productFailures": 0,
+      "gateTimeouts": 0,
+      "browserVersion": "155.0.4283.62",
+      "externalPageRouteRequestAttempts": 0,
+      "postDataInvariantChecks": 11,
+      "cleanup": {
+        "temporaryPortsClosed": true,
+        "originalContainersUnchanged": true
+      },
+      "rawSummarySha256": "c2b9bb4d36e681d09720fb2f9d17bf1d07c5418941f10c4d53146508438b6e9c"
+    },
+    {
+      "batch": 2,
+      "status": "PASS",
+      "runId": "r20261020-014317-59b23c",
+      "checks": 80,
+      "caseCounts": {
+        "C00-serial-control": 20,
+        "C01-delete-before-atomic-save": 20,
+        "C02-delete-after-session-read": 20,
+        "C03-delete-after-atomic-save": 20
+      },
+      "actualConcurrencyInterleavings": 60,
+      "serialControls": 20,
+      "productFailures": 0,
+      "gateTimeouts": 0,
+      "browserVersion": "155.0.4283.62",
+      "externalPageRouteRequestAttempts": 0,
+      "postDataInvariantChecks": 11,
+      "cleanup": {
+        "temporaryPortsClosed": true,
+        "originalContainersUnchanged": true
+      },
+      "rawSummarySha256": "c03f8b409eb544ceb45f584806411b466486b78b5dbcd4b31cdb3b67f92729d1"
+    }
+  ],
+  "deterministicInterleavings": 120,
+  "serialControls": 40,
+  "sharedHistory": "PENDING",
+  "actualDeploymentVerified": false,
+  "deploymentApproved": false,
+  "cloudTestExecuted": false,
+  "hpaMechanism": "NOT_EVALUATED",
+  "formalAcceptance": false,
+  "c05": "Independent branch preserved; late logout/anonymous Cookie and frontend switching are not fixed or accepted here",
+  "initialToolTestPermissionBlock": "Resolved using task-specific TEMP and authorized loopback execution; original failed log preserved privately"
+}

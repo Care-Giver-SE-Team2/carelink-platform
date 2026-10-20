@@ -15,7 +15,7 @@ public final class ServiceTables {
 			"visit_evidence_file");
 
 	public static final Set<String> REPORT = Set.of("caregiver_review", "report", "report_amendment", "report_basis",
-			"value_added_service", "value_added_service_request", "report_visit", "report_visit_task",
+			"value_added_service", "value_added_service_request", "report_visit", "report_visit_task", "report_visit_evidence",
 			"report_vital_sign", "report_elder_confirmation", "report_incident", "report_incident_log",
 			"report_spot_check", "report_roster_change");
 

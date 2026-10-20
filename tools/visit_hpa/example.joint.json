@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "runId": "replace-with-joint-run-id",
+  "codeBaseline": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "scenario": "work-pack",
+  "coreBase": "https://visit-hpa.example.invalid",
+  "visitBase": "https://visit-hpa.example.invalid",
+  "maxVUs": 8,
+  "socketTimeoutSeconds": 8,
+  "requestDeadlineSeconds": 10,
+  "stopDrainSeconds": 12,
+  "maxLaunchLagMs": 200,
+  "maxIterations": 2700,
+  "phases": [
+    {
+      "name": "baseline",
+      "rps": 1,
+      "durationSeconds": 180
+    },
+    {
+      "name": "step-2",
+      "rps": 2,
+      "durationSeconds": 120
+    },
+    {
+      "name": "step-4",
+      "rps": 4,
+      "durationSeconds": 120
+    },
+    {
+      "name": "step-5",
+      "rps": 5,
+      "durationSeconds": 120
+    },
+    {
+      "name": "hold",
+      "rps": 5,
+      "durationSeconds": 240
+    },
+    {
+      "name": "cooldown",
+      "rps": 0,
+      "durationSeconds": 480
+    }
+  ],
+  "actors": [
+    {
+      "alias": "synthetic-cg-1",
+      "userId": 71100,
+      "usernameEnv": "HPA_CG1_USERNAME",
+      "passwordEnv": "HPA_CG_PASSWORD",
+      "visits": [
+        {
+          "visitId": 1,
+          "elderId": 73100,
+          "expectedStatus": "SCHEDULED",
+          "expectedVersion": 0,
+          "expectedTaskCount": 0
+        }
+      ]
+    }
+  ],
+  "targets": {
+    "httpP95Ms": 1000,
+    "checkinHttpP95Ms": 2000,
+    "iterationP95Ms": 3000,
+    "errorRate": 0.01,
+    "minSamplesPerEndpoint": 100
+  },
+  "stop": {
+    "errorWindowSeconds": 30,
+    "latencyWindowSeconds": 60,
+    "errorRate": 0.05,
+    "p95Ms": 5000,
+    "consecutiveWindows": 2,
+    "minSamples": 20
+  },
+  "approval": {
+    "confirmed": false,
+    "environment": "UNCONFIRMED",
+    "windowUtc": "UNCONFIRMED",
+    "owner": "Chenyu + Zhili",
+    "deploymentRef": "UNCONFIRMED",
+    "allowedOrigins": []
+  },
+  "readProfile": "visit-hpa-A-waf-v1",
+  "wafBudget": {
+    "windowSeconds": 300,
+    "limitRequests": 2000,
+    "otherRequestsPerWindow": null,
+    "sourceIpReviewed": false
+  }
+}

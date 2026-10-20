@@ -15,6 +15,7 @@ class JdbcVisitEvidenceFileStore implements VisitEvidenceFileStore {
     @Override public List<Entry> list(Long visit,int offset,int size) { return jdbc.query(SELECT+" order by e.id desc limit ? offset ?",JdbcVisitEvidenceFileStore::entry,visit,size,offset); }
     @Override public Optional<Entry> find(Long visit,Long evidence) { return jdbc.query(SELECT+" and e.id=?",JdbcVisitEvidenceFileStore::entry,visit,evidence).stream().findFirst(); }
     @Override public long count(Long visit) { return Objects.requireNonNull(jdbc.queryForObject("select count(*) from visit_evidence where visit_id=?",Long.class,visit)); }
+    @Override public long verifiedCount(Long visit) { return Objects.requireNonNull(jdbc.queryForObject("select count(*) from visit_evidence where visit_id=? and verification_status='VERIFIED'",Long.class,visit)); }
     @Override public long fileCount(Long visit) { return Objects.requireNonNull(jdbc.queryForObject("select count(*) from visit_evidence e join visit_evidence_file f on f.evidence_id=e.id where e.visit_id=?",Long.class,visit)); }
     @Override public void save(VisitEvidenceFile f) {
         jdbc.update("insert into visit_evidence_file(evidence_id,uploader_user_id,storage_key,content_type,byte_size,sha256,original_sha256,sanitized_original_name,visit_task_id,submitted_at) values (?,?,?,?,?,?,?,?,?,?)",

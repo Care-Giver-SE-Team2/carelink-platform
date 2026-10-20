@@ -25,7 +25,7 @@ import sg.nus.carelink.eventtypes.VitalsRecorded;
 import sg.nus.carelink.report.domain.repository.KeptFacts;
 
 /**
- * Takes the facts a report is made from off report's queue: visit's ten events and core's four
+ * Takes the facts a report is made from off report's queue: visit's eleven events and core's four
  * (docs/platform/event-catalogue.md, section 3). Each handler is one call to {@link KeptFacts}:
  * keeping a fact is a projection with no rule of its own, so there is no application service in
  * between, as there is for a message ({@code NotificationRequestedHandler} in notification). The
@@ -34,6 +34,12 @@ import sg.nus.carelink.report.domain.repository.KeptFacts;
 @Configuration(proxyBeanMethods = false)
 @Profile("!worker")
 class ReportFactHandlers {
+    @Bean
+    EventHandler<sg.nus.carelink.eventtypes.VisitEvidenceUpdated> evidenceUpdatedHandler(KeptFacts facts) {
+        return on(sg.nus.carelink.eventtypes.VisitEvidenceUpdated.TYPE,
+                sg.nus.carelink.eventtypes.VisitEvidenceUpdated.class, (event, sequence) -> facts.keep(event));
+    }
+
 
 	@Bean
 	EventHandler<VisitScheduled> visitScheduledHandler(KeptFacts facts) {

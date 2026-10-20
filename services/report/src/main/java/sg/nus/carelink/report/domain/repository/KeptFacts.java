@@ -42,6 +42,8 @@ public interface KeptFacts {
 
 	void keep(VisitClosed event);
 
+	void keep(sg.nus.carelink.eventtypes.VisitEvidenceUpdated event);
+
 	/** @param sequence the envelope's sequence: a task has no version of its own */
 	void keep(VisitTaskRecorded event, long sequence);
 

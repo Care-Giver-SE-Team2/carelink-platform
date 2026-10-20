@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "protectedRefs": {
+    "codex/visit-hpa-d1-d6": "34371c24014ed9d12f1f3a6e86873dd34804c007",
+    "codex/fix-auth-switch-c05": "a106286224669cc9660ca1a47b0d107ae89f09f8",
+    "codex/migrate-caregiver-admission": "578cddf1926fa23bd3127bc56f877e7d43334072",
+    "main": "20e456a8191ce4fab437e6618d3169b2440f8a52"
+  },
+  "protectedWorktreesClean": true,
+  "applicationCommit": "65b9c6ac2d3b6fbb0882b3418dd0be377cb3394b",
+  "acceptedEngineUnchanged": true,
+  "mainCoreMigrationsAndReportV4Unchanged": true,
+  "frontendInfraChartsWorkflowsUnchanged": true,
+  "bundleVerified": true,
+  "generatedPrivateValuesAbsentFromPublicMaterials": true,
+  "remoteMainReadOnlyRecheck": "bfad2c7a3a8bbd03123389f9c6be7688b1864ce4",
+  "remotePR68BranchReadOnlyRecheck": "34371c24014ed9d12f1f3a6e86873dd34804c007",
+  "pushed": false,
+  "onlineBusinessAccess": false
+}

@@ -85,6 +85,9 @@ class CaregiverEvidenceIT {
         assertThat(replay.visitVersion()).isEqualTo(first.visitVersion());
         assertThatThrownBy(()->service.upload(username,visit,VisitEvidence.Kind.SIGNATURE,null,version,key,"demo.png","image/png",image)).hasMessageContaining("different content");
         assertThat(service.list(username,visit,0,20).total()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from outbox_event where type='VisitEvidenceUpdated' and JSON_EXTRACT(payload,'$.visitId')=?",Long.class,visit)).isEqualTo(1);
+        String payload=jdbc.queryForObject("select payload from outbox_event where type='VisitEvidenceUpdated' and JSON_EXTRACT(payload,'$.visitId')=?",String.class,visit);
+        assertThat(payload).contains("evidenceCount", "verifiedEvidenceCount").doesNotContain("storageKey", "filename", "sha256");
     }
     @Test void limitsAreCheckedInsideVisitLockAndWrongTasksCannotBeLinked() {
         int version=checkIn();
@@ -97,6 +100,7 @@ class CaregiverEvidenceIT {
         int version=checkIn(); long before=files();
         doThrow(new IllegalStateException("Synthetic metadata failure")).when(metadata).save(any());
         assertThatThrownBy(()->upload(version,UUID.randomUUID())).isInstanceOf(RuntimeException.class);
+        assertThat(jdbc.queryForObject("select count(*) from outbox_event where type='VisitEvidenceUpdated' and JSON_EXTRACT(payload,'$.visitId')=?",Long.class,visit)).isZero();
         assertThat(files()).isEqualTo(before); assertThat(service.list(username,visit,0,20).total()).isZero();
         assertThat(jdbc.queryForObject("select version from visit where id=?",Integer.class,visit)).isEqualTo(version);
         assertThat(jdbc.queryForObject("select count(*) from caregiver_command_receipt where visit_id=? and action_code='EVIDENCE_UPLOAD'",Long.class,visit)).isZero();

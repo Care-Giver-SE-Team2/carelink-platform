@@ -75,6 +75,13 @@ class OutboxVisitEvents implements VisitEvents {
 				visit.caregiverId(), time(visit.checkedInAt()), time(visit.checkedOutAt()), visit.version()));
 	}
 
+    @Override
+    public void evidenceUpdated(Visit visit, int count, int verified) {
+        events.publish(sg.nus.carelink.eventtypes.VisitEvidenceUpdated.TYPE,
+                new sg.nus.carelink.eventtypes.VisitEvidenceUpdated(visit.id(), visit.elderId(),
+                        time(visit.scheduledStart()), visit.version(), count, verified));
+    }
+
 	@Override
 	public void closed(Visit visit) {
 		events.publish(VisitClosed.TYPE, new VisitClosed(visit.id(), visit.elderId(), time(visit.scheduledStart()),
