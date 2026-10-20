@@ -129,6 +129,9 @@ deploy_service() {
     --set-string "image.tag=$tag"
     --set-string "image.digest=$digest"
   )
+  if [ "$service" = visit ] && [ "$env" = staging ]; then
+    release+=(-f deploy/environments/staging-visit-hpa.yaml)
+  fi
   if [ "$service" = report ] && [ "$worker_enabled" = true ]; then
     release+=(--set-string "env.SPRING_PROFILES_ACTIVE=api"
       --set-string "env.REPORT_LEGACY_SCHEDULER_ENABLED=false"
