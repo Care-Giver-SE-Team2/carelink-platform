@@ -8,13 +8,14 @@ autoscaling:
     scaleDown:
       stabilizationWindowSeconds: 300
 
-# Bound Java startup CPU and total database connections as replicas increase.
+# Bound Java startup CPU as replicas increase.
 resources:
   limits:
     cpu: 400m
 
 env:
-  SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "3"
+  # Keep the existing default maximum: REQUIRES_NEW audits need spare connections.
+  SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "10"
   SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "1"
 
 probes:

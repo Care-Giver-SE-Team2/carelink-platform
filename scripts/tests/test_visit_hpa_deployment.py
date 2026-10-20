@@ -28,7 +28,7 @@ class VisitHpaDeploymentTest(unittest.TestCase):
         self.assertIn("cpu: 100m\n", deployment)
         self.assertIn("cpu: 400m\n", deployment)
         self.assertIn("SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE", deployment)
-        self.assertIn('value: "3"', deployment)
+        self.assertIn('value: "10"', deployment)
         self.assertIn("failureThreshold: 60\n", deployment)
 
     def test_other_staging_apis_and_demo_remain_fixed(self):
