@@ -83,7 +83,10 @@ bash scripts/deploy-release.sh staging
 
 同步配置脚本校验 AWS 账号与集群端点；发布入口额外核对 ECR 中的 tag/digest 和 API 连接。
 部署脚本先检查全部选中服务的 Secret 和 CA，
-然后按 core、visit、report、notification 顺序执行 Helm，并等待各服务 ready。
+然后先部署 core，再部署 report，并等待 report 的完整 rollout 完成；
+之后 visit 与 notification 最多两个并行滚动更新。
+report 更新失败或 rollout 未完成时，不启动 visit，避免新 visit 发出的事件被旧 report 当作未知事件删除。
+这道顺序保护适用于 `all` 发布；单独部署 visit 前，操作者仍须确认 report 已兼容其事件。
 任一部署失败就停止，已完成的服务不会自动回滚；四服务升级不是一个事务。
 Secret 更新本身不重启已有 Pod：若镜像和 Pod 模板均未变化，需单独安排滚动重启。
 
