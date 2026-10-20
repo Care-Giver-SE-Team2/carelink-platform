@@ -6,7 +6,8 @@
 # Each service is a Helm release named after it, in the namespace named after the
 # environment, installed from charts/carelink-service with the service's own
 # services/<name>/deploy/values.yaml. "all" deploys core first, because the other services
-# call it. The remaining services update at most two at a time. Each release is a rolling
+# call it. Report finishes its rollout before visit can emit new event types.
+# The remaining services update at most two at a time. Each release is a rolling
 # update; unchanged manifests/images are skipped after verifying the live rollout.
 #
 # Environment:
@@ -37,8 +38,8 @@ case $env in staging | demo) ;; *)
   ;;
 esac
 
-# Every service with a values file, core first, then the services that call it
-order="core visit report notification"
+# Core first, then report's event consumers before visit's event producers.
+order="core report visit notification"
 deployable=$(for v in services/*/deploy/values.yaml; do
   s=${v#services/}
   echo "${s%%/*}"
@@ -162,11 +163,15 @@ deploy_service() {
       echo "$service: deployed image differs from the complete release" >&2
       exit 1
     fi
+    if [ "$service" = report ]; then
+      # No old facts consumer may remain when visit begins emitting new event types.
+      kubectl --context "$context" --namespace "$env" rollout status "deployment/report" --timeout=10m
+    fi
   fi
 }
 
-# Keep dry-run output deterministic. Core is ready before its callers; bound their surge
-# to two releases so the existing two-node environment is not flooded with new pods.
+# Keep dry-run output deterministic. Core and report are readiness barriers before
+# visit; bound the remaining surge to two releases on the existing two-node environment.
 pids=()
 failed=0
 wait_batch() {
@@ -179,7 +184,7 @@ wait_batch() {
   [ "$failed" = 0 ]
 }
 for service in $selected; do
-  if [ "${DRY_RUN:-0}" = 1 ] || [ "$service" = core ] || [ "$target" != all ]; then
+  if [ "${DRY_RUN:-0}" = 1 ] || [ "$service" = core ] || [ "$service" = report ] || [ "$target" != all ]; then
     deploy_service "$service"
   else
     deploy_service "$service" &
