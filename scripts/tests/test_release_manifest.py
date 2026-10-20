@@ -95,7 +95,8 @@ class ReleaseManifestTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             for record in self.records.values():
                 self.assertIn(f'image: "{record["image"]}@{record["digest"]}"', result.stdout)
-            self.assertEqual(result.stdout.count("kind: Deployment"), 4)
+            # HPA.scaleTargetRef also contains kind: Deployment; count only objects.
+            self.assertEqual(result.stdout.count("\nkind: Deployment\n"), 4)
 
     def test_conflicting_tag_is_rejected(self):
         result = self.deploy(IMAGE_TAG="a" * 40)
