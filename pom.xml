@@ -47,7 +47,7 @@
 		<sonar.version>5.7.0.6970</sonar.version>
 		<testcontainers.version>2.0.5</testcontainers.version>
 		<shedlock.version>7.10.1</shedlock.version>
-		<aws-sdk.version>2.55.14</aws-sdk.version>
+		<aws-sdk.version>2.56.0</aws-sdk.version>
 		<!--
 		  Security fixes that Spring Boot 4.1.1 does not manage yet. The dependency scan
 		  found fixable CRITICAL CVEs in Tomcat 11.0.24 and HIGH ones in Jackson 3.1.5;
