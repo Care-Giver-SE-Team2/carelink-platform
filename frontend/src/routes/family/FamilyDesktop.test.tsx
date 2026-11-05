@@ -34,7 +34,7 @@ const detail = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
-function installApi() {
+function installApi(tanMeiVisits: FamilyVisit[] = [live, afternoon, tomorrow]) {
   const fetchMock = vi.fn((path: string) => {
     const url = new URL(path, 'http://localhost')
     const elderId = url.searchParams.get('elderId')
@@ -42,7 +42,7 @@ function installApi() {
       '/api/auth/me': () => json(family),
       '/api/elders': () => json(elders),
       '/api/visits': () => {
-        const items = elderId === '21' ? [live, afternoon, tomorrow] : [{ ...tomorrow, elderId: 22, caregiverId: null }]
+        const items = elderId === '21' ? tanMeiVisits : [{ ...tomorrow, elderId: 22, caregiverId: null }]
         return json({ items, page: 0, size: 20, totalElements: items.length })
       },
       '/api/caregivers/31': () => json({ id: 31, fullName: 'Siti Rahmah', dialects: ['Malay'] }),
@@ -121,6 +121,16 @@ describe('Family desktop layout', () => {
     expect(within(later).getByText('14:00 – 14:30')).toBeInTheDocument()
     expect(within(later).getByText('Vital signs monitoring')).toBeInTheDocument()
     expect(within(later).getByText('Siti Rahmah')).toBeInTheDocument()
+  })
+
+  it('drops a visit closed ahead of its slot from Later today and says the day is done', async () => {
+    installApi([{ ...live, status: 'COMPLETED' }, { ...afternoon, status: 'COMPLETED' }])
+    openFamily('/family/home')
+
+    expect(await screen.findByRole('heading', { name: 'Later today' })).toBeInTheDocument()
+    const later = screen.getByRole('heading', { name: 'Later today' }).parentElement!
+    expect(within(later).queryByRole('listitem')).not.toBeInTheDocument()
+    expect(within(later).getByText("All of today's visits are done.")).toBeInTheDocument()
   })
 
   it('switches the followed elder from the rail, and Schedule keeps that elder', async () => {

@@ -76,10 +76,10 @@ export function toEditorTime(startTime: string): string {
   return `${time} ${meridiem}`
 }
 
-/** Visits happen between 7:00 AM and 8:00 PM: none starts earlier, and each is over by 8:00 PM. */
-const VISITING_HOURS = { from: 7 * 60, until: 20 * 60 }
+/** Visits happen between 7:00 AM and 11:00 PM: none starts earlier, and each is over by 11:00 PM. */
+const VISITING_HOURS = { from: 7 * 60, until: 23 * 60 }
 
-/** The start times a visit may take, as the editor shows them: every half hour, 7:00 AM to 7:30 PM. */
+/** The start times a visit may take, as the editor shows them: every half hour, 7:00 AM to 10:30 PM. */
 export const HALF_HOUR_START_TIMES: string[] = Array.from(
   { length: (VISITING_HOURS.until - VISITING_HOURS.from) / 30 },
   (_, i) => {
@@ -96,7 +96,7 @@ export function isAllowedDuration(minutes: number | null): boolean {
   return minutes !== null && VISIT_DURATIONS.includes(minutes)
 }
 
-/** True when a visit at this editor time falls within visiting hours; ending exactly at 8:00 PM is fine. */
+/** True when a visit at this editor time falls within visiting hours; ending exactly at 11:00 PM is fine. */
 export function withinVisitingHours(startTime: string, minutes: number): boolean {
   const parsed = parseEditorTime(startTime)
   if (parsed === null) return false

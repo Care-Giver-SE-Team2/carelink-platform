@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, ApiError } from '../../shared/api/client'
+import { api, ApiError, newRequestId } from '../../shared/api/client'
 import { getWorkPack } from '../../features/caregiver/api'
 import type { WorkPack } from '../../features/caregiver/api'
 import { useCaregiverQuery } from '../../features/caregiver/useCaregiverQuery'
@@ -52,7 +52,7 @@ function EvidenceUpload({ pack, close, saved }: { pack: WorkPack; close: () => v
   const [file, setFile] = useState<File | null>(null)
   const [kind, setKind] = useState('PHOTO')
   const [task, setTask] = useState('')
-  const [key, setKey] = useState(() => crypto.randomUUID())
+  const [key, setKey] = useState(() => newRequestId())
   const [validation, setValidation] = useState('')
   const mutation = useSelfServiceWrite()
   const uncertain = mutation.error !== null && (!(mutation.error instanceof ApiError) || mutation.error.status >= 500)
@@ -75,9 +75,9 @@ function EvidenceUpload({ pack, close, saved }: { pack: WorkPack; close: () => v
   if (isAccessFailure(mutation.error)) return <SelfServiceError error={mutation.error} retry={close} subject="this visit's evidence" />
   return <form className={styles.formPanel} aria-label="Upload evidence" onSubmit={submit} noValidate>
     <fieldset disabled={mutation.pending || uncertain || conflict}>
-      <label>Evidence kind<select value={kind} onChange={event => { setKind(event.target.value); setKey(crypto.randomUUID()) }}><option>PHOTO</option><option>SIGNATURE</option></select></label>
-      <label>Related task (optional)<select value={task} onChange={event => { setTask(event.target.value); setKey(crypto.randomUUID()) }}><option value="">No task selected</option>{pack.tasks.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label>Evidence image<input type="file" accept="image/jpeg,image/png" onChange={event => { setFile(event.target.files?.[0] ?? null); setKey(crypto.randomUUID()) }} /></label>
+      <label>Evidence kind<select value={kind} onChange={event => { setKind(event.target.value); setKey(newRequestId()) }}><option>PHOTO</option><option>SIGNATURE</option></select></label>
+      <label>Related task (optional)<select value={task} onChange={event => { setTask(event.target.value); setKey(newRequestId()) }}><option value="">No task selected</option>{pack.tasks.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label>Evidence image<input type="file" accept="image/jpeg,image/png" onChange={event => { setFile(event.target.files?.[0] ?? null); setKey(newRequestId()) }} /></label>
     </fieldset>
     {validation && <p role="alert">{validation}</p>}
     {mutation.error !== null && <p role="alert">{uncertain ? 'Upload result unknown. Keep this file and request unchanged; retry this request or close and check the saved list before a new submission.' : mutation.error instanceof ApiError ? mutation.error.message : 'Unable to upload.'}</p>}

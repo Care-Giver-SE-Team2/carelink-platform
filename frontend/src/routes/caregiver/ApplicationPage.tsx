@@ -5,7 +5,7 @@ import { editApplication, getAdmission, resubmitApplication, updateContact } fro
 import type { Admission } from '../../features/admission/api'
 import type { CaregiverProfile } from '../../features/caregiver/api'
 import { useCaregiverQuery } from '../../features/caregiver/useCaregiverQuery'
-import { ApiError } from '../../shared/api/client'
+import { ApiError, newRequestId } from '../../shared/api/client'
 import { phoneError, normalizeSgPhone } from '../../shared/validation/sg'
 import { useSelfServiceWrite } from './selfService'
 import ApplicationFields from './ApplicationFields'
@@ -44,7 +44,7 @@ export default function ApplicationPage({ profile, refreshProfile }: { profile: 
     {data.canEdit && !editing && <button className={styles.button} onClick={() => { setEditing(data); setNotice('') }}>Edit application</button>}
     {editing && data.canEdit && <EditForm source={editing} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); setNotice('Application details saved.'); reload(); refreshProfile() }} />}
     {data.canResubmit && !editing && <button className={styles.button} disabled={mutation.pending} onClick={() => {
-      const attempt = resubmission ?? { version: data.version, key: crypto.randomUUID() }; setResubmission(attempt)
+      const attempt = resubmission ?? { version: data.version, key: newRequestId() }; setResubmission(attempt)
       void mutation.send(signal => resubmitApplication(attempt.version, attempt.key, signal), () => { setResubmission(null); setNotice('Application resubmitted — awaiting admission approval.'); reload() })
     }}>Resubmit application</button>}
     {mutation.error !== null && <p role="alert">{message}</p>}
@@ -55,7 +55,7 @@ export default function ApplicationPage({ profile, refreshProfile }: { profile: 
 }
 function EditForm({ source, onCancel, onSaved }: { source: Admission; onCancel: () => void; onSaved: () => void }) {
   const [values, setValues] = useState(source.application!.details)
-  const [key, setKey] = useState(() => crypto.randomUUID())
+  const [key, setKey] = useState(() => newRequestId())
   const [validation, setValidation] = useState('')
   const mutation = useSelfServiceWrite()
   const uncertain = mutation.error !== null && (!(mutation.error instanceof ApiError) || mutation.error.status >= 500)
@@ -65,7 +65,7 @@ function EditForm({ source, onCancel, onSaved }: { source: Admission; onCancel: 
     void mutation.send(signal => editApplication(normalizedDetails(values), source.version, key, signal), onSaved)
   }
   return <form className={styles.formPanel} aria-label="Edit application" onSubmit={submit} noValidate>
-    <fieldset disabled={mutation.pending || uncertain}><ApplicationFields values={values} onChange={next => { setValues(next); setKey(crypto.randomUUID()) }} /></fieldset>
+    <fieldset disabled={mutation.pending || uncertain}><ApplicationFields values={values} onChange={next => { setValues(next); setKey(newRequestId()) }} /></fieldset>
     {validation && <p role="alert">{validation}</p>}
     {mutation.error !== null && <p role="alert">{mutation.error instanceof ApiError ? mutation.error.message : 'Unknown result. Refresh to check; retry only the same unchanged request.'}</p>}
     <button className={styles.button} disabled={mutation.pending} type="submit">{uncertain ? 'Retry unchanged request' : 'Save application'}</button>
@@ -76,7 +76,7 @@ function EditForm({ source, onCancel, onSaved }: { source: Admission; onCancel: 
 }
 function ContactForm({ profile, admission, onSaved, onCancel }: { profile: CaregiverProfile; admission: Admission; onSaved: () => void; onCancel: () => void }) {
   const [phone, setPhone] = useState(profile.phone ?? '')
-  const [key, setKey] = useState(() => crypto.randomUUID())
+  const [key, setKey] = useState(() => newRequestId())
   const [invalid, setInvalid] = useState('')
   const mutation = useSelfServiceWrite()
   const uncertain = mutation.error !== null && (!(mutation.error instanceof ApiError) || mutation.error.status >= 500)
@@ -86,7 +86,7 @@ function ContactForm({ profile, admission, onSaved, onCancel }: { profile: Careg
     void mutation.send(signal => updateContact(normalizeSgPhone(phone)!, admission.version, key, signal), onSaved)
   }
   return <form className={styles.formPanel} aria-label="Contact details" onSubmit={save} noValidate><h2>Contact details</h2>
-    <label>Current mobile number<input type="tel" value={phone} disabled={mutation.pending || uncertain} onChange={e => { setPhone(e.target.value); setKey(crypto.randomUUID()) }} /></label>
+    <label>Current mobile number<input type="tel" value={phone} disabled={mutation.pending || uncertain} onChange={e => { setPhone(e.target.value); setKey(newRequestId()) }} /></label>
     {invalid && <p role="alert">{invalid}</p>}{mutation.error !== null && <p role="alert">{mutation.error instanceof ApiError ? mutation.error.message : 'Unknown result. Refresh before retrying.'}</p>}
     <button className={styles.button} disabled={mutation.pending}>{uncertain ? 'Retry unchanged request' : 'Save contact details'}</button>
     <button className={styles.button} disabled={mutation.pending} type="button" onClick={() => { if (phone === (profile.phone ?? '') || window.confirm('Discard this contact draft? Check saved contact details before starting a new request if the result is unknown.')) onCancel() }}>Close editor</button>

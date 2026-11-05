@@ -70,12 +70,12 @@ const HALF_HOURS: SelectItem[] = HALF_HOUR_START_TIMES.map((time) => ({ value: t
 /** The half hours in visiting hours, led by the day's current time when it is a time but not one of them. */
 function startTimeOptions(current: string): SelectItem[] {
   if (HALF_HOUR_START_TIMES.includes(current) || parseEditorTime(current) === null) return HALF_HOURS
-  const why = isOnHalfHour(current) ? 'outside 7 AM – 8 PM' : 'pick :00 or :30'
+  const why = isOnHalfHour(current) ? 'outside 7 AM – 11 PM' : 'pick :00 or :30'
   return [{ value: current, label: `${current} – ${why}` }, ...HALF_HOURS]
 }
 
 /**
- * The 30-minute blocks that end by 8:00 PM from this start, led by the day's current length when
+ * The 30-minute blocks that end by 11:00 PM from this start, led by the day's current length when
  * it is set but not one of them, labelled with why.
  */
 function durationOptions(current: number | null, startTime: string): SelectItem[] {
@@ -86,7 +86,7 @@ function durationOptions(current: number | null, startTime: string): SelectItem[
   }))
   if (current === null || current <= 0 || options.some((o) => o.value === String(current))) return options
   const why = VISIT_DURATIONS.includes(current)
-    ? `${durationLabel(current)} – runs past 8 PM`
+    ? `${durationLabel(current)} – runs past 11 PM`
     : `${current} min – pick 30 min steps`
   return [{ value: String(current), label: why }, ...options]
 }
