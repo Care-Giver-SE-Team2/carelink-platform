@@ -66,7 +66,7 @@ describe('DaySchedule', () => {
     expect(screen.getByLabelText('Monday start time')).toHaveValue('8:15 AM')
     expect(screen.getByRole('option', { name: '8:15 AM – pick :00 or :30' })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: '6:30 AM' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: '8:00 PM' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: '11:00 PM' })).not.toBeInTheDocument()
   })
 
   it('shows a time saved outside visiting hours until one inside them is picked', () => {
@@ -74,17 +74,17 @@ describe('DaySchedule', () => {
     render(<DaySchedule value={value} onChange={vi.fn()} />)
 
     expect(screen.getByLabelText('Monday start time')).toHaveValue('6:00 AM')
-    expect(screen.getByRole('option', { name: '6:00 AM – outside 7 AM – 8 PM' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '6:00 AM – outside 7 AM – 11 PM' })).toBeInTheDocument()
   })
 
-  it('offers only the lengths that end by 8:00 PM, and flags one left too long by a later start', () => {
-    const value = { ...emptyDaySchedule(), sat: { active: true, startTime: '6:00 PM', minutes: 240 } }
+  it('offers only the lengths that end by 11:00 PM, and flags one left too long by a later start', () => {
+    const value = { ...emptyDaySchedule(), sat: { active: true, startTime: '9:00 PM', minutes: 240 } }
     render(<DaySchedule value={value} onChange={vi.fn()} />)
 
     const minutes = screen.getByLabelText('Saturday minutes') as HTMLSelectElement
     expect(minutes).toHaveValue('240')
     expect(Array.from(minutes.options).map((o) => o.text)).toEqual([
-      '4 h – runs past 8 PM', '30 min', '1 h', '1 h 30 min', '2 h',
+      '4 h – runs past 11 PM', '30 min', '1 h', '1 h 30 min', '2 h',
     ])
   })
 

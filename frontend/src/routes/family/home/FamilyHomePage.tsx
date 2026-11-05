@@ -139,19 +139,24 @@ function NeedsAnswer({ showElder }: { showElder: boolean }) {
   </section>
 }
 
-/** Desktop only: the rest of today's visits after the one shown above. Hidden when there are none. */
+/**
+ * Desktop only: the rest of today's visits after the one shown above. A visit closed ahead of its
+ * slot drops out; if that empties the list it says today is done. Hidden when there were none.
+ */
 function LaterToday({ visits, after, today, now, primary }: {
   visits: FamilyVisit[]; after?: FamilyVisit; today: string; now: number; primary: { id: number; name: string } | null
 }) {
   const from = after ? after.scheduledStart : new Date(now).toISOString()
-  const later = visits
+  const ahead = visits
     .filter((visit) => visit.id !== after?.id && visit.status !== 'CANCELLED'
       && singaporeToday(new Date(visit.scheduledStart)) === today && visit.scheduledStart > from)
+  const later = ahead
+    .filter((visit) => !closedStates.includes(visit.status))
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart))
-  if (later.length === 0) return null
+  if (ahead.length === 0) return null
   return <section aria-labelledby="home-later">
     <h2 id="home-later" className={styles.sectionLabel}>Later today</h2>
-    <ul className={styles.later}>
+    {later.length === 0 ? <p className={styles.card}>All of today's visits are done.</p> : <ul className={styles.later}>
       {later.map((visit) => <li key={visit.id}>
         <span className={styles.laterTime}>
           {visitTime(visit.scheduledStart)}{visit.scheduledEnd && ` – ${visitTime(visit.scheduledEnd)}`}
@@ -160,7 +165,7 @@ function LaterToday({ visits, after, today, now, primary }: {
         <span className={styles.laterCaregiver}>{visit.caregiverId === null ? 'Awaiting caregiver'
           : visit.caregiverId === primary?.id ? primary.name : 'Caregiver assigned'}</span>
       </li>)}
-    </ul>
+    </ul>}
   </section>
 }
 

@@ -5,7 +5,7 @@ import { getAvailability, getWorkSettings, saveAvailability, savePreferences } f
 import type { AvailabilityWindow, WeeklyWindow, WorkPreferences, WorkSettingsView } from '../../features/caregiver/workSettings'
 import { useCaregiverQuery } from '../../features/caregiver/useCaregiverQuery'
 import { todayInSingapore } from './format'
-import { ApiError } from '../../shared/api/client'
+import { ApiError, newRequestId } from '../../shared/api/client'
 import EnglishDateField from './EnglishDateField'
 import SelfServiceError from './SelfServiceError'
 import { isAccessFailure, useSelfServiceWrite } from './selfService'
@@ -57,7 +57,7 @@ export default function WorkSettingsPage({ mode }: { mode: 'availability' | 'pre
 function SettingsEditor({ mode, date, source, close, saved }: { mode: 'availability' | 'preferences'; date: string; source: WorkSettingsView; close: () => void; saved: () => void }) {
   const [windows, setWindows] = useState<AvailabilityWindow[]>(() => (source.settings.availability.find(day => day.date === date)?.windows ?? []).map(w => ({ ...w, start: shortTime(w.start), end: shortTime(w.end) })))
   const [preferences, setPreferences] = useState<WorkPreferences>(() => ({ ...source.settings.preferences, weeklyWindows: source.settings.preferences.weeklyWindows.map(w => ({ ...w, start: shortTime(w.start), end: shortTime(w.end) })) }))
-  const [key, setKey] = useState(() => crypto.randomUUID())
+  const [key, setKey] = useState(() => newRequestId())
   const [validation, setValidation] = useState('')
   const [reviewed, setReviewed] = useState(false)
   const mutation = useSelfServiceWrite()
@@ -65,7 +65,7 @@ function SettingsEditor({ mode, date, source, close, saved }: { mode: 'availabil
   const errorCode = mutation.error instanceof ApiError && mutation.error.body && typeof mutation.error.body === 'object' && 'code' in mutation.error.body ? String(mutation.error.body.code) : ''
   const conflict = errorCode === 'WORK_SETTINGS_VERSION_CONFLICT' || errorCode === 'WORK_SETTINGS_REQUEST_CONFLICT'
   useUnsavedCaregiverForm(true)
-  const change = (next: WorkPreferences) => { setPreferences(next); setKey(crypto.randomUUID()) }
+  const change = (next: WorkPreferences) => { setPreferences(next); setKey(newRequestId()) }
   function submit(event: FormEvent) {
     event.preventDefault()
     if (source.settings.dataIssues.length > 0 && !reviewed) { setValidation('Confirm that you reviewed the existing data issues before replacement.'); return }
@@ -79,11 +79,11 @@ function SettingsEditor({ mode, date, source, close, saved }: { mode: 'availabil
     <fieldset disabled={mutation.pending || uncertain || conflict}>
       {mode === 'availability' ? <>
         {windows.map((window, index) => <div className={styles.dateForm} key={index}>
-          <label>Status {index + 1}<select value={window.status} onChange={event => { setWindows(windows.map((w, i) => i === index ? { ...w, status: event.target.value as AvailabilityWindow['status'] } : w)); setKey(crypto.randomUUID()) }}><option value="AVAILABLE">Available</option><option value="UNAVAILABLE">Unavailable</option></select></label>
-          <TimeFields value={window} index={index} change={next => { setWindows(windows.map((w, i) => i === index ? { ...w, ...next } : w)); setKey(crypto.randomUUID()) }} />
-          <button type="button" onClick={() => { setWindows(windows.filter((_, i) => i !== index)); setKey(crypto.randomUUID()) }}>Remove window {index + 1}</button>
+          <label>Status {index + 1}<select value={window.status} onChange={event => { setWindows(windows.map((w, i) => i === index ? { ...w, status: event.target.value as AvailabilityWindow['status'] } : w)); setKey(newRequestId()) }}><option value="AVAILABLE">Available</option><option value="UNAVAILABLE">Unavailable</option></select></label>
+          <TimeFields value={window} index={index} change={next => { setWindows(windows.map((w, i) => i === index ? { ...w, ...next } : w)); setKey(newRequestId()) }} />
+          <button type="button" onClick={() => { setWindows(windows.filter((_, i) => i !== index)); setKey(newRequestId()) }}>Remove window {index + 1}</button>
         </div>)}
-        <button type="button" disabled={windows.length >= 8} onClick={() => { setWindows([...windows, { start: '09:00', end: '12:00', status: 'AVAILABLE' }]); setKey(crypto.randomUUID()) }}>Add window</button>
+        <button type="button" disabled={windows.length >= 8} onClick={() => { setWindows([...windows, { start: '09:00', end: '12:00', status: 'AVAILABLE' }]); setKey(newRequestId()) }}>Add window</button>
         {windows.length === 0 && <p>Saving no windows clears this day to Unspecified. It does not request leave or make you unavailable all day.</p>}
       </> : <>
         <Choices title="Preferred services" values={source.catalog.serviceCodes} selected={preferences.serviceCodes} change={serviceCodes => change({ ...preferences, serviceCodes })} />

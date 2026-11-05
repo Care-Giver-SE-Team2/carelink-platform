@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ApiError } from '../../shared/api/client'
+import { ApiError, newRequestId } from '../../shared/api/client'
 import { getCredential, getCredentials, getCredentialTypes, submitCredential } from '../../features/credentials/api'
 import type { Credential, CredentialPage, CredentialType, Submission } from '../../features/credentials/api'
 import { useCaregiverQuery } from '../../features/caregiver/useCaregiverQuery'
@@ -108,7 +108,7 @@ function CertificateForm({ source, types, onCancel, onSaved, onDenied }: { sourc
       if (!issuer.trim() || issuer.trim().length > 150 || number.trim().length > 100 || !isCalendarDate(validFrom)
         || (!noExpiry && (!isCalendarDate(expiryDate) || expiryDate < validFrom || expiryDate < todayInSingapore()))) { setError('Choose valid dates and an issuing body. Expiry must include today or later, unless No expiry is selected.'); return }
       if (files.length < 1 || files.length > 3 || files.some(file => file.size === 0 || file.size > 5 * 1024 * 1024 || !/\.(jpe?g|png|pdf)$/i.test(file.name))) { setError('Select 1 to 3 JPEG, PNG or PDF documents, each non-empty and at most 5 MiB.'); return }
-      frozen.current = { credentialTypeId: typeId, certificateNo: number.trim(), issuingBody: issuer.trim(), validFrom, expiryDate, noExpiry, files, clientRequestId: crypto.randomUUID() }
+      frozen.current = { credentialTypeId: typeId, certificateNo: number.trim(), issuingBody: issuer.trim(), validFrom, expiryDate, noExpiry, files, clientRequestId: newRequestId() }
     }
     setPending(true)
     const controller = new AbortController(); request.current = controller

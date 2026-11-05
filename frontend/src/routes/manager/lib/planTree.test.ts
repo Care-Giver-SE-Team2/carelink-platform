@@ -140,17 +140,17 @@ describe('visit lengths', () => {
 })
 
 describe('visiting hours', () => {
-  it('allows a visit from 7:00 AM that ends by 8:00 PM, and nothing outside that', () => {
+  it('allows a visit from 7:00 AM that ends by 11:00 PM, and nothing outside that', () => {
     expect(withinVisitingHours('7:00 AM', 30)).toBe(true)
-    expect(withinVisitingHours('7:30 PM', 30)).toBe(true)
-    expect(withinVisitingHours('4:00 PM', 240)).toBe(true)
+    expect(withinVisitingHours('10:30 PM', 30)).toBe(true)
+    expect(withinVisitingHours('7:00 PM', 240)).toBe(true)
     expect(withinVisitingHours('6:30 AM', 30)).toBe(false)
-    expect(withinVisitingHours('7:30 PM', 60)).toBe(false)
+    expect(withinVisitingHours('10:30 PM', 60)).toBe(false)
     expect(withinVisitingHours('soon', 30)).toBe(false)
   })
 
-  it('leaves a schedule incomplete while a day that’s on runs past 8:00 PM', () => {
-    const schedule = dayScheduleFromVisits([{ day: 'Sat', startTime: '18:00', minutes: 180 }])
+  it('leaves a schedule incomplete while a day that’s on runs past 11:00 PM', () => {
+    const schedule = dayScheduleFromVisits([{ day: 'Sat', startTime: '21:00', minutes: 180 }])
     expect(isScheduleComplete(schedule)).toBe(false)
     schedule.sat = { ...schedule.sat, minutes: 120 }
     expect(isScheduleComplete(schedule)).toBe(true)
@@ -158,10 +158,10 @@ describe('visiting hours', () => {
 })
 
 describe('half-hour start times', () => {
-  it('offers every half hour in visiting hours, 7:00 AM to 7:30 PM', () => {
-    expect(HALF_HOUR_START_TIMES).toHaveLength(26)
+  it('offers every half hour in visiting hours, 7:00 AM to 10:30 PM', () => {
+    expect(HALF_HOUR_START_TIMES).toHaveLength(32)
     expect(HALF_HOUR_START_TIMES.slice(0, 3)).toEqual(['7:00 AM', '7:30 AM', '8:00 AM'])
-    expect(HALF_HOUR_START_TIMES.at(-1)).toBe('7:30 PM')
+    expect(HALF_HOUR_START_TIMES.at(-1)).toBe('10:30 PM')
     expect(HALF_HOUR_START_TIMES.every(isOnHalfHour)).toBe(true)
   })
 
