@@ -18,7 +18,7 @@ import sg.nus.carelink.report.domain.model.ProviderJob;
 import sg.nus.carelink.report.domain.repository.ProviderJobs;
 
 /**
- * {@link ProviderJobs} in {@code report_provider_job} and {@code report_provider_job_key} (migration V3).
+ * {@link ProviderJobs} in {@code report_provider_job} and {@code report_provider_job_key} (migration V6).
  * Times are bound and read as {@link LocalDateTime}: Singapore wall-clock time, as the JPA entities
  * beside them write theirs.
  */
@@ -26,6 +26,12 @@ import sg.nus.carelink.report.domain.repository.ProviderJobs;
 class JdbcProviderJobs implements ProviderJobs {
 
 	private static final String SELECT = "select * from report_provider_job ";
+	/** Every status when {@code :allStatuses} is true, else only those in {@code :statuses}. */
+	private static final String STATUS_FILTER = " and (:allStatuses or status in (:statuses))";
+	private static final String FIND_BY_PROVIDER = SELECT + "where provider_id = :providerId" + STATUS_FILTER
+			+ " order by dispatched_at desc, id desc limit :size offset :offset";
+	private static final String COUNT_BY_PROVIDER =
+			"select count(*) from report_provider_job where provider_id = :providerId" + STATUS_FILTER;
 
 	private final JdbcClient jdbc;
 
@@ -121,9 +127,9 @@ class JdbcProviderJobs implements ProviderJobs {
 
 	@Override
 	public List<ProviderJob> findByProvider(Long providerId, Set<ProviderJob.Status> statuses, int page, int size) {
-		return jdbc.sql(SELECT + "where provider_id = :providerId" + statusFilter(statuses)
-				+ " order by dispatched_at desc, id desc limit :size offset :offset")
+		return jdbc.sql(FIND_BY_PROVIDER)
 				.param("providerId", providerId)
+				.param("allStatuses", statuses.isEmpty())
 				.param("statuses", names(statuses))
 				.param("size", size)
 				.param("offset", (long) page * size)
@@ -133,9 +139,9 @@ class JdbcProviderJobs implements ProviderJobs {
 
 	@Override
 	public long countByProvider(Long providerId, Set<ProviderJob.Status> statuses) {
-		return jdbc.sql("select count(*) from report_provider_job where provider_id = :providerId"
-				+ statusFilter(statuses))
+		return jdbc.sql(COUNT_BY_PROVIDER)
 				.param("providerId", providerId)
+				.param("allStatuses", statuses.isEmpty())
 				.param("statuses", names(statuses))
 				.query(Long.class)
 				.single();
@@ -182,10 +188,6 @@ class JdbcProviderJobs implements ProviderJobs {
 	@Override
 	public int forgetKeysBefore(LocalDateTime cutoff) {
 		return jdbc.sql("delete from report_provider_job_key where created_at < ?").param(cutoff).update();
-	}
-
-	private static String statusFilter(Set<ProviderJob.Status> statuses) {
-		return statuses.isEmpty() ? "" : " and status in (:statuses)";
 	}
 
 	/** A list the {@code in} clause can take; never empty, as MySQL refuses {@code in ()}. */
