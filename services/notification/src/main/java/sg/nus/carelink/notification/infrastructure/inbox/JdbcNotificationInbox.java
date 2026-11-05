@@ -44,10 +44,13 @@ class JdbcNotificationInbox implements NotificationInbox {
 	 * The family rule. A message about a care record is shown while the reader may read its elder,
 	 * and not otherwise; one that names no elder is not shown at all. Only a message with neither
 	 * resource type nor resource ID is account-only; unknown resource types must not bypass the
-	 * care-content authorization rule.
+	 * care-content authorization rule. A binding request (FAMILY_BINDING) is shown to the family
+	 * member it was sent to whatever its status: it waits on their answer rather than showing care
+	 * content, and the reader is already its recipient.
 	 */
 	private static final String FAMILY_SCOPE = """
 			  and ((n.resource_type is null and n.resource_id is null)
+			       or n.resource_type = 'FAMILY_BINDING'
 			       or (n.resource_type in ('INCIDENT', 'ROSTER_CHANGE', 'SPOT_CHECK', 'VALUE_ADDED_REQUEST', 'CARE_PLAN')
 			           and n.elder_id in (:elders)))
 			""";

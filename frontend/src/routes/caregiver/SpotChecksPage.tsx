@@ -54,7 +54,7 @@ export default function SpotChecksPage() {
   }
 
   return <div className={styles.page}>
-    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>Spot checks</h1><p className={styles.muted}>Read completed checks of your work and respond to the findings.</p></div><button className={styles.button} onClick={reload}>Refresh</button></div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>Spot checks</h1><p className={styles.muted}>Read completed checks of your work and respond to the findings.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} onClick={reload}>Refresh</button></div>
     <p className={styles.readOnly}>Only your completed conclusions are shown. Your response does not change the manager's conclusion. Saving a change replaces your current response.</p>
     <label className={styles.filterLabel}>Response status<select value={effectiveFilter} onChange={event => {
       const next = new URLSearchParams(params); next.delete('spotCheckId'); setParams(next, { replace: true }); setFilter(event.target.value as typeof filter)

@@ -54,12 +54,12 @@ public class CaregiverIncidentReportingService {
     }
     @Transactional(readOnly = true)
     public View own(String username, Long id) {
-        Long actor = directory.require(username).userId();
+        Long actor = directory.require(username).requireAdmittedHistory().userId();
         return new View(incidents.own(actor, id), receipts.incidentKey(actor, id).orElse(null));
     }
     @Transactional(readOnly = true)
     public Page list(String username, Long visit, int page, int size) {
-        Long actor = directory.require(username).userId();
+        Long actor = directory.require(username).requireAdmittedHistory().userId();
         var reports = incidents.list(actor, visit, page, size);
         return new Page(reports.items().stream().map(r -> new View(r, receipts.incidentKey(actor, r.id()).orElse(null))).toList(), page, size, reports.totalElements());
     }

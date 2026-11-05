@@ -1,0 +1,374 @@
+{
+  "schemaVersion": 1,
+  "applicationCommit": "09d6a3f9ec453906f613efd0af7f99fad4fdd8d3",
+  "engineCommit": "c5b13e2d91b9e5daa8cb536b8427fa184f60d394",
+  "board2ReviewedCommit": "ade044a8bf47c97bb0017dd4445405552ce97b07",
+  "cloudRelease": "UNCONFIRMED",
+  "sourceObjects": {
+    "services": "aee720afe14b6ba2b2b8bfd37b1b8f917ca95548",
+    "libs": "8228577eea523ae1c60bef19fdca5440bb505d7b",
+    "frontend": "107c4cd4acbaaec105aa87302a500b91c1c1262e",
+    "charts": "b8d9c4a844acded74ed1c010ea0dc8fbbe1f6162",
+    "deploy": "a1eece7d84777386102186d48a4a4802a84391e6",
+    "infra": "571230fa5697624b4c55819896b951a984339e30",
+    "scripts": "7703055bdfea409a7f0e7b15edc3d92f6d6a542e",
+    "pom.xml": "56ef6711439f3a94dfa456bbd9f4d4d05d1e6836",
+    ".mvn": "282ae9ee2617d45a3fa5c2c7f133ad43071032f3",
+    "mvnw": "bd8896bf2217b46faa0291585e01ac1a3441a958",
+    "mvnw.cmd": "92450f93273470af42eeee491874afb2039b700a",
+    ".github": "90c69105361434bc330b21db8fa22673966c59f7",
+    "docker-compose.yml": "df6793e24c5efd00526448a98c0476aa20ab07b4",
+    ".dockerignore": "9d8864a37b4030e6720ed5feba5862eaff5927c6"
+  },
+  "engineGitBlobSha256": {
+    "load.py": "5ab58bcf9c061ce7f63c767a736fe6a92a240741bbd34e00196e6c507192b321",
+    "compare_read.py": "fd8af7fd2abdc336cad504fc203adc93b7cf212c1fe47590ac5c66c8ef6a16f3",
+    "example.joint.json": "b4edf49c809177f170747d250a77c7c6fbe27c1e628021a216daee22b7d0d7ee"
+  },
+  "migrationEncoding": "UTF-8; no SQL placeholders",
+  "checksumMethod": "Flyway 12.4.0 line-normalized signed CRC32; SHA256 is a separate Git-blob hash",
+  "expectedVersions": {
+    "core": 28,
+    "visit": 5,
+    "report": 5,
+    "notification": 3
+  },
+  "migrations": [
+    {
+      "service": "core",
+      "version": "1",
+      "script": "V1__baseline.sql",
+      "path": "services/core/src/main/resources/db/migration/V1__baseline.sql",
+      "gitBlobSha256": "965b6db1fba8f194c40a8f351d51e57a8035e1493b334ac7ef7462fd2a1de1e4",
+      "flywayChecksum": -766878
+    },
+    {
+      "service": "core",
+      "version": "2",
+      "script": "V2__care_domain.sql",
+      "path": "services/core/src/main/resources/db/migration/V2__care_domain.sql",
+      "gitBlobSha256": "8f2537e7bba52eeb981e6febbe1005873fd66188a75ce93b77117e4998632dd3",
+      "flywayChecksum": -728354739
+    },
+    {
+      "service": "core",
+      "version": "3",
+      "script": "V3__stop_care_plan.sql",
+      "path": "services/core/src/main/resources/db/migration/V3__stop_care_plan.sql",
+      "gitBlobSha256": "19c59fd316da04a981a3f8249a8351cf23f0a52f44fb1ec904cad0f24db9648d",
+      "flywayChecksum": 1176559857
+    },
+    {
+      "service": "core",
+      "version": "4",
+      "script": "V4__flatten_care_plan_node.sql",
+      "path": "services/core/src/main/resources/db/migration/V4__flatten_care_plan_node.sql",
+      "gitBlobSha256": "bdcb53a0c2a869e9ae15793d51374bcd97e5065b0ff8a4451b90838317942220",
+      "flywayChecksum": -468232710
+    },
+    {
+      "service": "core",
+      "version": "5",
+      "script": "V5__drop_care_plan_node_service_type.sql",
+      "path": "services/core/src/main/resources/db/migration/V5__drop_care_plan_node_service_type.sql",
+      "gitBlobSha256": "5612f2c29f40a2381e59b3592837a9ae08c3ea8eeb11afc3946de9c50178cc16",
+      "flywayChecksum": -461535555
+    },
+    {
+      "service": "core",
+      "version": "6",
+      "script": "V6__care_plan_start_date.sql",
+      "path": "services/core/src/main/resources/db/migration/V6__care_plan_start_date.sql",
+      "gitBlobSha256": "12f752528dcadb7be6f25255f373fd01e072a6119f13abec5aac5e1a5c87e441",
+      "flywayChecksum": -879592470
+    },
+    {
+      "service": "core",
+      "version": "7",
+      "script": "V7__elder_service_dispute_incident_source.sql",
+      "path": "services/core/src/main/resources/db/migration/V7__elder_service_dispute_incident_source.sql",
+      "gitBlobSha256": "0c2e813fa9cd4b293a7add5422e8b3796548a7c8af03f083d82a648ba9ce8849",
+      "flywayChecksum": 457372633
+    },
+    {
+      "service": "core",
+      "version": "8",
+      "script": "V8__report_amendment.sql",
+      "path": "services/core/src/main/resources/db/migration/V8__report_amendment.sql",
+      "gitBlobSha256": "0b1ac22124223d526e8662372016c84e1d94b4a47f1f5513c5f7fdbeb581b4b2",
+      "flywayChecksum": 1836072364
+    },
+    {
+      "service": "core",
+      "version": "9",
+      "script": "V9__elder_primary_caregiver.sql",
+      "path": "services/core/src/main/resources/db/migration/V9__elder_primary_caregiver.sql",
+      "gitBlobSha256": "3ae356b416dbf099160bb394f0184786c19eddeb071b028b620460be6e54133d",
+      "flywayChecksum": -512060905
+    },
+    {
+      "service": "core",
+      "version": "10",
+      "script": "V10__care_plan_node_visit.sql",
+      "path": "services/core/src/main/resources/db/migration/V10__care_plan_node_visit.sql",
+      "gitBlobSha256": "d7ff218197c92a15a6a945742a8515e40254281dae0b76adfbf87b533073f1c0",
+      "flywayChecksum": -561518148
+    },
+    {
+      "service": "core",
+      "version": "11",
+      "script": "V11__credential_review.sql",
+      "path": "services/core/src/main/resources/db/migration/V11__credential_review.sql",
+      "gitBlobSha256": "e287625310918e6f17036b9041549d016e01e74ef5029dda0057bc396698f9aa",
+      "flywayChecksum": -1043063645
+    },
+    {
+      "service": "core",
+      "version": "12",
+      "script": "V12__absence_rerostering.sql",
+      "path": "services/core/src/main/resources/db/migration/V12__absence_rerostering.sql",
+      "gitBlobSha256": "72dc3e82dd3496212a3a60237ad7933e981618a8ad69ca6e1a9ca4f31248fbc0",
+      "flywayChecksum": -276744204
+    },
+    {
+      "service": "core",
+      "version": "13",
+      "script": "V13__spot_check_conclusion.sql",
+      "path": "services/core/src/main/resources/db/migration/V13__spot_check_conclusion.sql",
+      "gitBlobSha256": "02b19e3763af33266a2ef5796ff02767010b119241f5db5b97c80fe9c3f74ea4",
+      "flywayChecksum": 462914158
+    },
+    {
+      "service": "core",
+      "version": "14",
+      "script": "V14__seed_value_added_services.sql",
+      "path": "services/core/src/main/resources/db/migration/V14__seed_value_added_services.sql",
+      "gitBlobSha256": "c8b58e16140d6785ebdca00c57e0b643dd228c97ab4bc6eadd1fb3212dee4e16",
+      "flywayChecksum": -1677146032
+    },
+    {
+      "service": "core",
+      "version": "15",
+      "script": "V15__family_alert_delivery.sql",
+      "path": "services/core/src/main/resources/db/migration/V15__family_alert_delivery.sql",
+      "gitBlobSha256": "9c3f9f0a7f48e07bdc412a3018e051de2eea25267738a7cfb6654550fa35b323",
+      "flywayChecksum": 1833942631
+    },
+    {
+      "service": "core",
+      "version": "16",
+      "script": "V16__caregiver_command_receipt.sql",
+      "path": "services/core/src/main/resources/db/migration/V16__caregiver_command_receipt.sql",
+      "gitBlobSha256": "4cb3da121f6d94fbd77a58c350769610da9775755b3d67957eae85eec1b95620",
+      "flywayChecksum": 1295585224
+    },
+    {
+      "service": "core",
+      "version": "17",
+      "script": "V17__visit_check_in_and_task_uniqueness.sql",
+      "path": "services/core/src/main/resources/db/migration/V17__visit_check_in_and_task_uniqueness.sql",
+      "gitBlobSha256": "b4e403cc2bab9b84f9e8980c66b69a3fda1b73a5a58254ee499b695da2b47f47",
+      "flywayChecksum": -216226740
+    },
+    {
+      "service": "core",
+      "version": "18",
+      "script": "V18__visit_missed_check_in_trigger.sql",
+      "path": "services/core/src/main/resources/db/migration/V18__visit_missed_check_in_trigger.sql",
+      "gitBlobSha256": "9a1d47f2cf1c851e673b79adb5a36bac83ce09f31b72c1c7ed458615c61d24c6",
+      "flywayChecksum": -380969238
+    },
+    {
+      "service": "core",
+      "version": "19",
+      "script": "V19__incident_description_and_report_basis.sql",
+      "path": "services/core/src/main/resources/db/migration/V19__incident_description_and_report_basis.sql",
+      "gitBlobSha256": "24d29003473dc2b04905a1633623e113d31382f4e782b5cfd81b27e6f0563e95",
+      "flywayChecksum": -2116843670
+    },
+    {
+      "service": "core",
+      "version": "20",
+      "script": "V20__visit_health_records.sql",
+      "path": "services/core/src/main/resources/db/migration/V20__visit_health_records.sql",
+      "gitBlobSha256": "d6a9dcc4220ed7a34631bb2ec426a3755491e62dd502615894d9bc1b54e46164",
+      "flywayChecksum": 503757286
+    },
+    {
+      "service": "core",
+      "version": "21",
+      "script": "V21__family_care_service_application.sql",
+      "path": "services/core/src/main/resources/db/migration/V21__family_care_service_application.sql",
+      "gitBlobSha256": "4d5ca2d067a78b3a9d7065665e899a0a3171df7ed0fde99afa84c7d5d5a4d82b",
+      "flywayChecksum": 27408493
+    },
+    {
+      "service": "core",
+      "version": "22",
+      "script": "V22__value_added_service_duration.sql",
+      "path": "services/core/src/main/resources/db/migration/V22__value_added_service_duration.sql",
+      "gitBlobSha256": "19dd8c5a403c39fcd949e9a97b1ccc6c05df392444670bd6f1cb1efff59f6f5a",
+      "flywayChecksum": -568160987
+    },
+    {
+      "service": "core",
+      "version": "23",
+      "script": "V23__visit_instructions.sql",
+      "path": "services/core/src/main/resources/db/migration/V23__visit_instructions.sql",
+      "gitBlobSha256": "aea6cf50cd92e720781ea196dfb8511232089acc3f5dcb2aa075b85b732f787e",
+      "flywayChecksum": -969942316
+    },
+    {
+      "service": "core",
+      "version": "24",
+      "script": "V24__care_plan_node_activity_code.sql",
+      "path": "services/core/src/main/resources/db/migration/V24__care_plan_node_activity_code.sql",
+      "gitBlobSha256": "d827f342b89c4494e55f97c68d13b066703baab796491a5c822f814aa7bdb82a",
+      "flywayChecksum": -384056573
+    },
+    {
+      "service": "core",
+      "version": "25",
+      "script": "V25__service_application_decline.sql",
+      "path": "services/core/src/main/resources/db/migration/V25__service_application_decline.sql",
+      "gitBlobSha256": "cf3a9c9aa4afcf364c845e36c42b0403f4e2a9c68b468db846b772897b9e3c16",
+      "flywayChecksum": 993302770
+    },
+    {
+      "service": "core",
+      "version": "26",
+      "script": "V26__caregiver_admission.sql",
+      "path": "services/core/src/main/resources/db/migration/V26__caregiver_admission.sql",
+      "gitBlobSha256": "a91fe6adb271e28ab26203a0d7cb8badbe20ed8d050679c006615920dbe54281",
+      "flywayChecksum": 1119888666
+    },
+    {
+      "service": "core",
+      "version": "27",
+      "script": "V27__caregiver_credential_submission.sql",
+      "path": "services/core/src/main/resources/db/migration/V27__caregiver_credential_submission.sql",
+      "gitBlobSha256": "11b12dff93737c6c0108a07442e567b03194281cdc08a02dbf3649e749c8b986",
+      "flywayChecksum": 1999752257
+    },
+    {
+      "service": "core",
+      "version": "28",
+      "script": "V28__caregiver_work_settings.sql",
+      "path": "services/core/src/main/resources/db/migration/V28__caregiver_work_settings.sql",
+      "gitBlobSha256": "b2dd52f6238b2e1ff19a4bb7e283c81c508ae70b842c4a4c037f2772fe93e68f",
+      "flywayChecksum": 740801175
+    },
+    {
+      "service": "visit",
+      "version": "1",
+      "script": "V1__visit_tables.sql",
+      "path": "services/visit/src/main/resources/db/migration/V1__visit_tables.sql",
+      "gitBlobSha256": "ac02539d1dbd86e9271f7c711a3a082daf279c7602a2784880465c4c1711a2e8",
+      "flywayChecksum": -1450296056
+    },
+    {
+      "service": "visit",
+      "version": "2",
+      "script": "V2__visit_request.sql",
+      "path": "services/visit/src/main/resources/db/migration/V2__visit_request.sql",
+      "gitBlobSha256": "22ffd077bbf9caa2e0b50c27aee1710d218fb2baf987475d5f2b9c4428feb613",
+      "flywayChecksum": 556943074
+    },
+    {
+      "service": "visit",
+      "version": "3",
+      "script": "V3__caregiver_system_alert_index.sql",
+      "path": "services/visit/src/main/resources/db/migration/V3__caregiver_system_alert_index.sql",
+      "gitBlobSha256": "f082fe8db6b971c1d2a94e8dfc87ad606c9b06a54fdbb6d8db734fd8cd9e2e7b",
+      "flywayChecksum": -1444325943
+    },
+    {
+      "service": "visit",
+      "version": "4",
+      "script": "V4__visit_evidence_file.sql",
+      "path": "services/visit/src/main/resources/db/migration/V4__visit_evidence_file.sql",
+      "gitBlobSha256": "ca861599d79819b1d1a5fc511124c4fb0827a5c62425faa62bbe7648ff5b196e",
+      "flywayChecksum": -597251045
+    },
+    {
+      "service": "visit",
+      "version": "5",
+      "script": "V5__caregiver_history_index.sql",
+      "path": "services/visit/src/main/resources/db/migration/V5__caregiver_history_index.sql",
+      "gitBlobSha256": "2723c442a39bdcbaa04327b51c72e1694c491997c1b9e8e059bfd2f3b768aef9",
+      "flywayChecksum": 1897602332
+    },
+    {
+      "service": "report",
+      "version": "1",
+      "script": "V1__report_tables.sql",
+      "path": "services/report/src/main/resources/db/migration/V1__report_tables.sql",
+      "gitBlobSha256": "937ba8b92eed72c8b184abdf9a5a7c4240b4efd9a42637927dae6c2b976d1b5d",
+      "flywayChecksum": 1215694517
+    },
+    {
+      "service": "report",
+      "version": "2",
+      "script": "V2__value_added_service_catalogue.sql",
+      "path": "services/report/src/main/resources/db/migration/V2__value_added_service_catalogue.sql",
+      "gitBlobSha256": "99f2692615243e452ebe694ed8d4d8be4591bb6996baa01279cbdc5ac6f84c5f",
+      "flywayChecksum": 1085518467
+    },
+    {
+      "service": "report",
+      "version": "3",
+      "script": "V3__report_unique_period.sql",
+      "path": "services/report/src/main/resources/db/migration/V3__report_unique_period.sql",
+      "gitBlobSha256": "3f6ad2760df8610561af309cd1dd3948777a76ccc35268c0c469e9953121e6c0",
+      "flywayChecksum": -572798646
+    },
+    {
+      "service": "report",
+      "version": "4",
+      "script": "V4__report_task_dispatch.sql",
+      "path": "services/report/src/main/resources/db/migration/V4__report_task_dispatch.sql",
+      "gitBlobSha256": "12a8b840b38decb87dc9917eb39179b1a591283d50ccf8efd2fd0439f961d581",
+      "flywayChecksum": 1912429229
+    },
+    {
+      "service": "report",
+      "version": "5",
+      "script": "V5__visit_evidence_projection.sql",
+      "path": "services/report/src/main/resources/db/migration/V5__visit_evidence_projection.sql",
+      "gitBlobSha256": "ce6f0cd49646ad25e014573e4820bc173ae551c5dd27aa81f9d0857d3c1572b2",
+      "flywayChecksum": -1121044410
+    },
+    {
+      "service": "notification",
+      "version": "1",
+      "script": "V1__notification_tables.sql",
+      "path": "services/notification/src/main/resources/db/migration/V1__notification_tables.sql",
+      "gitBlobSha256": "b10276bc16de2290d35c7397f0a1a87442f99e76667bc0751b1dd44fe0e3eb61",
+      "flywayChecksum": 898893085
+    },
+    {
+      "service": "notification",
+      "version": "2",
+      "script": "V2__webhook_delivery.sql",
+      "path": "services/notification/src/main/resources/db/migration/V2__webhook_delivery.sql",
+      "gitBlobSha256": "265ee0af4091630ade7580ba258d56b151a3cedff8e36d3148e2a8eab271e813",
+      "flywayChecksum": 1050415276
+    },
+    {
+      "service": "notification",
+      "version": "3",
+      "script": "V3__provider_onboarding.sql",
+      "path": "services/notification/src/main/resources/db/migration/V3__provider_onboarding.sql",
+      "gitBlobSha256": "dbdf9a5a9258797fa5d2847831616125df90079d1e24c6c2159991e5bc383258",
+      "flywayChecksum": 1620249201
+    }
+  ],
+  "oldReportEvidenceV4": {
+    "oldCommit": "b486ccd",
+    "oldScript": "V4__visit_evidence_projection.sql",
+    "gitBlobSha256": "ce6f0cd49646ad25e014573e4820bc173ae551c5dd27aa81f9d0857d3c1572b2",
+    "flywayChecksum": -1121044410,
+    "sameSqlAsNewV5": true,
+    "sharedDatabaseApplied": "UNKNOWN"
+  }
+}

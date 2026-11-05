@@ -1,7 +1,9 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Button, Callout, Eyebrow, MetaText } from '../../../shared/components/ui'
-import type { CredentialRegisterRow } from '../../../shared/api/profile'
+import type { CredentialDocument, CredentialRegisterRow } from '../../../shared/api/profile'
 import { caregiverRef, formatDate, formatDateTime, nextReminder, reviewTitle } from '../lib/certifications'
+import { useCredentialDocuments } from '../lib/useCertifications'
+import { ScanThumbnail, ScanViewer, type Scan } from './CertificateScan'
 import styles from './ReviewPanel.module.css'
 
 /**
@@ -40,13 +42,7 @@ export function ReviewPanel({
 
       <section className={styles.detail}>
         <div className={styles.detailRow}>
-          <div className={styles.scan} role="img" aria-label="Certificate scan not available">
-            <span>
-              scan of
-              <br />
-              certificate
-            </span>
-          </div>
+          <Scans key={row.id} row={row} />
           <dl className={styles.fields}>
             <Detail label="Issuing body">{row.issuingBody ?? '—'}</Detail>
             <Detail label="Certificate no." mono>
@@ -86,6 +82,48 @@ export function ReviewPanel({
       {reviewable && <PublishEffect row={row} visitsAtRisk={visitsAtRisk} />}
     </aside>
   )
+}
+
+/**
+ * Every file uploaded with the certificate, each opening full size; the striped stand-in while
+ * they load or when none were uploaded.
+ */
+function Scans({ row }: { row: CredentialRegisterRow }) {
+  const { data: documents } = useCredentialDocuments(row.id)
+  const [viewing, setViewing] = useState<CredentialDocument | null>(null)
+  if (!documents?.length) {
+    return (
+      <div className={styles.scan} role="img" aria-label="Certificate scan not available">
+        <span>
+          scan of
+          <br />
+          certificate
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className={styles.scans}>
+      {documents.map((document) => (
+        <ScanThumbnail key={document.id} scan={toScan(document)} onOpen={() => setViewing(document)} />
+      ))}
+      {viewing && (
+        <ScanViewer
+          title={reviewTitle(row)}
+          scan={{ ...toScan(viewing), url: viewing.contentUrl }}
+          onClose={() => setViewing(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function toScan(document: CredentialDocument): Scan {
+  return {
+    fileName: document.fileName,
+    url: document.contentAvailable ? document.contentUrl : null,
+    contentType: document.contentType,
+  }
 }
 
 function Detail({ label, mono = false, children }: { label: string; mono?: boolean; children: ReactNode }) {

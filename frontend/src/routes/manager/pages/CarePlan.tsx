@@ -14,6 +14,7 @@ import {
 } from '../lib/familyRequests'
 import type { RequestedNeedStatus } from '../lib/familyRequests'
 import { useElder } from '../lib/useElder'
+import { useElders } from '../lib/useElders'
 import { useElderFamily } from '../lib/useElderFamily'
 import { useCarePlanVersions } from '../lib/useCarePlanVersions'
 import { continuityLabel, dialectsLabel, familyLabel, livesLabel, mobilityLabel } from '../lib/elderProfile'
@@ -53,12 +54,15 @@ import {
   KeyValueList,
   MetaText,
   PageHeader,
+  PersonCard,
   PlanTreeView,
   SidePanel,
   SplitLayout,
   TextArea,
 } from '../../../shared/components/ui'
 import type { BadgeStatus, SelectGroup, TagTone } from '../../../shared/components/ui'
+import { CaregiverPickerModal } from '../components/CaregiverPickerModal'
+import { EmptyAssignSlot } from '../components/EmptyAssignSlot'
 import { PlanTreeEditor } from '../components/PlanTreeEditor'
 import { FamilyRequestsPanel } from '../components/FamilyRequestsPanel'
 import { StopCarePlanButton } from '../components/StopCarePlanButton'
@@ -78,7 +82,9 @@ const REQUESTED_NEED_TAG: Record<RequestedNeedStatus, { label: string; tone: Tag
 
 /** Local-date "yyyy-MM-dd" — lexically comparable with the plan's ISO start date. */
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
 /** An issued version's badge: superseded ones are archived; a published one not yet started is scheduled. */
@@ -123,6 +129,10 @@ export default function CarePlan() {
   const { data: currentUser } = useCurrentUser()
   const { data: catalog } = useCareActivities()
   const { data: careRequests } = useElderCareRequests(elderId)
+  // GET /api/elders/{id} doesn't carry the primary caregiver; the elder list does, and is
+  // usually cached already from the Elders page.
+  const { data: elderRows } = useElders()
+  const elderRow = elderRows?.find((row) => row.id === elderId)
   const queryClient = useQueryClient()
 
   const [tree, setTree] = useState<PlanNode[]>([])
@@ -140,6 +150,7 @@ export default function CarePlan() {
 
   const [stopInfo, setStopInfo] = useState<{ effectiveDate: string; reason: string } | null>(null)
   const [showStopModal, setShowStopModal] = useState(false)
+  const [showCaregiverPicker, setShowCaregiverPicker] = useState(false)
 
   // The inline panels keep their own in-progress input; the page only tracks which is open.
   const [addPanelOpen, setAddPanelOpen] = useState(false)
@@ -379,12 +390,15 @@ export default function CarePlan() {
       const published = await publishCarePlan(planId, startDate, toPlanNodePayloads(tree))
       autosave.published()
       void queryClient.invalidateQueries({ queryKey: ['carePlan', 'latest', elder!.id] })
+      void queryClient.invalidateQueries({ queryKey: ['elders'] })
       refreshVersions()
       setVersion(published.version)
       setStatus('published')
       setPriorPublishedHours(undefined)
       setStopInfo(null)
       setShowPublishModal(false)
+      // A plan is the prerequisite for a primary caregiver, so go straight on to picking one.
+      if (elderRow && !elderRow.primaryCaregiver) setShowCaregiverPicker(true)
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : 'Could not publish this plan.')
     } finally {
@@ -455,13 +469,16 @@ export default function CarePlan() {
       })),
   ]
 
+  // Back on Elders, this elder stays selected, under whichever tab they now belong to.
+  const eldersHref = `/manager/elders?selected=${encodeURIComponent(elder.id)}`
+
   const headerContext = (
     <span>
-      <Link to="/manager/elders" className={styles.breadcrumbLink}>
+      <Link to={eldersHref} className={styles.breadcrumbLink}>
         Elders
       </Link>
       {' / '}
-      <Link to="/manager/elders" className={styles.breadcrumbLink}>
+      <Link to={eldersHref} className={styles.breadcrumbLink}>
         {elder.name}
       </Link>
       {' / care plan'}
@@ -489,7 +506,7 @@ export default function CarePlan() {
       )}
 
       <PageHeader
-        back={<BackLink to="/manager/elders">Back to Elders</BackLink>}
+        back={<BackLink to={eldersHref}>Back to Elders</BackLink>}
         title="Care plan"
         meta={[
           `${subPlans} sub-plans`,
@@ -525,6 +542,8 @@ export default function CarePlan() {
             <DateInput
               id={id}
               value={startDate}
+              // A plan can't start in the past: the calendar greys out days before today.
+              min={todayIso()}
               disabled={!editable}
               onChange={(value) => {
                 setStartDate(value)
@@ -534,15 +553,6 @@ export default function CarePlan() {
           )}
         </Field>
       </PageHeader>
-
-      {editable && unscheduled.length > 0 && (
-        <div className={styles.banner}>
-          <Callout tone="info" role="status">
-            Set days and times for {unscheduled.map((task) => task.name).join(', ')} before publishing — the family
-            chose these activities, not when they happen.
-          </Callout>
-        </div>
-      )}
 
       {editable ? (
         <PlanTreeEditor
@@ -587,11 +597,31 @@ export default function CarePlan() {
             meta={[elder.age, elder.id, elder.sector].filter((part) => part !== '' && part !== null).join(' · ')}
           />
         </div>,
+        // Once the elder has a plan on record (draft or issued), they need a primary caregiver.
+        elderRow &&
+          elderRow.planStatus !== 'none' &&
+          !locked &&
+          (elderRow.primaryCaregiver ? (
+            <PersonCard
+              key="caregiver"
+              name={elderRow.primaryCaregiver}
+              role="Primary caregiver"
+              meta={elderRow.primaryCaregiverSince ? `since ${formatDate(elderRow.primaryCaregiverSince)}` : undefined}
+              actions={<Button onClick={() => setShowCaregiverPicker(true)}>Change</Button>}
+            />
+          ) : (
+            <EmptyAssignSlot
+              key="caregiver"
+              message="No primary caregiver"
+              actionLabel="Assign caregiver"
+              onAction={() => setShowCaregiverPicker(true)}
+            />
+          )),
         <KeyValueList
           key="profile"
           variant="ruled"
           items={[
-            { label: 'Dialect', value: dialectsLabel(elder.preferredDialects) },
+            { label: 'Languages', value: dialectsLabel(elder.preferredDialects) },
             { label: 'Lives', value: livesLabel(elder.livesAlone) },
             { label: 'Family', value: family ? familyLabel(family) : '…' },
             { label: 'Mobility', value: mobilityLabel(elder.mobilityLevel) },
@@ -739,6 +769,21 @@ export default function CarePlan() {
               reason: stopped.stopReason ?? '',
             })
             setShowStopModal(false)
+          }}
+        />
+      )}
+
+      {showCaregiverPicker && elderRow && (
+        <CaregiverPickerModal
+          elder={elderRow}
+          onClose={() => setShowCaregiverPicker(false)}
+          onAssign={() => {
+            void queryClient.invalidateQueries({ queryKey: ['elders'] })
+            setShowCaregiverPicker(false)
+          }}
+          onRemove={() => {
+            void queryClient.invalidateQueries({ queryKey: ['elders'] })
+            setShowCaregiverPicker(false)
           }}
         />
       )}

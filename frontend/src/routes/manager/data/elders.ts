@@ -12,6 +12,10 @@ export type ElderRow = {
   sector: string
   planStatus: PlanStatus
   planVersion: number | null
+  /** A published version is in force — still true while a newer version is being drafted. */
+  hasPublishedPlan: boolean
+  /** The family has applied for care (intake or service application). */
+  hasCareRequest: boolean
   primaryCaregiver: string | null
   /** Caregiver id as a string; null while unassigned. */
   primaryCaregiverId: string | null
@@ -36,6 +40,8 @@ export async function fetchElders(): Promise<ElderRow[]> {
     sector: r.sector ?? '',
     planStatus: r.planStatus,
     planVersion: r.planVersion,
+    hasPublishedPlan: r.hasPublishedPlan,
+    hasCareRequest: r.hasCareRequest,
     primaryCaregiver: r.primaryCaregiverName,
     primaryCaregiverId: r.primaryCaregiverId == null ? null : String(r.primaryCaregiverId),
     primaryCaregiverSince: r.primaryCaregiverAssignedAt,

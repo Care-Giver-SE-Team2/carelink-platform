@@ -41,7 +41,7 @@ public class CaregiverCommandExecutor {
         var context = new Context();
         try {
             return tx.execute(status -> {
-                var profile = directory.require(username);
+                var profile = directory.require(username).requireWorking();
                 context.actor = profile.userId();
                 var visit = visits.lock(id).orElseThrow(() -> new ResourceNotFound("Visit", id));
                 context.visit = visit;

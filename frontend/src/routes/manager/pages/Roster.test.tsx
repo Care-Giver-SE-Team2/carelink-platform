@@ -55,6 +55,7 @@ beforeEach(() => {
       primaryCaregiverId: null,
       primaryCaregiverName: null,
       primaryCaregiverAssignedAt: null,
+      hasPublishedPlan: true, hasCareRequest: true,
     },
   ])
   vi.spyOn(profileApi, 'fetchCaregivers').mockResolvedValue([

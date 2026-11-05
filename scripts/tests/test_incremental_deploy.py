@@ -24,6 +24,7 @@ import fcntl,json,os,pathlib,sys,time
 p=pathlib.Path(os.environ['FIXTURE']);args=sys.argv[1:];tool=pathlib.Path(sys.argv[0]).name
 with (p/'calls').open('a') as f: f.write(json.dumps([tool,*args])+'\\n')
 if tool=='kubectl':
+ if 'rollout' in args and 'deployment/report' in args and os.environ.get('FAIL_REPORT_ROLLOUT')=='true': sys.exit(1)
  if 'configmap' in args: print('public-ca')
  elif 'secret' in args: print('\\n'.join('DB_URL DB_USER DB_PASSWORD SPRING_DATA_REDIS_HOST SPRING_DATA_REDIS_PORT SPRING_DATA_REDIS_PASSWORD SPRING_DATA_REDIS_SSL_ENABLED CARELINK_EVENTS_TOPICARN CARELINK_EVENTS_QUEUEURL CARELINK_WEBHOOKS_ENCRYPTIONKEY'.split()))
  elif 'get' in args:
@@ -46,11 +47,12 @@ sys.exit(1 if os.environ.get('FAIL_SERVICE')==s else 0)
             path.write_text(stub)
             path.chmod(0o700)
 
-    def run_deploy(self, unchanged=False, fail=""):
+    def run_deploy(self, unchanged=False, fail="", fail_report_rollout=False):
         env = dict(os.environ, PATH=f"{self.directory}:{os.environ['PATH']}", FIXTURE=str(self.directory),
                    IMAGE_REGISTRY=REGISTRY, IMAGE_TAG="", RELEASE_MANIFEST=str(self.directory / "release.json"),
                    KUBE_CONTEXT="test-context", DRY_RUN="0", PUBLIC_HTTPS="false",
-                   UNCHANGED=str(unchanged).lower(), FAIL_SERVICE=fail)
+                   UNCHANGED=str(unchanged).lower(), FAIL_SERVICE=fail,
+                   FAIL_REPORT_ROLLOUT=str(fail_report_rollout).lower())
         result = subprocess.run(["bash", "scripts/deploy.sh", "all", "staging"], cwd=ROOT,
                                 env=env, capture_output=True, text=True)
         calls = [json.loads(line) for line in (self.directory / "calls").read_text().splitlines()]
@@ -72,13 +74,46 @@ sys.exit(1 if os.environ.get('FAIL_SERVICE')==s else 0)
         self.assertEqual(state["active"], 0)
         self.assertEqual(len([c for c in calls if c[:2] == ["helm", "upgrade"]]), 4)
 
+    def test_report_consumer_finishes_before_visit_producer_starts(self):
+        result, calls = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads((self.directory / "state").read_text())
+        self.assertLess(state["events"].index(["report", "end"]), state["events"].index(["visit", "start"]))
+        rollout = next(i for i, c in enumerate(calls) if c[0] == "kubectl" and "rollout" in c and "deployment/report" in c)
+        visit_start = next(i for i, c in enumerate(calls) if c[:3] == ["helm", "upgrade", "--install"] and c[3] == "visit")
+        self.assertLess(rollout, visit_start)
+
+    def test_report_failure_prevents_visit_and_notification_release(self):
+        result, _ = self.run_deploy(fail="report")
+        self.assertNotEqual(result.returncode, 0)
+        state = json.loads((self.directory / "state").read_text())
+        self.assertEqual(state["active"], 0)
+        self.assertNotIn(["visit", "start"], state["events"])
+        self.assertNotIn(["notification", "start"], state["events"])
+
+    def test_report_rollout_failure_prevents_visit_even_after_helm_succeeds(self):
+        result, calls = self.run_deploy(fail_report_rollout=True)
+        self.assertNotEqual(result.returncode, 0)
+        state = json.loads((self.directory / "state").read_text())
+        self.assertIn(["report", "end"], state["events"])
+        self.assertEqual(state["active"], 0)
+        self.assertNotIn(["visit", "start"], state["events"])
+        self.assertNotIn(["notification", "start"], state["events"])
+        self.assertTrue(any(c[0] == "kubectl" and "rollout" in c and "deployment/report" in c for c in calls))
+
+    def test_unchanged_report_rollout_failure_also_stops_visit(self):
+        result, calls = self.run_deploy(unchanged=True, fail_report_rollout=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any(c[:2] == ["helm", "upgrade"] for c in calls))
+        self.assertFalse(any(c[0] == "helm" and c[1:3] == ["template", "visit"] for c in calls))
+
     def test_failed_parallel_release_fails_deployment_and_waits_for_other_inflight_release(self):
         result, _ = self.run_deploy(fail="visit")
         self.assertNotEqual(result.returncode, 0)
         state = json.loads((self.directory / "state").read_text())
         self.assertEqual(state["active"], 0)
         self.assertIn(["report", "end"], state["events"])
-        self.assertNotIn(["notification", "start"], state["events"])
+        self.assertIn(["notification", "end"], state["events"])
 
 
 if __name__ == "__main__":

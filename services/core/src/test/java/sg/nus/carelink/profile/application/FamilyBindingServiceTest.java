@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import sg.nus.carelink.identity.domain.model.AppUser;
 import sg.nus.carelink.identity.domain.repository.AppUserRepository;
@@ -32,6 +34,7 @@ class FamilyBindingServiceTest {
     private FamilyMemberRepository familyMembers;
     private ElderFamilyBindingRepository bindings;
     private AppUserRepository users;
+    private ApplicationEventPublisher events;
 
     private FamilyBindingService service;
 
@@ -41,12 +44,14 @@ class FamilyBindingServiceTest {
         familyMembers = mock(FamilyMemberRepository.class);
         bindings = mock(ElderFamilyBindingRepository.class);
         users = mock(AppUserRepository.class);
+        events = mock(ApplicationEventPublisher.class);
 
         service = new FamilyBindingService(
                 elders,
                 familyMembers,
                 bindings,
-                users
+                users,
+                events
         );
     }
 
@@ -134,6 +139,11 @@ class FamilyBindingServiceTest {
 
         assertThat(created.id())
                 .isEqualTo(10L);
+
+        verify(events)
+                .publishEvent(
+                        new FamilyBindingRequested(10L, 1L, 3L)
+                );
 
         assertThat(created.elderId())
                 .isEqualTo(1L);
@@ -327,6 +337,8 @@ class FamilyBindingServiceTest {
                 .hasMessageContaining(
                         "already linked or awaiting confirmation"
                 );
+
+        verifyNoInteractions(events);
     }
 
     @Test
@@ -466,6 +478,11 @@ class FamilyBindingServiceTest {
         assertThat(reopened.relationship())
                 .isEqualTo(
                         ElderFamilyBinding.Relationship.GUARDIAN
+                );
+
+        verify(events)
+                .publishEvent(
+                        new FamilyBindingRequested(10L, 1L, 3L)
                 );
     }
 

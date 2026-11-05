@@ -12,14 +12,14 @@ export default function IncidentsPage() {
   const load = useCallback((signal: AbortSignal) => listReports(page, signal), [page])
   const { result, reload } = useCaregiverQuery('reports-' + page, load, true)
   return <div className={styles.page}>
-    <div className={styles.heading}><div><h1>My reports</h1><p>Reports you submitted. A report does not mean a responder has taken over.</p></div><button className={styles.button} onClick={reload}>Refresh</button></div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My reports</h1><p className={styles.muted}>Reports you submitted. A report does not mean a responder has taken over.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} onClick={reload}>Refresh</button></div>
     {result.status === 'loading' && <p role="status">Loading your reports…</p>}
     {result.status === 'error' && <SelfServiceError error={result.error} retry={reload} subject="your reports" />}
     {result.status === 'success' && <><LastFetched at={result.receivedAt} subject="report" />
       {!result.data.items.length && <p className={styles.empty}>No reports on this page.</p>}
       {result.data.items.map(({ report }) => <section className={styles.card} key={report.id}><ReportSummary report={report} /><Link className={styles.linkButton} to={'/caregiver/incidents/' + report.id}>Open report #{report.id}</Link></section>)}
-      <button className={styles.button} disabled={!page} onClick={() => setPage(p => p - 1)}>Previous</button>{' '}
-      <button className={styles.button} disabled={(page + 1) * result.data.size >= result.data.totalElements} onClick={() => setPage(p => p + 1)}>Next</button>
+      <div className={styles.pager}><button className={styles.button} disabled={!page} onClick={() => setPage(p => p - 1)}>Previous</button>
+      <button className={styles.button} disabled={(page + 1) * result.data.size >= result.data.totalElements} onClick={() => setPage(p => p + 1)}>Next</button></div>
     </>}
   </div>
 }

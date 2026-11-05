@@ -47,8 +47,10 @@ import sg.nus.carelink.incident.application.IncidentRequests;
 import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
 import sg.nus.carelink.incident.application.MissedCheckInPauseEvidence;
+import sg.nus.carelink.incident.application.SpotCheckService;
 import sg.nus.carelink.incident.controller.InternalIncidentController;
 import sg.nus.carelink.incident.domain.model.Incident;
+import sg.nus.carelink.incident.domain.model.SpotCheck;
 import sg.nus.carelink.profile.application.CaregiverDirectory;
 import sg.nus.carelink.profile.application.CaregiverPublicCredential;
 import sg.nus.carelink.profile.application.CaregiverPublicProfile;
@@ -130,6 +132,9 @@ class CoreApiContractTest {
 
 	@MockitoBean
 	private IncidentRequests once;
+
+	@MockitoBean
+	private SpotCheckService spotChecks;
 
 	@MockitoBean
 	private VisitCover visitCover;
@@ -332,6 +337,22 @@ class CoreApiContractTest {
 
 		assertThat(core.soleMissedCheckInIncident(56L, 3L, 100L).sole()).isTrue();
 		assertThat(core.soleMissedCheckInIncident(57L, 3L, 100L).sole()).isFalse();
+	}
+
+	@Test
+	void aCaregiversOwnSpotChecksOnOneVisit() {
+		LocalDateTime checked = LocalDateTime.of(2026, 10, 12, 10, 0);
+		when(spotChecks.forCaregiver("siti")).thenReturn(List.of(
+				new SpotCheckService.SpotCheckView(4L, 3L, "Tan Ah Kow", 7L, "Siti Rahman", 100L, checked, "Routine", null,
+						null, SpotCheck.Result.MEETS_STANDARD, "Private manager notes", checked, null, null, "Thank you"),
+				new SpotCheckService.SpotCheckView(5L, 3L, "Tan Ah Kow", 7L, "Siti Rahman", 101L, checked, "Routine", null,
+						null, null, null, null, null, null, null)));
+		doThrow(new AccessDeniedException("Manager admission approval is required.")).when(spotChecks).forCaregiver("applicant");
+
+		assertThat(core.caregiverSpotChecks("siti", 100L)).containsExactly(
+				new CoreApi.SpotCheckConclusion(4L, 100L, "MEETS_STANDARD", checked, "Thank you"));
+		assertThat(core.caregiverSpotChecks("siti", 102L)).isEmpty();
+		assertThatThrownBy(() -> core.caregiverSpotChecks("applicant", 100L)).isInstanceOf(AccessDeniedException.class);
 	}
 
 	@Test

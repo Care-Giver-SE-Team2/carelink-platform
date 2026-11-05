@@ -15,10 +15,16 @@ import sg.nus.carelink.careplan.domain.model.CarePlan;
 class FakeCarePlanLookup implements CarePlanLookup {
 
     private final Map<Long, CarePlan> latestByElderId = new HashMap<>();
+    private final Map<Long, CarePlan> publishedByElderId = new HashMap<>();
     private final Map<Long, LocalDate> nextVisitByElderId = new HashMap<>();
 
     void put(Long elderId, CarePlan plan) {
         latestByElderId.put(elderId, plan);
+    }
+
+    /** The version still in force while the latest one is a draft revising it. */
+    void putPublished(Long elderId, CarePlan plan) {
+        publishedByElderId.put(elderId, plan);
     }
 
     void putNextVisit(Long elderId, LocalDate nextVisitDate) {
@@ -28,6 +34,15 @@ class FakeCarePlanLookup implements CarePlanLookup {
     @Override
     public Optional<CarePlan> findLatestByElderId(Long elderId) {
         return Optional.ofNullable(latestByElderId.get(elderId));
+    }
+
+    @Override
+    public Optional<CarePlan> findPublishedByElderId(Long elderId) {
+        CarePlan published = publishedByElderId.get(elderId);
+        if (published != null) {
+            return Optional.of(published);
+        }
+        return findLatestByElderId(elderId).filter(plan -> plan.status() == CarePlan.Status.PUBLISHED);
     }
 
     @Override

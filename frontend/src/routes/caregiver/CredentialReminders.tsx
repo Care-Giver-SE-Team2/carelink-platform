@@ -1,4 +1,5 @@
 import type { CredentialAlert, CredentialAlertContext } from '../../features/caregiver/api'
+import { Link } from 'react-router-dom'
 import { dateLabel } from './format'
 import styles from './Caregiver.module.css'
 
@@ -38,6 +39,7 @@ export default function CredentialReminders({ alerts, context }: { alerts: Crede
       <p>{deadline(alert)} Expiry date: {dateLabel(alert.expiryDate)}</p>
       {alert.certificateNo && <p>Certificate: {alert.certificateNo}</p>}
       <p>{renewalNote(alert)}</p>
+      <Link to={'/caregiver/credentials/' + alert.id}>View certificate and renewal options</Link>
     </article>)}
     <p className={styles.muted}>These are expiry reminders, not confirmation that all credentials are approved or that you meet rostering requirements.</p>
   </section>

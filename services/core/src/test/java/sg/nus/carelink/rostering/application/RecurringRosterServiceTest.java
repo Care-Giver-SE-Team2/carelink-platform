@@ -94,6 +94,20 @@ class RecurringRosterServiceTest {
 	}
 
 	@Test
+	void createsAVisitAlreadyRunningOnlyWhenThereIsACaregiverForIt() {
+		plans.put(42L, List.of(plan(9L, THU_1, null, Map.of(DayOfWeek.THURSDAY, LocalTime.of(8, 45)))));
+
+		roster.refreshElder(42L);
+		assertThat(visits.scheduled).extracting(PlannedVisit::start).doesNotContain(THU_1.atTime(8, 45));
+
+		visits.scheduled.clear();
+		primaryCaregivers.put(42L, 5L);
+		roster.refreshElder(42L);
+		assertThat(visits.scheduled).extracting(PlannedVisit::start, PlannedVisit::caregiverId)
+				.contains(org.assertj.core.groups.Tuple.tuple(THU_1.atTime(8, 45), 5L));
+	}
+
+	@Test
 	void handsOverFromTheReplacedVersionOnTheNewOnesStartDate() {
 		LocalDate monday = LocalDate.of(2026, 10, 5);
 		plans.put(42L, List.of(

@@ -1,5 +1,7 @@
 package sg.nus.carelink.incident.controller;
 
+import java.util.List;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,11 +15,13 @@ import sg.nus.carelink.incident.application.IncidentRequests;
 import sg.nus.carelink.incident.application.IncidentService;
 import sg.nus.carelink.incident.application.MissedCheckInIncidentGateway;
 import sg.nus.carelink.incident.application.MissedCheckInPauseEvidence;
+import sg.nus.carelink.incident.application.SpotCheckService;
 
 /**
  * incident's part of core's internal API ({@link CoreApi}): the incidents a visit raises, either
  * reported by the caregiver, found by the missed check-in scan, or disputed by the elder, and
- * whether a missed check-in's incident is the visit's only one.
+ * whether a missed check-in's incident is the visit's only one; and the spot checks a caregiver's own
+ * execution history shows.
  */
 @RestController
 @RequestMapping("/internal/v1")
@@ -33,9 +37,12 @@ public class InternalIncidentController {
 
 	private final IncidentRequests once;
 
+	private final SpotCheckService spotChecks;
+
 	InternalIncidentController(CaregiverIncidentGateway caregiverIncidents,
 			MissedCheckInIncidentGateway missedCheckIns, IncidentService incidents,
-			MissedCheckInPauseEvidence pauseEvidence, IncidentRequests once) {
+			MissedCheckInPauseEvidence pauseEvidence, IncidentRequests once, SpotCheckService spotChecks) {
+		this.spotChecks = spotChecks;
 		this.caregiverIncidents = caregiverIncidents;
 		this.missedCheckIns = missedCheckIns;
 		this.incidents = incidents;
@@ -80,6 +87,17 @@ public class InternalIncidentController {
 	public CoreApi.SoleIncident soleMissedCheckInIncident(@PathVariable Long incidentId, @RequestParam Long elderId,
 			@RequestParam Long visitId) {
 		return new CoreApi.SoleIncident(pauseEvidence.isSoleIncident(elderId, visitId, incidentId));
+	}
+
+	@GetMapping("/caregivers/by-username/{username}/spot-checks")
+	public List<CoreApi.SpotCheckConclusion> caregiverSpotChecks(@PathVariable String username,
+			@RequestParam Long visitId) {
+		return spotChecks.forCaregiver(username).stream()
+				.filter(check -> visitId.equals(check.visitId()))
+				.map(check -> new CoreApi.SpotCheckConclusion(check.id(), check.visitId(),
+						check.result() == null ? null : check.result().name(), check.checkedAt(),
+						check.caregiverResponse()))
+				.toList();
 	}
 
 	private static CoreApi.IncidentReport report(CaregiverIncidentGateway.Report report) {

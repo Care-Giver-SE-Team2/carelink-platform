@@ -14,7 +14,7 @@ const pack: WorkPack = {
   carePlanId: 7, carePlanVersion: 1, serviceInstructions: ['Care'], requiredEvidenceKinds: [],
   tasks: [{ id: 9, name: 'Care', status: 'PENDING', outcome: null, caregiverNote: null }],
   healthObservation: { healthFlag: null, healthNote: null },
-  execution: { allowedActions: ['TASK_RESULT', 'HEALTH_RECORD'], blockedReason: null, serverNow: '2026-10-09T12:00:00', checkInOpensAt: '2026-10-09T11:30:00', checkInClosesAt: '2026-10-09T13:00:00', checkedInAt: '2026-10-09T12:00:00', checkedOutAt: null, lateArrival: false, locationSource: 'MANUAL_LOCATION_NOTE' },
+  execution: { allowedActions: ['TASK_RESULT', 'HEALTH_RECORD'], blockedReason: null, serverNow: '2026-10-09T12:00:00', checkInOpensAt: '2026-10-09T11:30:00', checkInClosesAt: '2026-10-09T13:00:00', checkedInAt: '2026-10-09T12:00:00', checkedOutAt: null, lateArrival: false },
 }
 const record: HealthRecord = { id: 8, visitId: 3, healthFlag: 'ATTENTION', healthNote: 'Private observation', recordedAt: '2026-10-09T12:05:00', readings: [
   { metric: 'systolic', value: 123, unit: 'mmHg' }, { metric: 'diastolic', value: 81, unit: 'mmHg' }, { metric: 'pulse', value: 73, unit: 'bpm' }, { metric: 'temperature', value: 36.7, unit: '°C' },

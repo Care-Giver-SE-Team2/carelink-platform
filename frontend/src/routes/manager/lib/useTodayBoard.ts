@@ -14,6 +14,9 @@ const elders = (client: QueryClient) => client.query({ queryKey: ['elders'], que
 const caregivers = (client: QueryClient) =>
   client.query({ queryKey: ['caregivers'], queryFn: fetchCaregivers, staleTime: 'static' })
 
+/** Re-polled, like the exception count, so check-ins and overdue visits show without a reload. */
+const REFRESH_MS = 30_000
+
 /** Today's roster, fetched apart from how it's shown so a timeline view can reuse it. */
 export function useTodayRoster() {
   const client = useQueryClient()
@@ -27,6 +30,7 @@ export function useTodayRoster() {
       ])
       return toRoster(visits, elderRows, caregiverRows)
     },
+    refetchInterval: REFRESH_MS,
   })
 }
 

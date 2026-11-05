@@ -23,7 +23,7 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
         var start=LocalDateTime.now(ZoneId.of("Asia/Singapore")).plusMinutes(5).withSecond(0).withNano(0);
         return publishPlan(start,60,"CHECKLIST","Care routine").visits().getFirst();
     }
-    private Map<String,Object> check(int version) { return new HashMap<>(Map.of("expectedVersion",version,"clientRequestId",UUID.randomUUID().toString(),"locationSource","MANUAL_LOCATION_NOTE","locationNote","At the service doorway")); }
+    private Map<String,Object> check(int version) { return new HashMap<>(Map.of("expectedVersion",version,"clientRequestId",UUID.randomUUID().toString())); }
     private Map<String,Object> task(int version,String status) { return new HashMap<>(Map.of("expectedVersion",version,"clientRequestId",UUID.randomUUID().toString(),"status",status,"outcome","Observed result","caregiverNote","Internal factual reason")); }
     @Test void realRosterCheckInTaskIncidentAndFamilyReadsShareOneSourceOfTruth() throws Exception {
         long id=plannedVisit();
@@ -35,10 +35,9 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
             assertThat(a.post("/api/visits/"+id+"/check-in",check(1)).statusCode()).isEqualTo(409);
             var pack=a.read("/api/visits/"+id+"/work-pack");long taskId=pack.path("tasks").get(0).path("id").asLong();
             assertThat(pack.path("visit").path("version").asInt()).isEqualTo(1);
-            assertThat(pack.path("execution").path("locationSource").asString()).isEqualTo("MANUAL_LOCATION_NOTE");
             assertThat(pack.path("requiredEvidenceKinds").toString()).contains("CHECKLIST");
             var familyDetail=familyBrowser.read("/api/visits/"+id);
-            assertThat(familyDetail.toString()).contains("IN_PROGRESS","checkedInAt").doesNotContain("locationNote","latitude","longitude");
+            assertThat(familyDetail.toString()).contains("IN_PROGRESS","checkedInAt");
             var timeline=familyBrowser.read("/api/visits/"+id+"/timeline");assertThat(timeline.size()).isEqualTo(2);
             assertThat(timeline.toString()).doesNotContain("REJECTED","actorUserId","rejectionReason");
             var result=task(1,"DONE");body(a.post("/api/visits/"+id+"/tasks/"+taskId+"/complete",result),200);
@@ -84,16 +83,13 @@ class CaregiverVisitExecutionWorkflowIT extends CaregiverHttpITSupport {
             }
         }
     }
-    @Test void gpsValidationRolesCsrfPlanMismatchAndTaskParentAreChecked() throws Exception {
+    @Test void rolesCsrfPlanMismatchAndTaskParentAreChecked() throws Exception {
         long id=plannedVisit();
         try(var a=browser(caregiverName);var b=browser(otherName);var relative=browser(familyName)) {
-            var gps=new HashMap<>(Map.<String,Object>of("expectedVersion",0,"clientRequestId",UUID.randomUUID().toString(),"locationSource","GPS","latitude",91,"longitude",103.8,"accuracy",5,"clientCapturedAt",Instant.now().toString()));
-            assertThat(a.post("/api/visits/"+id+"/check-in",gps).statusCode()).isEqualTo(400);
             assertThat(a.withoutCsrf("/api/visits/"+id+"/check-in",check(0)).statusCode()).isEqualTo(403);
             assertThat(b.post("/api/visits/"+id+"/check-in",check(0)).statusCode()).isEqualTo(403);
             assertThat(relative.post("/api/visits/"+id+"/check-in",check(0)).statusCode()).isEqualTo(403);
-            gps.put("latitude",1.3);body(a.post("/api/visits/"+id+"/check-in",gps),200);
-            assertThat(jdbc.queryForObject("select location_source from visit_check_in_record where visit_id=?",String.class,id)).isEqualTo("GPS");
+            body(a.post("/api/visits/"+id+"/check-in",check(0)),200);
             long wrong=insert("insert into visit_task(visit_id,name,status) values (?,'Other visit task','PENDING')",visit);
             assertThat(a.post("/api/visits/"+id+"/tasks/"+wrong+"/complete",task(1,"DONE")).statusCode()).isEqualTo(404);
             assertThat(b.get("/api/visits/"+id+"/tasks").statusCode()).isEqualTo(403);

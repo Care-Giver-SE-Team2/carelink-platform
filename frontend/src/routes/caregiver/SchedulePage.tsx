@@ -20,8 +20,7 @@ export default function SchedulePage() {
   const changes = useScheduleChanges(query, result)
   function choose(dateFrom: string, dateTo: string) { setParams({ dateFrom, dateTo }) }
   return <div className={styles.page}>
-    <p className={styles.eyebrow}>Caregiver workspace</p>
-    <div className={styles.heading}><div><h1>My schedule</h1><p className={styles.muted}>Your assigned visits, one day at a time.</p></div><button className={styles.button} onClick={reload}>Refresh</button></div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Caregiver workspace</p><h1>My schedule</h1><p className={styles.muted}>Your assigned visits, one day at a time.</p></div></div><div className={styles.toolbar}><button className={styles.refresh} onClick={reload}>Refresh</button></div>
     <div className={styles.filters}><div className={styles.quick}>
       <button className={styles.button} onClick={() => choose(today, today)}>Today</button>
       <button className={styles.button} onClick={() => choose(today, addDays(today, 6))}>Next 7 days</button>

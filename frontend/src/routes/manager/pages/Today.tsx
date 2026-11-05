@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { Button, KpiStrip, SectionHeader } from '../../../shared/components/ui'
+import { KpiStrip, SectionHeader } from '../../../shared/components/ui'
 import type { KpiItem } from '../../../shared/components/ui'
 import { ManagerShell } from '../components/ManagerShell'
 import { VisitRosterTable } from '../components/VisitRosterTable'
@@ -23,7 +22,6 @@ function kpiItems(kpis: Kpis | undefined): KpiItem[] {
  * worked in the Exceptions tab; the exception figures here link there.
  */
 export default function Today() {
-  const navigate = useNavigate()
   const roster = useTodayRoster()
   const kpis = useTodayKpis()
   const rosterData = roster.data
@@ -33,18 +31,14 @@ export default function Today() {
       <KpiStrip items={kpiItems(kpis.data)} label="Today at a glance" />
 
       <section aria-labelledby="visit-roster-title">
-        <SectionHeader
-          id="visit-roster-title"
-          title="Visit roster"
-          actions={<Button onClick={() => navigate('/manager/roster')}>Re-roster absence</Button>}
-        />
+        <SectionHeader id="visit-roster-title" title="Visit roster" />
         <VisitRosterTable
           visits={rosterData?.visits ?? []}
           empty={roster.isError ? 'Could not load today’s roster.' : roster.isPending ? 'Loading today’s roster…' : 'No visits today.'}
           footer={
             rosterData &&
             rosterData.visits.length > 0 &&
-            `${rosterData.visits.length} visits today · sector ${rosterData.sectors.join(' / ')}`
+            `${rosterData.visits.length} visits today`
           }
         />
       </section>

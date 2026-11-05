@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Fragment, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
@@ -44,5 +44,8 @@ export function RequireRole({ role, children }: { role: CareLinkRole; children: 
   }
   if (!session.data) return <p role="status" style={{ padding: 24, textAlign: 'center' }}>Checking your sign-in…</p>
   if (!hasRole(session.data.roles, role)) return <Navigate to={homePathFor(session.data.roles) ?? '/'} replace />
+  // A different caregiver can sign in in another tab while this route stays mounted.
+  // Drop retained work-pack data and private-file drafts when that identity changes.
+  if (role === 'CAREGIVER') return <Fragment key={session.data.id}>{children}</Fragment>
   return children
 }

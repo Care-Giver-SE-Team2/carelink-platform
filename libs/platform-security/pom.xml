@@ -34,6 +34,20 @@
 			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 		</dependency>
 
+		<!-- Optional: services already opt into Redis sessions; this library adds atomic saves. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-session-data-redis</artifactId>
+			<optional>true</optional>
+			<!-- APIs only here; each service's existing Redis starter supplies the runtime. -->
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-data-redis</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
 		<!-- Testing -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

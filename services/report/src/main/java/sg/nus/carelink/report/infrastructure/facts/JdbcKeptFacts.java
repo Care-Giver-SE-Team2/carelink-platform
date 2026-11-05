@@ -16,6 +16,7 @@ import sg.nus.carelink.eventtypes.SpotCheckUpdated;
 import sg.nus.carelink.eventtypes.VisitCancelled;
 import sg.nus.carelink.eventtypes.VisitCaregiverChanged;
 import sg.nus.carelink.eventtypes.VisitCheckedIn;
+import sg.nus.carelink.eventtypes.VisitClosed;
 import sg.nus.carelink.eventtypes.VisitCompleted;
 import sg.nus.carelink.eventtypes.VisitExceptionRaised;
 import sg.nus.carelink.eventtypes.VisitScheduled;
@@ -34,6 +35,17 @@ import sg.nus.carelink.report.domain.repository.KeptFacts;
  */
 @Component
 class JdbcKeptFacts implements KeptFacts {
+    @Override public void keep(sg.nus.carelink.eventtypes.VisitEvidenceUpdated e){
+        jdbc.sql("""
+          insert into report_visit_evidence(visit_id,elder_id,scheduled_start,evidence_count,verified_evidence_count,version)
+          values (:id,:elder,:start,:count,:verified,:version)
+          on duplicate key update evidence_count=if(:version>version,:count,evidence_count),
+          verified_evidence_count=if(:version>version,:verified,verified_evidence_count),
+          version=greatest(version,:version)
+          """).param("id",e.visitId()).param("elder",e.elderId()).param("start",java.sql.Timestamp.valueOf(e.scheduledStart().atZoneSameInstant(sg.nus.carelink.eventtypes.SingaporeTime.ZONE).toLocalDateTime()))
+          .param("count",e.evidenceCount()).param("verified",e.verifiedEvidenceCount()).param("version",e.version()).update();
+    }
+
 
 	/** A visit's state as its latest event leaves it, kept only from a newer version than the row's. */
 	private static final String VISIT_STATE = """
@@ -194,6 +206,12 @@ class JdbcKeptFacts implements KeptFacts {
 	@Override
 	public void keep(VisitExceptionRaised event) {
 		visitState(event.visitId(), event.elderId(), event.scheduledStart(), event.version(), "EXCEPTION",
+				event.caregiverId(), null, null);
+	}
+
+	@Override
+	public void keep(VisitClosed event) {
+		visitState(event.visitId(), event.elderId(), event.scheduledStart(), event.version(), event.status(),
 				event.caregiverId(), null, null);
 	}
 

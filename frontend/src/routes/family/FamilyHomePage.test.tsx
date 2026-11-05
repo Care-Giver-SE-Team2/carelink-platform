@@ -89,9 +89,11 @@ describe('Family home', () => {
     const fetchMock = installApi([closed, visit, later, { ...later, id: 103, status: 'EXCEPTION' }])
     openFamily()
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Tan Mei' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Tan Mei' })).toBeInTheDocument()
+    expect(screen.getByText('Caring for')).toBeInTheDocument()
     expect(screen.getByLabelText('Current URL')).toHaveTextContent('/family/home')
-    expect(screen.getByText('78 · S31')).toBeInTheDocument()
+    expect(screen.getByText('Age 78 · S31')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
 
     const live = screen.getByRole('article', { name: 'Bathing assistance' })
@@ -175,10 +177,10 @@ describe('Family home', () => {
     installApi([visit, { ...later, elderId: 22, caregiverId: null }])
     openFamily('/family/home')
 
-    await screen.findByRole('heading', { level: 1, name: 'Tan Mei' })
+    await screen.findByRole('heading', { level: 2, name: 'Tan Mei' })
     await user.selectOptions(screen.getByRole('combobox', { name: 'Care for' }), '22')
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Lim Wei' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Lim Wei' })).toBeInTheDocument()
     expect(await screen.findByText('Caregiver awaiting assignment')).toBeInTheDocument()
   })
 

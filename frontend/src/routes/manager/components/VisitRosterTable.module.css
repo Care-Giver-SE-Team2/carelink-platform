@@ -6,11 +6,6 @@
   font: 500 13px/1.3 var(--font);
 }
 
-.sector {
-  font: 400 10px/1 var(--font-mono);
-  color: var(--text-faint);
-}
-
 .caregiver {
   font: 400 13px/1.3 var(--font);
 }
@@ -23,4 +18,24 @@
 .service {
   font: 400 12px/1.3 var(--font);
   color: var(--text-tertiary);
+}
+
+.attendance {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font: 400 12px/1 var(--font-mono);
+}
+
+.late {
+  color: var(--text-muted);
+}
+
+.out {
+  color: var(--text-tertiary);
+}
+
+.noAttendance {
+  font: 400 12px/1 var(--font-mono);
+  color: var(--text-faint);
 }

@@ -3,6 +3,8 @@ package sg.nus.carelink.visit.application;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.security.access.AccessDeniedException;
+
 /**
  * What a caregiver's working day needs from core: their own profile, the elder they visit, and
  * the certificates that are about to lapse.
@@ -23,6 +25,23 @@ public interface CaregiverWorkDirectory {
 	CredentialAlerts alerts(Long caregiverId, LocalDate today);
 
 	record Profile(Long id, Long userId, String fullName, String phone, String sector, String dialects, String status) {
+
+		/** Work access is separate from authentication and optional qualification uploads. */
+		public Profile requireWorking() {
+			if (!"AVAILABLE".equals(status) && !"BUSY".equals(status)) {
+				throw new AccessDeniedException("Manager admission approval is required for caregiver work.");
+			}
+			return this;
+		}
+
+		/** An admitted caregiver, including one who has since left, may still read their own history. */
+		public Profile requireAdmittedHistory() {
+			if (!List.of("AVAILABLE", "BUSY", "INACTIVE").contains(status == null ? "" : status)) {
+				throw new AccessDeniedException("Manager admission approval is required.");
+			}
+			return this;
+		}
+
 	}
 
 	record ElderView(Long elderId, String preferredName, String serviceAddress, String postalSector,

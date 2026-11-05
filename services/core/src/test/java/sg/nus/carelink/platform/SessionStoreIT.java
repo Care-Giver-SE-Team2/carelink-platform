@@ -8,6 +8,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.context.ApplicationContext;
+import org.springframework.session.Session;
+import org.springframework.session.SessionRepository;
+import org.springframework.session.data.redis.RedisSessionRepository;
+import sg.nus.carelink.platform.security.ConcurrentRedisSessionRepository;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +63,15 @@ class SessionStoreIT {
 
 	@Autowired
 	private StringRedisTemplate redis;
+
+	@Autowired
+	private ConcurrentRedisSessionRepository sessions;
+
+	@Autowired
+	private RedisSessionRepository defaults;
+
+	@Autowired
+	private ApplicationContext context;
 
 	@DynamicPropertySource
 	static void stores(DynamicPropertyRegistry registry) {
@@ -91,6 +115,195 @@ class SessionStoreIT {
 
 		assertThat(redis.hasKey(SESSION_KEYS + sessionId(session))).isFalse();
 		mvc.perform(get("/api/auth/me").cookie(session)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void httpUsesTheAtomicRepositoryAndKeepsTheDefaultRedisFormat() {
+		assertThat(context.getBean(SessionRepository.class)).isSameAs(sessions);
+		var session = sessions.createSession();
+		session.setAttribute("example", "shared");
+		sessions.save(session);
+		Session legacyReader = defaults.findById(session.getId());
+		assertThat(legacyReader).isNotNull();
+		assertThat(legacyReader.<String>getAttribute("example")).isEqualTo("shared");
+		assertThat(redis.getExpire(SESSION_KEYS + session.getId())).isPositive();
+	}
+
+	@Test
+	void anExistingLegacyHashCanBeReadAndUpdatedWithoutLosingOtherAttributes() {
+		String id = java.util.UUID.randomUUID().toString();
+		long now = Instant.now().toEpochMilli();
+		defaults.getSessionRedisOperations().opsForHash().putAll(SESSION_KEYS + id, Map.of(
+				"creationTime", now, "lastAccessedTime", now, "maxInactiveInterval", 1800,
+				"sessionAttr:legacy", "retained"));
+		var session = sessions.findById(id);
+		session.setAttribute("newAttribute", "added");
+		sessions.save(session);
+		Session legacyReader = defaults.findById(id);
+		assertThat(legacyReader.<String>getAttribute("legacy")).isEqualTo("retained");
+		assertThat(legacyReader.<String>getAttribute("newAttribute")).isEqualTo("added");
+	}
+
+	@Test
+	void aLogoutWinsOverBothAlreadyLoadedRequestSnapshots() {
+		var session = sessions.createSession();
+		sessions.save(session);
+		var first = sessions.findById(session.getId());
+		var second = sessions.findById(session.getId());
+		first.setLastAccessedTime(Instant.now());
+		second.setAttribute("late", "must not resurrect authentication");
+		sessions.deleteById(session.getId());
+		sessions.save(first);
+		sessions.save(second);
+		assertThat(redis.hasKey(SESSION_KEYS + session.getId())).isFalse();
+		assertThat(sessions.findById(session.getId())).isNull();
+	}
+
+	@Test
+	void concurrentDeltasPreserveEachOthersUnrelatedAttributes() throws Exception {
+		var initial = sessions.createSession();
+		initial.setAttribute("remove", "old");
+		sessions.save(initial);
+		var first = sessions.findById(initial.getId());
+		var second = sessions.findById(initial.getId());
+		first.setAttribute("first", "one");
+		first.removeAttribute("remove");
+		second.setAttribute("second", "two");
+		CountDownLatch start = new CountDownLatch(1);
+		try (var pool = Executors.newFixedThreadPool(2)) {
+			var a = pool.submit(() -> { start.await(); sessions.save(first); return true; });
+			var b = pool.submit(() -> { start.await(); sessions.save(second); return true; });
+			start.countDown();
+			a.get(5, TimeUnit.SECONDS);
+			b.get(5, TimeUnit.SECONDS);
+		}
+		var finalSession = sessions.findById(initial.getId());
+		assertThat(finalSession.<String>getAttribute("first")).isEqualTo("one");
+		assertThat(finalSession.<String>getAttribute("second")).isEqualTo("two");
+		assertThat(finalSession.<String>getAttribute("remove")).isNull();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"creationTime", "lastAccessedTime", "maxInactiveInterval"})
+	void incompleteHashesFailClosedAndAreRemoved(String missingField) throws Exception {
+		Cookie csrf = csrf();
+		Cookie session = login(csrf);
+		String key = SESSION_KEYS + sessionId(session);
+		redis.opsForHash().delete(key, missingField);
+		mvc.perform(get("/api/auth/me").cookie(session)).andExpect(status().isUnauthorized());
+		assertThat(redis.hasKey(key)).isFalse();
+		mvc.perform(post("/api/auth/logout").cookie(session, csrf).header("X-XSRF-TOKEN", csrf.getValue()))
+				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void logoutItselfCanEncounterAnIncompleteHashWithoutReturning500() throws Exception {
+		Cookie csrf = csrf();
+		Cookie session = login(csrf);
+		String key = SESSION_KEYS + sessionId(session);
+		redis.opsForHash().delete(key, "creationTime");
+		mvc.perform(post("/api/auth/logout").cookie(session, csrf).header("X-XSRF-TOKEN", csrf.getValue()))
+				.andExpect(status().isNoContent());
+		assertThat(redis.hasKey(key)).isFalse();
+	}
+
+	@Test
+	void aLoadedSnapshotCannotRepairAndResurrectAnIncompleteHash() {
+		var session = sessions.createSession();
+		sessions.save(session);
+		var pending = sessions.findById(session.getId());
+		pending.setLastAccessedTime(Instant.now());
+		redis.opsForHash().delete(SESSION_KEYS + session.getId(), "creationTime");
+		sessions.save(pending);
+		assertThat(redis.hasKey(SESSION_KEYS + session.getId())).isFalse();
+	}
+
+	@Test
+	void sessionIdRotationIsAtomicAndCannotReviveALoggedOutSnapshot() {
+		var session = sessions.createSession();
+		session.setAttribute("kept", "value");
+		sessions.save(session);
+		String oldId = session.getId();
+		var rotation = sessions.findById(oldId);
+		String newId = rotation.changeSessionId();
+		sessions.save(rotation);
+		assertThat(redis.hasKey(SESSION_KEYS + oldId)).isFalse();
+		assertThat(sessions.findById(newId).<String>getAttribute("kept")).isEqualTo("value");
+		var late = sessions.findById(newId);
+		String unpersistedId = late.changeSessionId();
+		sessions.deleteById(newId);
+		sessions.save(late);
+		assertThat(late.getId()).isEqualTo(newId);
+		assertThat(redis.hasKey(SESSION_KEYS + newId)).isFalse();
+		assertThat(redis.hasKey(SESSION_KEYS + unpersistedId)).isFalse();
+	}
+
+	@Test
+	void naturalExpiryCannotBeUndoneByAPendingRequest() throws Exception {
+		var session = sessions.createSession();
+		session.setMaxInactiveInterval(Duration.ofSeconds(1));
+		sessions.save(session);
+		var pending = sessions.findById(session.getId());
+		long stop = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
+		while (Boolean.TRUE.equals(redis.hasKey(SESSION_KEYS + session.getId())) && System.nanoTime() < stop) {
+			Thread.sleep(25);
+		}
+		assertThat(redis.hasKey(SESSION_KEYS + session.getId())).isFalse();
+		pending.setLastAccessedTime(Instant.now());
+		sessions.save(pending);
+		assertThat(redis.hasKey(SESSION_KEYS + session.getId())).isFalse();
+	}
+
+	@Test
+	void logoutStillRequiresTheRealCsrfToken() throws Exception {
+		Cookie session = login(csrf());
+		mvc.perform(post("/api/auth/logout").cookie(session)).andExpect(status().isForbidden());
+		mvc.perform(post("/api/auth/logout").cookie(session, new Cookie("XSRF-TOKEN", "valid-cookie"))
+				.header("X-XSRF-TOKEN", "wrong-header")).andExpect(status().isForbidden());
+		mvc.perform(get("/api/auth/me").cookie(session)).andExpect(status().isOk());
+	}
+
+	@Test
+	void anUnexpectedRedisTypeErrorIsNotMisreportedAsAnonymous() {
+		String id = java.util.UUID.randomUUID().toString();
+		redis.opsForValue().set(SESSION_KEYS + id, "unexpected string, not a session hash");
+		assertThatThrownBy(() -> sessions.findById(id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+	}
+
+	@Test
+	void cleaningAnInvalidSnapshotDoesNotDeleteARecordCompletedByAnotherWriter() {
+		var initial = sessions.createSession();
+		sessions.save(initial);
+		String key = SESSION_KEYS + initial.getId();
+		redis.opsForHash().delete(key, "creationTime");
+		var real = defaults.getSessionRedisOperations();
+		org.springframework.data.redis.core.HashOperations<String, String, Object> hashes = real.opsForHash();
+		var intercepted = org.mockito.Mockito.spy(hashes);
+		org.mockito.Mockito.doAnswer(invocation -> {
+			Map<String, Object> snapshot = hashes.entries(key);
+			hashes.put(key, "creationTime", initial.getCreationTime().toEpochMilli());
+			return snapshot;
+		}).when(intercepted).entries(key);
+		var operations = org.mockito.Mockito.spy(real);
+		org.mockito.Mockito.doReturn(intercepted).when(operations).opsForHash();
+		var isolatedReader = new ConcurrentRedisSessionRepository(operations, ((SessionRepository<?>) defaults)::createSession,
+				"carelink:session", org.springframework.session.FlushMode.ON_SAVE,
+				org.springframework.session.SaveMode.ON_SET_ATTRIBUTE, org.springframework.session.UuidSessionIdGenerator.getInstance());
+		assertThat(isolatedReader.findById(initial.getId())).isNull();
+		assertThat(redis.hasKey(key)).isTrue();
+		assertThat(sessions.findById(initial.getId())).isNotNull();
+	}
+
+	@Test
+	void redisConnectionFailuresAreNotConvertedToSuccessfulSaves() {
+		var operations = org.mockito.Mockito.spy(defaults.getSessionRedisOperations());
+		org.mockito.Mockito.doThrow(new org.springframework.data.redis.RedisConnectionFailureException("simulated unavailable Redis"))
+				.when(operations).execute(org.mockito.ArgumentMatchers.<org.springframework.data.redis.core.RedisCallback<Object>>any());
+		var unavailable = new ConcurrentRedisSessionRepository(operations, ((SessionRepository<?>) defaults)::createSession,
+				"carelink:session", org.springframework.session.FlushMode.ON_SAVE,
+				org.springframework.session.SaveMode.ON_SET_ATTRIBUTE, org.springframework.session.UuidSessionIdGenerator.getInstance());
+		var pending = unavailable.createSession();
+		assertThatThrownBy(() -> unavailable.save(pending)).isInstanceOf(org.springframework.data.redis.RedisConnectionFailureException.class);
 	}
 
 	private Cookie csrf() throws Exception {

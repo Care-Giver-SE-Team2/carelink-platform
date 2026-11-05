@@ -8,7 +8,7 @@ import { QueryError } from './components'
 import { isAccessFailure, useSelfServiceWrite } from './selfService'
 import { commandError, unknownResult } from './commandErrors'
 import styles from './Caregiver.module.css'
-import { ApiError } from '../../shared/api/client'
+import { ApiError, newRequestId } from '../../shared/api/client'
 
 export default function ReportIncidentPage() {
   const { visitId = '' } = useParams()
@@ -39,11 +39,11 @@ function ReportForm({ id }: { id: string }) {
     if (!pack) return
     if (!category || !severity || !description.trim() || description.trim().length > 2000) { setValidation('Choose a category and severity, and write 1 to 2,000 characters.'); return }
     setValidation('')
-    const payload = attempt ?? { visitId: Number(id), expectedVersion: pack.visit.version, category, severity, description: description.trim(), clientRequestId: crypto.randomUUID() }
+    const payload = attempt ?? { visitId: Number(id), expectedVersion: pack.visit.version, category, severity, description: description.trim(), clientRequestId: newRequestId() }
     setAttempt(payload)
     void write.send(signal => reportIncident(payload, signal), saved => navigate('/caregiver/incidents/' + saved.report.id))
   }
-  return <><h1>Report incident</h1><p className={styles.readOnly}>Record observed facts and actions, not a diagnosis. For an emergency, follow your organisation's emergency contact procedure now. Online submission does not mean someone has taken over.</p>
+  return <><div className={styles.heading}><h1>Report incident</h1></div><p className={styles.readOnly}>Record observed facts and actions, not a diagnosis. For an emergency, follow your organisation's emergency contact procedure now. Online submission does not mean someone has taken over.</p>
     {result.status === 'loading' && <p role="status">Checking assigned visit…</p>}
     {result.status === 'error' && <QueryError error={result.error} retry={reload} back="/caregiver" />}
     {validation && <p role="alert">{validation}</p>}{write.error != null && <p role="alert">{commandError(write.error)}</p>}

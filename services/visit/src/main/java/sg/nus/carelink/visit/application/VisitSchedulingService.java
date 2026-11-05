@@ -57,7 +57,8 @@ class VisitSchedulingService implements VisitScheduling {
 
 	@Override
 	public int cancelUntouchedFrom(Long carePlanId, LocalDateTime from) {
-		List<Visit> untouched = visits.findByCarePlanIdStartingFrom(carePlanId, from).stream()
+		List<Visit> untouched = visits.findByCarePlanIdStartingFrom(carePlanId, from.toLocalDate().atStartOfDay()).stream()
+				.filter(v -> !v.scheduledStart().isBefore(from) || (v.scheduledEnd() != null && v.scheduledEnd().isAfter(from)))
 				.filter(Visit::hasNotStarted)
 				.sorted(java.util.Comparator.comparing(Visit::id))
 				.toList();

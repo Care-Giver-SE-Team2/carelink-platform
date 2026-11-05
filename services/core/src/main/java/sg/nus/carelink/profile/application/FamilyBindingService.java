@@ -4,6 +4,7 @@ import java.util.List;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,17 +31,20 @@ public class FamilyBindingService {
     private final FamilyMemberRepository familyMembers;
     private final ElderFamilyBindingRepository bindings;
     private final AppUserRepository users;
+    private final ApplicationEventPublisher events;
 
     public FamilyBindingService(
             ElderRepository elders,
             FamilyMemberRepository familyMembers,
             ElderFamilyBindingRepository bindings,
-            AppUserRepository users) {
+            AppUserRepository users,
+            ApplicationEventPublisher events) {
 
         this.elders = elders;
         this.familyMembers = familyMembers;
         this.bindings = bindings;
         this.users = users;
+        this.events = events;
     }
 
     /**
@@ -119,13 +123,13 @@ public class FamilyBindingService {
                     || current.status()
                     == ElderFamilyBinding.Status.REVOKED) {
 
-                return bindings.save(
+                return requested(bindings.save(
                         current.requestAgain(
                                 relationship,
                                 primaryContact,
                                 accessScope
                         )
-                );
+                ));
             }
 
             throw new BusinessRuleViolation(
@@ -143,7 +147,24 @@ public class FamilyBindingService {
                         accessScope
                 );
 
-        return bindings.save(binding);
+        return requested(bindings.save(binding));
+    }
+
+    /**
+     * Tells the family member a request is waiting for them, once the request commits.
+     */
+    private ElderFamilyBinding requested(
+            ElderFamilyBinding binding) {
+
+        events.publishEvent(
+                new FamilyBindingRequested(
+                        binding.id(),
+                        binding.elderId(),
+                        binding.familyMemberId()
+                )
+        );
+
+        return binding;
     }
 
     /**

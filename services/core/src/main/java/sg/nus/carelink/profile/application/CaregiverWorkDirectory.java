@@ -9,7 +9,19 @@ public interface CaregiverWorkDirectory {
     ElderView elder(Long elderId);
     CredentialAlerts alerts(Long caregiverId, LocalDate today);
 
-    record Profile(Long id, Long userId, String fullName, String phone, String sector, String dialects, String status) {}
+    record Profile(Long id, Long userId, String fullName, String phone, String sector, String dialects, String status) {
+        /** Work access is separate from authentication and optional qualification uploads. */
+        public Profile requireWorking() {
+            if (!"AVAILABLE".equals(status) && !"BUSY".equals(status))
+                throw new org.springframework.security.access.AccessDeniedException("Manager admission approval is required for caregiver work.");
+            return this;
+        }
+        public Profile requireAdmittedHistory() {
+            if (!List.of("AVAILABLE", "BUSY", "INACTIVE").contains(status == null ? "" : status))
+                throw new org.springframework.security.access.AccessDeniedException("Manager admission approval is required.");
+            return this;
+        }
+    }
     record ElderView(Long elderId, String preferredName, String serviceAddress, String postalSector,
                      List<String> languageNeeds, String accessNotes, String emergencyNotes) {}
     record CredentialAlert(Long id, String name, String certificateNo, LocalDate expiryDate, String status, String warning,

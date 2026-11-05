@@ -17,9 +17,15 @@ public interface CarePlanLookup {
 	Optional<CarePlan> findLatestByElderId(Long elderId);
 
 	/**
+	 * The elder's plan in force right now, if any — the one published version that has been
+	 * neither superseded nor stopped. Still present while a newer version is being drafted.
+	 */
+	Optional<CarePlan> findPublishedByElderId(Long elderId);
+
+	/**
 	 * The earliest date on or after {@code max(from, plan.startDate())} that the elder's active
-	 * published plan has a visit scheduled, derived from its nodes' weekly schedule days. Empty
-	 * when the elder has no published plan, the plan has no start date yet, or none of its nodes
+	 * published plan (see findPublishedByElderId) has a visit scheduled, derived from its nodes'
+	 * weekly schedule days. Empty when the elder has no published plan, the plan has no start date yet, or none of its nodes
 	 * carry a schedule.
 	 */
 	Optional<LocalDate> findNextVisitDate(Long elderId, LocalDate from);

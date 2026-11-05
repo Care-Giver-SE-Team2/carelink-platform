@@ -56,13 +56,17 @@ describe('VisitStateBadge', () => {
   it('labels each visit state', () => {
     render(
       <>
+        <VisitStateBadge state="verified" />
         <VisitStateBadge state="in_visit" />
         <VisitStateBadge state="exception" />
+        <VisitStateBadge state="not_checked_in" />
         <VisitStateBadge state="needs_cover" />
       </>,
     )
+    expect(screen.getByText('VERIFIED')).toBeInTheDocument()
     expect(screen.getByText('IN VISIT')).toBeInTheDocument()
     expect(screen.getByText('EXCEPTION')).toBeInTheDocument()
+    expect(screen.getByText('NOT CHECKED IN')).toBeInTheDocument()
     expect(screen.getByText('NEEDS COVER')).toBeInTheDocument()
   })
 })

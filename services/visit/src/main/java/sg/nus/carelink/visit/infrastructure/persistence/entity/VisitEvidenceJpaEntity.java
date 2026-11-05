@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * JPA entity for table visit_evidence.
  *
  * From the caregiver analysis (VisitEvidence). What kinds are required comes from
- * care_plan_node.evidence_type; the visit cannot close until they are present.
+ * care_plan_node.evidence_type; missing evidence does not block caregiver check-out.
  *
  * <p>Generated from V2__care_domain.sql as a starting point; edit freely, it will not
  * be regenerated. Same shape as identity's AppUserJpaEntity: no domain logic here,

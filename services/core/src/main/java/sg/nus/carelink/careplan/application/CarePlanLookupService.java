@@ -32,9 +32,16 @@ class CarePlanLookupService implements CarePlanLookup {
 	}
 
 	@Override
+	public Optional<CarePlan> findPublishedByElderId(Long elderId) {
+		return carePlans.findByElderId(elderId).stream()
+				.filter(plan -> plan.status() == CarePlan.Status.PUBLISHED)
+				.findFirst();
+	}
+
+	@Override
 	public Optional<LocalDate> findNextVisitDate(Long elderId, LocalDate from) {
-		CarePlan plan = carePlans.findLatestByElderId(elderId).orElse(null);
-		if (plan == null || plan.status() != CarePlan.Status.PUBLISHED || plan.startDate() == null) {
+		CarePlan plan = findPublishedByElderId(elderId).orElse(null);
+		if (plan == null || plan.startDate() == null) {
 			return Optional.empty();
 		}
 		Set<DayOfWeek> scheduledDays = carePlanNodes.findByCarePlanId(plan.id()).stream()

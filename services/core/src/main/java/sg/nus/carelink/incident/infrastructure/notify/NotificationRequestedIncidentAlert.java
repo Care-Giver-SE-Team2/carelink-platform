@@ -22,7 +22,8 @@ import sg.nus.carelink.shared.security.Role;
  * in-app inbox, where it waits as PENDING until it is read.
  *
  * <p>Reads {@code user_role} with a plain statement, and asks visit for the caregiver on the
- * elder's most recent visit ({@link LatestCaregivers}). Reading is not
+ * elder's most recent visit, or for a missed check-in the caregiver on the triggering visit
+ * ({@link LatestCaregivers}). Reading is not
  * owning; no other module's code changes for this to work. Family messages are created only
  * by the after-commit FM05 observer, so this adapter never produces a second family copy.
  */
@@ -38,6 +39,14 @@ class NotificationRequestedIncidentAlert implements IncidentAlert {
 	/** The account of a caregiver: an alert reaches a caregiver through their account. */
 	private static final String CAREGIVER_ACCOUNT = "select user_id from caregiver where id = :caregiverId";
 
+	/** As {@link #CAREGIVER_ACCOUNT}, but only while the account is enabled and still holds the caregiver role. */
+	private static final String ACTIVE_CAREGIVER_ACCOUNT = """
+			select c.user_id from caregiver c
+			join app_user u on u.id = c.user_id
+			where c.id = :caregiverId and u.enabled = true
+			and exists (select 1 from user_role r where r.user_id = u.id and r.role = 'CAREGIVER')
+			""";
+
 	private final JdbcClient jdbc;
 	private final LatestCaregivers caregivers;
 	private final Events events;
@@ -52,8 +61,13 @@ class NotificationRequestedIncidentAlert implements IncidentAlert {
 
 	@Override
 	public int broadcastRaised(Incident incident) {
-		Set<Long> audience = new LinkedHashSet<>(managers());
-		audience.addAll(recentCaregiver(incident.elderId()));
+		Set<Long> managerAudience = new LinkedHashSet<>(managers());
+		Set<Long> audience = new LinkedHashSet<>(managerAudience);
+		// SYS03 is raised while visit holds this exact visit locked. Never substitute a later
+		// visit's caregiver; the trigger ledger visit saves preserves this assignment.
+		boolean missedCheckIn = incident.source() == Incident.Source.SYSTEM_MISSED_CHECKIN;
+		List<Long> caregivers = missedCheckIn ? assignedCaregiver(incident.visitId()) : recentCaregiver(incident.elderId());
+		audience.addAll(caregivers);
 
 		String title = "%s: %s".formatted(incident.severity(), incident.category());
 		String body = "%s. %s".formatted(
@@ -61,7 +75,15 @@ class NotificationRequestedIncidentAlert implements IncidentAlert {
 				incident.description() == null ? "No description given." : incident.description());
 
 		for (Long userId : audience) {
-			write(userId, "INCIDENT_RAISED", title, body, incident);
+			if (missedCheckIn && caregivers.contains(userId) && !managerAudience.contains(userId)) {
+				write(userId, "INCIDENT_RAISED", "Missed check-in alert",
+						"Visit %d was not checked in by the allowed threshold. This alert does not block service within the check-in window."
+								.formatted(incident.visitId()),
+						incident, "CAREGIVER_SYSTEM_ALERT");
+			}
+			else {
+				write(userId, "INCIDENT_RAISED", title, body, incident);
+			}
 		}
 		return audience.size();
 	}
@@ -86,6 +108,15 @@ class NotificationRequestedIncidentAlert implements IncidentAlert {
 		return jdbc.sql(MANAGERS).param("role", Role.MANAGER.name()).query(Long.class).list();
 	}
 
+	private List<Long> assignedCaregiver(Long visitId) {
+		if (visitId == null) {
+			return List.of();
+		}
+		return caregivers.assignedCaregiverId(visitId)
+				.map(caregiverId -> jdbc.sql(ACTIVE_CAREGIVER_ACCOUNT).param("caregiverId", caregiverId).query(Long.class).list())
+				.orElse(List.of());
+	}
+
 	private List<Long> recentCaregiver(Long elderId) {
 		if (elderId == null) {
 			return List.of();
@@ -98,8 +129,13 @@ class NotificationRequestedIncidentAlert implements IncidentAlert {
 	}
 
 	private void write(Long userId, String eventType, String title, String body, Incident incident) {
+		write(userId, eventType, title, body, incident, "INCIDENT");
+	}
+
+	private void write(Long userId, String eventType, String title, String body, Incident incident,
+			String resourceType) {
 		events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(userId, eventType, title, body,
-				"INCIDENT", incident.id(), incident.elderId(), LocalDateTime.now(clock)));
+				resourceType, incident.id(), incident.elderId(), LocalDateTime.now(clock)));
 	}
 
 	private static String describeSource(Incident.Source source) {

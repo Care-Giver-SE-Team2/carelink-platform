@@ -19,6 +19,8 @@ import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 import sg.nus.carelink.visit.domain.model.ElderConfirmation;
 import sg.nus.carelink.visit.domain.model.Visit;
+import sg.nus.carelink.visit.domain.model.VisitStateTransition;
+import sg.nus.carelink.visit.domain.repository.VisitStateTransitionRepository;
 
 class VisitServiceTest {
 
@@ -34,6 +36,7 @@ class VisitServiceTest {
     private InMemoryElderConfirmationRepository confirmations;
     private ElderServiceDisputes incidents;
     private RecordingVisitEvents events;
+    private VisitStateTransitionRepository transitions;
     private VisitService service;
 
     @BeforeEach
@@ -55,12 +58,16 @@ class VisitServiceTest {
         events =
                 new RecordingVisitEvents();
 
+        transitions =
+                mock(VisitStateTransitionRepository.class);
+
         service =
                 new VisitService(
                         visits,
                         confirmations,
                         incidents,
                         events,
+                        transitions,
                         Clock.fixed(
                                 NOW,
                                 ZONE
@@ -256,14 +263,42 @@ class VisitServiceTest {
                 )
         ).isTrue();
 
+        assertThat(
+                visits.findById(
+                        visit.id()
+                ).orElseThrow().status()
+        ).isEqualTo(
+                Visit.Status.VERIFIED
+        );
+
+        verify(transitions).save(
+                new VisitStateTransition(
+                        null,
+                        visit.id(),
+                        "COMPLETED",
+                        "VERIFIED",
+                        101L,
+                        VisitStateTransition.Result.APPLIED,
+                        null,
+                        LocalDateTime.of(
+                                2026,
+                                9,
+                                24,
+                                11,
+                                0
+                        )
+                )
+        );
+
         verifyNoInteractions(
                 incidents
         );
 
         assertThat(events.published())
-                .singleElement()
                 .extracting(RecordingVisitEvents.Published::event, RecordingVisitEvents.Published::why)
-                .containsExactly("ElderConfirmationSubmitted", "CONFIRMED");
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("VisitClosed", "VERIFIED"),
+                        org.assertj.core.groups.Tuple.tuple("ElderConfirmationSubmitted", "CONFIRMED"));
     }
 
     @Test
@@ -307,6 +342,18 @@ class VisitServiceTest {
                         101L,
                         "Caregiver left early."
                 );
+
+        assertThat(
+                visits.findById(
+                        visit.id()
+                ).orElseThrow().status()
+        ).isEqualTo(
+                Visit.Status.COMPLETED
+        );
+
+        verifyNoInteractions(
+                transitions
+        );
     }
 
     @Test

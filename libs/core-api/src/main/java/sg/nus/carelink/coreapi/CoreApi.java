@@ -178,6 +178,13 @@ public interface CoreApi {
 	SoleIncident soleMissedCheckInIncident(@PathVariable Long incidentId, @RequestParam Long elderId,
 			@RequestParam Long visitId);
 
+	/**
+	 * The signed-in caregiver's own concluded spot checks on one visit, for their execution history;
+	 * 403 when the account is not an admitted caregiver's.
+	 */
+	@GetExchange("/caregivers/by-username/{username}/spot-checks")
+	List<SpotCheckConclusion> caregiverSpotChecks(@PathVariable String username, @RequestParam Long visitId);
+
 	// ---------- Visit cover (rostering) ----------
 
 	@GetExchange("/visits/{visitId}/cover-options")
@@ -298,6 +305,11 @@ public interface CoreApi {
 	}
 
 	record SoleIncident(boolean sole) {
+	}
+
+	/** @param result null until the check is concluded */
+	record SpotCheckConclusion(Long id, Long visitId, String result, LocalDateTime checkedAt,
+			String caregiverResponse) {
 	}
 
 	/** {@code rank} is null when the caregiver cannot take the visit; {@code reason} says why. */

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Callout, Eyebrow, MetaText, TextArea } from '../../../shared/components/ui'
-import type { ApplicationCertificate, CaregiverApplication } from '../data/caregiverApplications'
+import { Link } from 'react-router-dom'
+import type { CaregiverApplication, CaregiverApplicationCertificate } from '../../../shared/api/profile'
+import { Button, Callout, CertificationStateTag, Eyebrow, MetaText, TextArea } from '../../../shared/components/ui'
 import { formatReceived } from '../lib/applications'
 import { languagesLabel } from '../lib/caregivers'
 import { expiryLabel, formatDate } from '../lib/certifications'
@@ -10,16 +11,19 @@ import styles from './CaregiverApplicationPanel.module.css'
 
 const MESSAGE_MAX = 255
 
+/** Stands in for the file name of a certificate uploaded without a scan. */
+const NO_FILE = 'no file uploaded'
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
  * The right-hand panel of the Caregivers screen for an application: what the applicant filled
  * in, each certificate they uploaded (its scan opens full size), an optional message to them,
  * and Approve / Decline.
- * Approving enables their login and publishes every certificate, so there is no separate
- * certificate review afterwards. Declining needs a message so the applicant knows why.
- * `onApprove`/`onDecline` do the request and reject with the error to show. Key it by
- * application id so the message resets between rows.
+ * Approving admits the caregiver to work; it does not publish their certificates, which are
+ * reviewed one by one in Certifications (each links there). Declining needs a message so the
+ * applicant knows why. `onApprove`/`onDecline` do the request and reject with the error to show.
+ * Key it by application id so the message resets between rows.
  */
 export function CaregiverApplicationPanel({
   application,
@@ -35,10 +39,11 @@ export function CaregiverApplicationPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now] = useState(() => Date.now())
-  const [viewing, setViewing] = useState<ApplicationCertificate | null>(null)
+  const [viewing, setViewing] = useState<CaregiverApplicationCertificate | null>(null)
 
   const name = application.fullName
   const count = application.certificates.length
+  const toPublish = application.certificates.filter((cert) => cert.state === 'SUBMITTED').length
 
   async function run(action: () => Promise<void>) {
     setBusy(true)
@@ -65,7 +70,8 @@ export function CaregiverApplicationPanel({
         <Eyebrow wide>Caregiver application · #{application.id}</Eyebrow>
         <h2 className={styles.title}>{name}</h2>
         <MetaText className={styles.meta}>
-          submitted {formatReceived(application.submittedAt)} from the caregiver app
+          {application.roundNumber > 1 ? 'resubmitted' : 'submitted'} {formatReceived(application.submittedAt)} from the
+          caregiver app
         </MetaText>
       </header>
 
@@ -75,7 +81,7 @@ export function CaregiverApplicationPanel({
           <Detail label="Name">{name}</Detail>
           <Detail label="Account">{application.username}</Detail>
           <Detail label="Mobile">{application.phone ?? <NotGiven />}</Detail>
-          <Detail label="Sector">{application.sector ?? <NotGiven />}</Detail>
+          <Detail label="Sector asked for">{application.requestedSector ?? <NotGiven />}</Detail>
           <Detail label="Languages">{languagesLabel(application.dialects) ?? <NotGiven />}</Detail>
         </dl>
       </section>
@@ -119,9 +125,12 @@ export function CaregiverApplicationPanel({
 
       <footer className={styles.footer}>
         <MetaText className={styles.effect}>
-          {count
-            ? `Approving activates ${name}'s login and publishes the ${count === 1 ? 'certificate' : `${count} certificates`} above, so they can be rostered straight away.`
-            : `Approving activates ${name}'s login. With no certificate they stay onboarding, and can't be rostered, until one is published.`}
+          Approving makes {name} available for rostering.{' '}
+          {toPublish
+            ? `It doesn't publish their certificates: review the ${toPublish === 1 ? 'one' : toPublish} waiting in Certifications.`
+            : count
+              ? null
+              : "They haven't uploaded any certificates yet."}
         </MetaText>
         {error && (
           <Callout tone="danger" role="alert">
@@ -146,7 +155,7 @@ export function CaregiverApplicationPanel({
       {viewing?.scanUrl && (
         <ScanViewer
           title={`${name} — ${viewing.credentialTypeName.toLowerCase()}`}
-          scan={{ fileName: viewing.fileName, url: viewing.scanUrl, contentType: viewing.scanContentType }}
+          scan={{ fileName: viewing.fileName ?? NO_FILE, url: viewing.scanUrl, contentType: viewing.scanContentType }}
           onClose={() => setViewing(null)}
         />
       )}
@@ -154,18 +163,34 @@ export function CaregiverApplicationPanel({
   )
 }
 
-/** One uploaded certificate: its scan and what the applicant typed in for it. */
-function Certificate({ cert, now, onOpenScan }: { cert: ApplicationCertificate; now: number; onOpenScan: () => void }) {
+/**
+ * One uploaded certificate: its scan, what the applicant typed in for it, and its review state,
+ * linking to its row in Certifications.
+ */
+function Certificate({
+  cert,
+  now,
+  onOpenScan,
+}: {
+  cert: CaregiverApplicationCertificate
+  now: number
+  onOpenScan: () => void
+}) {
   const expiry = cert.expiryDate ? expiryLabel(daysFrom(now, cert.expiryDate)) : null
   const warn = expiry?.tone === 'danger' || expiry?.tone === 'ink'
   return (
     <li className={styles.certificate}>
       <ScanThumbnail
-        scan={{ fileName: cert.fileName, url: cert.scanUrl, contentType: cert.scanContentType }}
+        scan={{ fileName: cert.fileName ?? NO_FILE, url: cert.scanUrl, contentType: cert.scanContentType }}
         onOpen={onOpenScan}
       />
       <div className={styles.certBody}>
-        <span className={styles.certName}>{cert.credentialTypeName}</span>
+        <div className={styles.certHead}>
+          <Link className={styles.certName} to={`/manager/certifications?filter=all&id=${cert.id}`}>
+            {cert.credentialTypeName}
+          </Link>
+          <CertificationStateTag state={cert.state} />
+        </div>
         <dl className={styles.certFields}>
           <Detail label="Issued by">{cert.issuingBody ?? <NotGiven />}</Detail>
           <Detail label="Cert no." mono>

@@ -59,7 +59,7 @@ public class CaregiverHealthService {
         if (page < 0 || page > 100000 || size < 1 || size > 50) {
             throw new IllegalArgumentException("Page must be 0–100000 and size 1–50.");
         }
-        var actor = directory.require(username);
+        var actor = directory.require(username).requireAdmittedHistory();
         var visit = visits.findById(visitId).orElseThrow(() -> new ResourceNotFound("Visit", visitId));
         if (!Objects.equals(visit.caregiverId(), actor.id())) throw new AccessDeniedException("Not assigned");
         if (visit.status() == Visit.Status.CANCELLED) throw new BusinessRuleViolation("VISIT_CANCELLED", "This visit was cancelled.");

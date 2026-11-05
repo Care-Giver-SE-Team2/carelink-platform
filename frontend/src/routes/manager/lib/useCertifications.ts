@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchCredentialRegister } from '../../../shared/api/profile'
+import { fetchCredentialDocuments, fetchCredentialRegister } from '../../../shared/api/profile'
 import { fetchVisitsAtRisk } from '../../../shared/api/rostering'
 import { filterRows } from './certifications'
 
@@ -20,6 +20,14 @@ export function useCertificationReviewCount() {
     queryKey: ['credentials'],
     queryFn: ({ signal }) => fetchCredentialRegister(signal),
     select: (rows) => filterRows(rows, 'review').length,
+  })
+}
+
+/** The files uploaded with one certificate, for the review panel's scans. */
+export function useCredentialDocuments(id: number) {
+  return useQuery({
+    queryKey: ['credentials', id, 'documents'],
+    queryFn: ({ signal }) => fetchCredentialDocuments(id, signal),
   })
 }
 

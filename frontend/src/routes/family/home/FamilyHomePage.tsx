@@ -16,21 +16,16 @@ import styles from './FamilyHome.module.css'
 const liveStates: FamilyVisit['status'][] = ['ARRIVED', 'IN_PROGRESS']
 const closedStates: FamilyVisit['status'][] = ['COMPLETED', 'VERIFIED', 'AUTO_CLOSED']
 
-/** The visit under way, or failing that the next scheduled one this week. */
-function pickVisit(visits: FamilyVisit[], now: number) {
+/**
+ * The visit under way, or failing that the next scheduled one this week. A visit of today's whose
+ * start has passed stays until it is checked in and done, rather than dropping out at its start time.
+ */
+function pickVisit(visits: FamilyVisit[], today: string) {
   const live = visits.find((visit) => liveStates.includes(visit.status))
   const next = live ? undefined : visits
-    .filter((visit) => visit.status === 'SCHEDULED' && new Date(visit.scheduledStart).getTime() >= now)
+    .filter((visit) => visit.status === 'SCHEDULED' && singaporeToday(new Date(visit.scheduledStart)) >= today)
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart))[0]
   return { live, visit: live ?? next }
-}
-
-/** "Tuesday 6 October" for a Singapore calendar date. */
-function longDate(date: string) {
-  const parts = new Intl.DateTimeFormat('en-SG', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
-    .formatToParts(new Date(`${date}T00:00:00Z`))
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value
-  return `${part('weekday')} ${part('day')} ${part('month')}`
 }
 
 /**
@@ -46,23 +41,27 @@ export function FamilyHomePage() {
   const data = resource.status === 'success' ? resource.data : null
   const elder = data?.elders.find((item) => item.id === data.selectedElderId) ?? null
   const age = ageOn(elder?.dateOfBirth ?? null, today)
-  const shown = data?.visits ? pickVisit(data.visits.items, now) : null
+  const shown = data?.visits ? pickVisit(data.visits.items, today) : null
 
   return <div className={styles.home}>
     <header className={styles.header}>
-      <div>
-        <p className={styles.eyebrow}>{desktop ? 'Home' : 'Family'}</p>
-        <h1>{elder?.fullName ?? 'Your family'}{desktop && elder && `, ${longDate(today)}`}</h1>
-        {elder && !desktop && <p className={styles.meta}>{[age === null ? null : `${age}`, elder.sector].filter(Boolean).join(' · ') || 'Linked elder'}</p>}
-      </div>
-      {elder && !desktop && <span className={styles.tag}>Linked</span>}
+      {!desktop && <p className={styles.eyebrow}>Family</p>}
+      <h1>Home</h1>
     </header>
     {resource.status === 'loading' && <p className={styles.loading} role="status">Loading today's care…</p>}
     {resource.status === 'error' && <ScheduleFeedback error={resource.error} onRetry={refresh}
       onResetAccess={() => { setElderId(null); refresh() }} />}
+    {elder && <section className={styles.elder} aria-labelledby="home-elder">
+      <div>
+        <p className={styles.elderLabel}>Caring for</p>
+        <h2 id="home-elder" className={styles.elderName}>{elder.fullName}</h2>
+        <p className={styles.meta}>{[age === null ? null : `Age ${age}`, elder.sector].filter(Boolean).join(' · ') || 'Linked elder'}</p>
+      </div>
+      <span className={styles.tag}>Linked</span>
+    </section>}
     {data && data.elders.length > 1 && !desktop && <div className={styles.picker}>
-      <label htmlFor="home-elder">Care for</label>
-      <select id="home-elder" value={data.selectedElderId ?? ''} onChange={(event) => setElderId(Number(event.target.value))}>
+      <label htmlFor="home-elder-picker">Care for</label>
+      <select id="home-elder-picker" value={data.selectedElderId ?? ''} onChange={(event) => setElderId(Number(event.target.value))}>
         {data.elders.map((item) => <option key={item.id} value={item.id}>{item.fullName}</option>)}
       </select>
     </div>}
@@ -143,19 +142,24 @@ function NeedsAnswer({ showElder }: { showElder: boolean }) {
   </section>
 }
 
-/** Desktop only: the rest of today's visits after the one shown above. Hidden when there are none. */
+/**
+ * Desktop only: the rest of today's visits after the one shown above. A visit closed ahead of its
+ * slot drops out; if that empties the list it says today is done. Hidden when there were none.
+ */
 function LaterToday({ visits, after, today, now, primary }: {
   visits: FamilyVisit[]; after?: FamilyVisit; today: string; now: number; primary: { id: number; name: string } | null
 }) {
   const from = after ? after.scheduledStart : new Date(now).toISOString()
-  const later = visits
+  const ahead = visits
     .filter((visit) => visit.id !== after?.id && visit.status !== 'CANCELLED'
       && singaporeToday(new Date(visit.scheduledStart)) === today && visit.scheduledStart > from)
+  const later = ahead
+    .filter((visit) => !closedStates.includes(visit.status))
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart))
-  if (later.length === 0) return null
+  if (ahead.length === 0) return null
   return <section aria-labelledby="home-later">
     <h2 id="home-later" className={styles.sectionLabel}>Later today</h2>
-    <ul className={styles.later}>
+    {later.length === 0 ? <p className={styles.card}>All of today's visits are done.</p> : <ul className={styles.later}>
       {later.map((visit) => <li key={visit.id}>
         <span className={styles.laterTime}>
           {visitTime(visit.scheduledStart)}{visit.scheduledEnd && ` – ${visitTime(visit.scheduledEnd)}`}
@@ -164,7 +168,7 @@ function LaterToday({ visits, after, today, now, primary }: {
         <span className={styles.laterCaregiver}>{visit.caregiverId === null ? 'Awaiting caregiver'
           : visit.caregiverId === primary?.id ? primary.name : 'Caregiver assigned'}</span>
       </li>)}
-    </ul>
+    </ul>}
   </section>
 }
 

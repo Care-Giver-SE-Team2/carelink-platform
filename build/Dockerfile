@@ -46,6 +46,12 @@ COPY --chmod=755 build/entrypoint.sh entrypoint.sh
 # checked from outside ("is staging running what I just merged?").
 ARG GIT_SHA=unknown
 ENV APP_COMMIT=$GIT_SHA
+# Uploaded certificates (core) and visit evidence (visit) are kept privately, never in the static
+# web root. The root filesystem is read-only in Kubernetes, so they go under the writable /tmp
+# volume: pod-local and lost with the pod until a persistent volume is mounted at these paths.
+ENV CARELINK_CREDENTIAL_STORAGE=/tmp/carelink/private/credentials \
+    CARELINK_EVIDENCE_STORAGE=/tmp/carelink/private/evidence \
+    CARELINK_MULTIPART_TEMP=/tmp/carelink/private/multipart
 USER 1001
 EXPOSE 8080
 ENTRYPOINT ["/app/entrypoint.sh"]

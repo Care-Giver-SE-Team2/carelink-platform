@@ -29,8 +29,9 @@ public record RecurringSchedule(Long carePlanId, Long elderId, LocalDate effecti
 	}
 
 	/**
-	 * Every visit this version calls for that starts at or after {@code from} and on a day
-	 * before {@code untilDay}, within the days the version is in force. Earliest first.
+	 * Every visit this version calls for that has not ended by {@code from} and falls on a day
+	 * before {@code untilDay}, within the days the version is in force. Earliest first. A visit
+	 * whose slot is already running is included: it can still be checked in until its end.
 	 */
 	public List<VisitSlot> visitsBetween(LocalDateTime from, LocalDate untilDay) {
 		LocalDate first = later(from.toLocalDate(), effectiveFrom);
@@ -43,7 +44,7 @@ public record RecurringSchedule(Long carePlanId, Long elderId, LocalDate effecti
 		return slots;
 	}
 
-	/** The visits one day calls for, leaving out any that start before {@code from}. */
+	/** The visits one day calls for, leaving out any that have ended by {@code from}. */
 	private List<VisitSlot> visitsOn(LocalDate day, LocalDateTime from) {
 		return tasks.stream()
 				.flatMap(task -> task.slots().stream()
@@ -53,14 +54,15 @@ public record RecurringSchedule(Long carePlanId, Long elderId, LocalDate effecti
 							return new VisitSlot(carePlanId, task.carePlanNodeId(), elderId, task.serviceType(),
 									start, start.plusMinutes(weekly.minutes()));
 						}))
-				.filter(slot -> !slot.start().isBefore(from))
+				.filter(slot -> slot.end().isAfter(from))
 				.toList();
 	}
 
 	/**
 	 * From when this version's visits that nobody has started must be called off: the day it
-	 * stopped or was replaced, but never earlier than {@code now}, so a visit that should have
-	 * happened already is left for the missed-check-in rule instead of quietly disappearing.
+	 * stopped or was replaced, but never earlier than {@code now}, so a visit whose slot is over
+	 * is left for the missed-check-in rule instead of quietly disappearing. One still running at
+	 * that time is called off too, as a successor version would roster that slot afresh.
 	 * Empty while the version is still open-ended.
 	 */
 	public Optional<LocalDateTime> callOffFrom(LocalDateTime now) {

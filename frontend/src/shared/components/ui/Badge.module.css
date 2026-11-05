@@ -84,6 +84,13 @@
   color: var(--success);
 }
 
+/* Completed and confirmed by the elder: the completed colour, filled in. */
+.visit_verified {
+  border-color: var(--success);
+  background: var(--success);
+  color: var(--bg);
+}
+
 .visit_in_visit {
   border-color: var(--text);
   background: var(--text);
@@ -99,6 +106,11 @@
 .visit_scheduled {
   border-color: var(--border-neutral);
   color: var(--text-muted);
+}
+
+.visit_not_checked_in {
+  border-color: var(--warning);
+  color: var(--warning-text);
 }
 
 .visit_needs_cover {

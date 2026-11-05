@@ -2,6 +2,7 @@ package sg.nus.carelink.profile.infrastructure.persistence.adapter;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -35,6 +36,14 @@ class IntakeApplicationRepositoryAdapter implements IntakeApplicationRepository 
 	public List<IntakeApplication> findApprovedByElderId(Long elderId) {
 		return jpa.findByElderIdAndStatus(elderId, IntakeApplicationJpaEntity.Status.APPROVED).stream()
 				.map(IntakeApplicationMapper::toDomain).toList();
+	}
+
+	@Override
+	public Set<Long> findElderIdsWithApprovedApplication(Set<Long> elderIds) {
+		if (elderIds.isEmpty()) {
+			return Set.of();
+		}
+		return Set.copyOf(jpa.findElderIdsInWithStatus(elderIds, IntakeApplicationJpaEntity.Status.APPROVED));
 	}
 
 	@Override

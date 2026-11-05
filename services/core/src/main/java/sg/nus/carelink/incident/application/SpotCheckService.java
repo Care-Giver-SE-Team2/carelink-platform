@@ -203,12 +203,12 @@ public class SpotCheckService implements SpotCheckHistory {
 	/** The caregiver's own concluded checks: "抽查结论对护理员可见". Requests before the day are not shown. */
 	@Transactional(readOnly = true)
 	public List<SpotCheckView> forCaregiver(String caregiverUsername) {
-		return conclusionsFor(caregivers.require(caregiverUsername).id());
+        return conclusionsFor(caregivers.require(caregiverUsername).requireAdmittedHistory().id());
 	}
 
 	/** The checked caregiver answers the conclusion. */
 	public SpotCheck respond(Long checkId, String caregiverUsername, String response) {
-		Long caregiverId = caregivers.require(caregiverUsername).id();
+        Long caregiverId = caregivers.require(caregiverUsername).requireWorking().id();
 		return checks.save(require(checkId).respondedBy(caregiverId, response));
 	}
 

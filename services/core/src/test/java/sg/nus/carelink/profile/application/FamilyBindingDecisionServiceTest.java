@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import sg.nus.carelink.identity.domain.repository.AppUserRepository;
 import sg.nus.carelink.profile.domain.model.ElderFamilyBinding;
 import sg.nus.carelink.profile.domain.model.FamilyMember;
@@ -28,7 +29,7 @@ class FamilyBindingDecisionServiceTest {
         families = mock(FamilyMemberRepository.class);
         bindings = mock(ElderFamilyBindingRepository.class);
         service = new FamilyBindingService(mock(ElderRepository.class), families,
-                bindings, mock(AppUserRepository.class));
+                bindings, mock(AppUserRepository.class), mock(ApplicationEventPublisher.class));
     }
 
     private FamilyMember family() {

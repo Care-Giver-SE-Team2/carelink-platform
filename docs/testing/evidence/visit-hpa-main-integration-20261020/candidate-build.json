@@ -1,0 +1,58 @@
+{
+  "applicationCommit": "65b9c6ac2d3b6fbb0882b3418dd0be377cb3394b",
+  "mainBaseCommit": "bfad2c7a3a8bbd03123389f9c6be7688b1864ce4",
+  "jarHashes": {
+    "core": "0974e114fbc53e8cddbcb424d07168cbc71a85e36bf41193a21ed7c2b1cfe134",
+    "visit": "63f38e53185de453a7caf8f56e657a56500bdd2d60d9f3bfa5606fa5e203e143",
+    "report": "db233abeb6c8d818cf39249351e8abcab2164a455183a3997ac8683b8b6322b6",
+    "notification": "47e625563a3893cbc84f888702aa7a102405a4ad4513a7463a3f681b2a5aac93"
+  },
+  "jars": [
+    {
+      "service": "core",
+      "jarSha256": "0974e114fbc53e8cddbcb424d07168cbc71a85e36bf41193a21ed7c2b1cfe134",
+      "bytes": 89063349,
+      "dependencies": [
+        "spring-boot-4.1.1.jar",
+        "spring-security-web-7.1.1.jar",
+        "flyway-core-12.4.0.jar",
+        "spring-session-data-redis-4.1.1.jar"
+      ]
+    },
+    {
+      "service": "visit",
+      "jarSha256": "63f38e53185de453a7caf8f56e657a56500bdd2d60d9f3bfa5606fa5e203e143",
+      "bytes": 83084731,
+      "dependencies": [
+        "spring-boot-4.1.1.jar",
+        "spring-security-web-7.1.1.jar",
+        "spring-session-data-redis-4.1.1.jar",
+        "flyway-core-12.4.0.jar"
+      ]
+    },
+    {
+      "service": "report",
+      "jarSha256": "db233abeb6c8d818cf39249351e8abcab2164a455183a3997ac8683b8b6322b6",
+      "bytes": 86767001,
+      "dependencies": [
+        "spring-boot-4.1.1.jar",
+        "spring-security-web-7.1.1.jar",
+        "spring-session-data-redis-4.1.1.jar",
+        "flyway-core-12.4.0.jar"
+      ]
+    },
+    {
+      "service": "notification",
+      "jarSha256": "47e625563a3893cbc84f888702aa7a102405a4ad4513a7463a3f681b2a5aac93",
+      "bytes": 82856952,
+      "dependencies": [
+        "spring-boot-4.1.1.jar",
+        "spring-security-web-7.1.1.jar",
+        "spring-session-data-redis-4.1.1.jar",
+        "flyway-core-12.4.0.jar"
+      ]
+    }
+  ],
+  "sourceChangeHashes": {},
+  "source": "New offline reactor package from committed integration source; not cached historical JARs"
+}

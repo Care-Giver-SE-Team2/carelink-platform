@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "arms": {
+    "A0": {
+      "conditions": {
+        "coreDigest": "UNCONFIRMED",
+        "visitDigest": "UNCONFIRMED",
+        "nodesRef": "UNCONFIRMED",
+        "resourcesRef": "UNCONFIRMED",
+        "sessionCacheRef": "UNCONFIRMED",
+        "readRoutingRef": "UNCONFIRMED",
+        "warmupRef": "UNCONFIRMED",
+        "fixtureShapeRef": "UNCONFIRMED"
+      },
+      "replicaControl": "fixed-2"
+    },
+    "A1": {
+      "conditions": {
+        "coreDigest": "UNCONFIRMED",
+        "visitDigest": "UNCONFIRMED",
+        "nodesRef": "UNCONFIRMED",
+        "resourcesRef": "UNCONFIRMED",
+        "sessionCacheRef": "UNCONFIRMED",
+        "readRoutingRef": "UNCONFIRMED",
+        "warmupRef": "UNCONFIRMED",
+        "fixtureShapeRef": "UNCONFIRMED"
+      },
+      "replicaControl": "hpa-reviewed"
+    }
+  },
+  "review": {
+    "owner": "",
+    "resourceEvidenceRef": "",
+    "fixturesFrozen": false,
+    "noConcurrentRelease": false,
+    "backgroundReviewed": false,
+    "generatorHeadroomReviewed": false,
+    "resourceMetricsComplete": false
+  }
+}

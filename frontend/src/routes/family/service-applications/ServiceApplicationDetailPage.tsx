@@ -4,7 +4,7 @@ import { intakeDate } from '../../../features/intake/presentation'
 import { careNeedLabel, useCareActivities } from '../../../features/careplan/careActivities'
 import { planDate } from '../../../features/careplan/familyCarePlan'
 import type { ServiceApplication, ServiceApplicationNeed } from '../../../features/service-applications/api'
-import { IntakeLoading } from '../intake/IntakeLayout'
+import { IntakeIcon, IntakeLoading } from '../intake/IntakeLayout'
 import { ElderSnapshot } from './ElderSnapshot'
 import { OutcomeBadge } from './OutcomeBadge'
 import styles from '../intake/FamilyIntake.module.css'
@@ -26,24 +26,31 @@ export function ServiceApplicationDetailPage() {
   const query = useServiceApplication(id)
   const activities = useCareActivities()
   const item = query.data
+  const valid = /^[1-9]\d*$/.test(id)
   return <div className={styles.page}>
     <div className={styles.detailNav}>
-      <Link to={'/family/service-applications' + search}>← Back to service applications</Link>
-      <button onClick={() => void query.refetch()} disabled={query.isFetching || !/^[1-9]\d*$/.test(id)}>Refresh</button>
+      <Link className={styles.backLink} to={'/family/service-applications' + search}><IntakeIcon name="back" />Back to service applications</Link>
     </div>
+    {item && <header className={styles.detailHeading}>
+      <p className={styles.eyebrow}>SERVICE APPLICATION #{item.id}</p><h1>{item.elderSnapshot.fullName}</h1>
+      <p className={styles.subtitle}>Your service application, at a glance.</p>
+    </header>}
     {Number.isSafeInteger(state?.submittedApplicationId) && String(state.submittedApplicationId) === id &&
       <section role="status" className={styles.progress}><h2>Application submitted</h2><p>Your service application #{id} has been received.</p></section>}
-    {!/^[1-9]\d*$/.test(id) ? <p role="alert">Invalid application reference.</p> : query.isError ?
+    {valid && <div className={styles.statusBar}>
+      <strong>{item && !query.isError ? 'Application status' : ''}</strong>
+      <button onClick={() => void query.refetch()} disabled={query.isFetching}>Refresh</button>
+    </div>}
+    {!valid ? <p role="alert" className={styles.state}>Invalid application reference.</p> : query.isError ?
       <p role="alert" className={styles.state}>Unable to view this service application. Check your current binding or try Refresh.</p> : query.isPending ? <IntakeLoading /> : item && <>
-        <header className={styles.detailHeading}><p className={styles.eyebrow}>SERVICE APPLICATION #{item.id}</p><h1>{item.elderSnapshot.fullName}</h1></header>
         <section className={styles.progress} aria-label="Application status"><OutcomeBadge outcome={item.outcome} />
           <p>{outcomeText[item.outcome]}</p>
           {item.outcome === 'DECLINED' && item.declineReason && <p>Reason: {item.declineReason}</p>}
           {item.needs.some((need) => need.plannedVersion) && <p><Link to="/family/care-plan">See the care plan</Link></p>}
-          <p>Submitted <time dateTime={item.createdAt}>{intakeDate(item.createdAt)}</time> (Singapore time)</p>
+          <div className={styles.submittedAt}>Submitted <time dateTime={item.createdAt}>{intakeDate(item.createdAt)}</time></div>
         </section>
         <section className={styles.detailSection}><h2>Elder details at submission</h2>
-          <p>These saved details stay unchanged when the elder's profile is updated.</p>
+          <p className={styles.muted}>These saved details stay unchanged when the elder's profile is updated.</p>
           <ElderSnapshot details={item.elderSnapshot} />
         </section>
         <section className={styles.detailSection}><h2>Requested care services</h2>
@@ -51,6 +58,7 @@ export function ServiceApplicationDetailPage() {
             {' — '}{needStatus(item.needs.find((progress) => progress.need === need))}</li>)}</ul>
           <h3 className={styles.fieldTitle}>Notes for this application</h3><p className={styles.notes}>{item.notes || 'Not provided'}</p>
         </section>
+        <p className={styles.footnote}>Application times are shown in Singapore time.</p>
       </>}
   </div>
 }

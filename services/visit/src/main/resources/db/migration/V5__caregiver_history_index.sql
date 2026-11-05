@@ -1,0 +1,1 @@
+CREATE INDEX idx_cg_command_month ON caregiver_command_receipt(actor_user_id,occurred_at,visit_id);

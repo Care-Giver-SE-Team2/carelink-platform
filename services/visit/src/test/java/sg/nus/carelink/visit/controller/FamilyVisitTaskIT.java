@@ -254,6 +254,9 @@ class FamilyVisitTaskIT {
 	@Test
 	void caregiverTasksRequireCurrentAssignmentAndAValidWorkPack() throws Exception {
 		var session = loginAs("caregiver");
+		// A default ONBOARDING profile has no work access, even if already assigned.
+		mvc.perform(get("/api/visits/501/tasks").session(session)).andExpect(status().isForbidden());
+		jdbc.update("UPDATE caregiver SET status = 'AVAILABLE' WHERE user_id = (SELECT id FROM app_user WHERE username = 'caregiver')");
 		// This older family fixture intentionally has no valid plan; it is not an executable work-pack.
 		mvc.perform(get("/api/visits/501/tasks").session(session)).andExpect(status().isConflict());
 		jdbc.update("UPDATE visit SET caregiver_id = NULL WHERE id = 501");

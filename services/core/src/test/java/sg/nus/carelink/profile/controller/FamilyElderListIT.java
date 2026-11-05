@@ -233,7 +233,8 @@ class FamilyElderListIT {
 	private static void assertListFields(JsonNode body) {
 		assertThat(body).isNotEmpty().allSatisfy(item -> assertThat(item.propertyNames()).containsExactlyInAnyOrder(
 				"id", "fullName", "dateOfBirth", "address", "sector", "planStatus", "planVersion", "nextVisitDate",
-				"primaryCaregiverId", "primaryCaregiverName", "primaryCaregiverAssignedAt"));
+				"primaryCaregiverId", "primaryCaregiverName", "primaryCaregiverAssignedAt", "hasPublishedPlan",
+				"hasCareRequest"));
 	}
 
 	private void seedBinding(long elderId, long familyId, String scope, String bindingStatus, LocalDateTime expiresAt) {

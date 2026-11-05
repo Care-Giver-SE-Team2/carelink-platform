@@ -62,7 +62,10 @@ function formatTime(
   )
 }
 
-/** "24 Sep 2026 · 10:00 to 10:55", or just the date and start time before check-out. */
+/**
+ * "24 Sep 2026 · 10:00 to 11:00": the booked slot, so the elder recognises the visit they were
+ * expecting. Just the date and start time when the visit was booked without an end.
+ */
 function formatVisitTimes(
   visit: PendingElderVisit,
 ): string {
@@ -79,8 +82,8 @@ function formatVisitTimes(
     visit.scheduledStart,
   )
 
-  return visit.checkedOutAt
-    ? `${day} · ${start} to ${formatTime(visit.checkedOutAt)}`
+  return visit.scheduledEnd
+    ? `${day} · ${start} to ${formatTime(visit.scheduledEnd)}`
     : `${day} · ${start}`
 }
 

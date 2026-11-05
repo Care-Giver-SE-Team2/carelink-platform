@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import sg.nus.carelink.report.application.ReportAiEnricher;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
@@ -27,7 +28,10 @@ public class ReportAiConfiguration {
             .build();
     }
 
+    // carelink.report.ai.enabled creates either disabledAi or bedrockAi, never both. @Primary only
+    // tells static analysis, which does not read the conditions, which one wins (Sonar java:S9352).
     @Bean
+    @Primary
     @ConditionalOnProperty(name = "carelink.report.ai.enabled", havingValue = "true")
     ReportAiSummary bedrockAi(BedrockRuntimeClient client,
             @Value("${carelink.report.ai.model-id}") String modelId) {

@@ -75,8 +75,12 @@ public class RecurringRosterService {
 		}
 
 		Long caregiverId = primaryCaregivers.findRosterableCaregiverId(elderId).orElse(null);
+		// A slot already running is only worth creating for someone who can still go: left
+		// unassigned it would turn straight into an uncovered-visit exception. Once a primary
+		// caregiver is named, that refresh creates it for them if it is still running.
 		List<PlannedVisit> wanted = versions.stream()
 				.flatMap(version -> version.visitsBetween(now, untilDay).stream())
+				.filter(slot -> caregiverId != null || !slot.start().isBefore(now))
 				.map(slot -> new PlannedVisit(slot.elderId(), caregiverId, slot.carePlanId(), slot.carePlanNodeId(),
 						slot.serviceType(), slot.start(), slot.end()))
 				.toList();

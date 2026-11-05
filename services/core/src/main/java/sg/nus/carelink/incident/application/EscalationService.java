@@ -82,8 +82,8 @@ public class EscalationService {
 		// after-commit Observer and must not survive a later CG04 receipt failure.
 		int told = alert.broadcastRaised(saved);
 		timeline.save(IncidentLog.systemEntry(saved.id(), IncidentLog.Action.BROADCAST,
-				"%d staff recipient(s): every manager and the caregiver "
-						.formatted(told) + "who last visited", now));
+				"%d staff recipient(s): every manager and the caregiver ".formatted(told)
+						+ (saved.source() == Incident.Source.SYSTEM_MISSED_CHECKIN ? "assigned to the triggering visit" : "who last visited"), now));
 		// One identity per new fact. Successful CG04 command replay never routes again.
 		familyEvents.raised(UUID.randomUUID(), saved.id(), saved.elderId(),
 				saved.reportedAt().atZone(Incident.CARELINK_ZONE).toOffsetDateTime());
