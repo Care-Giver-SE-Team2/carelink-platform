@@ -36,11 +36,11 @@ class RecurringScheduleTest {
 	}
 
 	@Test
-	void skipsTodaysVisitsThatHaveAlreadyStarted() {
+	void keepsTodaysVisitStillRunningButSkipsOneThatHasEnded() {
 		RecurringSchedule plan = new RecurringSchedule(9L, 42L, THU_1, null, List.of(bathing));
 
-		assertThat(plan.visitsBetween(THU_1.atTime(17, 0), THU_1.plusDays(1))).isEmpty();
-		assertThat(plan.visitsBetween(THU_1.atTime(16, 30), THU_1.plusDays(1))).hasSize(1);
+		assertThat(plan.visitsBetween(THU_1.atTime(17, 0), THU_1.plusDays(1))).containsExactly(slot(THU_1.atTime(FOUR_THIRTY), 45));
+		assertThat(plan.visitsBetween(THU_1.atTime(17, 15), THU_1.plusDays(1))).isEmpty();
 	}
 
 	@Test

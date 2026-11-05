@@ -21,9 +21,9 @@ public interface VisitScheduling {
 	Outcome schedule(List<PlannedVisit> visits);
 
 	/**
-	 * Cancels one plan version's visits that start at or after {@code from} and that nobody
-	 * has started. Visits already under way or finished keep pointing at the version they
-	 * were made from.
+	 * Cancels one plan version's visits that nobody has started and that start at or after
+	 * {@code from}, or are still running at it. Visits already under way or finished keep
+	 * pointing at the version they were made from.
 	 *
 	 * @return how many visits were cancelled
 	 */

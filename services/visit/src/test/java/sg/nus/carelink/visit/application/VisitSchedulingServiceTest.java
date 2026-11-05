@@ -94,6 +94,16 @@ class VisitSchedulingServiceTest {
 	}
 
 	@Test
+	void cancelsAnUntouchedVisitStillRunningAtTheGivenTime() {
+		scheduling.schedule(List.of(planned(MON_8, 5L), planned(WED_8, 5L)));
+
+		assertThat(scheduling.cancelUntouchedFrom(9L, WED_8.plusMinutes(10))).isEqualTo(1);
+		assertThat(visits.findByCarePlanIdStartingFrom(9L, MON_8))
+				.extracting(Visit::scheduledStart, Visit::status)
+				.containsExactlyInAnyOrder(tuple(MON_8, Visit.Status.SCHEDULED), tuple(WED_8, Visit.Status.CANCELLED));
+	}
+
+	@Test
 	void releasesOnlyTheFormerPrimarysUntouchedPlanVisitsFromTheGivenTime() {
 		LocalDateTime thu8 = WED_8.plusDays(1);
 		scheduling.schedule(List.of(planned(MON_8, 5L), planned(WED_8, 5L), planned(thu8, 5L),

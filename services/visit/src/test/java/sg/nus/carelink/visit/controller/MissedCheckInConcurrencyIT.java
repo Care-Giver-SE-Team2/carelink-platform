@@ -153,11 +153,17 @@ class MissedCheckInConcurrencyIT extends MissedCheckInITSupport {
         var alarm=workers.submit(()->scan.trigger(id));await(gate.entered());gate.release().countDown();
         stopped.get(20,TimeUnit.SECONDS);assertThat(alarm.get(20,TimeUnit.SECONDS)).isFalse();assertThat(count("incident",id)).isZero();
     }
-    @Test void planStoppedAfterVisitWasDueRetainsItForAttendanceReviewAsExistingMg03Requires() throws Exception {
-        long id=plannedVisit();overdue();long plan=jdbc.queryForObject("SELECT care_plan_id FROM visit WHERE id=?",Long.class,id);
+    @Test void planStoppedAfterVisitSlotEndedRetainsItForAttendanceReviewAsExistingMg03Requires() throws Exception {
+        long id=plannedVisit();clock.at(START.plusSeconds(3901));long plan=jdbc.queryForObject("SELECT care_plan_id FROM visit WHERE id=?",Long.class,id);
         stopPlan(plan,LocalDate.of(2026,10,8));
         assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("SCHEDULED");
         assertThat(scan.trigger(id)).isTrue();assertOneFact(id);
+    }
+    @Test void planStoppedWhileOverdueVisitSlotStillRunningCancelsItWithoutAnAlarm() throws Exception {
+        long id=plannedVisit();overdue();long plan=jdbc.queryForObject("SELECT care_plan_id FROM visit WHERE id=?",Long.class,id);
+        stopPlan(plan,LocalDate.of(2026,10,8));
+        assertThat(jdbc.queryForObject("SELECT status FROM visit WHERE id=?",String.class,id)).isEqualTo("CANCELLED");
+        assertThat(scan.trigger(id)).isFalse();assertThat(count("incident",id)).isZero();
     }
     @Test void independentNewScannerInstanceReadsPersistedLedgerInsteadOfAnInMemorySet() throws Exception {
         long id=plannedVisit();overdue();assertThat(scan.trigger(id)).isTrue();
