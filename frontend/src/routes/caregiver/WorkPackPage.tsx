@@ -25,13 +25,13 @@ function WorkPack({ id, back }: { id: string; back: string }) {
   const { result, reload } = useCaregiverQuery(id, load, true)
   const command = useExecutionCommands(reload)
   const accessError = command.accessError ?? (result.status === 'error' && result.error instanceof ApiError && [401,403,404,409].includes(result.error.status) ? result.error : null)
-  if (accessError && (Object.keys(command.drafts).length || command.attempt || command.fix || command.note || command.saved || command.locating || command.hasHealthDraft)) command.clearProtected()
+  if (accessError && (Object.keys(command.drafts).length || command.attempt || command.saved || command.hasHealthDraft)) command.clearProtected()
   if (accessError) return <QueryError error={accessError} retry={command.recover} back={back} />
   if (result.status === 'loading') return <p role="status">Loading assigned work pack…</p>
   if (result.status === 'error') return <QueryError error={result.error} retry={reload} back={back} />
   const pack = result.data
   return <>
-    <div className={styles.heading}><div><p className={styles.eyebrow}>Assigned visit · #{pack.visit.id}</p><h1>{pack.elder.preferredName}</h1><p className={styles.muted}>{titleCase(pack.visit.serviceType)}</p></div></div><div className={styles.toolbar}>{pack.execution?.allowedActions.includes('REPORT_INCIDENT') && !command.blocked && <Link className={styles.linkButton} to={'/caregiver/visits/' + id + '/report-incident' + (back.includes('?') ? back.slice(back.indexOf('?')) : '')}>Report incident</Link>}<button className={styles.refresh} disabled={command.write.pending} onClick={reload}>Refresh</button></div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Assigned visit · #{pack.visit.id}</p><h1>{pack.elder.preferredName}</h1><p className={styles.muted}>{titleCase(pack.visit.serviceType)}</p></div></div><div className={styles.toolbar}>{pack.execution?.allowedActions.includes('REPORT_INCIDENT') && !command.blocked && <Link className={styles.linkButton} to={'/caregiver/visits/' + id + '/report-incident' + (back.includes('?') ? back.slice(back.indexOf('?')) : '')}>Report incident</Link>}<button className={styles.button} disabled={command.write.pending} onClick={reload}>Refresh</button></div>
     <ExecutionPanel pack={pack} command={command} />
     <LastFetched at={result.receivedAt} />
     <section className={styles.card} aria-label="Visit details"><div className={styles.cardTop}><strong>Visit details</strong><span className={styles.badge}>{titleCase(pack.visit.status)}</span></div>

@@ -6,13 +6,12 @@ export async function checkOut(id: number, input: CommandIdentity, signal?: Abor
   await api('/auth/csrf', { signal })
   return api<CheckOutResult>(`/visits/${id}/check-out`, { method: 'POST', body: JSON.stringify(input), signal })
 }
-export type CheckInInput = CommandIdentity & { locationSource: 'GPS' | 'MANUAL_LOCATION_NOTE'; latitude?: number; longitude?: number; accuracy?: number; locationNote?: string; clientCapturedAt?: string }
 export type TaskInput = CommandIdentity & { status: 'DONE' | 'SKIPPED' | 'REFUSED'; outcome: string; caregiverNote: string }
 async function write(path: string, input: unknown, signal?: AbortSignal) {
   await api('/auth/csrf', { signal })
   return api<CommandResult>(path, { method: 'POST', body: JSON.stringify(input), signal })
 }
-export function checkIn(id: number, input: CheckInInput, signal?: AbortSignal) { return write(`/visits/${id}/check-in`, input, signal) }
+export function checkIn(id: number, input: CommandIdentity, signal?: AbortSignal) { return write(`/visits/${id}/check-in`, input, signal) }
 export function completeTask(id: number, task: number, input: TaskInput, signal?: AbortSignal) { return write(`/visits/${id}/tasks/${task}/complete`, input, signal) }
 
 export type HealthFlag = 'NO_CONCERN' | 'ATTENTION' | 'MEDICAL_REVIEW'

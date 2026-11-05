@@ -65,7 +65,7 @@ class CaregiverEvidenceIT {
     private long insert(String sql,Object...args) {
         var key=new GeneratedKeyHolder(); jdbc.update(c->{var s=c.prepareStatement(sql,java.sql.Statement.RETURN_GENERATED_KEYS);for(int i=0;i<args.length;i++)s.setObject(i+1,args[i]);return s;},key);return Objects.requireNonNull(key.getKey()).longValue();
     }
-    private int checkIn() { return execution.checkIn(username,visit,0,UUID.randomUUID(),new CheckInLocation("MANUAL_LOCATION_NOTE",null,null,null,"Fictional doorway",null)).visitVersion(); }
+    private int checkIn() { return execution.checkIn(username,visit,0,UUID.randomUUID()).visitVersion(); }
     private CaregiverEvidenceService.Saved upload(int version,UUID key) { return service.upload(username,visit,VisitEvidence.Kind.PHOTO,null,version,key,"demo.png","image/png",image); }
     @Test void uploadsUnverifiedImageAndDownloadsPrivatelyWithoutBlockingCheckout() throws Exception {
         var saved=upload(checkIn(),UUID.randomUUID());

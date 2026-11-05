@@ -30,8 +30,8 @@ public class CaregiverVisitExecutionService {
         this.executor=executor;this.receipts=receipts;this.visits=visits;this.tasks=tasks;this.transitions=transitions;this.checkIns=checkIns;this.plans=plans;this.policy=policy;
         this.resume=resume;this.events=events;
     }
-    public ExecutionResult checkIn(String username, Long id, Integer version, UUID key, CheckInLocation loc) {
-        String hash=CommandFingerprint.of(id,version,loc.source(),loc.latitude(),loc.longitude(),loc.accuracy(),loc.note(),loc.clientCapturedAt());
+    public ExecutionResult checkIn(String username, Long id, Integer version, UUID key) {
+        String hash=CommandFingerprint.of(id,version);
         return executor.execute(username,id,CHECK_IN,Visit.Status.ARRIVED.name(),(actor,visit)->{
             var previous=receipts.find(actor.userId(),key);
             if(previous.isPresent()) { var r=previous.get();r.requireSame(CHECK_IN,id,hash);return new ExecutionResult(id,r.version(),"IN_PROGRESS",null,true); }
@@ -44,7 +44,7 @@ public class CaregiverVisitExecutionService {
             var arrived=visit.status()==Visit.Status.EXCEPTION ? resume.arrive(visit,now) : state.arrive(visit,now);
             materialize(visit);
             var started=VisitStateFactory.forVisit(arrived).start(arrived);
-            checkIns.save(id,actor.userId(),key,loc,now);
+            checkIns.save(id,actor.userId(),key,now);
             var saved=visits.save(started);
             events.checkedIn(saved,visit.status()==Visit.Status.EXCEPTION);
             transitions.save(new VisitStateTransition(null,id,visit.status().name(),Visit.Status.ARRIVED.name(),actor.userId(),VisitStateTransition.Result.APPLIED,null,now));

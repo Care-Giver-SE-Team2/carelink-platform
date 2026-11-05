@@ -31,17 +31,15 @@ public class CaregiverWorkService {
     private final AccessAudit audit;
     private final Clock clock;
     private final sg.nus.carelink.visit.domain.model.VisitExecutionPolicy policy;
-    private final sg.nus.carelink.visit.domain.repository.VisitCheckInRepository checkIns;
     private final sg.nus.carelink.visit.domain.repository.VisitInstructionRepository instructions;
     private final MissedCheckInResumeService resume;
 
     public CaregiverWorkService(VisitRepository visits, VisitTaskRepository tasks, CaregiverWorkDirectory directory,
             VisitPlanReader plans, AccessAudit audit, Clock clock, sg.nus.carelink.visit.domain.model.VisitExecutionPolicy policy,
-            sg.nus.carelink.visit.domain.repository.VisitCheckInRepository checkIns,
             sg.nus.carelink.visit.domain.repository.VisitInstructionRepository instructions, MissedCheckInResumeService resume) {
         this.visits = visits; this.tasks = tasks; this.directory = directory;
         this.plans = plans; this.audit = audit; this.clock = clock;
-        this.policy = policy; this.checkIns = checkIns; this.instructions = instructions;
+        this.policy = policy; this.instructions = instructions;
         this.resume = resume;
     }
 
@@ -133,7 +131,7 @@ public class CaregiverWorkService {
             else reason = "VISIT_EXECUTION_NOT_ALLOWED";
         } catch (BusinessRuleViolation blocked) { reason = blocked.code(); }
         return new ExecutionContext(List.copyOf(actions), reason, now, policy.opens(visit), policy.closes(visit), visit.checkedInAt(), visit.checkedOutAt(),
-                visit.checkedInAt() != null && policy.late(visit, visit.checkedInAt()), checkIns.source(visit.id()).orElse(null));
+                visit.checkedInAt() != null && policy.late(visit, visit.checkedInAt()));
     }
 
     private VisitSummary summary(Visit v, String elderName) {
@@ -160,7 +158,7 @@ public class CaregiverWorkService {
         }
     }
     public record ExecutionContext(List<String> allowedActions,String blockedReason,LocalDateTime serverNow,LocalDateTime checkInOpensAt,
-            LocalDateTime checkInClosesAt,LocalDateTime checkedInAt,LocalDateTime checkedOutAt,boolean lateArrival,String locationSource) {}
+            LocalDateTime checkInClosesAt,LocalDateTime checkedInAt,LocalDateTime checkedOutAt,boolean lateArrival) {}
     public static class InvalidDateRange extends RuntimeException {
         public InvalidDateRange() { super("Provide both dates in order, with a range of at most 31 days."); }
     }
