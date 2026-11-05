@@ -13,8 +13,7 @@ public abstract class CaregiverHealthITSupport extends CaregiverHttpITSupport {
         return publishPlan(start, 60, "NONE", "Care routine").visits().getFirst();
     }
     protected void checkIn(Browser browser, long id) throws Exception {
-        body(browser.post("/api/visits/" + id + "/check-in", Map.of("expectedVersion", 0, "clientRequestId", UUID.randomUUID().toString(),
-                "locationSource", "MANUAL_LOCATION_NOTE", "locationNote", "At service doorway")), 200);
+        body(browser.post("/api/visits/" + id + "/check-in", Map.of("expectedVersion", 0, "clientRequestId", UUID.randomUUID().toString())), 200);
     }
     protected Map<String, Object> health(int version) {
         return new HashMap<>(Map.of("expectedVersion", version, "clientRequestId", UUID.randomUUID().toString(),

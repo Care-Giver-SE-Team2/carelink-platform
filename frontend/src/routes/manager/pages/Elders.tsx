@@ -193,8 +193,20 @@ export default function Elders() {
     )
   }
 
+  /**
+   * Pins the tab being viewed alongside the selection; otherwise a defaulted tab would be
+   * re-derived from the selected elder and jump (e.g. OPEN REQUESTS → NEEDS PLAN).
+   */
   function setSelectedId(id: string) {
-    setParam('selected', id)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('selected', id)
+        next.set('list', worklist)
+        return next
+      },
+      { replace: true },
+    )
   }
 
   const selected: ElderRow | undefined = selectedRow

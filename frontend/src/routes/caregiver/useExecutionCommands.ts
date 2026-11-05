@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import { checkIn, checkOut, completeTask, saveHealthRecord, type CommandIdentity, type CheckInInput, type TaskInput, type HealthInput, type HealthFlag } from '../../features/caregiver-execution/api'
+import { useRef, useState } from 'react'
+import { checkIn, checkOut, completeTask, saveHealthRecord, type CommandIdentity, type TaskInput, type HealthInput, type HealthFlag } from '../../features/caregiver-execution/api'
 import { isAccessFailure, useSelfServiceWrite } from './selfService'
 import { unknownResult } from './commandErrors'
 import { newRequestId } from '../../shared/api/client'
 
 type TaskDraft = { status: 'DONE' | 'SKIPPED' | 'REFUSED'; outcome: string; caregiverNote: string }
-type Attempt = { visitId: number } & ({ kind: 'CHECK_IN'; input: CheckInInput } | { kind: 'CHECK_OUT'; input: CommandIdentity } | { kind: 'TASK_RESULT'; taskId: number; input: TaskInput } | { kind: 'HEALTH_RECORD'; input: HealthInput })
+type Attempt = { visitId: number } & ({ kind: 'CHECK_IN'; input: CommandIdentity } | { kind: 'CHECK_OUT'; input: CommandIdentity } | { kind: 'TASK_RESULT'; taskId: number; input: TaskInput } | { kind: 'HEALTH_RECORD'; input: HealthInput })
 export type HealthDraft = { systolic: string; diastolic: string; pulse: string; temperature: string; healthFlag: HealthFlag | ''; healthNote: string }
 const blankHealth: HealthDraft = { systolic: '', diastolic: '', pulse: '', temperature: '', healthFlag: '', healthNote: '' }
 /** Mounted in the work-pack query owner, so a return refresh does not erase drafts. */
@@ -15,12 +15,6 @@ export function useExecutionCommands(reload: () => void) {
   const inFlight = useRef(false)
   const retainedAttempt = useRef<Attempt | null>(null)
   const [drafts, setDrafts] = useState<Record<number, TaskDraft>>({})
-  const [mode, setMode] = useState<'GPS' | 'MANUAL_LOCATION_NOTE'>('GPS')
-  const [note, setNote] = useState('')
-  const [fix, setFix] = useState<{ latitude: number; longitude: number; accuracy: number; clientCapturedAt: string } | null>(null)
-  const [locating, setLocating] = useState(false)
-  const generation = useRef(0)
-  useEffect(() => () => { generation.current++ }, [])
   const [validation, setValidation] = useState('')
   const [saved, setSaved] = useState('')
   const [healthDraft, setHealthDraft] = useState<HealthDraft>(blankHealth)
@@ -29,7 +23,7 @@ export function useExecutionCommands(reload: () => void) {
   const accessError = healthAccessError ?? (isAccessFailure(write.error) ? write.error : null)
   function clearProtected() {
     retainedAttempt.current = null
-    generation.current++; setDrafts({}); setAttempt(null); setNote(''); setFix(null); setSaved(''); setValidation(''); setLocating(false)
+    setDrafts({}); setAttempt(null); setSaved(''); setValidation('')
     setHealthDraft(blankHealth); setHealthEditing(false)
   }
   function send(next: Attempt) {
@@ -46,25 +40,14 @@ export function useExecutionCommands(reload: () => void) {
       if (next.kind === 'TASK_RESULT') setDrafts(old => { const copy = { ...old }; delete copy[next.taskId]; return copy })
       if (next.kind === 'HEALTH_RECORD') { setHealthDraft(blankHealth); setHealthEditing(false) }
       retainedAttempt.current = null
-      setAttempt(null); setNote(''); setFix(null); setSaved(next.kind === 'HEALTH_RECORD' ? 'Health record saved. Reloading the work pack…' : 'Saved on the server. Reloading the work pack…'); reload()
+      setAttempt(null); setSaved(next.kind === 'HEALTH_RECORD' ? 'Health record saved. Reloading the work pack…' : 'Saved on the server. Reloading the work pack…'); reload()
     }).finally(() => { inFlight.current = false })
   }
-  function locate() {
-    if (!navigator.geolocation) { setValidation('Location is unavailable. You may choose a clearly marked manual location note.'); return }
-    const token = ++generation.current; setLocating(true); setValidation('')
-    navigator.geolocation.getCurrentPosition(position => {
-      if (token !== generation.current) return
-      setFix({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, clientCapturedAt: new Date(position.timestamp).toISOString() }); setLocating(false)
-    }, () => {
-      if (token !== generation.current) return
-      setLocating(false); setValidation('GPS could not be obtained. Retry GPS or choose a manual location note; no GPS verification will be claimed.')
-    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
-  }
-  return { write, attempt, drafts, setDrafts, mode, setMode, note, setNote, fix, locating, locate, validation, setValidation, saved, accessError, clearProtected,
+  return { write, attempt, drafts, setDrafts, validation, setValidation, saved, accessError, clearProtected,
     healthDraft, setHealthDraft, healthEditing, setHealthAccessError,
     hasHealthDraft: Object.values(healthDraft).some(Boolean) || healthEditing,
     anotherMeasurement: () => { setHealthDraft(blankHealth); setHealthEditing(true); setSaved(''); setValidation('') },
-    blocked: write.pending || attempt !== null || locating,
+    blocked: write.pending || attempt !== null,
     uncertain: write.error != null && unknownResult(write.error),
     send, retry: () => { if (attempt) send(attempt) }, edit: () => { retainedAttempt.current = null; setAttempt(null); write.clearError(); reload() }, recover: () => { setHealthAccessError(null); write.clearError(); reload() },
     recordHealth: (visitId: number, version: number) => {
@@ -85,9 +68,7 @@ export function useExecutionCommands(reload: () => void) {
       send({ kind: 'CHECK_OUT', visitId, input: { expectedVersion: version, clientRequestId: newRequestId() } })
     },
     start: (visitId: number, version: number) => {
-      if (mode === 'GPS' && !fix) { setValidation('Obtain a GPS fix before checking in.'); return }
-      if (mode === 'MANUAL_LOCATION_NOTE' && (!note.trim() || note.trim().length > 500)) { setValidation('Write a manual location note of 1 to 500 characters.'); return }
-      send({ kind: 'CHECK_IN', visitId, input: { expectedVersion: version, clientRequestId: newRequestId(), locationSource: mode, ...(mode === 'GPS' ? fix! : { locationNote: note.trim() }) } })
+      send({ kind: 'CHECK_IN', visitId, input: { expectedVersion: version, clientRequestId: newRequestId() } })
     },
     finishTask: (visitId: number, taskId: number, version: number) => {
       const draft = drafts[taskId] ?? { status: 'DONE' as const, outcome: '', caregiverNote: '' }

@@ -16,11 +16,14 @@ import styles from './FamilyHome.module.css'
 const liveStates: FamilyVisit['status'][] = ['ARRIVED', 'IN_PROGRESS']
 const closedStates: FamilyVisit['status'][] = ['COMPLETED', 'VERIFIED', 'AUTO_CLOSED']
 
-/** The visit under way, or failing that the next scheduled one this week. */
-function pickVisit(visits: FamilyVisit[], now: number) {
+/**
+ * The visit under way, or failing that the next scheduled one this week. A visit of today's whose
+ * start has passed stays until it is checked in and done, rather than dropping out at its start time.
+ */
+function pickVisit(visits: FamilyVisit[], today: string) {
   const live = visits.find((visit) => liveStates.includes(visit.status))
   const next = live ? undefined : visits
-    .filter((visit) => visit.status === 'SCHEDULED' && new Date(visit.scheduledStart).getTime() >= now)
+    .filter((visit) => visit.status === 'SCHEDULED' && singaporeToday(new Date(visit.scheduledStart)) >= today)
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart))[0]
   return { live, visit: live ?? next }
 }
@@ -38,7 +41,7 @@ export function FamilyHomePage() {
   const data = resource.status === 'success' ? resource.data : null
   const elder = data?.elders.find((item) => item.id === data.selectedElderId) ?? null
   const age = ageOn(elder?.dateOfBirth ?? null, today)
-  const shown = data?.visits ? pickVisit(data.visits.items, now) : null
+  const shown = data?.visits ? pickVisit(data.visits.items, today) : null
 
   return <div className={styles.home}>
     <header className={styles.header}>

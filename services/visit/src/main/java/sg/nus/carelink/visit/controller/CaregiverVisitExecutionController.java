@@ -17,7 +17,7 @@ public class CaregiverVisitExecutionController {
     public CaregiverVisitExecutionController(CaregiverVisitExecutionService service) { this.service=service; }
     @PostMapping("/{visitId}/check-in")
     public CaregiverVisitExecutionService.ExecutionResult checkIn(Authentication auth,@PathVariable Long visitId,@Valid @RequestBody CaregiverCheckInRequest input) {
-        return service.checkIn(auth.getName(),visitId,input.expectedVersion(),input.clientRequestId(),input.location());
+        return service.checkIn(auth.getName(),visitId,input.expectedVersion(),input.clientRequestId());
     }
     @PostMapping("/{visitId}/tasks/{taskId}/complete")
     public CaregiverVisitExecutionService.ExecutionResult result(Authentication auth,@PathVariable Long visitId,@PathVariable Long taskId,@Valid @RequestBody CaregiverTaskResultRequest input) {

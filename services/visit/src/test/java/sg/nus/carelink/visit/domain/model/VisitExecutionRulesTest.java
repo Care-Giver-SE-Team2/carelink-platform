@@ -2,7 +2,6 @@ package sg.nus.carelink.visit.domain.model;
 
 import static org.assertj.core.api.Assertions.*;
 import java.time.*;
-import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 class VisitExecutionRulesTest {
@@ -85,20 +84,5 @@ class VisitExecutionRulesTest {
         assertThatThrownBy(()->VisitStateFactory.forVisit(completed).requireTaskResult()).hasMessageContaining("cannot");
         assertThatThrownBy(()->completed.observedHealth(new HealthMeasurement(null,null,null,null,
                 HealthObservation.Flag.NO_CONCERN,"Not measured"))).hasMessageContaining("active");
-    }
-    @Test void gpsAndManualRecordsNeverMasqueradeAsEachOther() {
-        var gps=new CheckInLocation("GPS",BigDecimal.valueOf(1.2),BigDecimal.valueOf(103.2),10.0,null,Instant.now());
-        assertThat(gps.note()).isNull();
-        assertThat(new CheckInLocation("MANUAL_LOCATION_NOTE",null,null,null," at doorway ",null).note()).isEqualTo("at doorway");
-        assertThat(CheckInLocation.valid("GPS",BigDecimal.valueOf(91),BigDecimal.ZERO,10.0,null)).isFalse();
-        assertThat(CheckInLocation.valid("GPS",BigDecimal.ZERO,BigDecimal.valueOf(181),10.0,null)).isFalse();
-        assertThat(CheckInLocation.valid("GPS",BigDecimal.ZERO,BigDecimal.ZERO,Double.NaN,null)).isFalse();
-        assertThat(CheckInLocation.valid("GPS",BigDecimal.ZERO,BigDecimal.ZERO,-1.0,null)).isFalse();
-        assertThat(CheckInLocation.valid("GPS",null,null,null,null)).isFalse();
-        assertThat(CheckInLocation.valid("GPS",BigDecimal.ZERO,BigDecimal.ZERO,0.0,"manual")).isFalse();
-        assertThat(CheckInLocation.valid("MANUAL_LOCATION_NOTE",BigDecimal.ZERO,null,null,"note")).isFalse();
-        assertThat(CheckInLocation.valid("MANUAL_LOCATION_NOTE",null,null,null," ")).isFalse();
-        assertThat(CheckInLocation.valid("OTHER",null,null,null,"note")).isFalse();
-        assertThatThrownBy(()->new CheckInLocation("GPS",null,null,null,null,null)).isInstanceOf(IllegalArgumentException.class);
     }
 }

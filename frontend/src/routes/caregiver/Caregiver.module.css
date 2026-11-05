@@ -193,7 +193,7 @@
  */
 .heading,
 .back {
-  border-image: linear-gradient(to top, var(--fm-line-card) 1px, var(--fm-card) 1px) fill 0 / / 0 100vmax;
+  border-image: linear-gradient(to top, var(--fm-line-card) 1px, var(--fm-card) 1px) fill 0 / 1 / 0 100vmax;
 }
 
 .heading {
@@ -766,6 +766,11 @@
   margin: 8px 8px 0 0;
 }
 
+/* A form that is only its button (check-in): the form's own top margin already spaces it. */
+.formPanel > form > fieldset > button:first-child {
+  margin-top: 0;
+}
+
 /*
  * A panel that holds a form rather than being one (the visit execution card): the form starts a
  * new block under the panel's text, and the notes after it are spaced from it and from each other
@@ -773,13 +778,6 @@
  */
 .formPanel > form {
   margin-top: 16px;
-}
-
-/* A status line under the form's buttons (e.g. the GPS fix). */
-.formPanel > form > fieldset > p {
-  margin: 12px 0 0;
-  color: var(--fm-secondary);
-  font-size: 14px;
 }
 
 .formPanel > .readOnly {

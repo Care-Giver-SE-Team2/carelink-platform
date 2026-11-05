@@ -110,7 +110,7 @@ class CaregiverWorkIT {
                 .andExpect(status().isForbidden());
             mvc.perform(post("/api/visits/"+aVisit+"/check-in").with(user("demo-cg-a").roles("CAREGIVER")).with(csrf())
                 .contentType("application/json")
-                .content("{\"expectedVersion\":0,\"clientRequestId\":\""+java.util.UUID.randomUUID()+"\",\"locationSource\":\"MANUAL_LOCATION_NOTE\",\"locationNote\":\"At the front door\"}"))
+                .content("{\"expectedVersion\":0,\"clientRequestId\":\""+java.util.UUID.randomUUID()+"\"}"))
                 .andExpect(status().isForbidden());
             mvc.perform(get("/api/caregivers/me/history").with(user("demo-cg-a").roles("CAREGIVER")).param("month",day.toString().substring(0,7)))
                 .andExpect(status().isForbidden());

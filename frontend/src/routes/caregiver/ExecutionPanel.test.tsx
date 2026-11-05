@@ -7,7 +7,7 @@ import { checkIn, checkOut, completeTask } from '../../features/caregiver-execut
 import { ApiError } from '../../shared/api/client'
 vi.mock('../../features/caregiver/api',()=>({getWorkPack:vi.fn()}))
 vi.mock('../../features/caregiver-execution/api',()=>({checkIn:vi.fn(),checkOut:vi.fn(),completeTask:vi.fn()}))
-const execution={allowedActions:['TASK_RESULT','REPORT_INCIDENT','CHECK_OUT'],blockedReason:null,serverNow:'2026-10-07T12:00:00',checkInOpensAt:'2026-10-07T11:30:00',checkInClosesAt:'2026-10-07T13:00:00',checkedInAt:'2026-10-07T12:00:00',checkedOutAt:null,lateArrival:false,locationSource:'MANUAL_LOCATION_NOTE'}
+const execution={allowedActions:['TASK_RESULT','REPORT_INCIDENT','CHECK_OUT'],blockedReason:null,serverNow:'2026-10-07T12:00:00',checkInOpensAt:'2026-10-07T11:30:00',checkInClosesAt:'2026-10-07T13:00:00',checkedInAt:'2026-10-07T12:00:00',checkedOutAt:null,lateArrival:false}
 const pack:WorkPack={visit:{id:3,elderId:4,elderName:'Mei',serviceType:'Care',scheduledStart:'2026-10-07T12:00:00',scheduledEnd:'2026-10-07T13:00:00',status:'IN_PROGRESS',version:1},elder:{elderId:4,preferredName:'Mei',serviceAddress:'Private address',postalSector:'North',languageNeeds:[],accessNotes:null,emergencyNotes:null},carePlanId:7,carePlanVersion:1,serviceInstructions:['Hygiene'],tasks:[{id:9,name:'Hygiene',status:'PENDING',outcome:null,caregiverNote:null}],requiredEvidenceKinds:['CHECKLIST'],execution}
 function mount() {render(<MemoryRouter initialEntries={['/caregiver/visits/3']}><Routes><Route path="/caregiver/visits/:visitId" element={<WorkPackPage/>}/></Routes></MemoryRouter>)}
 beforeEach(()=>{
@@ -40,15 +40,12 @@ it('hides old protected data and drafts immediately when a task write loses acce
   fireEvent.click(screen.getByRole('button',{name:'Save task result'}));await screen.findByText('Access not permitted')
   expect(screen.queryByText('Private address')).toBeNull();expect(screen.queryByDisplayValue('Private draft')).toBeNull()
 })
-it('marks a manual location explicitly and persists a real check-in before execution',async()=>{
-  vi.mocked(getWorkPack).mockResolvedValue({...pack,visit:{...pack.visit,status:'SCHEDULED',version:0},tasks:[],execution:{...execution,allowedActions:['CHECK_IN'],checkedInAt:null,locationSource:null}})
+it('persists a real check-in before execution',async()=>{
+  vi.mocked(getWorkPack).mockResolvedValue({...pack,visit:{...pack.visit,status:'SCHEDULED',version:0},tasks:[],execution:{...execution,allowedActions:['CHECK_IN'],checkedInAt:null}})
   mount();await screen.findByRole('button',{name:'Check in and start service'})
-  fireEvent.change(screen.getByLabelText('Location source'),{target:{value:'MANUAL_LOCATION_NOTE'}})
-  fireEvent.change(screen.getByLabelText('Manual location note'),{target:{value:' At doorway '}})
   vi.mocked(getWorkPack).mockResolvedValue(pack)
-  fireEvent.click(screen.getByRole('button',{name:'Check in and start service'}));await screen.findByText('Location record: Manual location note — not GPS verified')
-  expect(checkIn).toHaveBeenCalledWith(3,expect.objectContaining({expectedVersion:0,locationSource:'MANUAL_LOCATION_NOTE',locationNote:'At doorway'}),expect.any(AbortSignal))
-  expect(vi.mocked(checkIn).mock.calls[0][1]).not.toHaveProperty('latitude')
+  fireEvent.click(screen.getByRole('button',{name:'Check in and start service'}));await screen.findByText(/^Checked in:/)
+  expect(checkIn).toHaveBeenCalledWith(3,{expectedVersion:0,clientRequestId:expect.any(String)},expect.any(AbortSignal))
 })
 it('an exception pauses all task controls without pretending service is complete',async()=>{
   vi.mocked(getWorkPack).mockResolvedValue({...pack,visit:{...pack.visit,status:'EXCEPTION'},execution:{...execution,allowedActions:['REPORT_INCIDENT']}})
@@ -57,7 +54,7 @@ it('an exception pauses all task controls without pretending service is complete
 })
 it('shows an extra service as such, with check-in offered and no care plan',async()=>{
   vi.mocked(getWorkPack).mockResolvedValue({...structuredClone(pack),carePlanId:null,carePlanVersion:null,serviceInstructions:['Hospital escort','Bring the wheelchair'],tasks:[],requiredEvidenceKinds:[],
-    visit:{...pack.visit,serviceType:'Hospital escort',status:'SCHEDULED'},execution:{...execution,allowedActions:['CHECK_IN'],checkedInAt:null,locationSource:null}})
+    visit:{...pack.visit,serviceType:'Hospital escort',status:'SCHEDULED'},execution:{...execution,allowedActions:['CHECK_IN'],checkedInAt:null}})
   mount()
   const card=within(await screen.findByRole('region',{name:'Extra service'}))
   expect(card.getByRole('heading',{name:'Hospital escort'})).toBeInTheDocument()
