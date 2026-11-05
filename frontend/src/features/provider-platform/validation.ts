@@ -32,9 +32,24 @@ export const FIELD_LABELS: Record<ApplicationField, string> = {
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/**
+ * A local run against a provider on the same machine, with VITE_OPEN_PLATFORM_ALLOW_HTTP=true: an
+ * http:// URL and a host without a dot (localhost) are accepted, as notification accepts them with
+ * carelink.webhooks.allow-local-endpoints. Never under Vitest or in a build.
+ */
+export const ALLOW_HTTP_WEBHOOKS =
+  import.meta.env.DEV && import.meta.env.MODE !== 'test' && import.meta.env.VITE_OPEN_PLATFORM_ALLOW_HTTP === 'true'
+
 function webhookError(value: string): string | null {
   const url = value.trim()
   if (!url) return 'Enter the URL we should send jobs to.'
+  if (ALLOW_HTTP_WEBHOOKS) {
+    try {
+      return /^https?:$/.test(new URL(url).protocol) ? null : 'Must start with http:// or https://.'
+    } catch {
+      return 'Enter a full URL, for example http://localhost:4000/carelink.'
+    }
+  }
   if (/^http:\/\//i.test(url)) return 'Must be HTTPS. Change http:// to https://.'
   if (!/^https:\/\//i.test(url)) return 'Must be HTTPS, starting with https://.'
   try {

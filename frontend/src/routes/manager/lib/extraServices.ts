@@ -49,6 +49,8 @@ export function stateTag(row: ManagedValueAddedServiceRequest): { label: string;
     default:
       break
   }
+  // A provider that accepted has it; its visit was called off for that
+  if (row.providerJobStatus === 'ACCEPTED') return { label: 'PROVIDER ACCEPTED', tone: 'accent' }
   switch (row.visitStatus) {
     case 'EXCEPTION':
       return { label: 'EXCEPTION', tone: 'danger' }

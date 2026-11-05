@@ -34,6 +34,7 @@ public class ValueAddedServiceRequestService {
     private final ValueAddedVisitAssignment assignment;
     private final ValueAddedManagerAlert managerAlert;
     private final ValueAddedNotifier notifier;
+    private final ProviderJobDispatch providerJobs;
 
     @Autowired
     public ValueAddedServiceRequestService(
@@ -47,7 +48,8 @@ public class ValueAddedServiceRequestService {
             Clock clock,
             ValueAddedVisitAssignment assignment,
             ValueAddedManagerAlert managerAlert,
-            ValueAddedNotifier notifier) {
+            ValueAddedNotifier notifier,
+            ProviderJobDispatch providerJobs) {
         this.accounts = accounts;
         this.elders = elders;
         this.families = families;
@@ -59,6 +61,7 @@ public class ValueAddedServiceRequestService {
         this.assignment = assignment;
         this.managerAlert = managerAlert;
         this.notifier = notifier;
+        this.providerJobs = providerJobs;
     }
 
     @Transactional(readOnly = true)
@@ -147,7 +150,10 @@ public class ValueAddedServiceRequestService {
 
     /**
      * Approves the request in the family member's name and books its visit: the primary
-     * caregiver if they are free for the whole of it, else nobody, for a manager to staff.
+     * caregiver if they are free for the whole of it, else nobody, for a manager to staff. A visit
+     * with nobody is also offered to an Open Platform provider that offers the service, and the
+     * first to act has it: the provider accepting, or a manager putting a caregiver on the visit
+     * (docs/section5/decisions.md, D17).
      */
     private ValueAddedServiceRequest dispatch(ValueAddedServiceRequest request, Long familyMemberId,
             ValueAddedService service) {
@@ -161,6 +167,9 @@ public class ValueAddedServiceRequestService {
         managerAlert.approved(visitId, request.elderId(), service.name(), start, caregiverId);
         if (caregiverId != null) {
             notifier.caregiverAssigned(saved, service.name(), caregiverId);
+        }
+        else {
+            providerJobs.offer(saved, service, now());
         }
         return saved;
     }

@@ -14,6 +14,8 @@ export default defineConfig({
       // public API with its sign-in and tokens
       '/api/provider-applications': 'http://localhost:8083',
       '/api/providers': 'http://localhost:8083',
+      // The job API is report's (8082), listed before the rest of the Open Platform
+      '/api/open/v1/jobs': 'http://localhost:8082',
       '/api/open': 'http://localhost:8083',
       // The report service (8082): weekly reports, value-added services, caregiver reviews. The
       // weekly summary shares /api/elders/{id} with core, so it is matched by its full path.

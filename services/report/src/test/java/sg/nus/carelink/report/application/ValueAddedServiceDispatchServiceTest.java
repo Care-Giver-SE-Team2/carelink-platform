@@ -44,6 +44,7 @@ class ValueAddedServiceDispatchServiceTest {
     private VisitCover cover;
     private Elders elders;
     private ValueAddedNotifier notifier;
+    private ProviderJobDispatch providerJobs;
     private ValueAddedServiceDispatchService service;
 
     @BeforeEach
@@ -60,6 +61,7 @@ class ValueAddedServiceDispatchServiceTest {
         cover = mock(VisitCover.class);
         elders = mock(Elders.class);
         notifier = mock(ValueAddedNotifier.class);
+        providerJobs = mock(ProviderJobDispatch.class);
         Accounts accounts = mock(Accounts.class);
         when(accounts.idOf("manager")).thenReturn(11L);
         ValueAddedService escort = new ValueAddedService(2L, "Hospital escort", null,
@@ -69,7 +71,7 @@ class ValueAddedServiceDispatchServiceTest {
         when(requests.save(any())).thenAnswer(call -> call.getArgument(0));
         Clock clock = Clock.fixed(now.atZone(SINGAPORE).toInstant(), SINGAPORE);
         service = new ValueAddedServiceDispatchService(requests, services, standaloneVisits, visits, cover, accounts,
-                elders, notifier, clock);
+                elders, notifier, providerJobs, clock);
     }
 
     @Test
@@ -128,6 +130,49 @@ class ValueAddedServiceDispatchServiceTest {
         verify(cover).cover(40L, 9L, 11L);
         assertThat(result.caregiverId()).isEqualTo(9L);
         assertThat(result.needsCaregiver()).isFalse();
+    }
+
+    @Test
+    void assigningWithdrawsAnOpenProviderOfferBeforeTheVisitIsCovered() {
+        found(request(1L, Status.DISPATCHED, 40L));
+        visitIs(40L, 9L, "SCHEDULED");
+
+        service.assignCaregiver(1L, 9L, "manager");
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(providerJobs, cover);
+        order.verify(providerJobs).withdrawForStaffing(eq(1L), any());
+        order.verify(cover).cover(40L, 9L, 11L);
+    }
+
+    @Test
+    void aProviderThatAcceptedFirstKeepsTheRequest() {
+        found(request(1L, Status.DISPATCHED, 40L));
+        org.mockito.Mockito.doThrow(new BusinessRuleViolation("VALUE_ADDED_TAKEN_BY_PROVIDER", "taken"))
+                .when(providerJobs).withdrawForStaffing(eq(1L), any());
+
+        assertThatThrownBy(() -> service.assignCaregiver(1L, 9L, "manager"))
+                .isInstanceOf(BusinessRuleViolation.class);
+        verify(cover, never()).cover(anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
+    void cancellingARequestCallsItsProviderJobOffToo() {
+        found(request(1L, Status.DISPATCHED, 40L));
+        visitIs(40L, null, "CANCELLED");
+
+        service.cancel(1L, "manager");
+
+        verify(providerJobs).cancelFor(eq(1L), eq(ValueAddedServiceDispatchService.CANCEL_REASON), any());
+    }
+
+    @Test
+    void aVisitCalledOffForAProviderDoesNotCancelTheRequest() {
+        when(requests.findByStatus(Status.DISPATCHED)).thenReturn(List.of(request(1L, Status.DISPATCHED, 40L)));
+        visitIs(40L, null, "CANCELLED");
+        when(providerJobs.heldByProvider(1L)).thenReturn(true);
+
+        assertThat(service.settleWithVisits()).isZero();
+        verify(requests, never()).save(any());
     }
 
     @Test

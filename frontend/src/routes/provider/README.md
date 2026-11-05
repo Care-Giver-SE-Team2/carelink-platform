@@ -36,11 +36,11 @@ components are sized for the manager console.
 (`liveApi.ts`, docs/api/open-platform.yaml): applying, the portal, credentials and webhooks are
 real, and real webhooks are sent and logged. Signing in and getting tokens are notification's
 too: it issues the tokens itself, the same locally and in the cloud (docs/section5/decisions.md,
-D15). Every call is under `/api/open/v1`, which CloudFront sends to the services as it does all of
-`/api`; locally the Vite proxy sends `/api/open` to 8083.
+D15). The job calls (the Sandbox) are report's, which serves the job API with the same tokens
+(D16). Every call is under `/api/open/v1`, which CloudFront sends to the services as it does all of
+`/api`; locally the Vite proxy sends `/api/open/v1/jobs` to report on 8082 and the rest of
+`/api/open` to notification on 8083.
 
-The job calls (the Sandbox) stay on `mockPlatform.ts` until report serves the job API: a real
-token from the token endpoint is handed to the mock, which gives its client four demo jobs.
 Under Vitest, and with `VITE_OPEN_PLATFORM_MOCK=true`, every call is the mock's, in
 localStorage, with the seeded providers below.
 
@@ -57,12 +57,18 @@ password reset, team members, and approval emails (no email channel, docs/sectio
    **Continue**.
 4. `/provider/webhooks`: **Send test event**; open the delivery. With the endpoint the
    provider gave, the attempts show what it answered; on the mock, the jobs' deliveries too.
-5. `/provider/sandbox`: **Get access token** (filled in from step 3), open a job, **Accept
-   job**, then **Mark complete**. One new job is cancelled by the family as you accept it, to
-   show the 409 path. The jobs are the mock's until report serves the job API.
-6. Back on `/manager/providers`: the provider's health, and **Suspend provider**: its
-   webhooks stop and Status shows it. On the mock the Sandbox then gets 403; with the backend,
-   that comes with report's job API, which refuses a suspended provider's token.
+5. Make a job: the provider must offer the service, and the elder's primary caregiver must be
+   busy then. As a family member, book that service at least 5 hours ahead. report books the
+   visit for a manager and offers the job to the provider at once (`job.dispatched` appears
+   under Webhooks); the manager's Extra services screen shows "Offered to …" beside it. The
+   first to act has it (docs/section5/decisions.md, D17).
+6. `/provider/sandbox`: **Get access token** (filled in from step 3), open the job, **Accept
+   job** (the address appears; the manager's screen shows **PROVIDER ACCEPTED**), then **Mark
+   complete**; the family's request is completed. To show the 409 path, assign a caregiver to
+   another offered request as the manager first, then accept it. On
+   the mock, one new job is cancelled by the family as you accept it.
+7. Back on `/manager/providers`: the provider's health, and **Suspend provider**: its
+   webhooks stop, Status shows it, and the Sandbox gets 403 `provider_suspended`.
 
 On the mock, a provider approved in the seed data, with a failed and a retrying webhook, for
 skipping steps 1–3 (sign in on Status). These are mock values, valid only against the mock:

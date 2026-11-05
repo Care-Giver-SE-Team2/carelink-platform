@@ -106,6 +106,26 @@ class EventTypesTest {
 		assertThat(ProviderUpdated.TYPE).isEqualTo("ProviderUpdated");
 	}
 
+	/** A provider's job, field by field as the catalogue lists it, and back. */
+	@Test
+	void providerJobUpdatedIsWrittenWithTheCataloguesFields() {
+		var updated = new ProviderJobUpdated(24081L, 509L, 812L, "NEW", "Hospital escort", "19", "Hougang",
+				SingaporeTime.of(HALF_NINE.plusDays(1)), 180, SingaporeTime.of(HALF_NINE.plusHours(20)),
+				SingaporeTime.of(HALF_NINE), null, 0, SingaporeTime.of(HALF_NINE));
+		JsonNode written = json.readTree(json.writeValueAsString(updated));
+
+		assertThat(written.propertyNames()).containsExactly("jobId", "providerId", "valueAddedServiceRequestId",
+				"status", "serviceName", "district", "areaName", "scheduledStart", "durationMinutes", "respondBy",
+				"receivedAt", "cancelReason", "version", "changedAt");
+		assertThat(written.get("scheduledStart").asString()).isEqualTo("2026-10-13T09:35:00+08:00");
+		ProviderJobUpdated read = json.readValue(json.writeValueAsString(updated), ProviderJobUpdated.class);
+		assertThat(read.jobId()).isEqualTo(24081L);
+		assertThat(read.status()).isEqualTo("NEW");
+		assertThat(SingaporeTime.local(read.receivedAt())).isEqualTo(HALF_NINE);
+		assertThat(read.cancelReason()).isNull();
+		assertThat(ProviderJobUpdated.TYPE).isEqualTo("ProviderJobUpdated");
+	}
+
 	/** Visit's events, field by field as the catalogue lists them (section 3.2), and back. */
 	@Test
 	void visitsEventsAreWrittenWithTheCataloguesFields() {

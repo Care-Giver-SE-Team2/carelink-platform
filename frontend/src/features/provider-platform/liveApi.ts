@@ -4,19 +4,26 @@ import type {
   Application,
   ApplicationDetails,
   CredentialsSummary,
+  DeclineReason,
   Delivery,
   DeliveryStatus,
   IntegrationHealth,
   IssuedCredentials,
+  Job,
+  JobPage,
+  JobStatus,
+  JobSummary,
+  JobTab,
+  TimelineStep,
   WebhookEvent,
   WebhookSettings,
 } from './types'
 
 /**
- * The Open Platform as notification serves it (docs/api/open-platform.yaml), turned into the shapes
- * the Partner Portal's pages already use. Only the public API, `/api/open/v1/**`: signing in and
- * getting a server token, which notification issues, and the portal's calls with the portal user's
- * token. Under `/api` because that is what CloudFront sends to the services; through the Vite proxy
+ * The Open Platform as notification and report serve it (docs/api/open-platform.yaml), turned into the
+ * shapes the Partner Portal's pages already use. Only the public API, `/api/open/v1/**`: signing in and
+ * getting a server token, which notification issues, the portal's calls with the portal user's token,
+ * and the job calls, which report serves, with the server token. Under `/api` because that is what CloudFront sends to the services; through the Vite proxy
  * locally.
  *
  * The contract's names are mapped here and nowhere else: UPPER enums to the pages' lower case,
@@ -233,4 +240,137 @@ export async function resendDelivery(token: string, deliveryId: string): Promise
 
 export async function sendTestEvent(token: string): Promise<Delivery> {
   return delivery(await open<WireDelivery>('/api/open/v1/portal/webhook/test', token, { method: 'POST' }))
+}
+
+// ---------- Jobs (report) ----------
+
+type WireStatus = 'NEW' | 'ACCEPTED' | 'DECLINED' | 'COMPLETED' | 'CANCELLED'
+
+type WireJobSummary = {
+  id: string
+  version: number
+  status: WireStatus
+  serviceName: string
+  district: string
+  areaName: string
+  scheduledStart: string
+  durationMinutes: number
+  respondBy: string | null
+  receivedAt: string
+  cancelReason: string | null
+}
+
+type WireJob = WireJobSummary & {
+  elderSummary: string
+  languages: string
+  bookedBy: string
+  instructions: string | null
+  address: { text: string; accessNotes: string | null } | null
+  timeline: { step: WireStatus | 'DISPATCHED'; at: string }[]
+  completion: { actualStart: string; actualEnd: string; note: string | null } | null
+}
+
+type WireJobPage = {
+  items: WireJobSummary[]
+  page: number
+  size: number
+  totalElements: number
+  counts: Record<WireStatus, number>
+}
+
+/** The Sandbox's tabs, as the job API's states; "closed" is everything the provider can no longer act on. */
+const TAB_STATUSES: Record<JobTab, WireStatus[]> = {
+  new: ['NEW'],
+  accepted: ['ACCEPTED'],
+  completed: ['COMPLETED'],
+  closed: ['DECLINED', 'CANCELLED'],
+}
+
+/** As many jobs a page as the mock shows. */
+const JOBS_PAGE_SIZE = 5
+
+function jobSummary(job: WireJobSummary): JobSummary {
+  return {
+    id: job.id,
+    service: job.serviceName,
+    district: job.district,
+    areaName: job.areaName,
+    scheduledStart: job.scheduledStart,
+    durationMin: job.durationMinutes,
+    status: job.status.toLowerCase() as JobStatus,
+    receivedAt: job.receivedAt,
+  }
+}
+
+function job(wire: WireJob): Job {
+  return {
+    ...jobSummary(wire),
+    elder: wire.elderSummary,
+    language: wire.languages,
+    bookedBy: wire.bookedBy,
+    instructions: wire.instructions ?? '',
+    address: wire.address && { line1: wire.address.text, line2: wire.address.accessNotes ?? '' },
+    timeline: wire.timeline.map((step) => ({ step: step.step.toLowerCase() as TimelineStep['step'], at: step.at })),
+    completion: wire.completion && { ...wire.completion, note: wire.completion.note ?? '' },
+    cancelReason: wire.cancelReason,
+  }
+}
+
+function jobPath(jobId: string, action = ''): string {
+  return `/api/open/v1/jobs/${encodeURIComponent(jobId)}${action}`
+}
+
+/** GET /api/open/v1/jobs?status=…&page=&size=, the page counted from 1 as the Sandbox counts it. */
+export async function listJobs(token: string, tab: JobTab, page: number): Promise<JobPage> {
+  const query = new URLSearchParams()
+  for (const status of TAB_STATUSES[tab]) query.append('status', status)
+  query.set('page', String(Math.max(0, page - 1)))
+  query.set('size', String(JOBS_PAGE_SIZE))
+  const wire = await open<WireJobPage>(`/api/open/v1/jobs?${query}`, token)
+  const counts = {} as Record<JobTab, number>
+  for (const t of Object.keys(TAB_STATUSES) as JobTab[]) {
+    counts[t] = TAB_STATUSES[t].reduce((sum, status) => sum + (wire.counts[status] ?? 0), 0)
+  }
+  return { items: wire.items.map(jobSummary), page: wire.page + 1, pageSize: wire.size, total: wire.totalElements, counts }
+}
+
+/** GET /api/open/v1/jobs/{jobId} */
+export async function getJob(token: string, jobId: string): Promise<Job> {
+  return job(await open<WireJob>(jobPath(jobId), token))
+}
+
+/** POST /api/open/v1/jobs/{jobId}/accept */
+export async function acceptJob(token: string, jobId: string, idempotencyKey: string): Promise<Job> {
+  return job(await open<WireJob>(jobPath(jobId, '/accept'), token, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+  }))
+}
+
+/** POST /api/open/v1/jobs/{jobId}/decline {reason, note} */
+export async function declineJob(
+  token: string,
+  jobId: string,
+  body: { reason: DeclineReason; note: string | null },
+  idempotencyKey: string,
+): Promise<Job> {
+  return job(await open<WireJob>(jobPath(jobId, '/decline'), token, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(body),
+  }))
+}
+
+/** POST /api/open/v1/jobs/{jobId}/complete {actualStart, actualEnd, note} */
+export async function completeJob(
+  token: string,
+  jobId: string,
+  body: { actualStart: string; actualEnd: string; note: string },
+  idempotencyKey: string,
+): Promise<Job> {
+  return job(await open<WireJob>(jobPath(jobId, '/complete'), token, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ ...body, note: body.note.trim() === '' ? null : body.note }),
+  }))
 }

@@ -30,6 +30,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 import sg.nus.carelink.eventtypes.NotificationRequested;
+import sg.nus.carelink.eventtypes.ProviderJobUpdated;
 import sg.nus.carelink.testsupport.SharedMySql;
 
 /**
@@ -110,7 +111,7 @@ class NotificationRequestedIT {
 					.attributes().get("FilterPolicy");
 
 			assertThat(json.readTree(policy).get("type").valueStream().map(type -> type.asString()).toList())
-					.containsExactly(NotificationRequested.TYPE);
+					.containsExactly(NotificationRequested.TYPE, ProviderJobUpdated.TYPE);
 		}
 	}
 

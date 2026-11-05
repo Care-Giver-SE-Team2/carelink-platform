@@ -71,6 +71,7 @@ class ValueAddedServiceRequestServiceTest {
     private ValueAddedVisitAssignment assignment;
     private ValueAddedManagerAlert managerAlert;
     private ValueAddedNotifier notifier;
+    private ProviderJobDispatch providerJobs;
 
     private ValueAddedServiceRequestService service;
 
@@ -114,6 +115,7 @@ class ValueAddedServiceRequestServiceTest {
         assignment = mock(ValueAddedVisitAssignment.class);
         managerAlert = mock(ValueAddedManagerAlert.class);
         notifier = mock(ValueAddedNotifier.class);
+        providerJobs = mock(ProviderJobDispatch.class);
         service =
                 new ValueAddedServiceRequestService(
                         accounts,
@@ -126,7 +128,8 @@ class ValueAddedServiceRequestServiceTest {
                         CLOCK,
                         assignment,
                         managerAlert,
-                        notifier
+                        notifier,
+                        providerJobs
                 );
     }
 
@@ -887,6 +890,37 @@ class ValueAddedServiceRequestServiceTest {
         verify(visits).schedule(saved.capture());
         assertThat(saved.getValue().caregiverId()).isNull();
         verify(managerAlert).approved(77L, 10L, "Hospital escort", SCHEDULE, null);
+    }
+
+    @Test
+    void approvalWithNobodyFreeBooksTheVisitForAManagerAndOffersItToAProvider() {
+        prepareFamilyDecision();
+        when(services.findById(2L)).thenReturn(Optional.of(availableService()));
+        when(assignment.chooseCaregiver(10L, SCHEDULE, SCHEDULE.plusHours(1))).thenReturn(Optional.empty());
+        when(visits.schedule(any())).thenReturn(77L);
+        when(requests.save(any(ValueAddedServiceRequest.class))).thenAnswer(call -> call.getArgument(0));
+
+        ValueAddedServiceRequest result = service.decideForFamily("family_test", 5L,
+                ValueAddedServiceRequestService.Decision.APPROVED);
+
+        assertThat(result.status()).isEqualTo(ValueAddedServiceRequest.Status.DISPATCHED);
+        assertThat(result.visitId()).isEqualTo(77L);
+        verify(managerAlert).approved(77L, 10L, "Hospital escort", SCHEDULE, null);
+        verify(providerJobs).offer(org.mockito.ArgumentMatchers.argThat(offered -> offered.visitId() == 77L),
+                any(), any());
+    }
+
+    @Test
+    void aFreeCaregiverComesBeforeAnyProvider() {
+        prepareFamilyDecision();
+        when(services.findById(2L)).thenReturn(Optional.of(availableService()));
+        when(assignment.chooseCaregiver(10L, SCHEDULE, SCHEDULE.plusHours(1))).thenReturn(Optional.of(42L));
+        when(visits.schedule(any())).thenReturn(77L);
+        when(requests.save(any(ValueAddedServiceRequest.class))).thenAnswer(call -> call.getArgument(0));
+
+        service.decideForFamily("family_test", 5L, ValueAddedServiceRequestService.Decision.APPROVED);
+
+        verifyNoInteractions(providerJobs);
     }
 
     @Test

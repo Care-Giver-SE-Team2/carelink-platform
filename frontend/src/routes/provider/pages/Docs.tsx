@@ -25,36 +25,37 @@ app.post('/carelink', express.raw({ type: 'application/json' }), (req, res) => {
   res.sendStatus(200)                                           // answer fast, work later
 })`
 
-const TOKEN = `curl -X POST https://api.carelink.sg/oauth2/token \\
+const TOKEN = `curl -X POST https://api.carelink.sg/api/open/v1/oauth2/token \\
   -u "$CARELINK_CLIENT_ID:$CARELINK_CLIENT_SECRET" \\
-  -d "grant_type=client_credentials&scope=jobs:read%20jobs:write"
+  -d "grant_type=client_credentials"
 
-# → { "access_token": "…", "token_type": "Bearer", "expires_in": 3600, "scope": "jobs:read jobs:write" }`
+# → { "access_token": "…", "token_type": "Bearer", "expires_in": 3600,
+#     "scope": "open-platform/jobs.read open-platform/jobs.write" }`
 
-const ACCEPT = `curl -X POST https://api.carelink.sg/v1/jobs/JOB-24081/accept \\
+const ACCEPT = `curl -X POST https://api.carelink.sg/api/open/v1/jobs/JOB-24081/accept \\
   -H "Authorization: Bearer $TOKEN" \\
   -H "Idempotency-Key: $(uuidgen)"   # a new key per action; reuse it only to retry`
 
 const ENDPOINTS: [string, string, string][] = [
-  ['GET', '/v1/jobs?status=new|accepted|completed|closed&page=', 'Jobs sent to you, newest first, with every status’s count'],
-  ['GET', '/v1/jobs/{id}', 'One job; the address only once you’ve accepted it'],
-  ['POST', '/v1/jobs/{id}/accept', 'Take the job'],
-  ['POST', '/v1/jobs/{id}/decline', '{ reason, note } — CareLink offers it to another provider'],
-  ['POST', '/v1/jobs/{id}/complete', '{ actual_start, actual_end, note } — the note reaches the family'],
+  ['GET', '/api/open/v1/jobs?status=NEW&page=0', 'Jobs sent to you, newest first, with every status’s count'],
+  ['GET', '/api/open/v1/jobs/{id}', 'One job; the address only once you’ve accepted it'],
+  ['POST', '/api/open/v1/jobs/{id}/accept', 'Take the job, before its respondBy'],
+  ['POST', '/api/open/v1/jobs/{id}/decline', '{ reason, note } — CareLink makes other arrangements'],
+  ['POST', '/api/open/v1/jobs/{id}/complete', '{ actualStart, actualEnd, note } — when the work really started and ended'],
 ]
 
 const ERRORS: [string, string][] = [
   ['401', 'Token missing, wrong or expired: get a new one'],
   ['403', 'Your provider account is suspended'],
   ['404', 'No such job, or it wasn’t sent to you'],
-  ['409', 'The job can no longer change, e.g. CareLink cancelled it first'],
-  ['422', 'The request is invalid, or its Idempotency-Key was used for a different request'],
+  ['400', 'The request is invalid, or the Idempotency-Key header is missing'],
+  ['409', 'The job can no longer change, e.g. CareLink cancelled it first, or respondBy has passed'],
+  ['422', 'The Idempotency-Key was used for another job or another action'],
 ]
 
 /**
  * Docs: the integration in one page — get a token, receive and verify webhooks, act on jobs —
- * stating the same rules the platform follows (webhooks.ts). A draft until the Open API
- * contract and webhook spec are published.
+ * stating the same rules the platform follows (docs/api/open-platform.yaml, webhooks.md).
  */
 export default function Docs() {
   return (
