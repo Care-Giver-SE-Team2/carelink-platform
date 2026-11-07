@@ -139,7 +139,7 @@ export function Checkbox({
   )
 }
 
-type TagKind = JobStatus | DeliveryStatus | 'approved' | 'submitted' | 'rejected' | 'pending' | 'suspended'
+type TagKind = JobStatus | DeliveryStatus | 'approved' | 'submitted' | 'rejected' | 'pending' | 'suspended' | 'removed'
 
 const TAG: Record<TagKind, { label: string; tone: string }> = {
   new: { label: 'NEW', tone: 'tag_new' },
@@ -152,6 +152,7 @@ const TAG: Record<TagKind, { label: string; tone: string }> = {
   rejected: { label: 'REJECTED', tone: 'tag_bad' },
   pending: { label: 'PENDING REVIEW', tone: 'tag_pending' },
   suspended: { label: 'SUSPENDED', tone: 'tag_bad' },
+  removed: { label: 'REMOVED', tone: 'tag_bad' },
   delivered: { label: 'DELIVERED', tone: 'tag_good' },
   retrying: { label: 'RETRYING', tone: 'tag_pending' },
   failed: { label: 'FAILED', tone: 'tag_bad' },

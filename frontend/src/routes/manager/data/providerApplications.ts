@@ -4,6 +4,7 @@ import {
   listApprovedProviders,
   rejectApplication,
   reinstateProvider as reinstate,
+  removeProvider as remove,
   suspendProvider as suspend,
 } from '../../../features/provider-platform/mockPlatform'
 import type { ReviewApplication } from '../../../features/provider-platform/mockPlatform'
@@ -24,6 +25,8 @@ import { api } from '../../../shared/api/client'
  *        seven days' webhook deliveries
  *   POST /api/providers/{id}/suspend             tokens refused, no jobs or webhooks
  *   POST /api/providers/{id}/reinstate
+ *   POST /api/providers/{id}/remove              for good: its client is deleted, its open jobs go
+ *        back to the managers, and it leaves the list; the same email may apply again
  *
  * The manager never sees the client secret or the webhook secret, only the client id.
  * `services` are names from report's value-added catalogue, so a provider can be dispatched the
@@ -74,7 +77,7 @@ type WireApplication = {
 
 type WireProvider = WireApplication & {
   clientId: string
-  status: 'ACTIVE' | 'SUSPENDED'
+  status: 'ACTIVE' | 'SUSPENDED' | 'REMOVED'
   approvedAt: string
   health: IntegrationHealth
 }
@@ -146,6 +149,18 @@ export async function reinstateProvider(id: number): Promise<void> {
     return
   }
   reinstate(id)
+}
+
+/**
+ * Removes the provider for good: its credentials stop working, its open jobs come back to the
+ * managers to staff, and it leaves the list. It can apply again as a new provider.
+ */
+export async function removeProvider(id: number): Promise<void> {
+  if (LIVE) {
+    await api(`/providers/${id}/remove`, { method: 'POST' })
+    return
+  }
+  remove(id)
 }
 
 /** Approves the application: the provider is registered and its Open API client created. */

@@ -171,7 +171,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       refreshApplication,
-      portal: signedIn && application?.status === 'approved' ? session : null,
+      portal: signedIn && application?.status === 'approved' && !application.removed ? session : null,
       credentials,
       setCredentials,
       connectPrefill,
@@ -185,7 +185,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       expired: revoked || (token !== null && !live),
       now,
       // A token, even one that has run out, proves the provider was approved.
-      approved: (signedIn && application?.status === 'approved') || token !== null || revoked,
+      approved: (signedIn && application?.status === 'approved' && !application.removed) || token !== null || revoked,
       restoring,
       leaveGuard,
       setLeaveGuard,

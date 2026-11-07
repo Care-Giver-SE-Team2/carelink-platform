@@ -46,6 +46,8 @@ const TOKEN_ENDPOINT = 'POST /oauth2/token'
 const MINUTE_MS = 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
+const REMOVED_MESSAGE = 'CareLink has removed this provider. You may apply again.'
+const REMOVED_JOB_REASON = 'CareLink has removed this provider; CareLink has made other arrangements.'
 
 /** Jobs per page. Small so the demo data spans two pages; the real API uses 20. */
 export const JOBS_PAGE_SIZE = 5
@@ -206,6 +208,7 @@ function application(state: PlatformState, now: number, details: ApplicationDeta
     reviewedAt: null,
     reason: null,
     suspended: false,
+    removed: false,
     credentials: null,
     events: [...WEBHOOK_EVENTS],
     providerId: null,
@@ -557,6 +560,7 @@ function publicView(app: StoredApplication): Application {
     reviewedAt: app.reviewedAt,
     reason: app.reason,
     suspended: app.suspended,
+    removed: Boolean(app.removed),
   }
 }
 
@@ -607,12 +611,13 @@ function signedIn(state: PlatformState, session: string, now: number): StoredApp
 /**
  * POST /v1/applications {details, password} — also creates the portal account the provider
  * signs in with. 409 when the email already has an account with an application that is pending
- * or approved; a provider turned down may apply again, and sets a new password doing so.
+ * or approved; a provider turned down, or removed by CareLink, may apply again, and sets a new
+ * password doing so.
  */
 export function submitApplication(details: ApplicationDetails, password: string, now = Date.now()): { applicationId: string } {
   const state = load()
   const current = latestApplication(state, details.contactEmail)
-  if (current && current.status !== 'rejected') {
+  if (current && current.status !== 'rejected' && !current.removed) {
     fail(409, 'account_exists', 'This email already has a CareLink provider account. Sign in instead.')
   }
   if (password.length < MIN_PASSWORD_LENGTH) fail(422, 'weak_password', `Use at least ${MIN_PASSWORD_LENGTH} characters.`)
@@ -656,6 +661,7 @@ export function collectCredentials(session: string, now = Date.now()): IssuedCre
   const state = load()
   const app = signedIn(state, session, now)
   if (app.status !== 'approved' || !app.credentials) fail(409, 'not_approved', 'This application is not approved.')
+  if (app.removed) fail(403, 'provider_removed', REMOVED_MESSAGE)
   if (app.credentials.collected) {
     fail(410, 'credentials_collected', 'These credentials were already shown. Rotate the secret to get a new one.')
   }
@@ -669,7 +675,8 @@ export function collectCredentials(session: string, now = Date.now()): IssuedCre
 export function requestToken(clientId: string, clientSecret: string, now = Date.now()): AccessToken {
   const state = load()
   const app = state.applications.find((a) => a.credentials?.clientId === clientId.trim())
-  if (!app || app.credentials!.clientSecret !== clientSecret.trim()) {
+  // A removed provider's client is deleted: its secret no longer authenticates
+  if (!app || app.removed || app.credentials!.clientSecret !== clientSecret.trim()) {
     fail(401, 'invalid_client', 'Client authentication failed.')
   }
   if (app.suspended) fail(403, 'provider_suspended', 'CareLink has suspended this provider.')
@@ -682,9 +689,9 @@ export function requestToken(clientId: string, clientSecret: string, now = Date.
 function authorise(state: PlatformState, accessToken: string, now: number): string {
   const token = state.tokens.find((t) => t.token === accessToken)
   if (!token || token.expiresAt <= now) fail(401, 'invalid_token', 'The access token is missing or expired.')
-  if (state.applications.find((a) => a.credentials?.clientId === token.clientId)?.suspended) {
-    fail(403, 'provider_suspended', 'CareLink has suspended this provider.')
-  }
+  const app = state.applications.find((a) => a.credentials?.clientId === token.clientId)
+  if (app?.removed) fail(403, 'provider_removed', REMOVED_MESSAGE)
+  if (app?.suspended) fail(403, 'provider_suspended', 'CareLink has suspended this provider.')
   return token.clientId
 }
 
@@ -832,6 +839,7 @@ export function completeJob(
 function approvedApp(state: PlatformState, session: string, now: number): StoredApplication & { credentials: NonNullable<StoredApplication['credentials']> } {
   const app = signedIn(state, session, now)
   if (app.status !== 'approved' || !app.credentials) fail(403, 'not_approved', 'This application is not approved.')
+  if (app.removed) fail(403, 'provider_removed', REMOVED_MESSAGE)
   return app as StoredApplication & { credentials: NonNullable<StoredApplication['credentials']> }
 }
 
@@ -997,7 +1005,7 @@ export function listApplicationsForReview(): ReviewApplication[] {
 export function listApprovedProviders(now = Date.now()): ApprovedProvider[] {
   const state = load()
   return state.applications
-    .filter((a) => a.status === 'approved')
+    .filter((a) => a.status === 'approved' && !a.removed)
     .sort((a, b) => (b.reviewedAt ?? '').localeCompare(a.reviewedAt ?? ''))
     .map((a) => {
       const mine = state.jobs.filter((j) => j.clientId === a.credentials!.clientId)
@@ -1018,6 +1026,7 @@ export function listApprovedProviders(now = Date.now()): ApprovedProvider[] {
 function approvedBySeq(state: PlatformState, seq: number): StoredApplication {
   const app = state.applications.find((a) => a.seq === seq && a.status === 'approved')
   if (!app) fail(404, 'provider_not_found', 'No approved provider with that ID.')
+  if (app.removed) fail(409, 'provider_removed', 'This provider has been removed.')
   return app
 }
 
@@ -1034,6 +1043,25 @@ export function suspendProvider(seq: number) {
 export function reinstateProvider(seq: number) {
   const state = load()
   approvedBySeq(state, seq).suspended = false
+  save(state)
+}
+
+/**
+ * Removes an approved provider for good: its client stops authenticating, it leaves the list,
+ * and every job it could still act on is called off and goes back to CareLink's managers. The same
+ * email may apply again.
+ */
+export function removeProvider(seq: number, now = Date.now()) {
+  const state = load()
+  const app = approvedBySeq(state, seq)
+  app.removed = true
+  for (const job of state.jobs) {
+    if (job.clientId !== app.credentials?.clientId || (job.status !== 'new' && job.status !== 'accepted')) continue
+    job.status = 'cancelled'
+    job.cancelReason = REMOVED_JOB_REASON
+    job.cancelOnAccept = null
+    job.timeline.push({ step: 'cancelled', at: iso(now) })
+  }
   save(state)
 }
 

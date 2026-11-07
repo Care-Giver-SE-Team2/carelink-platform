@@ -143,7 +143,7 @@ export function WorkbenchShell({ children, dense = false }: { children: ReactNod
   )
 }
 
-/** Suspended, then failed deliveries, then ones still retrying, else all well. */
+/** Suspended, then failed deliveries, then ones still retrying, then none sent yet, else all well. */
 function HealthIndicator({ health }: { health: IntegrationHealth }) {
   const [tone, long, short] = health.suspended
     ? [styles.failed, 'SUSPENDED', 'SUSPENDED']
@@ -151,7 +151,9 @@ function HealthIndicator({ health }: { health: IntegrationHealth }) {
       ? [styles.failed, `${health.failed} WEBHOOK${health.failed === 1 ? '' : 'S'} FAILED`, `${health.failed} FAILED`]
       : health.retrying > 0
         ? [styles.warning, `${health.retrying} WEBHOOK${health.retrying === 1 ? '' : 'S'} RETRYING`, `${health.retrying} RETRYING`]
-        : [styles.connected, 'WEBHOOKS OK', 'WEBHOOKS OK']
+        : health.delivered === 0
+          ? [styles.idle, 'NO WEBHOOKS YET', 'NO WEBHOOKS']
+          : [styles.connected, 'WEBHOOKS OK', 'WEBHOOKS OK']
   return (
     <span className={cx(styles.indicator, tone)} title="Webhook deliveries in the last 7 days">
       <span className={styles.dot} aria-hidden="true" />

@@ -266,6 +266,27 @@ it('suspends a provider after confirming, and reinstates it', async () => {
   expect(await screen.findByText('BrightHome Services reinstated.')).toBeInTheDocument()
 })
 
+it('removes a provider for good after confirming, and drops it from the list', async () => {
+  const remove = vi.spyOn(store, 'removeProvider').mockImplementation(async () => {
+    approved = []
+  })
+  renderPage('/manager/providers?provider=109')
+
+  await screen.findByRole('heading', { name: 'BrightHome Services' })
+  const panel = screen.getByRole('complementary', { name: 'Provider detail' })
+  await userEvent.click(within(panel).getByRole('button', { name: 'Remove provider' }))
+  const dialog = screen.getByRole('dialog', { name: 'Remove BrightHome Services?' })
+  expect(dialog).toHaveTextContent("This can't be undone.")
+  expect(dialog).toHaveTextContent('Jobs it hasn\'t completed come back to you')
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Remove provider' }))
+
+  expect(remove).toHaveBeenCalledWith(9)
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'BrightHome Services removed. Its open jobs are back in Extra services for you to staff.',
+  )
+  expect(screen.queryByRole('heading', { name: 'BrightHome Services' })).not.toBeInTheDocument()
+})
+
 it('says when the lists cannot be loaded', async () => {
   vi.spyOn(store, 'fetchProviderApplications').mockRejectedValue(new Error('down'))
   vi.spyOn(store, 'fetchProviders').mockRejectedValue(new Error('down'))
