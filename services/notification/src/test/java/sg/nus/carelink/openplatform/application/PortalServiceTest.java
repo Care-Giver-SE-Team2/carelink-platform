@@ -129,7 +129,8 @@ class PortalServiceTest extends OpenPlatformFixture {
 	void aPendingProviderCannotChangeItsServices() {
 		applied(EMAIL);
 
-		assertThatThrownBy(() -> portal.updateServices(ME, List.of("Companionship"))).isInstanceOf(ProviderNotApproved.class);
+		List<String> services = List.of("Companionship");
+		assertThatThrownBy(() -> portal.updateServices(ME, services)).isInstanceOf(ProviderNotApproved.class);
 		assertThat(portal.application(ME).services()).containsExactly("Hospital escort", "Companionship");
 	}
 

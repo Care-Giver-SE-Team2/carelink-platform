@@ -196,10 +196,11 @@ class OnboardingAndReviewTest extends OpenPlatformFixture {
 				.containsExactly("ACTIVE", "SUSPENDED", "REMOVED");
 
 		// For good: nothing changes it again
-		assertThatThrownBy(() -> review.remove(provider.id()))
+		long id = provider.id();
+		assertThatThrownBy(() -> review.remove(id))
 				.isInstanceOfSatisfying(ProviderRemoved.class, e -> assertThat(e.code()).isEqualTo("PROVIDER_REMOVED"));
-		assertThatThrownBy(() -> review.reinstate(provider.id())).isInstanceOf(ProviderRemoved.class);
-		assertThatThrownBy(() -> review.suspend(provider.id())).isInstanceOf(ProviderRemoved.class);
+		assertThatThrownBy(() -> review.reinstate(id)).isInstanceOf(ProviderRemoved.class);
+		assertThatThrownBy(() -> review.suspend(id)).isInstanceOf(ProviderRemoved.class);
 		assertThatThrownBy(() -> review.remove(999)).isInstanceOf(ResourceNotFound.class);
 	}
 
