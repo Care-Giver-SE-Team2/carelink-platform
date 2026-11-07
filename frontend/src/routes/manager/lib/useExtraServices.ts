@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   fetchCaregiverCoverOptions,
   fetchManagedValueAddedServiceRequests,
+  fetchProviderOptions,
 } from '../../../features/value-added-services/api'
 
 /**
@@ -29,5 +30,13 @@ export function useCaregiverCoverOptions(requestId: number) {
   return useQuery({
     queryKey: ['extra-services', requestId, 'caregiver-options'],
     queryFn: ({ signal }) => fetchCaregiverCoverOptions(requestId, signal),
+  })
+}
+
+/** Which providers a request can be offered to, by name. */
+export function useProviderOptions(requestId: number) {
+  return useQuery({
+    queryKey: ['extra-services', requestId, 'provider-options'],
+    queryFn: ({ signal }) => fetchProviderOptions(requestId, signal),
   })
 }

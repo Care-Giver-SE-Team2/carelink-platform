@@ -3,6 +3,7 @@ import type {
   CaregiverCoverOption,
   FamilyValueAddedServiceRequestCreate,
   ManagedValueAddedServiceRequest,
+  ProviderOption,
   ValueAddedService,
   ValueAddedServiceRequest,
   ValueAddedServiceRequestCreate,
@@ -76,6 +77,19 @@ export function assignValueAddedServiceCaregiver(
   return api<ManagedValueAddedServiceRequest>(`/value-added-service-requests/${id}/caregiver`, {
     method: 'POST',
     body: JSON.stringify({ caregiverId }),
+  })
+}
+
+/** The providers a manager may offer the request to, by name (manager only). */
+export function fetchProviderOptions(id: number, signal?: AbortSignal): Promise<ProviderOption[]> {
+  return api<ProviderOption[]>(`/value-added-service-requests/${id}/provider-options`, { signal })
+}
+
+/** Offers a dispatched visit nobody holds to the provider the manager picked (manager only). */
+export function offerValueAddedServiceToProvider(id: number, providerId: number): Promise<ManagedValueAddedServiceRequest> {
+  return api<ManagedValueAddedServiceRequest>(`/value-added-service-requests/${id}/provider`, {
+    method: 'POST',
+    body: JSON.stringify({ providerId }),
   })
 }
 

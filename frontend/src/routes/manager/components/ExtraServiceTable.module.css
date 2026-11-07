@@ -37,3 +37,13 @@
   font: 400 11px/1.3 var(--font-mono);
   color: var(--text-muted);
 }
+
+/* The state tag, easier to tell apart at a glance: a light fill of its own colour, bolder and a
+   little larger than the plain outlined tag. span.state outranks the shared .tag rules. */
+span.state {
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--tag-color) 12%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+}

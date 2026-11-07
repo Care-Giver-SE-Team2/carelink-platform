@@ -35,14 +35,24 @@ describe('extra services', () => {
   })
 
   it('tags a request by its visit once it has one', () => {
-    expect(stateTag(unstaffed)).toEqual({ label: 'NEEDS CAREGIVER', tone: 'danger' })
+    expect(stateTag(unstaffed)).toEqual({ label: 'NEEDS ASSIGNMENT', tone: 'danger' })
     expect(stateTag(pending).label).toBe('AWAITING FAMILY')
     expect(stateTag(row({ visitStatus: 'EXCEPTION', caregiverId: null })).tone).toBe('danger')
     expect(stateTag(row({ visitStatus: 'IN_PROGRESS' })).label).toBe('IN VISIT')
     expect(stateTag(row({ visitStatus: 'VERIFIED' })).label).toBe('COMPLETED')
-    expect(stateTag(row({})).label).toBe('SCHEDULED')
-    // An open offer leaves the visit the manager's to staff; an accepted one is the provider's
-    expect(stateTag(row({ caregiverId: null, needsCaregiver: true, providerJobStatus: 'NEW' })).label).toBe('NEEDS CAREGIVER')
+    expect(stateTag(row({}))).toEqual({ label: 'SCHEDULED', tone: 'info' })
+    expect(stateTag(row({ status: 'COMPLETED' })).tone).toBe('success')
+    expect(stateTag(row({ visitStatus: 'VERIFIED' })).tone).toBe('success')
+    expect(stateTag(pending).tone).toBe('warning')
+    expect(stateTag(row({ status: 'CANCELLED' })).tone).toBe('muted')
+    // An open offer waits for the provider's answer; an accepted one is the provider's
+    expect(stateTag(row({ caregiverId: null, needsCaregiver: false, providerJobStatus: 'NEW' }))).toEqual({
+      label: 'AWAITING PROVIDER',
+      tone: 'warning',
+    })
+    expect(stateTag(row({ caregiverId: null, needsCaregiver: true, providerJobStatus: 'DECLINED' })).label).toBe(
+      'NEEDS ASSIGNMENT',
+    )
     expect(stateTag(row({ visitStatus: 'CANCELLED', providerJobStatus: 'ACCEPTED' }))).toEqual({
       label: 'PROVIDER ACCEPTED',
       tone: 'accent',

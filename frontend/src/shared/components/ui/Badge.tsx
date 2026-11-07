@@ -36,7 +36,7 @@ export function Badge({
   )
 }
 
-export type TagTone = 'ink' | 'danger' | 'muted' | 'accent'
+export type TagTone = 'ink' | 'danger' | 'muted' | 'accent' | 'success' | 'warning' | 'info'
 
 /**
  * Outlined label, e.g. a required certification ("FIRST AID"). `solid` fills it in the

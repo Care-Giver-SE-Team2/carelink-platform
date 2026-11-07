@@ -4,7 +4,7 @@ import type { ManagedValueAddedServiceRequest } from '../../../features/value-ad
 export type ExtraServiceFilter = 'needs' | 'awaiting' | 'scheduled' | 'closed' | 'all'
 
 export const EXTRA_SERVICE_FILTERS: { value: ExtraServiceFilter; label: string }[] = [
-  { value: 'needs', label: 'NEEDS CAREGIVER' },
+  { value: 'needs', label: 'NEEDS ASSIGNMENT' },
   { value: 'awaiting', label: 'AWAITING FAMILY' },
   { value: 'scheduled', label: 'SCHEDULED' },
   { value: 'closed', label: 'CLOSED' },
@@ -36,21 +36,23 @@ export function isExtraServiceFilter(value: string | null): value is ExtraServic
 
 /** Where a request stands, as one tag: the visit's state once there is one, else the request's. */
 export function stateTag(row: ManagedValueAddedServiceRequest): { label: string; tone: TagTone } {
-  if (row.needsCaregiver) return { label: 'NEEDS CAREGIVER', tone: 'danger' }
+  if (row.needsCaregiver) return { label: 'NEEDS ASSIGNMENT', tone: 'danger' }
   switch (row.status) {
     case 'PENDING_APPROVAL':
-      return { label: 'AWAITING FAMILY', tone: 'muted' }
+      return { label: 'AWAITING FAMILY', tone: 'warning' }
     case 'REJECTED':
       return { label: 'DECLINED', tone: 'muted' }
     case 'CANCELLED':
       return { label: 'CANCELLED', tone: 'muted' }
     case 'COMPLETED':
-      return { label: 'COMPLETED', tone: 'muted' }
+      return { label: 'COMPLETED', tone: 'success' }
     default:
       break
   }
   // A provider that accepted has it; its visit was called off for that
   if (row.providerJobStatus === 'ACCEPTED') return { label: 'PROVIDER ACCEPTED', tone: 'accent' }
+  // Offered to a provider that has not answered: the visit waits for it
+  if (row.providerJobStatus === 'NEW' && row.visitStatus === 'SCHEDULED') return { label: 'AWAITING PROVIDER', tone: 'warning' }
   switch (row.visitStatus) {
     case 'EXCEPTION':
       return { label: 'EXCEPTION', tone: 'danger' }
@@ -60,11 +62,11 @@ export function stateTag(row: ManagedValueAddedServiceRequest): { label: string;
     case 'COMPLETED':
     case 'VERIFIED':
     case 'AUTO_CLOSED':
-      return { label: 'COMPLETED', tone: 'muted' }
+      return { label: 'COMPLETED', tone: 'success' }
     case 'CANCELLED':
       return { label: 'CANCELLED', tone: 'muted' }
     default:
-      return { label: 'SCHEDULED', tone: 'ink' }
+      return { label: 'SCHEDULED', tone: 'info' }
   }
 }
 
@@ -109,7 +111,7 @@ export function selectedRow(
 
 /** What the table says when a filter has nothing in it. */
 export const EXTRA_SERVICE_EMPTY_TEXT: Record<ExtraServiceFilter, string> = {
-  needs: 'Every dispatched visit has a caregiver.',
+  needs: 'Every dispatched visit has a caregiver or a provider.',
   awaiting: 'No requests are waiting for a family’s answer.',
   scheduled: 'No extra-service visits are coming up.',
   closed: 'Nothing completed, declined or cancelled yet.',
