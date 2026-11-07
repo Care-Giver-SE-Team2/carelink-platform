@@ -14,6 +14,7 @@ import sg.nus.carelink.openplatform.domain.model.ApplicationDetails;
 import sg.nus.carelink.openplatform.domain.model.InvalidField;
 import sg.nus.carelink.openplatform.domain.model.Provider;
 import sg.nus.carelink.openplatform.domain.model.ProviderApplication;
+import sg.nus.carelink.openplatform.domain.model.ProviderRemoved;
 import sg.nus.carelink.openplatform.domain.model.WebhookEndpoint;
 import sg.nus.carelink.openplatform.domain.model.WebhookEvent;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
@@ -178,5 +179,64 @@ class OnboardingAndReviewTest extends OpenPlatformFixture {
 		assertThat(portal.application(provider.portalUserId()).suspended()).isTrue();
 		assertThat(portal.health(provider.portalUserId()).suspended()).isTrue();
 		assertThat(Set.copyOf(review.providers())).extracting(Provider::suspended).containsExactly(true);
+	}
+
+	@Test
+	void removingDeletesTheClientStopsTheWebhooksAndLeavesTheListReportHearingOfIt() {
+		Provider provider = approved("ops@brighthome.sg");
+		review.suspend(provider.id());
+
+		Provider removed = review.remove(provider.id());
+		assertThat(removed.removed()).isTrue();
+		assertThat(removed.version()).isEqualTo(2);
+		assertThat(identities.secretByClient).doesNotContainKey(provider.clientId());
+		assertThat(endpoints.find(provider.id()).orElseThrow().enabled()).isFalse();
+		assertThat(review.providers()).isEmpty();
+		assertThat(events.published).extracting(entry -> ((ProviderUpdated) entry.getValue()).status())
+				.containsExactly("ACTIVE", "SUSPENDED", "REMOVED");
+
+		// For good: nothing changes it again
+		long id = provider.id();
+		assertThatThrownBy(() -> review.remove(id))
+				.isInstanceOfSatisfying(ProviderRemoved.class, e -> assertThat(e.code()).isEqualTo("PROVIDER_REMOVED"));
+		assertThatThrownBy(() -> review.reinstate(id)).isInstanceOf(ProviderRemoved.class);
+		assertThatThrownBy(() -> review.suspend(id)).isInstanceOf(ProviderRemoved.class);
+		assertThatThrownBy(() -> review.remove(999)).isInstanceOf(ResourceNotFound.class);
+	}
+
+	@Test
+	void aRemovedProviderSeesItInThePortalAndIsRefusedWhatOnlyAProviderHas() {
+		Provider provider = approved("ops@brighthome.sg");
+		review.remove(provider.id());
+		String me = provider.portalUserId();
+
+		PortalService.MyApplication mine = portal.application(me);
+		assertThat(mine.application().status()).isEqualTo(ProviderApplication.Status.APPROVED);
+		assertThat(mine.removed()).isTrue();
+		assertThat(mine.suspended()).isFalse();
+		assertThatThrownBy(() -> portal.collectCredentials(me)).isInstanceOf(ProviderRemoved.class);
+		assertThatThrownBy(() -> portal.credentials(me)).isInstanceOf(ProviderRemoved.class);
+		assertThatThrownBy(() -> portal.webhookSettings(me)).isInstanceOf(ProviderRemoved.class);
+		assertThatThrownBy(() -> portal.sendTestEvent(me)).isInstanceOf(ProviderRemoved.class);
+	}
+
+	@Test
+	void aRemovedProvidersEmailMayApplyAgainAndIsApprovedAsANewProvider() {
+		Provider first = approved("ops@brighthome.sg");
+		review.remove(first.id());
+
+		ProviderApplication again = applied("ops@brighthome.sg");
+		assertThat(again.portalUserId()).isEqualTo(first.portalUserId());
+		PortalService.MyApplication mine = portal.application(first.portalUserId());
+		assertThat(mine.application().id()).isEqualTo(again.id());
+		assertThat(mine.removed()).isFalse();
+		assertThatThrownBy(() -> applied("ops@brighthome.sg"))
+				.isInstanceOfSatisfying(BusinessRuleViolation.class, e -> assertThat(e.code()).isEqualTo("ACCOUNT_EXISTS"));
+
+		Provider second = review.approve(again.id(), MANAGER);
+		assertThat(second.id()).isNotEqualTo(first.id());
+		assertThat(second.clientId()).isNotEqualTo(first.clientId());
+		assertThat(review.providers()).extracting(Provider::id).containsExactly(second.id());
+		assertThat(portal.collectCredentials(first.portalUserId()).clientId()).isEqualTo(second.clientId());
 	}
 }

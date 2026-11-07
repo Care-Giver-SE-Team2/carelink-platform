@@ -11,6 +11,7 @@ import {
   approveProviderApplication,
   declineProviderApplication,
   reinstateProvider,
+  removeProvider,
   suspendProvider,
 } from '../data/providerApplications'
 import type { ProviderApplication } from '../data/providerApplications'
@@ -23,7 +24,7 @@ import styles from './Providers.module.css'
  * organisation, the services they offer and their webhook; the applications wait at the top
  * until the manager approves (which gives the provider access to the Open API) or declines with
  * a reason. Below is every approved provider and how its integration is doing; one can be
- * suspended and reinstated. Either kind of row opens in the panel on the right.
+ * suspended, reinstated and removed. Either kind of row opens in the panel on the right.
  * The open row lives in the URL (?application=14, ?provider=109).
  */
 export default function Providers() {
@@ -169,6 +170,13 @@ export default function Providers() {
               await reinstateProvider(selectedProvider.id)
               await queryClient.invalidateQueries({ queryKey: ['providers'] })
               setNotice(`${selectedProvider.organisationName} reinstated.`)
+            }}
+            onRemove={async () => {
+              await removeProvider(selectedProvider.id)
+              await queryClient.invalidateQueries({ queryKey: ['providers'] })
+              setNotice(
+                `${selectedProvider.organisationName} removed. Its open jobs are back in Extra services for you to staff.`,
+              )
             }}
           />
         ) : (

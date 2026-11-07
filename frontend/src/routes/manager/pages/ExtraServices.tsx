@@ -5,6 +5,7 @@ import { FilterChips, MetaText, Pagination } from '../../../shared/components/ui
 import {
   assignValueAddedServiceCaregiver,
   cancelValueAddedServiceRequest,
+  offerValueAddedServiceToProvider,
 } from '../../../features/value-added-services/api'
 import { ExtraServicePanel } from '../components/ExtraServicePanel'
 import { ExtraServiceTable } from '../components/ExtraServiceTable'
@@ -25,9 +26,10 @@ import styles from './ExtraServices.module.css'
 
 /**
  * Extra services — every service an elder has asked for on top of their care plan, from the
- * family's answer to the visit that carries it out. Approval puts the elder's primary caregiver
- * on the visit when they are free; when they are not, the visit waits here for the manager to
- * staff it. The manager can also call a request off before its visit starts. Opens on the
+ * family's answer to the visit that carries it out. Approval books the visit with nobody on it,
+ * and it waits here for the manager to choose who carries it out: a caregiver, or an Open Platform
+ * provider they pick, who may decline and hand it back. The manager can also call a request off
+ * before its visit starts. Opens on the
  * visits needing a caregiver when there are any. The filter, page and open row live in the URL
  * (?filter=needs&page=2&id=41); a manager-bell link names the visit instead (?visit=88).
  */
@@ -136,6 +138,10 @@ export default function ExtraServices() {
             caregiverName={selected.caregiverId === null ? null : caregiverName(selected.caregiverId)}
             onAssign={async (caregiverId) => {
               await assignValueAddedServiceCaregiver(selected.id, caregiverId)
+              await refresh()
+            }}
+            onOffer={async (providerId) => {
+              await offerValueAddedServiceToProvider(selected.id, providerId)
               await refresh()
             }}
             onCancel={async () => {

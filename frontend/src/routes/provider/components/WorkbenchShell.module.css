@@ -134,6 +134,15 @@
   color: var(--warning-text);
 }
 
+/* Nothing sent in the last seven days: nothing to judge by yet */
+.idle {
+  color: var(--text-muted);
+}
+
+.idle .dot {
+  box-shadow: inset 0 0 0 1px var(--text-muted);
+}
+
 .warning .dot {
   background: var(--warning);
 }

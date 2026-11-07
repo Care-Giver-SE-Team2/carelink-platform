@@ -64,6 +64,20 @@
   --tag-color: var(--accent);
 }
 
+.tag_success {
+  --tag-color: var(--success);
+}
+
+/* The warning colour is too pale for text; the border keeps it, the label uses the darker one. */
+.tag_warning {
+  --tag-color: var(--warning-text);
+  border-color: var(--warning);
+}
+
+.tag_info {
+  --tag-color: var(--link);
+}
+
 .tag.solid {
   background: var(--tag-color);
   color: var(--bg);

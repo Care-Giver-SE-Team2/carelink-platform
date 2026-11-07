@@ -159,28 +159,31 @@ export default function ValueAddedServices() {
                       {request.visitId && (
                         <p className={styles.familyMeta}>Work order visit: #{request.visitId}</p>
                       )}
-                      {withdrawable(request) &&
-                        (confirmingId === request.id ? (
-                          <ActionStack>
-                            <WideButton
-                              onClick={() => void withdraw(request.id)}
-                              disabled={withdrawingId === request.id}
-                            >
-                              {withdrawingId === request.id ? 'Cancelling…' : 'Yes, cancel it'}
+                      {withdrawable(request) && (
+                        <div className={styles.cardAction}>
+                          {confirmingId === request.id ? (
+                            <ActionStack>
+                              <WideButton
+                                onClick={() => void withdraw(request.id)}
+                                disabled={withdrawingId === request.id}
+                              >
+                                {withdrawingId === request.id ? 'Cancelling…' : 'Yes, cancel it'}
+                              </WideButton>
+                              <WideButton
+                                variant="secondary"
+                                onClick={() => setConfirmingId(null)}
+                                disabled={withdrawingId === request.id}
+                              >
+                                Keep it
+                              </WideButton>
+                            </ActionStack>
+                          ) : (
+                            <WideButton variant="secondary" onClick={() => setConfirmingId(request.id)}>
+                              Cancel this request
                             </WideButton>
-                            <WideButton
-                              variant="secondary"
-                              onClick={() => setConfirmingId(null)}
-                              disabled={withdrawingId === request.id}
-                            >
-                              Keep it
-                            </WideButton>
-                          </ActionStack>
-                        ) : (
-                          <WideButton variant="secondary" onClick={() => setConfirmingId(request.id)}>
-                            Cancel this request
-                          </WideButton>
-                        ))}
+                          )}
+                        </div>
+                      )}
                     </InfoCard>
                   ))
                 )}

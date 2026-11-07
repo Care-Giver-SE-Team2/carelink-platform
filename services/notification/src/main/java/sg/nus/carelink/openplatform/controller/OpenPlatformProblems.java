@@ -17,6 +17,7 @@ import sg.nus.carelink.openplatform.application.PortalService;
 import sg.nus.carelink.openplatform.domain.model.CredentialsAlreadyCollected;
 import sg.nus.carelink.openplatform.domain.model.InvalidField;
 import sg.nus.carelink.openplatform.domain.model.ProviderNotApproved;
+import sg.nus.carelink.openplatform.domain.model.ProviderRemoved;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 
@@ -62,8 +63,9 @@ class OpenPlatformProblems {
 		return validationFailed(Map.of(ex.field(), ex.getMessage()));
 	}
 
-	@ExceptionHandler(ProviderNotApproved.class)
-	ProblemDetail onNotApproved(ProviderNotApproved ex) {
+	/** Not approved, or removed since: what only a provider has is refused, 403 with the reason's code. */
+	@ExceptionHandler({ ProviderNotApproved.class, ProviderRemoved.class })
+	ProblemDetail onNotApproved(BusinessRuleViolation ex) {
 		return problem(HttpStatus.FORBIDDEN, ex.code(), ex.getMessage());
 	}
 

@@ -23,7 +23,7 @@ relationship, as developer portals are elsewhere:
 | Docs | Token, webhook verification and job calls in one page (a draft until the Open API contract) |
 
 The header shows the provider and how its webhooks are doing; the manager console's Providers
-screen shows the same health and can suspend a provider.
+screen shows the same health and can suspend or remove a provider.
 
 Design: the "provider workbench" handoff (v3, manager-console style), extended in the same
 language for the portal pages. The controls are in `components/ui.tsx`, because the shared
@@ -57,11 +57,12 @@ password reset, team members, and approval emails (no email channel, docs/sectio
    **Continue**.
 4. `/provider/webhooks`: **Send test event**; open the delivery. With the endpoint the
    provider gave, the attempts show what it answered; on the mock, the jobs' deliveries too.
-5. Make a job: the provider must offer the service, and the elder's primary caregiver must be
-   busy then. As a family member, book that service at least 5 hours ahead. report books the
-   visit for a manager and offers the job to the provider at once (`job.dispatched` appears
-   under Webhooks); the manager's Extra services screen shows "Offered to …" beside it. The
-   first to act has it (docs/section5/decisions.md, D17).
+5. Make a job: the provider must offer the service. As a family member, book that service at
+   least 5 hours ahead; report books the visit with nobody on it. As a manager, on Extra
+   services, open the request and **Offer to provider**, picking this provider
+   (`job.dispatched` appears under Webhooks; the request shows **AWAITING PROVIDER**). A
+   decline or no answer hands it back to the manager, who may pick another provider or a
+   caregiver (docs/section5/decisions.md, D20).
 6. `/provider/sandbox`: **Get access token** (filled in from step 3), open the job, **Accept
    job** (the address appears; the manager's screen shows **PROVIDER ACCEPTED**), then **Mark
    complete**; the family's request is completed. To show the 409 path, assign a caregiver to
@@ -69,6 +70,11 @@ password reset, team members, and approval emails (no email channel, docs/sectio
    the mock, one new job is cancelled by the family as you accept it.
 7. Back on `/manager/providers`: the provider's health, and **Suspend provider**: its
    webhooks stop, Status shows it, and the Sandbox gets 403 `provider_suspended`.
+8. **Remove provider** ends it for good (docs/section5/decisions.md, D19): it leaves the list, its
+   client secret is refused, Status shows it removed with a link to apply again, and the Sandbox
+   gets 403 `provider_removed`. Jobs it hadn't completed are called off and come back to the
+   manager: an accepted one gets a new visit to staff in Extra services. Applying again with the
+   same email makes a new provider once approved.
 
 On the mock, a provider approved in the seed data, with a failed and a retrying webhook, for
 skipping steps 1–3 (sign in on Status). These are mock values, valid only against the mock:

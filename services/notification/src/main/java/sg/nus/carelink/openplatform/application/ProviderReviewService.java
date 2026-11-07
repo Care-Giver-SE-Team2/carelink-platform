@@ -20,8 +20,8 @@ import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 
 /**
- * A CareLink manager's side of the Open Platform: deciding applications, and suspending and
- * reinstating providers. Internal, behind core's session; the public API has none of it.
+ * A CareLink manager's side of the Open Platform: deciding applications, suspending and reinstating
+ * providers, and removing them for good. Internal, behind core's session; the public API has none of it.
  *
  * <p>Approving makes the provider whole at once: its app client and secret, its webhook endpoint at
  * the URL it applied with, subscribed to every job event, with a new signing secret. Both secrets are
@@ -56,7 +56,7 @@ public class ProviderReviewService {
 		return applications.pending();
 	}
 
-	/** Every approved provider, the most recently approved first. */
+	/** Every approved provider not removed, the most recently approved first. */
 	@Transactional(readOnly = true)
 	public List<Provider> providers() {
 		return providers.all();
@@ -120,6 +120,19 @@ public class ProviderReviewService {
 	public Provider reinstate(long providerId) {
 		Provider provider = provider(providerId);
 		return standing(provider, provider.reinstate(), true);
+	}
+
+	/**
+	 * Removes the provider for good (D19): its client is deleted, so its secret and the tokens it got are
+	 * refused, its webhooks stop, and it leaves the manager's list. report, hearing of it, takes back
+	 * the jobs it has open. Its email may apply again.
+	 */
+	@Transactional
+	public Provider remove(long providerId) {
+		Provider provider = provider(providerId);
+		Provider removed = standing(provider, provider.remove(), false);
+		identities.deleteClient(removed.clientId());
+		return removed;
 	}
 
 	private Provider standing(Provider before, Provider after, boolean sending) {

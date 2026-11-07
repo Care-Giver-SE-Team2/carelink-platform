@@ -31,6 +31,11 @@ export type Application = ApplicationDetails & {
   reason: string | null
   /** An approved provider CareLink has stopped: no tokens, no jobs, no webhooks until reinstated. */
   suspended: boolean
+  /**
+   * An approved provider CareLink has removed for good: its client is gone and its open jobs went
+   * back to CareLink. The same email may apply again.
+   */
+  removed: boolean
 }
 
 /** Handed over once, when an approved provider first collects them. */

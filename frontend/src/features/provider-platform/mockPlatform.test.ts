@@ -17,6 +17,7 @@ import {
   getWebhookSettings,
   listWebhookDeliveries,
   reinstateProvider,
+  removeProvider,
   resendDelivery,
   rotateClientSecret,
   rotateWebhookSecret,
@@ -334,6 +335,23 @@ describe('the developer portal', () => {
 
     reinstateProvider(seq)
     expect(listJobs(token, 'new', 1, NOW).total).toBe(7)
+  })
+
+  it('removes a provider for good: its client refused, its open jobs called off, and its email free to apply again', () => {
+    const seq = listApprovedProviders().find((p) => p.id === SEEDED_ID)!.seq
+    const token = requestToken('cl_prov_BrightHome9', 'cs_demo_brighthome', NOW).accessToken
+    removeProvider(seq, NOW)
+
+    expect(apiError(() => listJobs(token, 'new', 1, NOW)).code).toBe('provider_removed')
+    expect(apiError(() => requestToken('cl_prov_BrightHome9', 'cs_demo_brighthome', NOW)).code).toBe('invalid_client')
+    expect(apiError(() => getCredentialsSummary(seeded())).code).toBe('provider_removed')
+    expect(getMyApplication(seeded())).toEqual(expect.objectContaining({ status: 'approved', removed: true }))
+    expect(listApprovedProviders().map((p) => p.id)).not.toContain(SEEDED_ID)
+    expect(apiError(() => suspendProvider(seq)).code).toBe('provider_removed')
+
+    const { applicationId } = submitApplication({ ...DETAILS, contactEmail: SEEDED_EMAIL }, PASSWORD, NOW + 1000)
+    const again = signIn(SEEDED_EMAIL, PASSWORD).session
+    expect(getMyApplication(again)).toEqual(expect.objectContaining({ id: applicationId, status: 'pending', removed: false }))
   })
 
   it('reports each provider’s jobs by state to the manager', () => {

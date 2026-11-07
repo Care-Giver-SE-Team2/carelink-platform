@@ -31,10 +31,8 @@ public class ValueAddedServiceRequestService {
     private final ValueAddedServiceRequestRepository requests;
     private final StandaloneVisits visits;
     private final Clock clock;
-    private final ValueAddedVisitAssignment assignment;
     private final ValueAddedManagerAlert managerAlert;
     private final ValueAddedNotifier notifier;
-    private final ProviderJobDispatch providerJobs;
 
     @Autowired
     public ValueAddedServiceRequestService(
@@ -46,10 +44,8 @@ public class ValueAddedServiceRequestService {
             ValueAddedServiceRequestRepository requests,
             StandaloneVisits visits,
             Clock clock,
-            ValueAddedVisitAssignment assignment,
             ValueAddedManagerAlert managerAlert,
-            ValueAddedNotifier notifier,
-            ProviderJobDispatch providerJobs) {
+            ValueAddedNotifier notifier) {
         this.accounts = accounts;
         this.elders = elders;
         this.families = families;
@@ -58,10 +54,8 @@ public class ValueAddedServiceRequestService {
         this.requests = requests;
         this.visits = visits;
         this.clock = clock;
-        this.assignment = assignment;
         this.managerAlert = managerAlert;
         this.notifier = notifier;
-        this.providerJobs = providerJobs;
     }
 
     @Transactional(readOnly = true)
@@ -149,28 +143,19 @@ public class ValueAddedServiceRequestService {
     }
 
     /**
-     * Approves the request in the family member's name and books its visit: the primary
-     * caregiver if they are free for the whole of it, else nobody, for a manager to staff. A visit
-     * with nobody is also offered to an Open Platform provider that offers the service, and the
-     * first to act has it: the provider accepting, or a manager putting a caregiver on the visit
-     * (docs/section5/decisions.md, D17).
+     * Approves the request in the family member's name and books its visit with nobody on it, and
+     * tells the managers: a manager decides who carries it out, a caregiver or an Open Platform
+     * provider they pick, on the Extra services screen (docs/section5/decisions.md, D20).
      */
     private ValueAddedServiceRequest dispatch(ValueAddedServiceRequest request, Long familyMemberId,
             ValueAddedService service) {
         LocalDateTime start = request.requestedSchedule();
         LocalDateTime end = start.plus(service.duration());
-        Long caregiverId = assignment.chooseCaregiver(request.elderId(), start, end).orElse(null);
         Long visitId = visits.schedule(new StandaloneVisits.NewVisit(
-                request.elderId(), caregiverId, service.name(), start, end, request.specialInstructions()));
+                request.elderId(), null, service.name(), start, end, request.specialInstructions()));
         ValueAddedServiceRequest saved = requests.save(request.approveAndDispatch(familyMemberId, visitId, now()));
         // Same transaction: if notification persistence fails, approval is rolled back.
-        managerAlert.approved(visitId, request.elderId(), service.name(), start, caregiverId);
-        if (caregiverId != null) {
-            notifier.caregiverAssigned(saved, service.name(), caregiverId);
-        }
-        else {
-            providerJobs.offer(saved, service, now());
-        }
+        managerAlert.approved(visitId, request.elderId(), service.name(), start);
         return saved;
     }
 

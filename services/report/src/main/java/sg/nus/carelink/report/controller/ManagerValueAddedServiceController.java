@@ -16,8 +16,13 @@ import sg.nus.carelink.report.application.ValueAddedServiceDispatchService;
 import sg.nus.carelink.report.controller.dto.CaregiverAssignmentRequest;
 import sg.nus.carelink.report.controller.dto.CaregiverOptionResponse;
 import sg.nus.carelink.report.controller.dto.ManagedValueAddedServiceRequestResponse;
+import sg.nus.carelink.report.controller.dto.ProviderOfferRequest;
+import sg.nus.carelink.report.controller.dto.ProviderOptionResponse;
 
-/** The manager's Extra services screen: every request, staffing a dispatched visit, and cancelling. */
+/**
+ * The manager's Extra services screen: every request, assigning a dispatched visit to a caregiver or
+ * offering it to a provider, and cancelling.
+ */
 @RestController
 @RequestMapping("/api/value-added-service-requests")
 @PreAuthorize("hasRole('MANAGER')")
@@ -45,6 +50,18 @@ public class ManagerValueAddedServiceController {
             Principal principal) {
         return ManagedValueAddedServiceRequestResponse.from(
                 service.assignCaregiver(id, request.caregiverId(), principal.getName()));
+    }
+
+    @GetMapping("/{id}/provider-options")
+    public List<ProviderOptionResponse> providerOptions(@PathVariable Long id) {
+        return service.providerOptions(id).stream().map(ProviderOptionResponse::from).toList();
+    }
+
+    @PostMapping("/{id}/provider")
+    public ManagedValueAddedServiceRequestResponse offerToProvider(
+            @PathVariable Long id,
+            @Valid @RequestBody ProviderOfferRequest request) {
+        return ManagedValueAddedServiceRequestResponse.from(service.offerToProvider(id, request.providerId()));
     }
 
     @PostMapping("/{id}/cancellation")

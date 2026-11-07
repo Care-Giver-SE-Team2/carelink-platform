@@ -36,16 +36,26 @@ public class NotificationRequestedValueAddedManagerAlert implements ValueAddedMa
     }
 
     @Override
-    public void approved(Long visitId, Long elderId, String serviceName, LocalDateTime start, Long caregiverId) {
-        String title = caregiverId == null ? "Extra service needs caregiver assignment"
-                : "Extra service approved and assigned";
+    public void approved(Long visitId, Long elderId, String serviceName, LocalDateTime start) {
         String body = names.elder(elderId) + ": " + serviceName + " on " + start.format(WHEN)
-                + (caregiverId == null
-                        ? ". The primary caregiver is not free; assign a caregiver in Extra services."
-                        : ". " + names.caregiver(caregiverId) + " (primary caregiver) is on it. Review in Extra services.");
+                + ". Assign a caregiver or offer it to a provider in Extra services.";
+        tellManagers("VALUE_ADDED_APPROVED", "Extra service needs assignment", body, visitId, elderId);
+    }
+
+    @Override
+    public void providerRemoved(Long visitId, Long elderId, String serviceName, LocalDateTime start,
+            String providerName) {
+        String body = names.elder(elderId) + ": " + serviceName + " on " + start.format(WHEN) + ". "
+                + (providerName == null ? "The provider" : providerName)
+                + " had taken it on and was removed; assign a caregiver in Extra services.";
+        tellManagers("VALUE_ADDED_PROVIDER_REMOVED", "Extra service needs caregiver assignment", body, visitId,
+                elderId);
+    }
+
+    private void tellManagers(String kind, String title, String body, Long visitId, Long elderId) {
         LocalDateTime now = LocalDateTime.now(clock);
         for (Long managerId : core.enabledAccountsWithRole("MANAGER").userIds()) {
-            events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(managerId, "VALUE_ADDED_APPROVED",
+            events.publish(NotificationRequested.TYPE, NotificationRequested.inApp(managerId, kind,
                     title, body, "VISIT", visitId, elderId, now));
         }
     }

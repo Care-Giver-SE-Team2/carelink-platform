@@ -4,29 +4,34 @@ import { Link } from 'react-router-dom'
 import { Button, Callout, ConfirmDialog, Eyebrow, MetaText } from '../../../shared/components/ui'
 import type { ManagedValueAddedServiceRequest } from '../../../features/value-added-services/types'
 import { canCancel, formatWhen, stateTag } from '../lib/extraServices'
+import { ProviderOfferModal } from './ProviderOfferModal'
 import { VisitCoverModal } from './VisitCoverModal'
 import styles from './ExtraServicePanel.module.css'
 
 /**
  * The right-hand panel of the Extra services screen: what the elder asked for and when, the
- * family's answer, the work order's visit, and the two things a manager can do — put a
- * caregiver on a visit nobody holds, and call the request off. `onAssign`/`onCancel` do the
- * request and reject with the error to show. Key it by request id so dialogs reset between rows.
+ * family's answer, the work order's visit, and what a manager can do — choose who carries out a
+ * visit nobody holds, a caregiver or an Open Platform provider they pick, and call the request off.
+ * While a provider has not answered, the manager may still assign a caregiver, which withdraws the
+ * offer. `onAssign`/`onOffer`/`onCancel` do the request and reject with the error to show. Key it
+ * by request id so dialogs reset between rows.
  */
 export function ExtraServicePanel({
   request,
   elderName,
   caregiverName,
   onAssign,
+  onOffer,
   onCancel,
 }: {
   request: ManagedValueAddedServiceRequest
   elderName: string
   caregiverName: string | null
   onAssign: (caregiverId: number) => Promise<void>
+  onOffer: (providerId: number) => Promise<void>
   onCancel: () => Promise<void>
 }) {
-  const [picking, setPicking] = useState(false)
+  const [picking, setPicking] = useState<'caregiver' | 'provider' | null>(null)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +39,8 @@ export function ExtraServicePanel({
   const service = request.serviceName ?? 'Extra service'
   const when = formatWhen(request.requestedSchedule)
   const tag = stateTag(request)
+  const awaitingProvider = awaitsProvider(request)
+  const canAssign = request.needsCaregiver || awaitingProvider
 
   async function cancel() {
     setBusy(true)
@@ -79,6 +86,11 @@ export function ExtraServicePanel({
             {request.visitId === null ? <NotGiven text="none until the family approves" /> : `#${request.visitId} · ${visitLabel(request.visitStatus)}`}
           </Detail>
           <Detail label="Caregiver">{caregiverName ?? <NotGiven text="nobody yet" />}</Detail>
+          {request.providerName && (
+            <Detail label="Provider">
+              {request.providerName} · {providerLabel(request.providerJobStatus)}
+            </Detail>
+          )}
         </dl>
       </section>
 
@@ -89,11 +101,16 @@ export function ExtraServicePanel({
             {error}
           </Callout>
         )}
-        {(request.needsCaregiver || canCancel(request)) && (
+        {(canAssign || canCancel(request)) && (
           <div className={styles.actions}>
+            {canAssign && (
+              <Button variant="primary" block disabled={busy} onClick={() => setPicking('caregiver')}>
+                {awaitingProvider ? 'Assign caregiver instead' : 'Assign caregiver'}
+              </Button>
+            )}
             {request.needsCaregiver && (
-              <Button variant="primary" block disabled={busy} onClick={() => setPicking(true)}>
-                Assign caregiver
+              <Button block disabled={busy} onClick={() => setPicking('provider')}>
+                Offer to provider
               </Button>
             )}
             {canCancel(request) && (
@@ -105,16 +122,29 @@ export function ExtraServicePanel({
         )}
       </footer>
 
-      {picking && (
+      {picking === 'caregiver' && (
         <VisitCoverModal
           requestId={request.id}
           title={`${service} · ${elderName}`}
           meta={when}
           assign={async (caregiverId) => {
             await onAssign(caregiverId)
-            setPicking(false)
+            setPicking(null)
           }}
-          onClose={() => setPicking(false)}
+          onClose={() => setPicking(null)}
+        />
+      )}
+
+      {picking === 'provider' && (
+        <ProviderOfferModal
+          requestId={request.id}
+          title={`${service} · ${elderName}`}
+          meta={when}
+          offer={async (providerId) => {
+            await onOffer(providerId)
+            setPicking(null)
+          }}
+          onClose={() => setPicking(null)}
         />
       )}
 
@@ -144,10 +174,20 @@ export function ExtraServicePanel({
 /** What the manager should know about where the request stands, if anything. */
 function Guidance({ request }: { request: ManagedValueAddedServiceRequest }) {
   if (request.needsCaregiver) {
+    const declined = request.providerJobStatus === 'DECLINED' || request.providerJobStatus === 'CANCELLED'
     return (
       <MetaText className={styles.effect}>
-        The elder’s primary caregiver was not free at this time, so nobody is on the visit. Assign somebody before it is
-        due, or it becomes an exception when it starts.
+        {declined && request.providerName ? `${request.providerName} didn’t take it. ` : ''}
+        Nobody is on the visit. Assign a caregiver, or offer it to a provider, before it is due, or it becomes an exception
+        when it starts.
+      </MetaText>
+    )
+  }
+  if (awaitsProvider(request)) {
+    return (
+      <MetaText className={styles.effect}>
+        Offered to {request.providerName}; waiting for its answer. If it declines or doesn’t answer in time, the request
+        comes back here. Assigning a caregiver now withdraws the offer.
       </MetaText>
     )
   }
@@ -161,12 +201,34 @@ function Guidance({ request }: { request: ManagedValueAddedServiceRequest }) {
   if (request.status === 'PENDING_APPROVAL') {
     return (
       <MetaText className={styles.effect}>
-        Waiting for the family to approve in the family app. Approval creates the visit and puts the primary caregiver on
-        it if they are free.
+        Waiting for the family to approve in the family app. Approval creates the visit, with nobody on it, for you to
+        assign.
       </MetaText>
     )
   }
   return null
+}
+
+/** Offered to a provider that hasn't answered, and the visit still waits for it. */
+function awaitsProvider(request: ManagedValueAddedServiceRequest): boolean {
+  return (
+    request.status === 'DISPATCHED' &&
+    request.providerJobStatus === 'NEW' &&
+    request.caregiverId === null &&
+    request.visitStatus === 'SCHEDULED'
+  )
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  NEW: 'offered, no answer yet',
+  ACCEPTED: 'accepted',
+  COMPLETED: 'completed',
+  DECLINED: 'declined',
+  CANCELLED: 'offer called off',
+}
+
+function providerLabel(status: string | null | undefined): string {
+  return status ? (PROVIDER_LABELS[status] ?? status.toLowerCase()) : 'offered'
 }
 
 function familyAnswer(request: ManagedValueAddedServiceRequest): ReactNode {

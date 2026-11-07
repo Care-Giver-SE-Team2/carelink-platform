@@ -5,6 +5,7 @@ import {
   approveApplication,
   listApplicationsForReview,
   listApprovedProviders,
+  removeProvider,
   suspendProvider,
 } from '../../../features/provider-platform/mockPlatform'
 import { renderWorkbench, resetWorkbench, signInAs } from '../testing'
@@ -261,5 +262,18 @@ describe('API credentials', () => {
     expect(await screen.findByText('CareLink has suspended your provider account')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'View credentials →' })).not.toBeInTheDocument()
     expect(await screen.findByText('SUSPENDED')).toBeInTheDocument()
+  })
+
+  it('says so when CareLink has removed the provider, and offers a new application', async () => {
+    const seq = listApprovedProviders().find((p) => p.id === 'APP-2026-00409')!.seq
+    removeProvider(seq)
+    signInAs()
+    renderWorkbench('/provider/status')
+
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent('CareLink has removed your provider account')
+    expect(within(banner).getByRole('link', { name: 'start a new application' })).toHaveAttribute('href', '/provider/apply')
+    expect(screen.queryByRole('button', { name: 'View credentials →' })).not.toBeInTheDocument()
+    expect(screen.getByText('REMOVED')).toBeInTheDocument()
   })
 })

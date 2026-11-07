@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import sg.nus.carelink.report.application.ValueAddedNotifier.Why;
+import sg.nus.carelink.report.domain.model.Provider;
+import sg.nus.carelink.report.domain.model.ProviderJob;
 import sg.nus.carelink.report.domain.model.ValueAddedService;
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 import sg.nus.carelink.report.domain.repository.ValueAddedServiceRepository;
@@ -20,9 +22,9 @@ import sg.nus.carelink.shared.error.BusinessRuleViolation;
 import sg.nus.carelink.shared.error.ResourceNotFound;
 
 /**
- * An extra service once it has been asked for: the manager's overview, a caregiver for a
- * dispatched visit nobody holds, and calling a request off - by a manager or by the elder who
- * asked. Also keeps requests in step with time and with their visits, so the elder, family and
+ * An extra service once it has been asked for: the manager's overview, the manager's choice of who
+ * carries out a dispatched visit nobody holds - a caregiver, or a provider they pick (D20) - and
+ * calling a request off - by a manager or by the elder who asked. Also keeps requests in step with time and with their visits, so the elder, family and
  * reports never read "booked" for a service that cannot happen: a request nobody answered lapses,
  * and one whose visit failed before anybody started on it is closed.
  *
@@ -91,6 +93,31 @@ public class ValueAddedServiceDispatchService {
     @Transactional(readOnly = true)
     public List<VisitCover.Option> caregiverOptions(Long requestId) {
         return cover.options(dispatchedVisitId(requireRequest(requestId)));
+    }
+
+    /** The providers the manager may offer the request to, by name: active, offering it, not tried before. */
+    @Transactional(readOnly = true)
+    public List<Provider> providerOptions(Long requestId) {
+        ValueAddedServiceRequest request = requireRequest(requestId);
+        dispatchedVisitId(request);
+        return providerJobs.optionsFor(request, requireService(request), LocalDateTime.now(clock).withNano(0));
+    }
+
+    /**
+     * Offers a dispatched visit nobody holds to the provider the manager picked. The visit stays, with
+     * nobody on it, until the provider accepts; a decline or no answer hands it back to the manager.
+     */
+    public ManagedRequest offerToProvider(Long requestId, Long providerId) {
+        ValueAddedServiceRequest request = requireRequest(requestId);
+        Long visitId = dispatchedVisitId(request);
+        StandaloneVisits.State visit = standaloneVisits.find(visitId).orElse(null);
+        if (visit == null || visit.caregiverId() != null || !"SCHEDULED".equals(visit.status())) {
+            throw new BusinessRuleViolation("VALUE_ADDED_NOT_UNASSIGNED",
+                    "Only a scheduled visit with nobody on it can be offered to a provider.");
+        }
+        ValueAddedService service = requireService(request);
+        providerJobs.offerTo(request, service, providerId, LocalDateTime.now(clock).withNano(0));
+        return managed(request, service.name());
     }
 
     /**
@@ -231,6 +258,11 @@ public class ValueAddedServiceDispatchService {
                 .orElse("Extra service");
     }
 
+    private ValueAddedService requireService(ValueAddedServiceRequest request) {
+        return services.findById(request.valueAddedServiceId())
+                .orElseThrow(() -> new ResourceNotFound("Value-added service", request.valueAddedServiceId()));
+    }
+
     private ValueAddedServiceRequest requireRequest(Long id) {
         return requests.findById(id)
                 .orElseThrow(() -> new ResourceNotFound("Value-added service request", id));
@@ -251,10 +283,18 @@ public class ValueAddedServiceDispatchService {
             this(request, serviceName, visitStatus, caregiverId, null);
         }
 
-        /** Dispatched, but its visit has nobody on it and has not started: the manager's to staff. */
+        /**
+         * Dispatched, but its visit has nobody on it, has not started and is not waiting on a provider's
+         * answer: the manager's to assign, to a caregiver or a provider.
+         */
         public boolean needsCaregiver() {
             return request.status() == ValueAddedServiceRequest.Status.DISPATCHED
-                    && caregiverId == null && "SCHEDULED".equals(visitStatus);
+                    && caregiverId == null && "SCHEDULED".equals(visitStatus) && !awaitingProvider();
+        }
+
+        /** Offered to a provider that has not answered yet. */
+        public boolean awaitingProvider() {
+            return providerOffer != null && providerOffer.job().status() == ProviderJob.Status.NEW;
         }
     }
 }

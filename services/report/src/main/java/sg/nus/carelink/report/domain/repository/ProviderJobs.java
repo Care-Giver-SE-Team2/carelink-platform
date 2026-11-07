@@ -21,9 +21,19 @@ public interface ProviderJobs {
 
     Optional<ProviderJob> findForUpdate(Long jobId);
 
+    /**
+     * The request's latest job. A request may have several, one per provider a manager offered it to,
+     * but only the latest may be open.
+     */
     Optional<ProviderJob> findByRequestId(Long requestId);
 
     Optional<ProviderJob> findByRequestIdForUpdate(Long requestId);
+
+    /** The providers the request was offered to already, whatever became of the offers. */
+    Set<Long> providersOfferedFor(Long requestId);
+
+    /** The provider's NEW and ACCEPTED jobs, oldest first, each locked. */
+    List<ProviderJob> findOpenByProviderForUpdate(Long providerId);
 
     /** The provider's jobs in these states (all when empty), newest dispatch first. */
     List<ProviderJob> findByProvider(Long providerId, Set<ProviderJob.Status> statuses, int page, int size);

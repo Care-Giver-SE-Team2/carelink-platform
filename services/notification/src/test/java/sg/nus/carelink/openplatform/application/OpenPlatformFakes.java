@@ -30,7 +30,13 @@ final class OpenPlatformFakes {
 	static final class Applications implements ProviderApplications {
 
 		final Map<Long, ProviderApplication> byId = new LinkedHashMap<>();
+		private final ProviderStore providers;
 		private long nextId = 417;
+
+		/** @param providers whose removals free an approved application's email */
+		Applications(ProviderStore providers) {
+			this.providers = providers;
+		}
 
 		@Override
 		public ProviderApplication create(ProviderApplication application) {
@@ -56,7 +62,9 @@ final class OpenPlatformFakes {
 		@Override
 		public boolean emailHeld(String contactEmail) {
 			return byId.values().stream().anyMatch(application -> application.holdsItsEmail()
-					&& application.details().contactEmail().equals(contactEmail));
+					&& application.details().contactEmail().equals(contactEmail)
+					&& (application.providerId() == null
+							|| providers.find(application.providerId()).map(p -> !p.removed()).orElse(true)));
 		}
 
 		@Override
@@ -97,12 +105,14 @@ final class OpenPlatformFakes {
 
 		@Override
 		public Optional<Provider> findByPortalUser(String portalUserId) {
-			return byId.values().stream().filter(provider -> provider.portalUserId().equals(portalUserId)).findFirst();
+			return byId.values().stream().filter(provider -> provider.portalUserId().equals(portalUserId))
+					.max(Comparator.comparing(Provider::approvedAt).thenComparing(Provider::id));
 		}
 
 		@Override
 		public List<Provider> all() {
-			return byId.values().stream().sorted(Comparator.comparing(Provider::approvedAt).reversed()).toList();
+			return byId.values().stream().filter(provider -> !provider.removed())
+					.sorted(Comparator.comparing(Provider::approvedAt).reversed()).toList();
 		}
 
 		@Override
@@ -160,6 +170,11 @@ final class OpenPlatformFakes {
 		public ClientCredentials replaceClient(String oldClientId, long providerId, String organisationName) {
 			secretByClient.remove(oldClientId);
 			return createClient(providerId, organisationName);
+		}
+
+		@Override
+		public void deleteClient(String clientId) {
+			secretByClient.remove(clientId);
 		}
 
 		@Override

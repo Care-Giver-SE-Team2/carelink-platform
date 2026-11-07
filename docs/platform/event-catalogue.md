@@ -122,7 +122,7 @@ transaction, so every method listed publishes it.
 
 | Event | Published by | When | Handled by | Status |
 |---|---|---|---|---|
-| `ProviderUpdated` | notification (openplatform): approving, suspending or reinstating a provider, and rotating its client secret | An approved provider is added or changes | report: whom it can dispatch to, and whose token is whose (`ProviderUpdatedHandler`) | published |
+| `ProviderUpdated` | notification (openplatform): approving, suspending, reinstating or removing a provider, rotating its client secret, and the provider changing its services | An approved provider is added or changes | report: whom it can dispatch to, and whose token is whose (`ProviderUpdatedHandler`) | published |
 | `ProviderJobUpdated` | report: dispatching a request to a provider, the provider's answers through the job API, and calling the job off | A provider job is created or changes | notification: the provider's webhooks (`ProviderJobUpdatedHandler`) | published |
 
 **Not built.**
@@ -342,7 +342,9 @@ EventBridge Scheduler puts the envelope on report's queue directly.
 ```
 
 - Only approved providers: a pending or rejected application sends nothing.
-- `status` is `ACTIVE` or `SUSPENDED`. A suspended provider is dispatched nothing, and its token is refused.
+- `status` is `ACTIVE`, `SUSPENDED` or `REMOVED`. A suspended provider is dispatched nothing, and its token is
+  refused. `REMOVED` is for good (docs/section5/decisions.md, D19): report also takes back the provider's NEW and
+  ACCEPTED jobs, in the transaction that handles the event, and no event for the provider follows it.
 - `clientId` is the provider's OAuth2 client, which the job API's token names (`client_id`). It is set from
   approval, and changes when the provider rotates its secret, as rotating issues a new client.
 - `services` are names from report's value-added catalogue.

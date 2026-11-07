@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,37 @@ class PortalServiceTest extends OpenPlatformFixture {
 		ProviderUpdated told = (ProviderUpdated) events.published.getLast().getValue();
 		assertThat(told.clientId()).isEqualTo(rotated.clientId());
 		assertThat(told.version()).isEqualTo(1);
+	}
+
+	@Test
+	void changingTheServicesTellsReportAndShowsOnTheApplication() {
+		Provider provider = approved(EMAIL);
+		int told = events.published.size();
+
+		List<String> saved = portal.updateServices(ME, List.of(" Light housekeeping ", "Companionship", "Light housekeeping"));
+
+		assertThat(saved).containsExactly("Light housekeeping", "Companionship");
+		assertThat(portal.services(ME)).isEqualTo(saved);
+		assertThat(portal.application(ME).services()).as("the application shows what is offered now").isEqualTo(saved);
+		Provider after = providers.find(provider.id()).orElseThrow();
+		assertThat(after.version()).isEqualTo(provider.version() + 1);
+		ProviderUpdated event = (ProviderUpdated) events.published.getLast().getValue();
+		assertThat(event.services()).isEqualTo(saved);
+		assertThat(event.version()).isEqualTo(after.version());
+
+		portal.updateServices(ME, List.of("Light housekeeping", "Companionship"));
+		assertThat(events.published).as("the same list again tells no one").hasSize(told + 1);
+		assertThatThrownBy(() -> portal.updateServices(ME, List.of(" ")))
+				.isInstanceOfSatisfying(InvalidField.class, e -> assertThat(e.field()).isEqualTo("services"));
+	}
+
+	@Test
+	void aPendingProviderCannotChangeItsServices() {
+		applied(EMAIL);
+
+		List<String> services = List.of("Companionship");
+		assertThatThrownBy(() -> portal.updateServices(ME, services)).isInstanceOf(ProviderNotApproved.class);
+		assertThat(portal.application(ME).services()).containsExactly("Hospital escort", "Companionship");
 	}
 
 	@Test

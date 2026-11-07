@@ -223,7 +223,7 @@ Not part of the contract partners rely on. Built in notification's `openplatform
   bytes) and `webhook_delivery_attempt` (every attempt and its answer).
 - **Creating a delivery** happens in the transaction of its cause, with a `dedupe_key` naming that cause (unique),
   so the same cause handled twice makes one delivery (`WebhookDeliveryService.enqueue`). Nothing is created for an
-  event the provider did not subscribe to, or while it is suspended.
+  event the provider did not subscribe to, or while it is suspended. A removed provider is sent nothing again.
 - **Attempts** are made by a scheduled job every 10 seconds (`carelink.webhooks.poll-interval`), on one replica at a
   time (ShedLock `notification.webhook-deliveries`), at most 20 a run. Each request runs outside any database
   transaction; its outcome and the delivery's next state are written together, only if the delivery is still as it

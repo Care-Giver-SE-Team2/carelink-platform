@@ -24,7 +24,12 @@ public record Provider(Long id, String clientId, String organisationName, Status
         return status == Status.ACTIVE;
     }
 
+    /** Removed for good by a manager: its open jobs went back to the managers (D19). */
+    public boolean removed() {
+        return status == Status.REMOVED;
+    }
+
     public enum Status {
-        ACTIVE, SUSPENDED
+        ACTIVE, SUSPENDED, REMOVED
     }
 }

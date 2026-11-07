@@ -72,7 +72,7 @@ export function ExtraServiceTable({
       render: (row) => {
         const tag = stateTag(row)
         return (
-          <Tag compact tone={tag.tone}>
+          <Tag compact tone={tag.tone} className={styles.state}>
             {tag.label}
           </Tag>
         )

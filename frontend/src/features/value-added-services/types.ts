@@ -54,13 +54,19 @@ export type ManagedValueAddedServiceRequest = {
   caregiverId: number | null
   /** Dispatched, with nobody on a visit that has not started yet. */
   needsCaregiver: boolean
-  /** The Open Platform provider it was offered to, when no caregiver was free; null when it was not. */
+  /** The Open Platform provider a manager last offered it to; null when none was. */
   providerName?: string | null
   /** That provider's job: NEW, ACCEPTED, DECLINED, COMPLETED or CANCELLED. */
   providerJobStatus?: string | null
 }
 
 /** One caregiver in the picker for a dispatched visit, from the same search absences use. */
+/** An Open Platform provider a manager may offer a request to: active, offering the service, not tried yet. */
+export type ProviderOption = {
+  providerId: number
+  organisationName: string
+}
+
 export type CaregiverCoverOption = {
   caregiverId: number
   name: string

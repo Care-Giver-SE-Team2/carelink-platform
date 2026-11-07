@@ -161,6 +161,21 @@ class ProviderOnboardingIT {
 		mvc.perform(post("/api/open/v1/portal/credentials/collect").header("Authorization", portal))
 				.andExpect(status().isOk());
 
+		mvc.perform(put("/api/open/v1/portal/services").header("Authorization", portal)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"services\":[]}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fields.services").exists());
+		mvc.perform(put("/api/open/v1/portal/services").header("Authorization", portal)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"services\":[\"Light housekeeping\"]}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.services[0]").value("Light housekeeping"));
+		mvc.perform(get("/api/open/v1/portal/application").header("Authorization", portal))
+				.andExpect(jsonPath("$.services.length()").value(1))
+				.andExpect(jsonPath("$.services[0]").value("Light housekeeping"));
+		assertThat(jdbc.queryForObject("SELECT JSON_EXTRACT(payload, '$.services[0]') FROM outbox_event "
+				+ "WHERE type = 'ProviderUpdated' AND JSON_EXTRACT(payload, '$.providerId') = ? ORDER BY id DESC LIMIT 1",
+				String.class, providerId)).isEqualTo("\"Light housekeeping\"");
+
 		mvc.perform(get("/api/open/v1/portal/webhook").header("Authorization", portal))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.url").value("https://hooks.example-provider.sg/carelink"))
@@ -284,6 +299,67 @@ class ProviderOnboardingIT {
 						.content(application("ops@plainhttp-it.sg").replace("https://", "http://")))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.fields.webhookUrl").value("Must be HTTPS."));
+	}
+
+	@Test
+	void aRemovedProviderLosesItsClientLeavesTheListAndItsEmailMayApplyAgain() throws Exception {
+		String email = "ops@removed-it.sg";
+		apply(email);
+		long providerId = pendingId(email);
+		mvc.perform(post("/api/provider-applications/" + providerId + "/approve").with(manager()).with(csrf()))
+				.andExpect(status().isOk());
+		String portal = signIn(email, PASSWORD);
+		String collected = mvc.perform(post("/api/open/v1/portal/credentials/collect").header("Authorization", portal))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		String clientId = JsonPath.read(collected, "$.clientId");
+		String clientSecret = JsonPath.read(collected, "$.clientSecret");
+		clientToken(clientId, clientSecret);
+
+		mvc.perform(post("/api/providers/" + providerId + "/remove").with(caregiver()).with(csrf()))
+				.andExpect(status().isForbidden());
+		mvc.perform(post("/api/providers/" + providerId + "/remove").with(manager()).with(csrf()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("REMOVED"));
+		mvc.perform(post("/api/providers/" + providerId + "/remove").with(manager()).with(csrf()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("PROVIDER_REMOVED"));
+		String listed = mvc.perform(get("/api/providers").with(manager()))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		assertThat(JsonPath.<List<Integer>>read(listed, "$[*].id")).doesNotContain((int) providerId);
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_event WHERE type = 'ProviderUpdated' "
+				+ "AND JSON_EXTRACT(payload, '$.providerId') = ? AND JSON_EXTRACT(payload, '$.status') = 'REMOVED'",
+				Integer.class, providerId)).isOne();
+
+		// Its server is refused a token; its people may still sign in, and see it
+		mvc.perform(post("/api/open/v1/oauth2/token").contentType(MediaType.APPLICATION_FORM_URLENCODED)
+						.header("Authorization", basic(clientId, clientSecret))
+						.param("grant_type", "client_credentials"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error").value("invalid_client"));
+		mvc.perform(get("/api/open/v1/portal/application").header("Authorization", portal))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("APPROVED"))
+				.andExpect(jsonPath("$.removed").value(true));
+		mvc.perform(get("/api/open/v1/portal/credentials").header("Authorization", portal))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PROVIDER_REMOVED"));
+
+		// The same email applies again, with the same portal user, and is approved as a new provider
+		apply(email);
+		long again = pendingId(email);
+		assertThat(again).isNotEqualTo(providerId);
+		mvc.perform(get("/api/open/v1/portal/application").header("Authorization", signIn(email, PASSWORD)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("PENDING"))
+				.andExpect(jsonPath("$.removed").value(false));
+		mvc.perform(post("/api/provider-applications/" + again + "/approve").with(manager()).with(csrf()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ACTIVE"));
+		mvc.perform(get("/api/open/v1/portal/credentials").header("Authorization", portal))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.clientId").value(org.hamcrest.Matchers.not(clientId)));
 	}
 
 	@Test

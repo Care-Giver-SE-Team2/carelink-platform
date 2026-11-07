@@ -24,18 +24,22 @@ public final class OpenPlatformResponses {
 	public record ApplicationReceived(String applicationId) {
 	}
 
+	/** {@code Services}. */
+	public record Services(List<String> services) {
+	}
+
 	/** {@code Application}. */
 	public record Application(String id, String organisationName, String contactName, String contactEmail,
 			String contactPhone, List<String> services, URI webhookUrl, String status, OffsetDateTime submittedAt,
-			OffsetDateTime reviewedAt, String reason, boolean suspended) {
+			OffsetDateTime reviewedAt, String reason, boolean suspended, boolean removed) {
 
 		public static Application of(PortalService.MyApplication mine) {
 			ProviderApplication application = mine.application();
 			ApplicationDetails details = application.details();
 			return new Application(application.reference(), details.organisationName(), details.contactName(),
-					details.contactEmail(), details.contactPhone(), details.services(), details.webhookUrl(),
+					details.contactEmail(), details.contactPhone(), mine.services(), details.webhookUrl(),
 					application.status().name(), OpenTimes.of(application.submittedAt()),
-					OpenTimes.of(application.reviewedAt()), application.reason(), mine.suspended());
+					OpenTimes.of(application.reviewedAt()), application.reason(), mine.suspended(), mine.removed());
 		}
 	}
 

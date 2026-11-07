@@ -22,6 +22,9 @@ dt { color: var(--fm-muted); } dd { margin: 0; font-weight: 700; text-align: rig
 .actions { display: flex; gap: 10px; }
 .actions button { min-height: 42px; padding: 8px 16px; border-radius: 12px; border: 1px solid var(--fm-accent); background: var(--fm-accent); color: white; font-weight: 750; }
 .actions .reject { background: white; color: #a12828; border-color: #c66; }
+/* Outranks the portal's pale grey button hover, which washes out Approve's white text. */
+.actions > button:not(:disabled):hover:not(.reject) { background: var(--fm-accent-strong); border-color: var(--fm-accent-strong); }
+.actions > button.reject:not(:disabled):hover { background: #fff3f3; }
 .error { padding: 14px; border: 1px solid #c66; border-radius: 14px; background: #fff3f3; color: #8b1d1d; }
 .muted { color: var(--fm-muted); }
 /* Desktop: the single 640px column sits centred under the header, not against the rail. */

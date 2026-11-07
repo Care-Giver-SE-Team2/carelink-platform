@@ -82,7 +82,7 @@ it('opens on the visits needing a caregiver, with names instead of ids', async (
   const table = await screen.findByRole('table', { name: 'Extra service requests' })
   expect(within(table).getByText('Hospital escort')).toBeTruthy()
   expect(within(table).queryByText('Grocery assistance')).toBeNull()
-  expect(screen.getByRole('button', { name: 'NEEDS CAREGIVER · 1' }).getAttribute('aria-pressed')).toBe('true')
+  expect(screen.getByRole('button', { name: 'NEEDS ASSIGNMENT · 1' }).getAttribute('aria-pressed')).toBe('true')
 
   expect(await screen.findByText(/for Tan Bee Choo · Sat 10 Oct, 10:00/)).toBeTruthy()
   const panel = screen.getByRole('complementary', { name: 'Extra service detail' })
@@ -145,6 +145,41 @@ it('cancels a request after confirming', async () => {
 
   expect(cancel).toHaveBeenCalledWith(3)
   expect(await screen.findByText('No requests are waiting for a family’s answer.')).toBeTruthy()
+})
+
+it('offers a visit nobody holds to a provider the manager picks, then waits for its answer', async () => {
+  const user = userEvent.setup()
+  vi.spyOn(valueAddedApi, 'fetchProviderOptions').mockResolvedValue([
+    { providerId: 509, organisationName: 'BrightHome Care' },
+    { providerId: 510, organisationName: 'KindCare' },
+  ])
+  const offer = vi.spyOn(valueAddedApi, 'offerValueAddedServiceToProvider').mockImplementation(async () => {
+    requests = [request({ needsCaregiver: false, providerName: 'KindCare', providerJobStatus: 'NEW' }), ...requests.slice(1)]
+    return requests[0]
+  })
+  renderPage('/manager/extra-services?filter=all&id=1')
+
+  await user.click(await screen.findByRole('button', { name: 'Offer to provider' }))
+  const dialog = await screen.findByRole('dialog')
+  expect(within(dialog).getByText('BrightHome Care')).toBeTruthy()
+  // Listed by name: KindCare is the second
+  await user.click(within(dialog).getAllByRole('button', { name: 'Offer' })[1])
+
+  expect(offer).toHaveBeenCalledWith(1, 510)
+  const panel = await screen.findByRole('complementary', { name: 'Extra service detail' })
+  expect(await within(panel).findByText('AWAITING PROVIDER')).toBeTruthy()
+  expect(within(panel).getByText(/Offered to KindCare; waiting for its answer/)).toBeTruthy()
+  expect(within(panel).getByRole('button', { name: 'Assign caregiver instead' })).toBeTruthy()
+  expect(within(panel).queryByRole('button', { name: 'Offer to provider' })).toBeNull()
+})
+
+it('says when no provider can take the request', async () => {
+  const user = userEvent.setup()
+  vi.spyOn(valueAddedApi, 'fetchProviderOptions').mockResolvedValue([])
+  renderPage('/manager/extra-services?filter=all&id=1')
+
+  await user.click(await screen.findByRole('button', { name: 'Offer to provider' }))
+  expect(await screen.findByText(/No provider can take it/)).toBeTruthy()
 })
 
 it('opens the request a manager-bell link names by its visit, with its row in the table', async () => {

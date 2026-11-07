@@ -1,7 +1,9 @@
 package sg.nus.carelink.report.application;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,13 +17,15 @@ import sg.nus.carelink.report.domain.repository.Providers;
 import sg.nus.carelink.shared.error.BusinessRuleViolation;
 
 /**
- * Offering a value-added request to an Open Platform provider, and calling the offer off
- * (docs/section5/decisions.md, D16 and D17). Caregivers come first: a request is offered only when the
- * primary caregiver is not free, alongside the visit a manager may staff, and only far enough ahead
- * that the manager still has time if the provider says no. Whoever acts first has it: a manager
- * staffing the visit withdraws the offer ({@link #withdrawForStaffing}), and a provider accepting calls
- * the visit off ({@link ProviderJobService#accept}). Both lock the job, so the second sees the first.
- * Each change tells notification ({@code ProviderJobUpdated}), which sends the provider its webhook.
+ * Offering a value-added request to the Open Platform provider a manager picks, and calling the offer
+ * off (docs/section5/decisions.md, D16 and D20). A manager decides who carries out each request: a
+ * caregiver, or a provider that offers the service, only far enough ahead that the manager still has
+ * time if the provider says no. One offer is open at a time; a provider that declines, or does not
+ * answer in time, hands the request back, and the manager may offer it to another, never the same one
+ * twice. While an offer is open the manager may still staff the visit, which withdraws it
+ * ({@link #withdrawForStaffing}); a provider accepting calls the visit off ({@link ProviderJobService#accept}).
+ * Both lock the job, so the second sees the first. Each change tells notification
+ * ({@code ProviderJobUpdated}), which sends the provider its webhook.
  */
 @Service
 @Transactional
@@ -45,25 +49,50 @@ public class ProviderJobDispatch {
     }
 
     /**
-     * Offers the request to the provider that offers its service and was offered a job least
-     * recently. Nothing when the start is too near, or no active provider offers the service.
+     * The providers a manager may offer the request to: active, offering its service, and not offered
+     * it before. Empty when the start is too near for any provider to answer in time.
      */
-    public Optional<ProviderJob> offer(ValueAddedServiceRequest request, ValueAddedService service,
-            LocalDateTime now) {
+    @Transactional(readOnly = true)
+    public List<Provider> optionsFor(ValueAddedServiceRequest request, ValueAddedService service, LocalDateTime now) {
         if (request.requestedSchedule() == null || !ProviderJob.offerable(request.requestedSchedule(), now)) {
-            return Optional.empty();
+            return List.of();
         }
-        Optional<Provider> provider = providers.nextFor(service.name());
-        if (provider.isEmpty()) {
-            return Optional.empty();
+        Set<Long> offered = jobs.providersOfferedFor(request.id());
+        return providers.activeFor(service.name()).stream().filter(p -> !offered.contains(p.id())).toList();
+    }
+
+    /**
+     * Offers the request to the provider the manager picked, which sends it {@code job.dispatched}.
+     *
+     * @throws BusinessRuleViolation {@code VALUE_ADDED_ALREADY_OFFERED} while an offer is open or a
+     *         provider has taken it; {@code PROVIDER_NOT_AVAILABLE} for a provider not among
+     *         {@link #optionsFor}; {@code VALUE_ADDED_TOO_LATE_FOR_PROVIDER} too near the start
+     */
+    public ProviderJob offerTo(ValueAddedServiceRequest request, ValueAddedService service, Long providerId,
+            LocalDateTime now) {
+        jobs.findByRequestIdForUpdate(request.id())
+                .filter(job -> job.open() || job.status() == ProviderJob.Status.COMPLETED)
+                .ifPresent(job -> {
+                    throw new BusinessRuleViolation("VALUE_ADDED_ALREADY_OFFERED",
+                            "This request is already with a provider. Wait for its answer, or assign a caregiver.");
+                });
+        if (request.requestedSchedule() == null || !ProviderJob.offerable(request.requestedSchedule(), now)) {
+            throw new BusinessRuleViolation("VALUE_ADDED_TOO_LATE_FOR_PROVIDER",
+                    "It is too close to the start for a provider to answer in time. Assign a caregiver.");
         }
+        Provider provider = optionsFor(request, service, now).stream()
+                .filter(p -> p.id().equals(providerId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessRuleViolation("PROVIDER_NOT_AVAILABLE",
+                        "This provider can't be offered the request: it is not active, does not offer the service, "
+                                + "or was offered it before."));
         JobElders.Brief brief = elders.brief(request.elderId());
-        ProviderJob job = jobs.create(ProviderJob.dispatched(provider.get().id(), request.id(), service.name(),
+        ProviderJob job = jobs.create(ProviderJob.dispatched(provider.id(), request.id(), service.name(),
                 brief.district(), brief.areaName(), brief.summary(), brief.languages(),
                 request.requestedByFamilyMemberId() == null ? BOOKED_BY_ELDER : BOOKED_BY_FAMILY,
                 request.requestedSchedule(), service.durationMinutes(), now));
         events.changed(job);
-        return Optional.of(job);
+        return job;
     }
 
     /** Calls off the request's job, if it has one the provider may still act on, giving it the reason. */

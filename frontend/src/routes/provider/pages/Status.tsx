@@ -134,12 +134,18 @@ function SignedIn({ application }: { application: Application }) {
 
   return (
     <>
-      {application.status === 'approved' && application.suspended && (
+      {application.status === 'approved' && application.removed && (
+        <Banner tone="danger" title="CareLink has removed your provider account" role="alert">
+          Your API credentials no longer work, webhooks have stopped and CareLink has taken back any open jobs. To join the Open
+          Platform again, <Link to="/provider/apply">start a new application</Link> with this email.
+        </Banner>
+      )}
+      {application.status === 'approved' && !application.removed && application.suspended && (
         <Banner tone="danger" title="CareLink has suspended your provider account" role="alert">
           Your access tokens don't work and no jobs are sent to you until CareLink reinstates you. Contact your CareLink partner manager.
         </Banner>
       )}
-      {application.status === 'approved' && !application.suspended && (
+      {application.status === 'approved' && !application.removed && !application.suspended && (
         <div className={styles.approved}>
           <div className={styles.approvedText}>
             <div className={styles.approvedTitle}>You're approved</div>
@@ -180,7 +186,7 @@ function ApplicationCard({ application }: { application: Application }) {
           <span className={styles.id}>{application.id}</span>
           <span className={styles.when}>{when}</span>
         </div>
-        <StateTag kind={application.status} />
+        <StateTag kind={application.status === 'approved' && application.removed ? 'removed' : application.status} />
       </div>
       {application.status === 'rejected' && application.reason && (
         <div className={styles.reason}>

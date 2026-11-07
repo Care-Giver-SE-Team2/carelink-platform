@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import sg.nus.carelink.openplatform.domain.model.DeliveryAttempt;
 import sg.nus.carelink.openplatform.domain.model.Provider;
 import sg.nus.carelink.openplatform.domain.model.ProviderApplication;
 import sg.nus.carelink.openplatform.domain.model.ProviderNotApproved;
+import sg.nus.carelink.openplatform.domain.model.ProviderRemoved;
 import sg.nus.carelink.openplatform.domain.model.WebhookEndpoint;
 import sg.nus.carelink.openplatform.domain.model.WebhookEvent;
 import sg.nus.carelink.openplatform.domain.repository.ProviderApplications;
@@ -73,14 +75,19 @@ public class PortalService {
 		this.clock = clock;
 	}
 
-	/** The portal user's latest application, whatever its status, and whether its provider is suspended. */
+	/**
+	 * The portal user's latest application, whatever its status, and whether its provider is suspended
+	 * or was removed.
+	 */
 	@Transactional(readOnly = true)
 	public MyApplication application(String portalUser) {
 		ProviderApplication application = applications.latestOf(portalUser)
 				.orElseThrow(() -> new ResourceNotFound("Application of portal user", portalUser));
-		boolean suspended = application.status() == ProviderApplication.Status.APPROVED
-				&& providers.findByPortalUser(portalUser).map(Provider::suspended).orElse(false);
-		return new MyApplication(application, suspended);
+		Optional<Provider> provider = application.status() == ProviderApplication.Status.APPROVED
+				? providers.findByPortalUser(portalUser)
+				: Optional.empty();
+		return new MyApplication(application, provider.map(Provider::services).orElse(application.details().services()),
+				provider.map(Provider::suspended).orElse(false), provider.map(Provider::removed).orElse(false));
 	}
 
 	/**
@@ -88,6 +95,7 @@ public class PortalService {
 	 * CareLink keeps neither.
 	 *
 	 * @throws BusinessRuleViolation {@code NOT_APPROVED} (409, as the contract has it for this call)
+	 * @throws ProviderRemoved when CareLink removed the provider
 	 * @throws CredentialsAlreadyCollected when they were collected
 	 */
 	@Transactional
@@ -127,6 +135,30 @@ public class PortalService {
 		}
 		events.changed(rotated, now);
 		return client;
+	}
+
+	/** The services an approved provider offers: what CareLink may dispatch to it. */
+	@Transactional(readOnly = true)
+	public List<String> services(String portalUser) {
+		return approved(portalUser).services();
+	}
+
+	/**
+	 * Changes the services the provider offers, and tells report, which dispatches by them. Jobs already
+	 * offered stay offered. The same list again changes nothing and tells no one.
+	 */
+	@Transactional
+	public List<String> updateServices(String portalUser, List<String> services) {
+		Provider provider = approved(portalUser);
+		Provider changed = provider.withServices(services);
+		if (changed.services().equals(provider.services())) {
+			return provider.services();
+		}
+		if (!providers.update(provider, changed)) {
+			throw concurrentUpdate();
+		}
+		events.changed(changed, clock.instant());
+		return changed.services();
 	}
 
 	@Transactional(readOnly = true)
@@ -209,8 +241,13 @@ public class PortalService {
 		return view(webhooks.resend(provider.id(), deliveryId), endpoint(provider));
 	}
 
+	/** The portal user's provider; refused when there is none, or it was removed. */
 	private Provider approved(String portalUser) {
-		return providers.findByPortalUser(portalUser).orElseThrow(ProviderNotApproved::new);
+		Provider provider = providers.findByPortalUser(portalUser).orElseThrow(ProviderNotApproved::new);
+		if (provider.removed()) {
+			throw new ProviderRemoved();
+		}
+		return provider;
 	}
 
 	private WebhookEndpoint endpoint(Provider provider) {
@@ -240,8 +277,12 @@ public class PortalService {
 		return new BusinessRuleViolation("CONCURRENT_UPDATE", "The provider changed meanwhile. Refresh and retry.");
 	}
 
-	/** The application, and whether its approved provider is suspended. */
-	public record MyApplication(ProviderApplication application, boolean suspended) {
+	/**
+	 * The application, the services offered (the provider's once approved, as they may have changed since),
+	 * and whether its approved provider is suspended, or was removed.
+	 */
+	public record MyApplication(ProviderApplication application, List<String> services, boolean suspended,
+			boolean removed) {
 	}
 
 	/** The secrets, shown once. */

@@ -64,6 +64,16 @@ public class PortalController {
 		return new OpenPlatformResponses.RotatedClientSecret(rotated.clientId(), rotated.clientSecret());
 	}
 
+	@GetMapping("/services")
+	public OpenPlatformResponses.Services services() {
+		return new OpenPlatformResponses.Services(portal.services(me()));
+	}
+
+	@PutMapping("/services")
+	public OpenPlatformResponses.Services updateServices(@Valid @RequestBody OpenPlatformRequests.ServicesUpdate request) {
+		return new OpenPlatformResponses.Services(portal.updateServices(me(), request.services()));
+	}
+
 	@GetMapping("/health")
 	public OpenPlatformResponses.IntegrationHealth health() {
 		return OpenPlatformResponses.IntegrationHealth.of(portal.health(me()));

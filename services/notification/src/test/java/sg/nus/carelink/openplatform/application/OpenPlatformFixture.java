@@ -22,8 +22,8 @@ class OpenPlatformFixture {
 	static final long MANAGER = 42;
 
 	final WebhookDeliveryServiceTest.MutableClock clock = new WebhookDeliveryServiceTest.MutableClock(NOW);
-	final OpenPlatformFakes.Applications applications = new OpenPlatformFakes.Applications();
 	final OpenPlatformFakes.ProviderStore providers = new OpenPlatformFakes.ProviderStore();
+	final OpenPlatformFakes.Applications applications = new OpenPlatformFakes.Applications(providers);
 	final OpenPlatformFakes.Endpoints endpoints = new OpenPlatformFakes.Endpoints();
 	final InMemoryWebhookDeliveries deliveries = new InMemoryWebhookDeliveries();
 	final OpenPlatformFakes.Identities identities = new OpenPlatformFakes.Identities();

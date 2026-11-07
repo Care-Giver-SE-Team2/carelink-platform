@@ -24,7 +24,7 @@ import sg.nus.carelink.shared.error.BusinessRuleViolation;
 /**
  * The Open Platform's job API (docs/api/open-platform.yaml, Jobs): a provider reads the jobs it was
  * offered and accepts, declines or completes them. The caller is the provider whose token names the
- * client; a suspended provider is refused.
+ * client; a suspended or removed provider is refused.
  *
  * <p>The request also has a visit nobody holds, which a manager may staff while the job is open (D17).
  * Accepting, a manager staffing the visit and the family cancelling are each decided on the locked job,
@@ -217,6 +217,9 @@ public class ProviderJobService {
 
     private Provider caller(String clientId) {
         Provider provider = providers.findByClientId(clientId).orElseThrow(UnknownClient::new);
+        if (provider.removed()) {
+            throw new ProviderRemoved();
+        }
         if (!provider.active()) {
             throw new ProviderSuspended();
         }
@@ -254,6 +257,13 @@ public class ProviderJobService {
     public static final class ProviderSuspended extends RuntimeException {
         public ProviderSuspended() {
             super("CareLink has suspended this provider.");
+        }
+    }
+
+    /** Its token may still be good for the rest of its hour, but the provider is gone. */
+    public static final class ProviderRemoved extends RuntimeException {
+        public ProviderRemoved() {
+            super("CareLink has removed this provider.");
         }
     }
 

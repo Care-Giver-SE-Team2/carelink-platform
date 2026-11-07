@@ -10,19 +10,22 @@ import styles from './ProviderPanel.module.css'
  * The right-hand panel of the Providers screen for an approved provider: who it is, what it
  * offers, how it reaches the Open API, and how its integration is doing — the last
  * seven days' webhook deliveries and its jobs by state. Suspend stops the provider (its tokens
- * are refused, so it can't see or act on jobs) until Reinstate. `onSuspend`/`onReinstate` do
+ * are refused, so it can't see or act on jobs) until Reinstate. Remove ends it for good: its open
+ * jobs come back to the managers and it leaves the list. `onSuspend`/`onReinstate`/`onRemove` do
  * the request and reject with the error to show.
  */
 export function ProviderPanel({
   provider,
   onSuspend,
   onReinstate,
+  onRemove,
 }: {
   provider: Provider
   onSuspend: () => Promise<void>
   onReinstate: () => Promise<void>
+  onRemove: () => Promise<void>
 }) {
-  const [confirming, setConfirming] = useState(false)
+  const [confirming, setConfirming] = useState<'suspend' | 'remove' | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const tag = healthTag(provider)
@@ -33,7 +36,7 @@ export function ProviderPanel({
     setError(null)
     try {
       await action()
-      setConfirming(false)
+      setConfirming(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save this change.')
     } finally {
@@ -55,7 +58,9 @@ export function ProviderPanel({
               ? 'Tokens refused; no jobs or webhooks until reinstated.'
               : health.failed > 0
                 ? 'Some webhooks never reached its endpoint.'
-                : 'Can be dispatched jobs through the Open API.'}
+                : health.delivered === 0 && health.retrying === 0
+                  ? 'No webhooks sent in the last 7 days, so its endpoint is untested.'
+                  : 'Can be dispatched jobs through the Open API.'}
           </MetaText>
         </div>
         <MetaText tone="faint" className={styles.meta}>
@@ -130,20 +135,45 @@ export function ProviderPanel({
             {busy ? 'Saving…' : 'Reinstate provider'}
           </Button>
         ) : (
-          <Button variant="dangerOutline" block onClick={() => setConfirming(true)}>
+          <Button variant="dangerOutline" block onClick={() => setConfirming('suspend')}>
             Suspend provider
           </Button>
         )}
+        <Button variant="danger" block onClick={() => setConfirming('remove')}>
+          Remove provider
+        </Button>
       </footer>
 
-      {confirming && (
+      {confirming === 'remove' && (
+        <ConfirmDialog
+          title={`Remove ${provider.organisationName}?`}
+          tone="danger"
+          confirmLabel="Remove provider"
+          busy={busy}
+          onConfirm={() => void run(onRemove)}
+          onCancel={() => setConfirming(null)}
+        >
+          <MetaText>
+            This can't be undone. Its client secret and access tokens stop working at once and no more jobs or webhooks are sent.
+            Jobs it hasn't completed come back to you: an offer is withdrawn, and an accepted job gets a new visit for you to staff
+            in Extra services. It leaves this list; the organisation can apply again as a new provider.
+          </MetaText>
+          {error && (
+            <Callout tone="danger" role="alert">
+              {error}
+            </Callout>
+          )}
+        </ConfirmDialog>
+      )}
+
+      {confirming === 'suspend' && (
         <ConfirmDialog
           title={`Suspend ${provider.organisationName}?`}
           tone="danger"
           confirmLabel="Suspend provider"
           busy={busy}
           onConfirm={() => void run(onSuspend)}
-          onCancel={() => setConfirming(false)}
+          onCancel={() => setConfirming(null)}
         >
           <MetaText>
             Its access tokens stop working at once, so it can't see or act on jobs, and no new jobs or webhooks are sent until you

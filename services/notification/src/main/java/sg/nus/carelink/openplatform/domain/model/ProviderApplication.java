@@ -69,7 +69,10 @@ public record ProviderApplication(
 		return matcher.matches() ? Optional.of(Long.parseLong(matcher.group(2))) : Optional.empty();
 	}
 
-	/** A pending or approved application holds its email: nobody may apply with it again. */
+	/**
+	 * A pending or approved application holds its email: nobody may apply with it again. An approved one
+	 * stops holding it when its provider is removed, which only the provider knows.
+	 */
 	public boolean holdsItsEmail() {
 		return status != Status.REJECTED;
 	}

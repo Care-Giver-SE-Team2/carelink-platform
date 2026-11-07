@@ -18,8 +18,8 @@ import sg.nus.carelink.openplatform.domain.model.Provider;
 import sg.nus.carelink.platform.security.SignedInUsers;
 
 /**
- * The manager's side of the Open Platform, in the CareLink app: deciding applications and suspending
- * providers (PT01). Internal: core's session and the MANAGER role, with the CSRF cookie like every
+ * The manager's side of the Open Platform, in the CareLink app: deciding applications, and suspending
+ * and removing providers (PT01). Internal: core's session and the MANAGER role, with the CSRF cookie like every
  * {@code /api} write. The public API has none of it.
  */
 @RestController
@@ -70,6 +70,12 @@ public class ProviderAdminController {
 	@PostMapping("/api/providers/{id}/reinstate")
 	public OpenPlatformResponses.ProviderView reinstate(@PathVariable long id) {
 		return view(review.reinstate(id));
+	}
+
+	/** POST /api/providers/{id}/remove : for good; its open jobs go back to the managers, and it may apply again. */
+	@PostMapping("/api/providers/{id}/remove")
+	public OpenPlatformResponses.ProviderView remove(@PathVariable long id) {
+		return view(review.remove(id));
 	}
 
 	private OpenPlatformResponses.ProviderView view(Provider provider) {

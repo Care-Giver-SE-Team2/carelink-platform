@@ -42,6 +42,11 @@ class OpenJobsProblems {
 		return problem(HttpStatus.FORBIDDEN, "PROVIDER_SUSPENDED", ex.getMessage());
 	}
 
+	@ExceptionHandler(ProviderJobService.ProviderRemoved.class)
+	ProblemDetail onRemoved(ProviderJobService.ProviderRemoved ex) {
+		return problem(HttpStatus.FORBIDDEN, "PROVIDER_REMOVED", ex.getMessage());
+	}
+
 	@ExceptionHandler(ProviderJobService.JobNotFound.class)
 	ProblemDetail onNotFound(ProviderJobService.JobNotFound ex) {
 		return problem(HttpStatus.NOT_FOUND, "JOB_NOT_FOUND", ex.getMessage());

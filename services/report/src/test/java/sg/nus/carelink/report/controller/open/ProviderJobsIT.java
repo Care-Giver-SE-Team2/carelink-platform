@@ -60,7 +60,6 @@ import sg.nus.carelink.platform.security.OpenPlatformTokens;
 import sg.nus.carelink.report.application.ProviderJobService;
 import sg.nus.carelink.report.application.StandaloneVisits;
 import sg.nus.carelink.report.application.ValueAddedNotifier;
-import sg.nus.carelink.report.application.ValueAddedVisitAssignment;
 import sg.nus.carelink.report.application.VisitCover;
 import sg.nus.carelink.report.application.VisitReassignment;
 import sg.nus.carelink.report.support.SignedInSessions;
@@ -103,9 +102,6 @@ class ProviderJobsIT {
 	private ProviderJobService jobs;
 
 	@MockitoBean
-	private ValueAddedVisitAssignment assignment;
-
-	@MockitoBean
 	private StandaloneVisits visits;
 
 	@MockitoBean
@@ -140,8 +136,7 @@ class ProviderJobsIT {
 	@BeforeEach
 	void layOut() {
 		CLOCK.set(NOW);
-		reset(assignment, visits, reassignment, cover);
-		when(assignment.chooseCaregiver(anyLong(), any(), any())).thenReturn(Optional.empty());
+		reset(visits, reassignment, cover);
 		when(visits.schedule(any())).thenReturn(900L);
 		// The visit approval books for a manager to staff, with nobody on it yet
 		when(visits.find(anyLong())).thenReturn(Optional.of(new StandaloneVisits.State(900L, null, "SCHEDULED", false)));
@@ -334,26 +329,89 @@ class ProviderJobsIT {
 	}
 
 	@Test
-	void jobsGoToTheProviderOfferedOneLeastRecently() throws Exception {
+	void approvalOffersNothingAndWaitsForTheManagerToChoose() throws Exception {
+		Long requestId = bookOnly();
+
+		assertThat(requestStatus(requestId)).isEqualTo("DISPATCHED");
+		assertThat(jdbc.queryForObject("select count(*) from report_provider_job", Integer.class)).isZero();
+		org.mockito.ArgumentCaptor<StandaloneVisits.NewVisit> visit =
+				org.mockito.ArgumentCaptor.forClass(StandaloneVisits.NewVisit.class);
+		verify(visits).schedule(visit.capture());
+		assertThat(visit.getValue().caregiverId()).isNull();
+		mvc.perform(get("/api/value-added-service-requests").session(sessions().of("manager")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].needsCaregiver").value(true))
+				.andExpect(jsonPath("$[0].providerName").doesNotExist());
+	}
+
+	@Test
+	void theManagerPicksAProviderAndAfterADeclineMayPickAnotherButNotTheSameOne() throws Exception {
 		provider(510L, "cl_kind", "KindCare", "ACTIVE", 0, "Hospital escort");
+		provider(511L, "cl_shop", "ShopRight", "ACTIVE", 0, "Grocery assistance");
+		provider(512L, "cl_away", "AwayCare", "SUSPENDED", 1, "Hospital escort");
+		Long requestId = bookOnly();
 
-		book();
-		CLOCK.set(NOW.plusMinutes(1));
-		book();
+		// Only active providers that offer the service, by name
+		mvc.perform(get("/api/value-added-service-requests/" + requestId + "/provider-options")
+						.session(sessions().of("manager")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[*].organisationName").value(org.hamcrest.Matchers.contains("BrightHome Care", "KindCare")));
+		offer(requestId, 511L).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("PROVIDER_NOT_AVAILABLE"));
 
+		offer(requestId, 510L).andExpect(status().isOk())
+				.andExpect(jsonPath("$.providerName").value("KindCare"))
+				.andExpect(jsonPath("$.providerJobStatus").value("NEW"))
+				.andExpect(jsonPath("$.needsCaregiver").value(false));
+		assertThat((String) lastEvent("ProviderJobUpdated").get("payload")).contains("\"status\": \"NEW\"");
+		offer(requestId, 509L).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("VALUE_ADDED_ALREADY_OFFERED"));
+
+		// KindCare's server declines
+		mvc.perform(post("/api/open/v1/jobs/" + onlyJobId() + "/decline").header("Authorization", bearer("cl_kind"))
+						.header("Idempotency-Key", "key-1").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"reason\":\"NO_PRACTITIONER\"}"))
+				.andExpect(status().isOk());
+
+		mvc.perform(get("/api/value-added-service-requests").session(sessions().of("manager")))
+				.andExpect(jsonPath("$[0].needsCaregiver").value(true))
+				.andExpect(jsonPath("$[0].providerJobStatus").value("DECLINED"));
+		mvc.perform(get("/api/value-added-service-requests/" + requestId + "/provider-options")
+						.session(sessions().of("manager")))
+				.andExpect(jsonPath("$[*].providerId").value(org.hamcrest.Matchers.contains(509)));
+		offer(requestId, 510L).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("PROVIDER_NOT_AVAILABLE"));
+		offer(requestId, 509L).andExpect(status().isOk())
+				.andExpect(jsonPath("$.providerName").value("BrightHome Care"));
 		assertThat(jdbc.queryForList("select provider_id from report_provider_job order by id", Long.class))
-				.containsExactly(509L, 510L);
+				.containsExactly(510L, 509L);
 	}
 
 	@Test
 	void nobodyIsOfferedAJobTooNearItsStart() throws Exception {
 		CLOCK.set(START.minusHours(4).minusMinutes(30));
+		Long requestId = bookOnly();
 
-		Long requestId = book();
-
-		assertThat(jdbc.queryForObject("select visit_id from value_added_service_request where id = ?", Long.class,
-				requestId)).isEqualTo(900L);
+		mvc.perform(get("/api/value-added-service-requests/" + requestId + "/provider-options")
+						.session(sessions().of("manager")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$").isEmpty());
+		offer(requestId, 509L).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("VALUE_ADDED_TOO_LATE_FOR_PROVIDER"));
 		assertThat(jdbc.queryForObject("select count(*) from report_provider_job", Integer.class)).isZero();
+	}
+
+	@Test
+	void onlyAManagerMayOfferAndOnlyAVisitNobodyHolds() throws Exception {
+		Long requestId = bookOnly();
+		mvc.perform(post("/api/value-added-service-requests/" + requestId + "/provider")
+						.session(sessions().of("family-a")).with(csrf())
+						.contentType(MediaType.APPLICATION_JSON).content("{\"providerId\":509}"))
+				.andExpect(status().isForbidden());
+
+		when(visits.find(anyLong())).thenReturn(Optional.of(new StandaloneVisits.State(900L, 501L, "SCHEDULED", false)));
+		offer(requestId, 509L).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("VALUE_ADDED_NOT_UNASSIGNED"));
 	}
 
 	@Test
@@ -386,10 +444,92 @@ class ProviderJobsIT {
 				.isEqualTo("SUSPENDED");
 	}
 
+	@Test
+	void aRemovedProvidersNewOfferIsCalledOffItsTokenRefusedAndItIsOfferedNothingMore() throws Exception {
+		Long requestId = book();
+
+		provider(509L, "cl_bright", "BrightHome Care", "REMOVED", 2, "Hospital escort", "Companionship");
+
+		assertThat(jdbc.queryForMap("select status, cancel_reason from report_provider_job"))
+				.containsEntry("status", "CANCELLED")
+				.containsEntry("cancel_reason", "CareLink has removed this provider; CareLink has made other arrangements.");
+		// The managers already had the visit, nobody on it: nothing else changes
+		assertThat(requestStatus(requestId)).isEqualTo("DISPATCHED");
+		verify(visits).schedule(any());
+		mvc.perform(get("/api/open/v1/jobs").header("Authorization", bearer("cl_bright")))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PROVIDER_REMOVED"));
+
+		Long another = bookOnly();
+		offer(another, 509L).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("PROVIDER_NOT_AVAILABLE"));
+	}
+
+	@Test
+	void anAcceptedJobOfARemovedProviderGoesBackToTheManagersOnANewVisit() throws Exception {
+		Long requestId = book();
+		accept(onlyJobId(), "key-1").andExpect(status().isOk());
+		when(visits.schedule(any())).thenReturn(901L);
+		int alertsBefore = jdbc.queryForObject("select count(*) from outbox_event where type = 'NotificationRequested'",
+				Integer.class);
+
+		provider(509L, "cl_bright", "BrightHome Care", "REMOVED", 2, "Hospital escort", "Companionship");
+
+		assertThat(jdbc.queryForObject("select status from report_provider_job", String.class)).isEqualTo("CANCELLED");
+		assertThat((String) lastEvent("ProviderJobUpdated").get("payload")).contains("\"status\": \"CANCELLED\"");
+		assertThat(requestStatus(requestId)).isEqualTo("DISPATCHED");
+		assertThat(jdbc.queryForObject("select visit_id from value_added_service_request where id = ?", Long.class,
+				requestId)).isEqualTo(901L);
+		org.mockito.ArgumentCaptor<StandaloneVisits.NewVisit> visit =
+				org.mockito.ArgumentCaptor.forClass(StandaloneVisits.NewVisit.class);
+		verify(visits, org.mockito.Mockito.times(2)).schedule(visit.capture());
+		assertThat(visit.getValue().caregiverId()).isNull();
+		assertThat(visit.getValue().start()).isEqualTo(START);
+		assertThat(visit.getValue().instructions()).isEqualTo("Ring twice");
+		assertThat(jdbc.queryForObject("select count(*) from outbox_event where type = 'NotificationRequested'",
+				Integer.class)).isGreaterThan(alertsBefore);
+		assertThat((String) lastEvent("NotificationRequested").get("payload"))
+				.contains("BrightHome Care had taken it on and was removed");
+
+		// The event again, redelivered, takes back nothing more
+		provider(509L, "cl_bright", "BrightHome Care", "REMOVED", 3, "Hospital escort", "Companionship");
+		verify(visits, org.mockito.Mockito.times(2)).schedule(any());
+	}
+
+	@Test
+	void anAcceptedJobWhoseStartHasPassedClosesTheRequestWhenItsProviderIsRemoved() throws Exception {
+		Long requestId = book();
+		accept(onlyJobId(), "key-1").andExpect(status().isOk());
+		CLOCK.set(START.plusMinutes(30));
+
+		provider(509L, "cl_bright", "BrightHome Care", "REMOVED", 2, "Hospital escort", "Companionship");
+
+		assertThat(jdbc.queryForObject("select status from report_provider_job", String.class)).isEqualTo("CANCELLED");
+		assertThat(requestStatus(requestId)).isEqualTo("CANCELLED");
+		verify(visits).schedule(any());
+		verify(familyMessages).cancelled(any(), org.mockito.ArgumentMatchers.eq("Hospital escort"),
+				org.mockito.ArgumentMatchers.isNull(),
+				org.mockito.ArgumentMatchers.eq(sg.nus.carelink.report.application.ValueAddedNotifier.Why.NOT_PROVIDED));
+	}
+
 	// ---------- helpers ----------
 
-	/** The family books the escort for {@link #START} through the app's API; answers the request's id. */
+	/** The family books the escort, and a manager offers it to BrightHome Care; answers the request's id. */
 	private Long book() throws Exception {
+		Long requestId = bookOnly();
+		offer(requestId, 509L).andExpect(status().isOk());
+		return requestId;
+	}
+
+	/** A manager offers the request to the provider, from the Extra services screen. */
+	private ResultActions offer(Long requestId, Long providerId) throws Exception {
+		return mvc.perform(post("/api/value-added-service-requests/" + requestId + "/provider")
+				.session(sessions().of("manager")).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON).content("{\"providerId\":" + providerId + "}"));
+	}
+
+	/** The family books the escort for {@link #START} through the app's API; answers the request's id. */
+	private Long bookOnly() throws Exception {
 		String body = "{\"elderId\":101,\"valueAddedServiceId\":%d,\"requestedSchedule\":\"%s\",\"specialInstructions\":\"Ring twice\"}"
 				.formatted(escortId(), START);
 		String response = mvc.perform(post("/api/family/value-added-service-requests")

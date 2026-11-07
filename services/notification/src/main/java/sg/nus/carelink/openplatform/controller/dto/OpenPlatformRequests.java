@@ -35,6 +35,10 @@ public final class OpenPlatformRequests {
 		}
 	}
 
+	/** {@code Services}: what the provider offers from now on. */
+	public record ServicesUpdate(@NotEmpty @Size(max = 20) List<@NotBlank @Size(max = 100) String> services) {
+	}
+
 	/** {@code WebhookSettingsUpdate}: the job events only; {@code ping} is not subscribed to. */
 	public record WebhookSettingsUpdate(
 			@NotBlank @Size(max = 2048) String url,

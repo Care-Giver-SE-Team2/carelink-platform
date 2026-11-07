@@ -82,8 +82,11 @@ class JdbcProviderApplications implements ProviderApplications {
 	@Override
 	public boolean emailHeld(String contactEmail) {
 		Integer held = jdbc.queryForObject("""
-				SELECT COUNT(*) FROM provider_application
-				WHERE contact_email = ? AND status IN ('PENDING', 'APPROVED')""", Integer.class, contactEmail);
+				SELECT COUNT(*) FROM provider_application a
+				LEFT JOIN provider p ON p.id = a.provider_id
+				WHERE a.contact_email = ?
+				  AND (a.status = 'PENDING' OR (a.status = 'APPROVED' AND (p.status IS NULL OR p.status <> 'REMOVED')))""",
+				Integer.class, contactEmail);
 		return held != null && held > 0;
 	}
 

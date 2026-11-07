@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,21 +34,20 @@ class NotificationRequestedValueAddedManagerAlertTest {
     @BeforeEach
     void setUp() {
         when(core.elderReportProfile(1L)).thenReturn(elder("Tan Ah Kow"));
-        when(core.findCaregiverPublicProfile(7L))
-                .thenReturn(Optional.of(new CoreApi.CaregiverPublicProfile(7L, "Siti Rahman", List.of())));
         when(core.enabledAccountsWithRole("MANAGER")).thenReturn(new CoreApi.AccountIds(List.of(4L)));
     }
 
     @Test
-    void assignedCaregiverSendsSuccessNotificationToManager() {
-        alert.approved(14L, 1L, "Hospital escort", START, 7L);
+    void anApprovedRequestAsksTheManagersToAssignIt() {
+        alert.approved(14L, 1L, "Grocery assistance", START);
 
         assertThat(sent()).singleElement().satisfies(message -> {
             assertThat(message.recipientUserId()).isEqualTo(4L);
             assertThat(message.kind()).isEqualTo("VALUE_ADDED_APPROVED");
             assertThat(message.channel()).isEqualTo("IN_APP");
-            assertThat(message.title()).isEqualTo("Extra service approved and assigned");
-            assertThat(message.body()).isEqualTo("Tan Ah Kow: Hospital escort on 24 Oct 10:00. Siti Rahman (primary caregiver) is on it. Review in Extra services.");
+            assertThat(message.title()).isEqualTo("Extra service needs assignment");
+            assertThat(message.body()).isEqualTo("Tan Ah Kow: Grocery assistance on 24 Oct 10:00. "
+                    + "Assign a caregiver or offer it to a provider in Extra services.");
             assertThat(message.resourceType()).isEqualTo("VISIT");
             assertThat(message.resourceId()).isEqualTo(14L);
             assertThat(message.elderId()).isEqualTo(1L);
@@ -57,13 +55,14 @@ class NotificationRequestedValueAddedManagerAlertTest {
     }
 
     @Test
-    void unassignedVisitSendsActionRequiredNotification() {
-        alert.approved(14L, 1L, "Grocery assistance", START, null);
+    void aRemovedProvidersJobAsksTheManagersForACaregiver() {
+        alert.providerRemoved(15L, 1L, "Hospital escort", START, "BrightHome Care");
 
         assertThat(sent()).singleElement().satisfies(message -> {
-            assertThat(message.title()).isEqualTo("Extra service needs caregiver assignment");
-            assertThat(message.body()).isEqualTo("Tan Ah Kow: Grocery assistance on 24 Oct 10:00. The primary caregiver is not free; assign a caregiver in Extra services.");
-            assertThat(message.resourceId()).isEqualTo(14L);
+            assertThat(message.kind()).isEqualTo("VALUE_ADDED_PROVIDER_REMOVED");
+            assertThat(message.body()).isEqualTo("Tan Ah Kow: Hospital escort on 24 Oct 10:00. "
+                    + "BrightHome Care had taken it on and was removed; assign a caregiver in Extra services.");
+            assertThat(message.resourceId()).isEqualTo(15L);
         });
     }
 
@@ -71,7 +70,7 @@ class NotificationRequestedValueAddedManagerAlertTest {
     void notifiesEveryEnabledManagerCoreNames() {
         when(core.enabledAccountsWithRole("MANAGER")).thenReturn(new CoreApi.AccountIds(List.of(4L, 8L, 12L)));
 
-        alert.approved(14L, 1L, "Hospital escort", START, 7L);
+        alert.approved(14L, 1L, "Hospital escort", START);
 
         assertThat(sent()).extracting(NotificationRequested::recipientUserId).containsExactly(4L, 8L, 12L);
     }
@@ -80,20 +79,19 @@ class NotificationRequestedValueAddedManagerAlertTest {
     void noManagersSendsNothing() {
         when(core.enabledAccountsWithRole("MANAGER")).thenReturn(new CoreApi.AccountIds(List.of()));
 
-        alert.approved(14L, 1L, "Hospital escort", START, null);
+        alert.approved(14L, 1L, "Hospital escort", START);
 
         assertThat(sent()).isEmpty();
     }
 
     @Test
-    void namesFallBackToIdsWhenCoreHasNobody() {
+    void theElderFallsBackToItsIdWhenCoreHasNobody() {
         when(core.elderReportProfile(1L)).thenThrow(new CoreNotFound("Elder [1] does not exist"));
-        when(core.findCaregiverPublicProfile(7L)).thenReturn(Optional.empty());
 
-        alert.approved(14L, 1L, "Companionship", START, 7L);
+        alert.approved(14L, 1L, "Companionship", START);
 
         assertThat(sent()).singleElement().extracting(NotificationRequested::body)
-                .isEqualTo("Elder #1: Companionship on 24 Oct 10:00. Caregiver #7 (primary caregiver) is on it. Review in Extra services.");
+                .isEqualTo("Elder #1: Companionship on 24 Oct 10:00. Assign a caregiver or offer it to a provider in Extra services.");
     }
 
     private List<NotificationRequested> sent() {

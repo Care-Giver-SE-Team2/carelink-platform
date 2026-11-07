@@ -76,20 +76,17 @@ class JdbcProviders implements Providers {
 	}
 
 	@Override
-	public Optional<Provider> nextFor(String serviceName) {
+	public List<Provider> activeFor(String serviceName) {
 		return jdbc.sql("""
 				select p.provider_id, p.client_id, p.organisation_name, p.status, p.version
 				from report_provider p
 				join report_provider_service s on s.provider_id = p.provider_id and s.service_name = ?
-				left join (select provider_id, max(dispatched_at) as last_dispatched
-				           from report_provider_job group by provider_id) j on j.provider_id = p.provider_id
 				where p.status = 'ACTIVE' and p.client_id is not null
-				order by j.last_dispatched is not null, j.last_dispatched, p.provider_id
-				limit 1
+				order by p.organisation_name, p.provider_id
 				""")
 				.param(serviceName)
 				.query(this::row)
-				.optional();
+				.list();
 	}
 
 	private Provider row(ResultSet rs, int rowNum) throws SQLException {
