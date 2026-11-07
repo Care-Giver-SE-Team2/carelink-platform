@@ -465,7 +465,11 @@ p.card {
     margin: 26px 0 12px !important;
   }
 
+  /* Same centred 1120px block as the elder card above and the columns below. */
   .answer {
+    width: 100%;
+    max-width: 1120px;
+    margin-inline: auto;
     margin-bottom: 26px;
   }
 
