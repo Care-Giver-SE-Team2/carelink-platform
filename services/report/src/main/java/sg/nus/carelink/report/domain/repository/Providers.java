@@ -1,5 +1,6 @@
 package sg.nus.carelink.report.domain.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import sg.nus.carelink.report.domain.model.Provider;
@@ -15,9 +16,6 @@ public interface Providers {
     /** The provider whose token names this client. */
     Optional<Provider> findByClientId(String clientId);
 
-    /**
-     * The active provider offering the service that was offered a job least recently, one never
-     * offered any first: jobs are spread between providers rather than all going to one.
-     */
-    Optional<Provider> nextFor(String serviceName);
+    /** The active providers offering the service, by name: whom a manager may offer it to. */
+    List<Provider> activeFor(String serviceName);
 }

@@ -289,8 +289,8 @@ rate limits (429) are the gateway's, which Phase 5 no longer builds.
 
 ## D17. The provider and the manager are offered the request together; the first to act has it
 
-*Changed by D18: a manager approves the request first, and the primary caregiver and every matching provider are
-offered it.*
+*Changed by D20: nothing is offered automatically; a manager chooses a caregiver or a provider. (D18, which would
+have changed it otherwise, was not built.)*
 
 *2026-10-17. Changes D7 and D16. Changes report (Section 4's service): needs Section 4's review.*
 
@@ -320,6 +320,8 @@ caregiver column), and accepting now calls visit, inside the transaction that ac
 acceptance is refused and can be sent again with the same key.
 
 ## D18. A manager approves the request; then the primary caregiver, the providers and the manager may take it
+
+*Superseded by D20 before it was built.*
 
 *2026-10-18. Planned, not built: after the 10/21 rehearsal, which runs D17. Changes D7, D16 and D17. Changes report
 (Section 4's service) and the caregiver app: needs Section 4's review and the caregiver app owner's.*
@@ -380,3 +382,63 @@ provider is sent every job, most of which they cannot win.
 - **Frontend:** the manager's Extra services screen (awaiting approval, Approve, the providers offered), the
   family's request status ("Awaiting CareLink's approval"), the caregiver app's open jobs, and the portal's mock and
   README demo.
+
+## D19. A manager may remove a provider for good; its open jobs go back to the managers
+
+*2026-11-06. Built. Changes notification and report (Section 4's service): report's part needs Section 4's review.*
+
+Suspending can be undone and keeps the provider on the manager's list. Removing is for providers CareLink stops
+working with: `POST /api/providers/{id}/remove` (manager only), from `ACTIVE` or `SUSPENDED`, to `REMOVED`, which
+nothing leaves.
+
+- **notification** keeps the `provider` row, for the jobs and webhook deliveries that name it, but deletes its
+  `provider_client`, so the client secret is refused (`invalid_client`); disables its webhook endpoint; and leaves it
+  out of `GET /api/providers`. Its people may still sign in to the portal: `GET /portal/application` shows
+  `removed: true`, and every provider-only portal call answers 403 `PROVIDER_REMOVED`.
+- **The email is free again.** A new application with it reuses the portal user (as after a rejection, with the new
+  password) and, approved, is a new provider with a new id and client. `provider.portal_user_id` is no longer
+  unique; a generated `current_portal_user_id`, null once removed, is (notification `V4`). The portal reads the
+  portal user's most recently approved provider.
+- **report** hears of it by `ProviderUpdated` (`status: REMOVED`, report `V7`). The job API answers a token got
+  before the removal 403 `PROVIDER_REMOVED`, and the provider is offered nothing. In the same transaction, every job
+  it may still act on is called off ("CareLink has removed this provider…"), and its request goes back to the
+  managers: a `NEW` offer leaves the visit the managers already have; an `ACCEPTED` job still to start gets a new
+  visit with nobody on it, and the managers are told to staff it (`VALUE_ADDED_PROVIDER_REMOVED`); an `ACCEPTED` job
+  whose start has passed closes the request and tells the family (`NOT_PROVIDED`), as for a visit nobody started.
+  Completed, declined and cancelled jobs stay as they were.
+
+Why: a provider CareLink has stopped working with should leave the manager's list and lose its access for good,
+without losing the record of the work it did. Handing back its jobs, rather than refusing to remove a provider that
+has some, lets a manager act at once. The trade-off: the provider is not told of the jobs taken back, as its
+webhooks have stopped; a manager tells it, as for suspension.
+
+## D20. A manager chooses who carries out each extra service: a caregiver, or a provider they pick
+
+*2026-11-06. Built. Changes D17 and supersedes D18. Changes report (Section 4's service): needs Section 4's review.*
+
+D17 gave a free primary caregiver the visit at once and otherwise offered the job to one provider automatically,
+picked by report. Now nothing is assigned or offered when the family approves: report books the visit with nobody
+on it and alerts the managers ("Extra service needs assignment"). On the Extra services screen the manager either
+assigns a caregiver (the ranked cover options, as before) or offers it to a provider they pick:
+
+- **`GET /api/value-added-service-requests/{id}/provider-options`** lists, by name, the active providers that offer
+  the service and have not been offered this request before; empty when the start is under 5 hours away
+  (`ProviderJob.MIN_NOTICE`).
+- **`POST /api/value-added-service-requests/{id}/provider {providerId}`** offers it, for a dispatched visit that is
+  scheduled with nobody on it: the provider is sent `job.dispatched` and answers by `respondBy`, as before. Refused
+  with `VALUE_ADDED_ALREADY_OFFERED` while an offer is open or a provider has it, `PROVIDER_NOT_AVAILABLE` for a
+  provider not among the options, `VALUE_ADDED_TOO_LATE_FOR_PROVIDER`, and `VALUE_ADDED_NOT_UNASSIGNED`.
+- **While an offer is open** the request is not "needs assignment" but "awaiting provider"; the manager may still
+  assign a caregiver, which withdraws the offer (`job.cancelled`), as in D17. A provider accepting calls the visit
+  off, as before.
+- **A decline, or no answer by `respondBy`,** hands the request back as "needs assignment". The manager may offer it
+  to another provider, one at a time and never the same one twice: `report_provider_job` is now unique on
+  (request, provider) rather than on the request (report `V8`), and a request's latest job is the one that counts.
+
+The automatic choices are gone with it: `ValueAddedVisitAssignment` (the primary caregiver if free) and
+`Providers.nextFor` (the provider offered a job least recently).
+
+Why: the manager knows the elder, the caregivers and the providers, and wants to decide who goes. The trade-off:
+every approved request waits for a manager, including ones the primary caregiver could have taken at once, and a
+provider's offer starts only when a manager sends it, which shortens its time to answer.
+

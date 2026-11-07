@@ -111,7 +111,7 @@ class JdbcProviderJobs implements ProviderJobs {
 
 	@Override
 	public Optional<ProviderJob> findByRequestId(Long requestId) {
-		return jdbc.sql(SELECT + "where value_added_service_request_id = ?")
+		return jdbc.sql(SELECT + "where value_added_service_request_id = ? order by id desc limit 1")
 				.param(requestId)
 				.query(this::row)
 				.optional();
@@ -119,10 +119,18 @@ class JdbcProviderJobs implements ProviderJobs {
 
 	@Override
 	public Optional<ProviderJob> findByRequestIdForUpdate(Long requestId) {
-		return jdbc.sql(SELECT + "where value_added_service_request_id = ? for update")
+		return jdbc.sql(SELECT + "where value_added_service_request_id = ? order by id desc limit 1 for update")
 				.param(requestId)
 				.query(this::row)
 				.optional();
+	}
+
+	@Override
+	public Set<Long> providersOfferedFor(Long requestId) {
+		return Set.copyOf(jdbc.sql("select provider_id from report_provider_job where value_added_service_request_id = ?")
+				.param(requestId)
+				.query(Long.class)
+				.list());
 	}
 
 	@Override
@@ -155,6 +163,14 @@ class JdbcProviderJobs implements ProviderJobs {
 				.query((rs, rowNum) -> counts.put(ProviderJob.Status.valueOf(rs.getString("status")), rs.getLong("n")))
 				.list();
 		return counts;
+	}
+
+	@Override
+	public List<ProviderJob> findOpenByProviderForUpdate(Long providerId) {
+		return jdbc.sql(SELECT + "where provider_id = ? and status in ('NEW', 'ACCEPTED') order by id for update")
+				.param(providerId)
+				.query(this::row)
+				.list();
 	}
 
 	@Override

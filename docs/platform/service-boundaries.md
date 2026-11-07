@@ -172,7 +172,7 @@ outbox, `requested_notification` (`src/test/resources/db/platform`).
 | Class | Reads from other schemas | Direction of the fix |
 |---|---|---|
 | report `KeptFactsSource` (was `ReportFactsJdbcSource`) | none now; it read `care_plan`, `caregiver`, `elder`, `elder_confirmation`, `elder_primary_caregiver`, `incident`, `incident_log`, `roster_change`, `spot_check`, `visit`, `visit_evidence`, `visit_task`, `vital_sign` | Done: report keeps the facts in its own tables from visit's and core's events (`ReportFactHandlers`, `JdbcKeptFacts`), and asks core for the elder (`CoreApi.elderReportProfile`) and the caregivers' names |
-| report `ApiValueAddedVisitAssignment` (was `JdbcValueAddedVisitAssignment`) | none now; it read `absence_report`, `visit` | Done: `CoreApi.onLeave` and `VisitApi.caregiverBusy` |
+| report `ApiValueAddedVisitAssignment` (was `JdbcValueAddedVisitAssignment`) | none now; it read `absence_report`, `visit` | Done: `CoreApi.onLeave` and `VisitApi.caregiverBusy`. Removed since: a manager assigns every request (docs/section5/decisions.md, D20) |
 | report `NotificationRequestedValueAddedManagerAlert` | none now; it reads `app_user`, `user_role`, `elder` and `caregiver` through `CoreApi` | Done |
 | report `NotificationRequestedValueAddedNotifier` | none now; the caregiver's account through `CoreApi.caregiverAccount`, the names through `CoreApi` | Done |
 | notification `JdbcNotificationInbox` | none now | Done: each message keeps the elder its event names (`notification.elder_id`), and the family rule takes the elders `CoreApi.readableElders` answers |

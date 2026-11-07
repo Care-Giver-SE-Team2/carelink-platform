@@ -160,6 +160,23 @@ public record ValueAddedServiceRequest(
         return withStatus(Status.CANCELLED);
     }
 
+    /**
+     * Dispatched again, to a new visit nobody holds yet: the provider that took it on was removed, and
+     * its visit had been called off for the provider.
+     */
+    public ValueAddedServiceRequest redispatchedTo(Long newVisitId) {
+        Objects.requireNonNull(newVisitId, "newVisitId");
+        if (status != Status.DISPATCHED) {
+            throw new BusinessRuleViolation(
+                    "VALUE_ADDED_SERVICE_REQUEST_NOT_DISPATCHED",
+                    "Only a dispatched value-added service request can be given a new visit.");
+        }
+        return new ValueAddedServiceRequest(
+                id, elderId, valueAddedServiceId, requestedByFamilyMemberId,
+                approvingFamilyMemberId, newVisitId, requestedSchedule, specialInstructions,
+                status, decidedAt, createdAt, updatedAt);
+    }
+
     /** Its visit was carried out. */
     public ValueAddedServiceRequest completed() {
         if (status != Status.DISPATCHED) {
