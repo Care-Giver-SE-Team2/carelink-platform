@@ -124,6 +124,33 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
 
+  # ── Catalogue (report) ────────────────────────────────────────────────────────────────────
+
+  /api/open/v1/services:
+    get:
+      tags: [Onboarding]
+      operationId: listOfferableServices
+      x-served-by: report
+      summary: The services a provider may offer
+      description: |
+        CareLink's catalogue of value-added services that elders and families can ask for now, by name. An
+        application, or a change to the services a provider offers, names services from this list. CareLink adds
+        to it; a service it withdraws leaves the list, and jobs for it stop.
+      security: []
+      responses:
+        '200':
+          description: The services, by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [services]
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProviderService'
+
   # ── Portal (notification) ─────────────────────────────────────────────────────────────────
 
   /api/open/v1/portal/sessions:
@@ -1012,8 +1039,8 @@ components:
     ProviderService:
       type: string
       description: |
-        A value-added service, as report's catalogue names it. The four below are the catalogue today; a service
-        CareLink adds can be offered too.
+        A value-added service, as report's catalogue names it: one of `GET /api/open/v1/services`. A name never
+        changes; CareLink adds services and withdraws them.
       examples: [Hospital escort, Grocery assistance, Companionship, Light housekeeping]
 
     Services:

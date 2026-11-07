@@ -27,12 +27,13 @@ class PublicRoutingTest(unittest.TestCase):
             "/api/elders/me/visits": "visit", "/api/reports/7": "report",
             "/api/elders/7/weekly-summary": "report", "/api/family/caregiver-reviews": "report",
             "/api/family/value-added-services": "report", "/api/elders/me/value-added-service": "report",
-            "/api/value-added-service-requests": "report", "/api/notifications": "notification",
+            "/api/value-added-service-requests": "report", "/api/value-added-services/7": "report", "/api/notifications": "notification",
             "/api/provider-applications/417/approve": "notification", "/api/providers": "notification",
             "/api/providers/509/suspend": "notification",
             "/api/open/v1/applications": "notification", "/api/open/v1/portal/sessions": "notification",
             "/api/open/v1/oauth2/token": "notification", "/api/open/v1/jobs": "report",
             "/api/open/v1/jobs/JOB-24081/accept": "report", "/api/open/v1/jobsite": "notification",
+            "/api/open/v1/services": "report", "/api/open/v1/portal/services": "notification",
             "/actuator/health": None, "/internal/v1/users": None,
         }
         for path, expected in cases.items():

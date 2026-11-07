@@ -1,7 +1,9 @@
 package sg.nus.carelink.report.infrastructure.persistence.adapter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Repository;
 
@@ -44,5 +46,17 @@ class ValueAddedServiceRequestRepositoryAdapter implements ValueAddedServiceRequ
     @Override
     public ValueAddedServiceRequest save(ValueAddedServiceRequest request) {
         return ValueAddedServiceRequestMapper.toDomain(jpa.save(ValueAddedServiceRequestMapper.toEntity(request)));
+    }
+
+    @Override
+    public Map<Long, Long> countByService() {
+        return jpa.countGroupedByService().stream().collect(Collectors.toMap(
+                ValueAddedServiceRequestJpaRepository.ServiceRequestCount::getServiceId,
+                ValueAddedServiceRequestJpaRepository.ServiceRequestCount::getRequests));
+    }
+
+    @Override
+    public boolean existsForService(Long serviceId) {
+        return jpa.existsByValueAddedServiceId(serviceId);
     }
 }

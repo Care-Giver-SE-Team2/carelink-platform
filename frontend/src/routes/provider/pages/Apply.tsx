@@ -3,11 +3,12 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { submitApplication } from '../../../features/provider-platform/api'
 import { ApiError } from '../../../features/provider-platform/errors'
-import { MIN_PASSWORD_LENGTH, PROVIDER_SERVICES } from '../../../features/provider-platform/types'
+import { MIN_PASSWORD_LENGTH } from '../../../features/provider-platform/types'
 import { FIELD_LABELS, summaryLine, toDetails, validateApplication } from '../../../features/provider-platform/validation'
 import type { ApplicationField, ApplicationForm } from '../../../features/provider-platform/validation'
 import { Banner, Button, Checkbox, Field, SectionLabel, StateTag, TextInput } from '../components/ui'
 import { WorkbenchShell } from '../components/WorkbenchShell'
+import { useOfferableServices } from '../useOfferableServices'
 import { useWorkbench } from '../workbenchContext'
 import styles from './Apply.module.css'
 
@@ -50,6 +51,7 @@ export default function Apply() {
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState<{ id: string; email: string } | null>(null)
+  const offerable = useOfferableServices()
 
   const errors = attempted ? validateApplication(form) : {}
   const errorFields = Object.keys(errors) as ApplicationField[]
@@ -205,7 +207,16 @@ export default function Apply() {
             <fieldset className={styles.fieldset} aria-describedby={errorId('services')}>
               <legend className={styles.legend}>{FIELD_LABELS.services}</legend>
               <div id={FIELD_IDS.services} tabIndex={-1} className={error('services') ? styles.servicesInvalid : styles.services}>
-                {PROVIDER_SERVICES.map((service) => (
+                {offerable.isPending && <span className={styles.legend}>Loading services…</span>}
+                {offerable.isError && (
+                  <span className={styles.legend}>
+                    Couldn't load CareLink's services.{' '}
+                    <Button size="small" onClick={() => void offerable.refetch()}>
+                      Try again
+                    </Button>
+                  </span>
+                )}
+                {offerable.data?.map((service) => (
                   <Checkbox key={service} checked={form.services.includes(service)} onChange={(on) => toggleService(service, on)}>
                     {service}
                   </Checkbox>

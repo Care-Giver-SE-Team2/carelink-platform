@@ -82,6 +82,11 @@ class OpenPlatformSecurityTest {
 	}
 
 	@Test
+	void anyoneMayReadTheServicesAProviderMayOffer() throws Exception {
+		mvc.perform(get("/api/open/v1/services")).andExpect(status().isOk());
+	}
+
+	@Test
 	void aMissingTokenIsAnswered401WithTheContractsCode() throws Exception {
 		mvc.perform(get("/api/open/v1/portal/application"))
 				.andExpect(status().isUnauthorized())
@@ -248,6 +253,11 @@ class OpenPlatformSecurityTest {
 		@GetMapping("/api/open/v1/.well-known/jwks.json")
 		Map<String, Object> keys() {
 			return Map.of("keys", new Object[0]);
+		}
+
+		@GetMapping("/api/open/v1/services")
+		Map<String, Object> services() {
+			return Map.of("services", new String[] { "Hospital escort" });
 		}
 
 		@GetMapping("/api/open/v1/portal/application")

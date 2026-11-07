@@ -138,6 +138,20 @@ export async function getMyApplication(token: string): Promise<Application> {
   return application(await open<WireApplication>('/api/open/v1/portal/application', token))
 }
 
+/** GET /api/open/v1/services: report's catalogue, the services a provider may offer. Open, without a token. */
+export async function listOfferableServices(): Promise<string[]> {
+  return (await open<{ services: string[] }>('/api/open/v1/services', null)).services
+}
+
+/** PUT /api/open/v1/portal/services {services}: what CareLink may dispatch to the provider from now on. */
+export async function updateMyServices(token: string, services: string[]): Promise<string[]> {
+  const saved = await open<{ services: string[] }>('/api/open/v1/portal/services', token, {
+    method: 'PUT',
+    body: JSON.stringify({ services }),
+  })
+  return saved.services
+}
+
 export function collectCredentials(token: string): Promise<IssuedCredentials> {
   return open('/api/open/v1/portal/credentials/collect', token, { method: 'POST' })
 }

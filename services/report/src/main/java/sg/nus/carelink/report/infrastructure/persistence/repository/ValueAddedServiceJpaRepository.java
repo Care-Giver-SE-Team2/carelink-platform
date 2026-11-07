@@ -1,6 +1,7 @@
 package sg.nus.carelink.report.infrastructure.persistence.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -9,4 +10,5 @@ import sg.nus.carelink.report.infrastructure.persistence.entity.ValueAddedServic
 /** Spring Data repository for value_added_service. */
 public interface ValueAddedServiceJpaRepository extends JpaRepository<ValueAddedServiceJpaEntity, Long> {
     List<ValueAddedServiceJpaEntity> findByStatusOrderByNameAsc(ValueAddedServiceJpaEntity.Status status);
+    Optional<ValueAddedServiceJpaEntity> findFirstByNameIgnoreCase(String name);
 }

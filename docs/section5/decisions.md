@@ -442,3 +442,41 @@ Why: the manager knows the elder, the caregivers and the providers, and wants to
 every approved request waits for a manager, including ones the primary caregiver could have taken at once, and a
 provider's offer starts only when a manager sends it, which shortens its time to answer.
 
+
+## D21. A manager keeps the catalogue of extra services; a service is never renamed, and one asked for is never deleted
+
+*2026-11-07. Built. Changes report (Section 4's service) and D1's routing: needs Section 4's review.*
+
+Until now the catalogue changed only by migration. Now the manager's Extra services screen has a second view,
+**Catalogue**, served by report:
+
+- **`GET /api/value-added-services`** lists every service, unavailable ones too, by name, each with `requestCount`
+  (requests that ever named it) and `removable` (none did).
+- **`POST /api/value-added-services {name, description, durationMinutes}`** adds one, available at once to elders,
+  families and providers. The name is stripped and must be new, ignoring case, unavailable services included:
+  refused with 409 `VALUE_ADDED_SERVICE_NAME_TAKEN`. Report `V9` adds a unique key on the name, so two managers
+  adding the same name at once can't both succeed.
+- **`PUT /api/value-added-services/{id} {description, durationMinutes, status}`** changes everything but the name. A
+  new length applies to visits booked from now on. `UNAVAILABLE` hides the service from elders, families and the
+  application form; requests already made carry on.
+- **`DELETE /api/value-added-services/{id}`** removes a service nobody ever asked for, such as one added by mistake
+  (204). One that was asked for is refused with 409 `VALUE_ADDED_SERVICE_IN_USE`, and the request's foreign key holds
+  if one arrives meanwhile. A provider that offered it keeps the name until it changes its services; the portal
+  shows it as no longer offered.
+- **`GET /api/open/v1/services`**, open without a token, lists the available names for the Partner Portal: its
+  application form, and a new **Services you offer** card on Status, where an approved provider changes its services
+  (`PUT /api/open/v1/portal/services`, which existed without a screen). The ingress sends `/api/open/v1/services`
+  to report beside the job calls, and the whole `/api/value-added-service*` prefix to report;
+  `OpenPlatformSecurityConfiguration` and `WebMvcConfig` both list it as public.
+
+**No rename, and no delete once asked for.** A provider offers services by name: `ProviderUpdated` and
+`job.dispatched` carry the name, not the id. A renamed service would leave every provider offering the old name, and
+nothing would match it again. Requests point at the service by id, and reports and history name it, so a service
+that was asked for stays; withdrawing it stops new requests. A service never asked for has nothing pointing at it,
+so it may go. **Adding a service changes no provider:** a provider that wants it ticks it in the portal, so until one does,
+the manager's "offer to a provider" list is empty for it.
+
+Why: a manager should be able to offer a new service without a deploy. The trade-off: a typo in a name stays,
+and the fix is to withdraw it and add the right name. notification still accepts any name in an application or a
+services change, since it has no copy of the catalogue. The portal offers only catalogue names, but an API caller
+could send another, which would match nothing.

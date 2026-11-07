@@ -3,6 +3,7 @@ import {
   fetchCaregiverCoverOptions,
   fetchManagedValueAddedServiceRequests,
   fetchProviderOptions,
+  fetchServiceCatalogue,
 } from '../../../features/value-added-services/api'
 
 /**
@@ -38,5 +39,13 @@ export function useProviderOptions(requestId: number) {
   return useQuery({
     queryKey: ['extra-services', requestId, 'provider-options'],
     queryFn: ({ signal }) => fetchProviderOptions(requestId, signal),
+  })
+}
+
+/** The catalogue of extra services, withdrawn ones too (GET /api/value-added-services). */
+export function useServiceCatalogue() {
+  return useQuery({
+    queryKey: ['value-added-catalogue'],
+    queryFn: ({ signal }) => fetchServiceCatalogue(signal),
   })
 }

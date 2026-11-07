@@ -66,6 +66,31 @@
   border: 1px solid var(--border);
 }
 
+.services {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.servicesHelp {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.servicesList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px 16px;
+}
+
+.servicesActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .cardHead {
   display: flex;
   justify-content: space-between;

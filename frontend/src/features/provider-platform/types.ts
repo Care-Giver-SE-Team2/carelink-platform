@@ -3,9 +3,6 @@
  * returns. Field names are camelCase here; the wire format is settled by the Open API contract.
  */
 
-/** Value-added services a provider can offer, as report's catalogue names them. */
-export const PROVIDER_SERVICES = ['Hospital escort', 'Grocery assistance', 'Companionship', 'Light housekeeping'] as const
-
 /** Shortest portal password the platform accepts. */
 export const MIN_PASSWORD_LENGTH = 8
 

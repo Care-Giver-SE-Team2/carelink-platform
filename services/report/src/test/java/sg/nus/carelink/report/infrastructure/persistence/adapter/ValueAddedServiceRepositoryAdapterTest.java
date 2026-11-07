@@ -107,6 +107,15 @@ class ValueAddedServiceRepositoryAdapterTest {
         assertThat(saved.available()).isTrue();
     }
 
+    @Test
+    void findByNameIgnoresCase() {
+        when(jpa.findFirstByNameIgnoreCase("hospital ESCORT"))
+                .thenReturn(Optional.of(availableEntity(7L, "Hospital escort")));
+
+        assertThat(adapter.findByName("hospital ESCORT"))
+                .map(ValueAddedService::id).contains(7L);
+    }
+
     private ValueAddedServiceJpaEntity availableEntity(
             Long id,
             String name) {

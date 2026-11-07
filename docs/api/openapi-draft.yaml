@@ -3596,17 +3596,129 @@ paths:
     get:
       tags:
       - Value-added services
-      summary: List the service catalogue
-      x-status: draft
+      summary: List the whole catalogue, unavailable services too (manager)
+      description: By name. Served by report (docs/section5/decisions.md, D21).
       responses:
         '200':
-          description: Available services.
+          description: Every service, with how often it was asked for.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ValueAddedService'
+                  allOf:
+                  - $ref: '#/components/schemas/ValueAddedService'
+                  - type: object
+                    required:
+                    - requestCount
+                    - removable
+                    properties:
+                      requestCount:
+                        type: integer
+                        format: int64
+                      removable:
+                        type: boolean
+                        description: Nobody ever asked for it, so DELETE may remove it.
+    post:
+      tags:
+      - Value-added services
+      summary: Add a service to the catalogue (manager)
+      description: Available at once. The name is stripped, and never changes afterwards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              - durationMinutes
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 1000
+                durationMinutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 720
+      responses:
+        '201':
+          description: The service as saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValueAddedService'
+        '400':
+          description: A field is missing or out of range.
+        '409':
+          description: '`VALUE_ADDED_SERVICE_NAME_TAKEN`: a service of that name, whatever its case, is in the catalogue.'
+  /value-added-services/{id}:
+    delete:
+      tags:
+      - Value-added services
+      summary: Remove a service nobody ever asked for (manager)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          description: No such service.
+        '409':
+          description: '`VALUE_ADDED_SERVICE_IN_USE`: a request names it. Make it unavailable instead.'
+    put:
+      tags:
+      - Value-added services
+      summary: Change a service's description, length or status (manager)
+      description: >-
+        Everything but the name. A new length applies to visits booked from now on. UNAVAILABLE stops new requests;
+        those made already carry on.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - durationMinutes
+              - status
+              properties:
+                description:
+                  type: string
+                  maxLength: 1000
+                durationMinutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 720
+                status:
+                  type: string
+                  enum:
+                  - AVAILABLE
+                  - UNAVAILABLE
+      responses:
+        '200':
+          description: The service as saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValueAddedService'
+        '404':
+          description: No such service.
   /value-added-service-requests:
     get:
       tags:
@@ -6098,6 +6210,9 @@ components:
           type: string
         description:
           type: string
+        durationMinutes:
+          type: integer
+          description: How long the visit an approved request dispatches lasts.
         status:
           type: string
           enum:

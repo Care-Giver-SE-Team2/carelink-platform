@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { collectCredentials } from '../../../features/provider-platform/api'
+import { collectCredentials, updateMyServices } from '../../../features/provider-platform/api'
 import { ApiError } from '../../../features/provider-platform/errors'
 import { formatLong } from '../../../features/provider-platform/format'
 import type { Application } from '../../../features/provider-platform/types'
-import { Banner, Button, Facts, Field, SectionLabel, StateTag, TextInput } from '../components/ui'
+import { Banner, Button, Checkbox, Facts, Field, SectionLabel, StateTag, TextInput } from '../components/ui'
 import { WorkbenchShell } from '../components/WorkbenchShell'
+import { useOfferableServices } from '../useOfferableServices'
 import { useWorkbench } from '../workbenchContext'
 import styles from './Status.module.css'
 
@@ -169,7 +170,83 @@ function SignedIn({ application }: { application: Application }) {
         </Banner>
       )}
       <ApplicationCard application={application} />
+      {application.status === 'approved' && !application.removed && <ServicesCard application={application} />}
     </>
+  )
+}
+
+/**
+ * The services an approved provider offers, which it may change at any time: CareLink dispatches only these to
+ * it from now on, and a job already offered stays offered. The choices are report's catalogue, which a CareLink
+ * manager adds to; a service CareLink has withdrawn stays ticked until the provider unticks it.
+ */
+function ServicesCard({ application }: { application: Application }) {
+  const { session, refreshApplication } = useWorkbench()
+  const offerable = useOfferableServices()
+  const [chosen, setChosen] = useState<string[]>(application.services)
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+
+  const choices = [...(offerable.data ?? []), ...application.services.filter((s) => !offerable.data?.includes(s))]
+  const changed = chosen.length !== application.services.length || chosen.some((s) => !application.services.includes(s))
+
+  function toggle(service: string, on: boolean) {
+    setSaved(false)
+    setChosen((current) => (on ? [...current, service] : current.filter((s) => s !== service)))
+  }
+
+  async function save() {
+    if (chosen.length === 0) {
+      setFailure('Choose at least one service.')
+      return
+    }
+    setBusy(true)
+    setFailure(null)
+    try {
+      setChosen(await updateMyServices(session!, chosen))
+      await refreshApplication()
+      setSaved(true)
+    } catch (err) {
+      setFailure(err instanceof Error ? err.message : "Couldn't reach CareLink.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className={styles.card} aria-labelledby="status-services-heading">
+      <div className={styles.cardHead}>
+        <SectionLabel id="status-services-heading">Services you offer</SectionLabel>
+      </div>
+      <div className={styles.services}>
+        <p className={styles.servicesHelp}>
+          CareLink sends you jobs only for these. When CareLink adds a service, tick it here to start receiving it.
+        </p>
+        {offerable.isPending && <p className={styles.servicesHelp}>Loading services…</p>}
+        {offerable.isError && <p className={styles.servicesHelp}>Couldn't load CareLink's services.</p>}
+        {offerable.isSuccess && (
+          <div className={styles.servicesList}>
+            {choices.map((service) => (
+              <Checkbox key={service} checked={chosen.includes(service)} onChange={(on) => toggle(service, on)}>
+                {offerable.data.includes(service) ? service : `${service} (no longer offered by CareLink)`}
+              </Checkbox>
+            ))}
+          </div>
+        )}
+        {failure && (
+          <Banner tone="danger" title="Couldn't save your services" role="alert">
+            {failure}
+          </Banner>
+        )}
+        <div className={styles.servicesActions}>
+          <Button variant="primary" busy={busy && 'Saving…'} disabled={!changed || !offerable.isSuccess} onClick={() => void save()}>
+            Save services
+          </Button>
+          {saved && !changed && <span className={styles.servicesHelp} role="status">Saved.</span>}
+        </div>
+      </div>
+    </section>
   )
 }
 

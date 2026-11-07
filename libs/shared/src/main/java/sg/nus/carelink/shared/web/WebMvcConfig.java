@@ -24,11 +24,12 @@ class WebMvcConfig implements WebMvcConfigurer {
 	static final String CAREGIVER_REGISTRATION_PATH = "/api/caregiver-registrations";
 	/**
 	 * The Open Platform's calls made before there is a token: applying, signing in to the Partner Portal,
-	 * the client-credentials grant and the key set. Mirrors the permitAll in platform-security's
-	 * OpenPlatformSecurityConfiguration; every other /api/open path is called with a token.
+	 * the client-credentials grant, the key set and the services a provider may offer (report's catalogue, for
+	 * the application form). Mirrors the permitAll in platform-security's OpenPlatformSecurityConfiguration;
+	 * every other /api/open path is called with a token.
 	 */
 	static final String[] OPEN_PLATFORM_PUBLIC_PATHS = { "/api/open/v1/applications", "/api/open/v1/portal/sessions",
-			"/api/open/v1/oauth2/token", "/api/open/v1/.well-known/jwks.json" };
+			"/api/open/v1/oauth2/token", "/api/open/v1/.well-known/jwks.json", "/api/open/v1/services" };
 
 	private final RequestContextInterceptor requestContext;
 
