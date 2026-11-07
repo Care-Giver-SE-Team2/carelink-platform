@@ -80,6 +80,18 @@ export function getMyApplication(session: PortalSession): Promise<Application> {
   return call(() => platform.getMyApplication(session.token))
 }
 
+/** GET /api/open/v1/services — the services a provider may offer, from report's catalogue. No sign-in. */
+export function listOfferableServices(): Promise<string[]> {
+  if (LIVE) return live.listOfferableServices()
+  return call(() => platform.listOfferableServices())
+}
+
+/** PUT /api/open/v1/portal/services {services} → the services as saved. */
+export function updateMyServices(session: PortalSession, services: string[]): Promise<string[]> {
+  if (LIVE) return live.updateMyServices(session.token, services)
+  return call(() => platform.updateMyServices(session.token, services))
+}
+
 /** POST /api/open/v1/portal/credentials/collect — once, after approval. */
 export function collectCredentials(session: PortalSession): Promise<IssuedCredentials> {
   if (LIVE) return live.collectCredentials(session.token)

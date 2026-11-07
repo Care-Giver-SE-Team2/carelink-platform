@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { FilterChips, MetaText, Pagination } from '../../../shared/components/ui'
+import { FilterChips, MetaText, Pagination, ViewToggle } from '../../../shared/components/ui'
 import {
   assignValueAddedServiceCaregiver,
   cancelValueAddedServiceRequest,
@@ -10,6 +10,7 @@ import {
 import { ExtraServicePanel } from '../components/ExtraServicePanel'
 import { ExtraServiceTable } from '../components/ExtraServiceTable'
 import { ManagerShell } from '../components/ManagerShell'
+import { ServiceCatalogue } from '../components/ServiceCatalogue'
 import {
   EXTRA_SERVICE_EMPTY_TEXT,
   EXTRA_SERVICE_FILTERS,
@@ -32,8 +33,34 @@ import styles from './ExtraServices.module.css'
  * before its visit starts. Opens on the
  * visits needing a caregiver when there are any. The filter, page and open row live in the URL
  * (?filter=needs&page=2&id=41); a manager-bell link names the visit instead (?visit=88).
+ *
+ * A second view, Catalogue (?view=catalogue), keeps the services themselves: adding one, changing one, and
+ * withdrawing one (D21).
  */
 export default function ExtraServices() {
+  const [params, setParams] = useSearchParams()
+  const view = params.get('view') === 'catalogue' ? 'catalogue' : 'requests'
+
+  return (
+    <ManagerShell headerContext="Extra services">
+      <div className={styles.viewBar}>
+        <ViewToggle
+          label="Extra services view"
+          value={view}
+          onChange={(next) => setParams(next === 'catalogue' ? { view: 'catalogue' } : {}, { replace: true })}
+          options={[
+            { value: 'requests', label: 'REQUESTS' },
+            { value: 'catalogue', label: 'CATALOGUE' },
+          ]}
+        />
+      </div>
+      {view === 'catalogue' ? <ServiceCatalogue /> : <Requests />}
+    </ManagerShell>
+  )
+}
+
+/** The Requests view: every request, and the panel for the one open. */
+function Requests() {
   const [params, setParams] = useSearchParams()
   const queryClient = useQueryClient()
   const requests = useExtraServices()
@@ -83,7 +110,7 @@ export default function ExtraServices() {
   }
 
   return (
-    <ManagerShell headerContext="Extra services">
+    <>
       <div className={styles.layout}>
         <section className={styles.list} aria-label="Extra service requests">
           <div className={styles.toolbar}>
@@ -155,6 +182,6 @@ export default function ExtraServices() {
           </aside>
         )}
       </div>
-    </ManagerShell>
+    </>
   )
 }

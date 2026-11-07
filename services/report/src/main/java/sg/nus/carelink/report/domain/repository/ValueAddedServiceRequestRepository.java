@@ -1,6 +1,7 @@
 package sg.nus.carelink.report.domain.repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
@@ -13,4 +14,7 @@ public interface ValueAddedServiceRequestRepository {
     List<ValueAddedServiceRequest> findAll();
     List<ValueAddedServiceRequest> findByStatus(ValueAddedServiceRequest.Status status);
     ValueAddedServiceRequest save(ValueAddedServiceRequest request);
+    /** How many requests name each service, whatever became of them; a service never asked for is absent. */
+    Map<Long, Long> countByService();
+    boolean existsForService(Long serviceId);
 }

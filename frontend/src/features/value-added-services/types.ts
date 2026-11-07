@@ -7,6 +7,27 @@ export type ValueAddedService = {
   status: 'AVAILABLE' | 'UNAVAILABLE'
 }
 
+/** A service in the manager's catalogue: how often it was asked for, and so whether it may be removed. */
+export type CatalogueService = ValueAddedService & {
+  requestCount: number
+  /** Nobody ever asked for it. One that was asked for stays, for its requests; it can be made unavailable. */
+  removable: boolean
+}
+
+/** A manager adds a service to the catalogue (POST /api/value-added-services). */
+export type ValueAddedServiceCreate = {
+  name: string
+  description: string | null
+  durationMinutes: number
+}
+
+/** What a manager may change about a service: everything but its name (PUT /api/value-added-services/{id}). */
+export type ValueAddedServiceUpdate = {
+  description: string | null
+  durationMinutes: number
+  status: ValueAddedService['status']
+}
+
 export type ValueAddedServiceRequestStatus =
   | 'PENDING_APPROVAL'
   | 'APPROVED'

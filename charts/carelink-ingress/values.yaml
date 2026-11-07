@@ -6,11 +6,11 @@ routes:
   - {path: "/^/api/notifications(/.*)?$", service: notification}
   - {path: "/^/api/provider-applications(/.*)?$", service: notification}
   - {path: "/^/api/providers(/.*)?$", service: notification}
-  # The Open Platform's public API: the job calls to report, the rest to notification
-  - {path: "/^/api/open/v1/jobs(/.*)?$", service: report}
+  # The Open Platform's public API: the job calls and the service catalogue to report, the rest to notification
+  - {path: "/^/api/open/v1/(jobs|services)(/.*)?$", service: report}
   - {path: "/^/api/open(/.*)?$", service: notification}
   - {path: "/^/api/reports(/.*)?$", service: report}
-  - {path: "/^/api/value-added-service-requests(/.*)?$", service: report}
+  - {path: "/^/api/value-added-service[^/]*(/.*)?$", service: report}
   - {path: "/^/api/family/caregiver-reviews(/.*)?$", service: report}
   - {path: "/^/api/family/value-added-service[^/]*(/.*)?$", service: report}
   - {path: "/^/api/elders/me/value-added-service[^/]*(/.*)?$", service: report}

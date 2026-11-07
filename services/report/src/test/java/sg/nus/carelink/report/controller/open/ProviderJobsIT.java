@@ -8,8 +8,10 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -222,6 +224,71 @@ class ProviderJobsIT {
 		assertThat(requestStatus(requestId)).isEqualTo("COMPLETED");
 		assertThat(jdbc.queryForObject("select count(*) from outbox_event where type = 'ProviderJobUpdated'",
 				Integer.class)).isEqualTo(3);
+	}
+
+	@Test
+	void aServiceAManagerAddsCanBeOfferedByProvidersUntilItIsWithdrawn() throws Exception {
+		jdbc.update("DELETE FROM value_added_service WHERE name = 'Medication collection'");
+		try {
+			String added = mvc.perform(post("/api/value-added-services").session(sessions().of("manager")).with(csrf())
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"name\":\" Medication collection \",\"description\":\"From the clinic.\","
+							+ "\"durationMinutes\":60}"))
+					.andExpect(status().isCreated())
+					.andExpect(jsonPath("$.name").value("Medication collection"))
+					.andExpect(jsonPath("$.status").value("AVAILABLE"))
+					.andReturn().getResponse().getContentAsString();
+			Long id = Long.valueOf(added.replaceAll("(?s).*?\"id\"\\s*:\\s*(\\d+).*", "$1"));
+
+			// The application form reads it without a token
+			mvc.perform(get("/api/open/v1/services"))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.services[?(@ == 'Medication collection')]").exists());
+			// The unique key compares names without regard to case
+			mvc.perform(post("/api/value-added-services").session(sessions().of("manager")).with(csrf())
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"name\":\"medication COLLECTION\",\"durationMinutes\":30}"))
+					.andExpect(status().isConflict())
+					.andExpect(jsonPath("$.code").value("VALUE_ADDED_SERVICE_NAME_TAKEN"));
+			// Only a manager keeps the catalogue
+			mvc.perform(post("/api/value-added-services").session(sessions().of("family-a")).with(csrf())
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"name\":\"Laundry\",\"durationMinutes\":30}"))
+					.andExpect(status().isForbidden());
+
+			mvc.perform(put("/api/value-added-services/" + id).session(sessions().of("manager")).with(csrf())
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"description\":null,\"durationMinutes\":45,\"status\":\"UNAVAILABLE\"}"))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.name").value("Medication collection"))
+					.andExpect(jsonPath("$.durationMinutes").value(45));
+			mvc.perform(get("/api/open/v1/services"))
+					.andExpect(jsonPath("$.services[?(@ == 'Medication collection')]").doesNotExist());
+			mvc.perform(get("/api/value-added-services").session(sessions().of("manager")))
+					.andExpect(jsonPath("$[?(@.name == 'Medication collection')].status").value("UNAVAILABLE"))
+					.andExpect(jsonPath("$[?(@.name == 'Medication collection')].removable").value(true));
+
+			// Nobody asked for it, so it may go
+			mvc.perform(delete("/api/value-added-services/" + id).session(sessions().of("manager")).with(csrf()))
+					.andExpect(status().isNoContent());
+			assertThat(jdbc.queryForObject("select count(*) from value_added_service where id = ?", Integer.class, id))
+					.isZero();
+		} finally {
+			jdbc.update("DELETE FROM value_added_service WHERE name = 'Medication collection'");
+		}
+	}
+
+	@Test
+	void aServiceThatWasAskedForStaysInTheCatalogue() throws Exception {
+		book();
+
+		mvc.perform(get("/api/value-added-services").session(sessions().of("manager")))
+				.andExpect(jsonPath("$[?(@.name == 'Hospital escort')].requestCount").value(1))
+				.andExpect(jsonPath("$[?(@.name == 'Hospital escort')].removable").value(false));
+		mvc.perform(delete("/api/value-added-services/" + escortId()).session(sessions().of("manager")).with(csrf()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("VALUE_ADDED_SERVICE_IN_USE"));
+		assertThat(escortId()).isNotNull();
 	}
 
 	@Test

@@ -39,6 +39,12 @@ import { ATTEMPT_TIMEOUT_SECONDS, MAX_ATTEMPTS, attemptOffsetMinutes } from './w
  * Every function throws ApiError the way the real endpoint would answer.
  */
 
+/**
+ * Report's catalogue as the mock serves it. The live portal reads the real one (GET /api/open/v1/services),
+ * which a manager adds to from the Extra services screen.
+ */
+export const MOCK_SERVICE_CATALOGUE = ['Hospital escort', 'Grocery assistance', 'Companionship', 'Light housekeeping']
+
 const STORAGE_KEY = 'carelink.mock.providerPlatform.v1'
 const TOKEN_TTL_MS = 60 * 60 * 1000
 const SCOPE = 'jobs:read jobs:write'
@@ -651,6 +657,27 @@ export function signOut(session: string) {
 /** GET /v1/portal/application — the signed-in provider's application. */
 export function getMyApplication(session: string, now = Date.now()): Application {
   return publicView(signedIn(load(), session, now))
+}
+
+/** GET /v1/services — the services a provider may offer. Open, without a session. */
+export function listOfferableServices(): string[] {
+  return [...MOCK_SERVICE_CATALOGUE]
+}
+
+/**
+ * PUT /v1/portal/services {services} — what CareLink may dispatch to the provider from now on. 403 unless
+ * approved and still on the platform; 400 with none.
+ */
+export function updateMyServices(session: string, services: string[], now = Date.now()): string[] {
+  const state = load()
+  const app = signedIn(state, session, now)
+  if (app.status !== 'approved') fail(403, 'not_approved', 'This application is not approved.')
+  if (app.removed) fail(403, 'provider_removed', REMOVED_MESSAGE)
+  const unique = [...new Set(services.map((s) => s.trim()).filter(Boolean))]
+  if (unique.length === 0) fail(400, 'validation_failed', 'Choose at least one service.')
+  app.services = unique
+  save(state)
+  return [...unique]
 }
 
 /**

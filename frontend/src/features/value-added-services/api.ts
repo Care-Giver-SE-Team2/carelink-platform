@@ -1,12 +1,15 @@
 import { api } from '../../shared/api/client'
 import type {
   CaregiverCoverOption,
+  CatalogueService,
   FamilyValueAddedServiceRequestCreate,
   ManagedValueAddedServiceRequest,
   ProviderOption,
   ValueAddedService,
+  ValueAddedServiceCreate,
   ValueAddedServiceRequest,
   ValueAddedServiceRequestCreate,
+  ValueAddedServiceUpdate,
 } from './types'
 
 export function fetchValueAddedServices(): Promise<ValueAddedService[]> {
@@ -96,4 +99,24 @@ export function offerValueAddedServiceToProvider(id: number, providerId: number)
 /** Calls the request off, and its visit with it if it has one (manager only). */
 export function cancelValueAddedServiceRequest(id: number): Promise<ManagedValueAddedServiceRequest> {
   return api<ManagedValueAddedServiceRequest>(`/value-added-service-requests/${id}/cancellation`, { method: 'POST' })
+}
+
+/** The whole catalogue, withdrawn services too, by name, with how often each was asked for (manager only). */
+export function fetchServiceCatalogue(signal?: AbortSignal): Promise<CatalogueService[]> {
+  return api<CatalogueService[]>('/value-added-services', { signal })
+}
+
+/** Removes a service nobody ever asked for; 409 when one was (manager only). */
+export function removeValueAddedService(id: number): Promise<void> {
+  return api<void>(`/value-added-services/${id}`, { method: 'DELETE' })
+}
+
+/** Adds a service, available at once; 409 when the name is taken (manager only). */
+export function addValueAddedService(service: ValueAddedServiceCreate): Promise<ValueAddedService> {
+  return api<ValueAddedService>('/value-added-services', { method: 'POST', body: JSON.stringify(service) })
+}
+
+/** Changes a service's description, length or status; its name stays (manager only). */
+export function updateValueAddedService(id: number, update: ValueAddedServiceUpdate): Promise<ValueAddedService> {
+  return api<ValueAddedService>(`/value-added-services/${id}`, { method: 'PUT', body: JSON.stringify(update) })
 }

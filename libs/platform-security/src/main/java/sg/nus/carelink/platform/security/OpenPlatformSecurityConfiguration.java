@@ -52,7 +52,10 @@ class OpenPlatformSecurityConfiguration {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.POST, "/api/open/v1/applications", "/api/open/v1/portal/sessions",
 								"/api/open/v1/oauth2/token").permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/open/v1/.well-known/jwks.json").permitAll()
+						// The signing keys, and the services a provider may offer (report's catalogue, for the
+						// application form)
+						.requestMatchers(HttpMethod.GET, "/api/open/v1/.well-known/jwks.json", "/api/open/v1/services")
+						.permitAll()
 						.requestMatchers("/api/open/v1/portal/**").hasAuthority(OpenPlatformTokens.PORTAL_USER)
 						.requestMatchers(HttpMethod.GET, "/api/open/v1/jobs", "/api/open/v1/jobs/**")
 						.hasAuthority("SCOPE_" + OpenPlatformTokens.JOBS_READ)

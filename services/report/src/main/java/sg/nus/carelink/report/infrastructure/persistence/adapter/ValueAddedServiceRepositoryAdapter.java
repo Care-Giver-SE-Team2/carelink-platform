@@ -35,6 +35,18 @@ class ValueAddedServiceRepositoryAdapter implements ValueAddedServiceRepository 
     }
 
     @Override
+    public Optional<ValueAddedService> findByName(String name) {
+        return jpa.findFirstByNameIgnoreCase(name).map(ValueAddedServiceMapper::toDomain);
+    }
+
+    @Override
+    public void delete(Long id) {
+        jpa.deleteById(id);
+        // Flush now, so a request saved for it meanwhile fails here, as a DataIntegrityViolationException.
+        jpa.flush();
+    }
+
+    @Override
     public ValueAddedService save(ValueAddedService service) {
         return ValueAddedServiceMapper.toDomain(jpa.save(ValueAddedServiceMapper.toEntity(service)));
     }

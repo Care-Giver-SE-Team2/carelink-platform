@@ -1,3 +1,16 @@
+.viewBar {
+  display: flex;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbarRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 420px;
