@@ -202,6 +202,56 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorised'
 
+  /api/open/v1/portal/services:
+    get:
+      tags: [Portal]
+      operationId: getServices
+      x-served-by: notification
+      summary: The services the provider offers
+      description: What CareLink may dispatch to it. Starts as the application's, and follows every change.
+      security:
+        - portalUser: []
+      responses:
+        '200':
+          description: The services.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Services'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+    put:
+      tags: [Portal]
+      operationId: updateServices
+      x-served-by: notification
+      summary: Change the services the provider offers
+      description: >-
+        From now on CareLink dispatches only these to the provider; a job already offered stays offered. Report is
+        told by `ProviderUpdated`. The same list again changes nothing.
+      security:
+        - portalUser: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Services'
+      responses:
+        '200':
+          description: The services as saved, each once, in the order given.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Services'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/NotApproved'
+
   /api/open/v1/portal/credentials/collect:
     post:
       tags: [Portal]
@@ -223,6 +273,12 @@ paths:
                 $ref: '#/components/schemas/IssuedCredentials'
         '401':
           $ref: '#/components/responses/Unauthorised'
+        '403':
+          description: '`PROVIDER_REMOVED`: CareLink removed the provider; its credentials are gone.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '409':
           description: '`NOT_APPROVED`: the application is not approved.'
           content:
@@ -878,13 +934,13 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     NotApproved:
-      description: '`NOT_APPROVED`: the provider''s application is not approved.'
+      description: '`NOT_APPROVED`: the provider''s application is not approved. `PROVIDER_REMOVED`: CareLink removed the provider.'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     JobsForbidden:
-      description: '`PROVIDER_SUSPENDED`: CareLink has suspended the provider. `INSUFFICIENT_SCOPE`: the token lacks the scope.'
+      description: '`PROVIDER_SUSPENDED`: CareLink has suspended the provider. `PROVIDER_REMOVED`: CareLink removed the provider; a token got before then is refused for the rest of its hour. `INSUFFICIENT_SCOPE`: the token lacks the scope.'
       content:
         application/problem+json:
           schema:
@@ -960,6 +1016,18 @@ components:
         CareLink adds can be offered too.
       examples: [Hospital escort, Grocery assistance, Companionship, Light housekeeping]
 
+    Services:
+      type: object
+      required: [services]
+      properties:
+        services:
+          type: array
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/ProviderService'
+
     ApplicationDetails:
       type: object
       required: [organisationName, contactName, contactEmail, contactPhone, services, webhookUrl]
@@ -1020,7 +1088,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/ApplicationDetails'
         - type: object
-          required: [id, status, submittedAt, reviewedAt, reason, suspended]
+          required: [id, status, submittedAt, reviewedAt, reason, suspended, removed]
           properties:
             id:
               type: string
@@ -1039,6 +1107,12 @@ components:
             suspended:
               type: boolean
               description: An approved provider CareLink has stopped. No tokens, jobs or webhooks until it is reinstated.
+            removed:
+              type: boolean
+              description: >-
+                An approved provider CareLink has removed for good. Its client is deleted, its webhooks have stopped and
+                CareLink has taken back its open jobs. The portal stays open to sign in to, and the same email may
+                apply again; a new application approved is a new provider, with new credentials.
 
     IssuedCredentials:
       type: object

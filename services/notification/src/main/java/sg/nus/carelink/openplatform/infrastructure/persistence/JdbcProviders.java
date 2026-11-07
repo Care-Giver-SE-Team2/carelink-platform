@@ -67,13 +67,15 @@ class JdbcProviders implements Providers {
 
 	@Override
 	public Optional<Provider> findByPortalUser(String portalUserId) {
-		return jdbc.query("SELECT " + COLUMNS + " FROM provider WHERE portal_user_id = ?", this::provider, portalUserId)
-				.stream().findFirst();
+		return jdbc.query("SELECT " + COLUMNS
+				+ " FROM provider WHERE portal_user_id = ? ORDER BY approved_at DESC, id DESC LIMIT 1", this::provider,
+				portalUserId).stream().findFirst();
 	}
 
 	@Override
 	public List<Provider> all() {
-		return jdbc.query("SELECT " + COLUMNS + " FROM provider ORDER BY approved_at DESC, id DESC", this::provider);
+		return jdbc.query("SELECT " + COLUMNS
+				+ " FROM provider WHERE status <> 'REMOVED' ORDER BY approved_at DESC, id DESC", this::provider);
 	}
 
 	@Override

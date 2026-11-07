@@ -13,9 +13,13 @@ public interface Providers {
 
 	Optional<Provider> find(long id);
 
+	/**
+	 * The portal user's provider: the most recently approved, which may be one removed. A portal user
+	 * whose provider was removed may apply and be approved again, and then has two.
+	 */
 	Optional<Provider> findByPortalUser(String portalUserId);
 
-	/** Every provider, the most recently approved first. */
+	/** Every provider not removed, the most recently approved first. */
 	List<Provider> all();
 
 	/**

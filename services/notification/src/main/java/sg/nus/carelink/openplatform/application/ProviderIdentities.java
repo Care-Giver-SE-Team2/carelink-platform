@@ -10,7 +10,7 @@ public interface ProviderIdentities {
 
 	/**
 	 * The portal user for {@code email}, with {@code password}: created, or, for an email that applied
-	 * before and was rejected, given the new password.
+	 * before and was rejected, or whose provider was removed, given the new password.
 	 *
 	 * @return the user's {@code sub}, which its tokens carry
 	 * @throws sg.nus.carelink.openplatform.domain.model.InvalidField for a password too short
@@ -25,6 +25,9 @@ public interface ProviderIdentities {
 	 * so that a token got with the old secret names a client that no longer exists.
 	 */
 	ClientCredentials replaceClient(String oldClientId, long providerId, String organisationName);
+
+	/** Deletes the provider's client: its secret stops working at once, and no token is issued to it again. */
+	void deleteClient(String clientId);
 
 	/** Where the provider's server asks for tokens: a path on CareLink's public address. */
 	String tokenUrl();

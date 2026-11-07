@@ -9,6 +9,10 @@ import sg.nus.carelink.shared.error.BusinessRuleViolation;
 public class ProviderNotApproved extends BusinessRuleViolation {
 
 	public ProviderNotApproved() {
-		super("NOT_APPROVED", "The application is not approved.");
+		this("NOT_APPROVED", "The application is not approved.");
+	}
+
+	protected ProviderNotApproved(String code, String message) {
+		super(code, message);
 	}
 }

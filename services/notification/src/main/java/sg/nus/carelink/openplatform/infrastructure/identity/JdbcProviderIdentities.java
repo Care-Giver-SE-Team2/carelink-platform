@@ -123,6 +123,11 @@ public class JdbcProviderIdentities implements ProviderIdentities {
 	}
 
 	@Override
+	public void deleteClient(String clientId) {
+		jdbc.update("DELETE FROM provider_client WHERE client_id = ?", clientId);
+	}
+
+	@Override
 	public String tokenUrl() {
 		return TOKEN_PATH;
 	}

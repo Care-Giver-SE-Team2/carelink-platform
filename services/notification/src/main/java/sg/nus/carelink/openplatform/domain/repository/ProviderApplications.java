@@ -16,7 +16,10 @@ public interface ProviderApplications {
 	/** The portal user's latest application, whatever its status. */
 	Optional<ProviderApplication> latestOf(String portalUserId);
 
-	/** Whether an application that holds this email (pending or approved) is kept. */
+	/**
+	 * Whether an application that holds this email is kept: one pending, or one approved whose provider
+	 * has not been removed. A removed provider's email is free to apply again.
+	 */
 	boolean emailHeld(String contactEmail);
 
 	/** The applications waiting for a manager, newest first. */
