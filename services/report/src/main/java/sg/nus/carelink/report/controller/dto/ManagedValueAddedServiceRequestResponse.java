@@ -8,7 +8,8 @@ import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 /**
  * A request as the manager's Extra services screen shows it: the request, plus where its work
  * order's visit stands and who is on it. Names are left to the client, which already holds the
- * elder and caregiver lists.
+ * elder and caregiver lists. {@code requestedByFamily}: a family member asked on the elder's
+ * behalf, rather than the elder.
  */
 public record ManagedValueAddedServiceRequestResponse(
         Long id,
@@ -20,6 +21,7 @@ public record ManagedValueAddedServiceRequestResponse(
         ValueAddedServiceRequest.Status status,
         LocalDateTime decidedAt,
         LocalDateTime createdAt,
+        boolean requestedByFamily,
         Long visitId,
         String visitStatus,
         Long caregiverId,
@@ -32,7 +34,7 @@ public record ManagedValueAddedServiceRequestResponse(
         return new ManagedValueAddedServiceRequestResponse(
                 request.id(), request.elderId(), request.valueAddedServiceId(), managed.serviceName(),
                 request.requestedSchedule(), request.specialInstructions(), request.status(),
-                request.decidedAt(), request.createdAt(), request.visitId(), managed.visitStatus(),
+                request.decidedAt(), request.createdAt(), request.requestedByFamilyMemberId() != null, request.visitId(), managed.visitStatus(),
                 managed.caregiverId(), managed.needsCaregiver(),
                 managed.providerOffer() == null ? null : managed.providerOffer().providerName(),
                 managed.providerOffer() == null ? null : managed.providerOffer().job().status().name());

@@ -291,6 +291,26 @@ class ProviderJobsIT {
 		assertThat(escortId()).isNotNull();
 	}
 
+	/**
+	 * created_at is stamped on Singapore's clock and goes through the driver like every other time.
+	 * Left to MySQL's UTC default it read back eight hours early. The wall clock, not the test's
+	 * clock: the stamp is when the row was written.
+	 */
+	@Test
+	void theManagerSeesWhenAndByWhomARequestWasAsked() throws Exception {
+		LocalDateTime before = LocalDateTime.now(SINGAPORE).withNano(0);
+		Long requestId = bookOnly();
+		LocalDateTime after = LocalDateTime.now(SINGAPORE);
+
+		String asked = com.jayway.jsonpath.JsonPath.<List<String>>read(
+				mvc.perform(get("/api/value-added-service-requests").session(sessions().of("manager")))
+						.andExpect(status().isOk())
+						.andExpect(jsonPath("$[?(@.id == " + requestId + ")].requestedByFamily").value(true))
+						.andReturn().getResponse().getContentAsString(),
+				"$[?(@.id == " + requestId + ")].createdAt").get(0);
+		assertThat(LocalDateTime.parse(asked)).isBetween(before, after);
+	}
+
 	@Test
 	void anAcceptanceAfterTheFamilyCancelledIsRefusedWithTheReason() throws Exception {
 		Long requestId = book();
