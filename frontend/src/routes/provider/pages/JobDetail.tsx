@@ -29,6 +29,11 @@ const NOT_SAVED: Record<Op, string> = {
   complete: "Your completion wasn't saved.",
 }
 
+/** The address in one line: the street, then the first of the access notes when there are any. */
+function oneLine(address: NonNullable<Job['address']>): string {
+  return [address.line1, address.line2.split(' · ')[0]].filter(Boolean).join(', ')
+}
+
 /** The time of the job's latest step, in the words the sub line uses. */
 function latestLine(job: Job): string {
   const last = job.timeline[job.timeline.length - 1]
@@ -244,7 +249,7 @@ export default function JobDetail() {
                       ? [
                           { label: 'Service', value: data.service },
                           { label: 'Scheduled', value: formatSchedule(data.scheduledStart, data.durationMin) },
-                          { label: "Elder's area", value: areaLong(data.district) },
+                          { label: "Elder's area", value: areaLong(data.district, data.areaName) },
                         ]
                       : [
                           { label: 'Service', value: data.service },
@@ -253,7 +258,7 @@ export default function JobDetail() {
                           { label: 'Language', value: data.language },
                           { label: 'Booked by', value: data.bookedBy },
                           ...(data.status === 'completed' && data.address
-                            ? [{ label: 'Location', value: `${data.address.line1}, ${data.address.line2.split(' · ')[0]}` }]
+                            ? [{ label: 'Location', value: oneLine(data.address) }]
                             : []),
                         ]
                   }
@@ -274,7 +279,7 @@ export default function JobDetail() {
                             <span className={styles.addressSub}>{data.address.line2}</span>
                           </div>
                           <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${data.address.line1}, ${data.address.line2.split(' · ')[0]}`)}`}
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(oneLine(data.address))}`}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -285,7 +290,7 @@ export default function JobDetail() {
                         <div className={styles.withheld}>
                           <LockIcon color="var(--text-muted)" />
                           <span>
-                            {areaLong(data.district)}. <span className={styles.muted}>Full address is revealed after you accept.</span>
+                            {areaLong(data.district, data.areaName)}. <span className={styles.muted}>Full address is revealed after you accept.</span>
                           </span>
                         </div>
                       )}

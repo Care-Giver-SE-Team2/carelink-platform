@@ -170,7 +170,7 @@ export default function Jobs() {
                               </Link>
                             </td>
                             <td className={styles.service}>{job.service}</td>
-                            <td className={styles.area}>{areaShort(job.district)}</td>
+                            <td className={styles.area}>{areaShort(job.district, job.areaName)}</td>
                             <td className={styles.when}>{formatDayTime(job.scheduledStart)}</td>
                             <td className={styles.status}>
                               <StateTag kind={job.status} />

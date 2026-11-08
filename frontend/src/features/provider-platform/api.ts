@@ -98,7 +98,7 @@ export function collectCredentials(session: PortalSession): Promise<IssuedCreden
   return call(() => platform.collectCredentials(session.token))
 }
 
-/** POST /oauth2/token (grant_type=client_credentials) */
+/** POST /api/open/v1/oauth2/token (grant_type=client_credentials) */
 export async function requestToken(clientId: string, clientSecret: string): Promise<AccessToken> {
   if (LIVE) return live.requestToken(clientId, clientSecret)
   return call(() => platform.requestToken(clientId, clientSecret))

@@ -14,6 +14,13 @@ import {
 it('names the district a job is in', () => {
   expect(areaShort('16')).toBe('D16 · Bedok')
   expect(areaLong('19')).toBe('District 19 · Hougang')
+  expect(areaShort('16', 'Bedok North')).toBe('D16 · Bedok North')
+})
+
+it('falls back to the area name when CareLink has no district', () => {
+  expect(areaShort('', 'AMK')).toBe('AMK')
+  expect(areaLong('', 'AMK')).toBe('AMK')
+  expect(areaLong('', '')).toBe('Area not given')
 })
 
 describe('times, in Singapore time', () => {
