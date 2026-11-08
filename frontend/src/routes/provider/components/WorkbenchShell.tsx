@@ -15,14 +15,14 @@ const NAV = [
   { label: 'Status', to: '/provider/status', open: true },
   { label: 'API credentials', to: '/provider/credentials', open: false },
   { label: 'Webhooks', to: '/provider/webhooks', open: false },
-  { label: 'Sandbox', to: '/provider/sandbox', open: false },
+  { label: 'Job console', to: '/provider/console', open: false },
   { label: 'Docs', to: '/provider/docs', open: true },
 ]
 
 /**
  * Frame for every developer-portal page: the top bar with Back to the CareLink home page and,
  * once signed in, the provider, how its webhooks are doing and Sign out; and one nav that is a left rail on a desktop and a wrapping row above the page on a
- * phone. API credentials, Webhooks and Sandbox stay locked until the application is approved.
+ * phone. API credentials, Webhooks and the Job console stay locked until the application is approved.
  * While a page has set a leave guard, following a nav link asks first. `dense` is the tighter
  * top padding of the job detail page.
  */
@@ -111,7 +111,7 @@ export function WorkbenchShell({ children, dense = false }: { children: ReactNod
       <div className={styles.body}>
         <nav className={styles.rail} aria-label="Partner Portal">
           {nav}
-          {!approved && <p className={styles.railNote}>API credentials, Webhooks and Sandbox unlock once CareLink approves your application.</p>}
+          {!approved && <p className={styles.railNote}>API credentials, Webhooks and the Job console unlock once CareLink approves your application.</p>}
         </nav>
         <main className={cx(styles.main, dense && styles.dense)}>{children}</main>
       </div>

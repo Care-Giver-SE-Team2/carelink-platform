@@ -19,7 +19,7 @@ relationship, as developer portals are elsewhere:
 | Status | Sign in; then the application and CareLink's decision |
 | API credentials | The client ID and secret, shown once; afterwards a hint, how a server uses them, and Rotate secret |
 | Webhooks | The endpoint and its events, the signing secret (rotate), Send test event, and CareLink's delivery log: every attempt, retries, failures, Resend |
-| Sandbox | The job API tried by hand: get a token, accept, decline, complete. What the provider's server would do; it keeps PT04's onboard → accept → complete demonstrable without a partner system |
+| Job console | The job API by hand, on the provider's real jobs (not a test environment; the page says so): get a token, accept, decline, complete. What the provider's server would do; it keeps PT04's onboard → accept → complete demonstrable without a partner system |
 | Docs | Token, webhook verification and job calls in one page (a draft until the Open API contract) |
 
 The header shows the provider and how its webhooks are doing; the manager console's Providers
@@ -36,7 +36,7 @@ components are sized for the manager console.
 (`liveApi.ts`, docs/api/open-platform.yaml): applying, the portal, credentials and webhooks are
 real, and real webhooks are sent and logged. Signing in and getting tokens are notification's
 too: it issues the tokens itself, the same locally and in the cloud (docs/section5/decisions.md,
-D15). The job calls (the Sandbox) are report's, which serves the job API with the same tokens
+D15). The job calls (the Job console) are report's, which serves the job API with the same tokens
 (D16). Every call is under `/api/open/v1`, which CloudFront sends to the services as it does all of
 `/api`; locally the Vite proxy sends `/api/open/v1/jobs` to report on 8082 and the rest of
 `/api/open` to notification on 8083.
@@ -63,15 +63,15 @@ password reset, team members, and approval emails (no email channel, docs/sectio
    (`job.dispatched` appears under Webhooks; the request shows **AWAITING PROVIDER**). A
    decline or no answer hands it back to the manager, who may pick another provider or a
    caregiver (docs/section5/decisions.md, D20).
-6. `/provider/sandbox`: **Get access token** (filled in from step 3), open the job, **Accept
+6. `/provider/console`: **Get access token** (filled in from step 3), open the job, **Accept
    job** (the address appears; the manager's screen shows **PROVIDER ACCEPTED**), then **Mark
    complete**; the family's request is completed. To show the 409 path, assign a caregiver to
    another offered request as the manager first, then accept it. On
    the mock, one new job is cancelled by the family as you accept it.
 7. Back on `/manager/providers`: the provider's health, and **Suspend provider**: its
-   webhooks stop, Status shows it, and the Sandbox gets 403 `provider_suspended`.
+   webhooks stop, Status shows it, and the Job console gets 403 `provider_suspended`.
 8. **Remove provider** ends it for good (docs/section5/decisions.md, D19): it leaves the list, its
-   client secret is refused, Status shows it removed with a link to apply again, and the Sandbox
+   client secret is refused, Status shows it removed with a link to apply again, and the Job console
    gets 403 `provider_removed`. Jobs it hadn't completed are called off and come back to the
    manager: an accepted one gets a new visit to staff in Extra services. Applying again with the
    same email makes a new provider once approved.

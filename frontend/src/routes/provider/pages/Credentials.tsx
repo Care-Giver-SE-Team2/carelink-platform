@@ -166,7 +166,7 @@ function Manage() {
   -u "${data.clientId}:$CARELINK_CLIENT_SECRET" \\
   -d "grant_type=client_credentials&scope=${data.scope.replace(' ', '%20')}"`}</pre>
               <p className={styles.note}>
-                Try it without writing code in the <Link to="/provider/sandbox">Sandbox</Link>. The webhook signing secret is on{' '}
+                Use your jobs without writing code in the <Link to="/provider/console">Job console</Link>. The webhook signing secret is on{' '}
                 <Link to="/provider/webhooks">Webhooks</Link>.
               </p>
             </div>

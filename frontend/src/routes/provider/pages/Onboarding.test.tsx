@@ -45,10 +45,10 @@ describe('Apply', () => {
     const nav = screen.getByRole('navigation', { name: 'Partner Portal' })
     expect(within(nav).getByRole('link', { name: 'Apply' })).toHaveAttribute('aria-current', 'page')
     expect(within(nav).getByRole('link', { name: 'Status' })).toBeInTheDocument()
-    expect(within(nav).queryByRole('link', { name: 'Sandbox' })).not.toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Job console' })).not.toBeInTheDocument()
     expect(within(nav).getByRole('link', { name: 'Docs' })).toBeInTheDocument()
     expect(within(nav).getAllByTitle('Available after approval')).toHaveLength(3)
-    expect(screen.getByText('API credentials, Webhooks and Sandbox unlock once CareLink approves your application.')).toBeInTheDocument()
+    expect(screen.getByText('API credentials, Webhooks and the Job console unlock once CareLink approves your application.')).toBeInTheDocument()
     expect(screen.queryByText('PROVIDER')).not.toBeInTheDocument()
   })
 
@@ -161,7 +161,7 @@ describe('API credentials', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
     await screen.findByText("You're approved")
     const nav = () => screen.getByRole('navigation', { name: 'Partner Portal' })
-    expect(within(nav()).getByRole('link', { name: 'Sandbox' })).toBeInTheDocument()
+    expect(within(nav()).getByRole('link', { name: 'Job console' })).toBeInTheDocument()
     expect(await screen.findByText('WEBHOOKS OK')).toBeInTheDocument()
     expect(screen.getByText('PROVIDER').parentElement).toHaveTextContent('Kinetic Care Pte Ltd')
     await userEvent.click(screen.getByRole('button', { name: 'View credentials →' }))
@@ -199,12 +199,12 @@ describe('API credentials', () => {
     expect(screen.getByRole('status', { name: 'Client ID' })).toHaveTextContent(clientId)
     expect(screen.getByText(/grant_type=client_credentials/)).toBeInTheDocument()
 
-    // The Sandbox starts filled in from the credentials just shown.
-    await userEvent.click(within(nav()).getByRole('link', { name: 'Sandbox' }))
+    // The Job console starts filled in from the credentials just shown.
+    await userEvent.click(within(nav()).getByRole('link', { name: 'Job console' }))
     expect(await screen.findByLabelText('Client ID')).toHaveValue(clientId)
     expect(screen.getByLabelText('Client secret')).toHaveAttribute('type', 'password')
     await userEvent.click(screen.getByRole('button', { name: 'Get access token' }))
-    const bar = await screen.findByRole('region', { name: 'Sandbox connection' })
+    const bar = await screen.findByRole('region', { name: 'Job console connection' })
     expect(bar).toHaveTextContent('Connected')
     expect(bar).toHaveTextContent(`${clientId} · jobs:read jobs:write · expires in 60 min`)
     expect(await screen.findByRole('table')).toBeInTheDocument()
@@ -235,11 +235,11 @@ describe('API credentials', () => {
     expect(screen.queryByRole('region', { name: 'New client secret' })).not.toBeInTheDocument()
   })
 
-  it('shows invalid credentials in the Sandbox', async () => {
+  it('shows invalid credentials in the Job console', async () => {
     signInAs()
     renderWorkbench('/provider/status')
     await screen.findByText("You're approved")
-    await userEvent.click(within(screen.getByRole('navigation', { name: 'Partner Portal' })).getByRole('link', { name: 'Sandbox' }))
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Partner Portal' })).getByRole('link', { name: 'Job console' }))
 
     await userEvent.type(await screen.findByLabelText('Client ID'), 'cl_prov_BrightHome9')
     await userEvent.type(screen.getByLabelText('Client secret'), 'wrong-secret')
