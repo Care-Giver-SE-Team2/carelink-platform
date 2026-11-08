@@ -1,5 +1,5 @@
 import { ATTEMPT_TIMEOUT_SECONDS, MAX_ATTEMPTS, SIGNATURE_TOLERANCE_SECONDS, retryScheduleLabel } from '../../../features/provider-platform/webhooks'
-import { Banner, SectionLabel } from '../components/ui'
+import { SectionLabel } from '../components/ui'
 import { WorkbenchShell } from '../components/WorkbenchShell'
 import styles from './Docs.module.css'
 
@@ -8,19 +8,21 @@ const VERIFY = `import crypto from 'node:crypto'
 // Express: keep the raw body, the signature is over the exact bytes CareLink sent.
 app.post('/carelink', express.raw({ type: 'application/json' }), (req, res) => {
   const timestamp = req.get('X-CareLink-Timestamp')
-  const signature = req.get('X-CareLink-Signature')          // "v1=<hex>"
-  const expected = 'v1=' + crypto
+  const expected = crypto
     .createHmac('sha256', process.env.CARELINK_WEBHOOK_SECRET)
-    .update(\`\${timestamp}.\${req.body}\`)
+    .update(\`\${timestamp}.\`).update(req.body)
     .digest('hex')
 
+  // "v1=<hex>", or "v1=<hex>,v1=<hex>" while CareLink rotates your secret: accept either
   const fresh = Math.abs(Date.now() / 1000 - Number(timestamp)) <= ${SIGNATURE_TOLERANCE_SECONDS}
-  const valid = signature?.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+  const valid = (req.get('X-CareLink-Signature') ?? '').split(',')
+    .map((part) => part.trim().replace(/^v1=/, ''))
+    .some((sig) => sig.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)))
   if (!fresh || !valid) return res.sendStatus(401)
 
   const deliveryId = req.get('X-CareLink-Delivery')
-  if (alreadyProcessed(deliveryId)) return res.sendStatus(200)  // a retry: acknowledge, don't redo
+  if (alreadyProcessed(deliveryId)) return res.sendStatus(200)  // a retry: answer, skip the work
   queueForProcessing(deliveryId, JSON.parse(req.body))
   res.sendStatus(200)                                           // answer fast, work later
 })`
@@ -29,8 +31,9 @@ const TOKEN = `curl -X POST https://api.carelink.sg/api/open/v1/oauth2/token \\
   -u "$CARELINK_CLIENT_ID:$CARELINK_CLIENT_SECRET" \\
   -d "grant_type=client_credentials"
 
-# → { "access_token": "…", "token_type": "Bearer", "expires_in": 3600,
-#     "scope": "open-platform/jobs.read open-platform/jobs.write" }`
+# → { "access_token": "…", "token_type": "Bearer", "expires_in": 3600 }
+# Without a scope parameter the token gets both job scopes:
+#   open-platform/jobs.read and open-platform/jobs.write`
 
 const ACCEPT = `curl -X POST https://api.carelink.sg/api/open/v1/jobs/JOB-24081/accept \\
   -H "Authorization: Bearer $TOKEN" \\
@@ -46,7 +49,7 @@ const ENDPOINTS: [string, string, string][] = [
 
 const ERRORS: [string, string][] = [
   ['401', 'Token missing, wrong or expired: get a new one'],
-  ['403', 'Your provider account is suspended'],
+  ['403', 'Your provider account is suspended or removed, or the token lacks the scope (jobs.read to read, jobs.write to act)'],
   ['404', 'No such job, or it wasn’t sent to you'],
   ['400', 'The request is invalid, or the Idempotency-Key header is missing'],
   ['409', 'The job can no longer change, e.g. CareLink cancelled it first, or respondBy has passed'],
@@ -68,10 +71,6 @@ export default function Docs() {
             staff keep working in your own system.
           </p>
         </div>
-
-        <Banner tone="warning" title="Draft">
-          The full contract will be published as an OpenAPI spec and a webhook guide. Until then, this page is the reference.
-        </Banner>
 
         <section className={styles.section} aria-labelledby="docs-token">
           <SectionLabel>Step 1</SectionLabel>
@@ -103,7 +102,8 @@ export default function Docs() {
             <dd>When it was signed, in Unix seconds. Refuse anything older than {SIGNATURE_TOLERANCE_SECONDS / 60} minutes.</dd>
             <dt>X-CareLink-Signature</dt>
             <dd>
-              <code>v1=</code> and the hex HMAC-SHA256 of <code>timestamp.body</code>, keyed with your signing secret.
+              <code>v1=</code> and the hex HMAC-SHA256 of <code>timestamp.body</code>, keyed with your signing secret. While CareLink
+              rotates your secret it sends two, comma-separated: accept either.
             </dd>
           </dl>
           <p>

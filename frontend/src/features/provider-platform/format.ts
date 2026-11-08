@@ -39,14 +39,19 @@ export function districtName(district: string): string {
   return DISTRICT_NAMES[district] ?? district
 }
 
-/** "16" → "D16 · Bedok": the short form in lists. */
-export function areaShort(district: string): string {
-  return `D${district} · ${districtName(district)}`
+/**
+ * "16" → "D16 · Bedok": the short form in lists. The job's own area name wins over the district's,
+ * and stands alone when CareLink has no district (an address without a postal code).
+ */
+export function areaShort(district: string, areaName = ''): string {
+  const name = areaName || districtName(district)
+  return district ? `D${district} · ${name}` : name || 'Area not given'
 }
 
-/** "16" → "District 16 · Bedok". */
-export function areaLong(district: string): string {
-  return `District ${district} · ${districtName(district)}`
+/** "16" → "District 16 · Bedok"; as {@link areaShort}, the area name alone without a district. */
+export function areaLong(district: string, areaName = ''): string {
+  const name = areaName || districtName(district)
+  return district ? `District ${district} · ${name}` : name || 'Area not given'
 }
 
 function parts(at: string | number, options: Intl.DateTimeFormatOptions): Record<string, string> {

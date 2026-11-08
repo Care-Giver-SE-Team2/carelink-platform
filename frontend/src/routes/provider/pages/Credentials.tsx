@@ -162,7 +162,7 @@ function Manage() {
                   { label: 'Lifetime', value: '60 minutes; ask for a new token when it runs out' },
                 ]}
               />
-              <pre className={styles.example}>{`curl -X POST https://api.carelink.sg/oauth2/token \\
+              <pre className={styles.example}>{`curl -X POST ${data.tokenEndpoint.replace(/^POST /, '')} \\
   -u "${data.clientId}:$CARELINK_CLIENT_SECRET" \\
   -d "grant_type=client_credentials&scope=${data.scope.replace(' ', '%20')}"`}</pre>
               <p className={styles.note}>

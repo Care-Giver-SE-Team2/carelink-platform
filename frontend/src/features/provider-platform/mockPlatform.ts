@@ -48,7 +48,7 @@ export const MOCK_SERVICE_CATALOGUE = ['Hospital escort', 'Grocery assistance', 
 const STORAGE_KEY = 'carelink.mock.providerPlatform.v1'
 const TOKEN_TTL_MS = 60 * 60 * 1000
 const SCOPE = 'jobs:read jobs:write'
-const TOKEN_ENDPOINT = 'POST /oauth2/token'
+const TOKEN_ENDPOINT = 'POST /api/open/v1/oauth2/token'
 const MINUTE_MS = 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
@@ -698,7 +698,7 @@ export function collectCredentials(session: string, now = Date.now()): IssuedCre
   return { clientId, clientSecret, webhookSecret }
 }
 
-/** POST /oauth2/token, grant_type=client_credentials */
+/** POST /api/open/v1/oauth2/token, grant_type=client_credentials */
 export function requestToken(clientId: string, clientSecret: string, now = Date.now()): AccessToken {
   const state = load()
   const app = state.applications.find((a) => a.credentials?.clientId === clientId.trim())
