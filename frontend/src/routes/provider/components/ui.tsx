@@ -293,7 +293,7 @@ export function Dialog({ title, children, footer, onClose }: { title: ReactNode;
 
   return createPortal(
     <div
-      className={styles.backdrop}
+      className={cx(styles.theme, styles.backdrop)}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}

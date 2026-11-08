@@ -1,20 +1,58 @@
 /*
- * The portal's own controls, sized to its handoff: 40px buttons and inputs at 15px, square
- * corners, no shadows except dialogs. Colours come from shared/theme/theme.css.
+ * The portal's own controls, in the look the landing, family and elder pages share: white rounded
+ * cards on a mint page, one green accent, rounded controls, pill tags, green small-caps labels, no
+ * shadows except dialogs. The palette is the family portal's --fm-* set; .theme also points the
+ * shared tokens (shared/theme/theme.css) at it, so everything inside the portal picks it up while
+ * the manager console keeps its own look. Dialogs render outside the shell and carry .theme too.
  */
+
+.theme {
+  --fm-page: #f3f7f5;
+  --fm-card: #fff;
+  --fm-accent: #1a6b5a;
+  --fm-accent-strong: #145446;
+  --fm-accent-tint: #e6f0ec;
+  --fm-ink: #1f3a33;
+  --fm-secondary: #3a4f48;
+  --fm-muted: #5c6e68;
+  --fm-faint: #7d8f89;
+  --fm-disabled: #b5c4be;
+  --fm-line-card: #e2e9e6;
+  --fm-line-control: #d5e2dc;
+  --fm-line-row: #e8eeeb;
+  --fm-note: #eef4f1;
+
+  --font: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --text: var(--fm-ink);
+  --text-secondary: var(--fm-secondary);
+  --text-muted: var(--fm-muted);
+  --text-faint: var(--fm-faint);
+  --bg: var(--fm-card);
+  --surface-2: var(--fm-note);
+  --border: var(--fm-line-card);
+  --border-light: var(--fm-line-row);
+  --accent: var(--fm-accent);
+  --accent-hover: var(--fm-accent-strong);
+  --accent-tint: var(--fm-accent-tint);
+  --link: var(--fm-accent);
+  --success: var(--fm-accent);
+
+  --radius-card: 18px;
+  --radius-control: 12px;
+}
 
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 40px;
+  height: 44px;
   min-height: 0;
   padding: 0 20px;
-  border: 1px solid var(--text);
-  border-radius: 0;
-  background: var(--bg);
-  color: var(--text);
+  border: 1px solid var(--fm-line-control);
+  border-radius: var(--radius-control);
+  background: var(--fm-card);
+  color: var(--fm-ink);
   font: 600 15px/1 var(--font);
   white-space: nowrap;
   cursor: pointer;
@@ -24,24 +62,25 @@
 .input:focus-visible,
 .checkbox input:focus-visible + .box,
 .link:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--fm-accent);
   outline-offset: 2px;
 }
 
 .button:hover:not(:disabled) {
-  background: var(--surface-2);
+  border-color: var(--fm-accent);
+  background: var(--fm-page);
 }
 
 .primary {
   padding: 0 22px;
-  border-color: var(--accent);
-  background: var(--accent);
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
   color: #fff;
 }
 
 .primary:hover:not(:disabled) {
-  border-color: var(--accent-hover);
-  background: var(--accent-hover);
+  border-color: var(--fm-accent-strong);
+  background: var(--fm-accent-strong);
 }
 
 .danger {
@@ -56,18 +95,20 @@
 }
 
 .success {
-  border-color: var(--success);
-  color: var(--success);
+  border-color: var(--fm-accent);
+  color: var(--fm-accent);
 }
 
 .small {
-  height: 36px;
+  height: 38px;
   padding: 0 14px;
+  border-radius: 10px;
   font-size: 14px;
 }
 
 .large {
-  height: 48px;
+  height: 52px;
+  border-radius: 16px;
 }
 
 .block {
@@ -75,22 +116,25 @@
 }
 
 .button:disabled {
-  border-color: var(--border);
-  background: var(--bg);
-  color: var(--text-muted);
+  border-color: var(--fm-line-card);
+  background: var(--fm-card);
+  color: var(--fm-disabled);
   cursor: not-allowed;
 }
 
-.primary:disabled {
-  border-color: #a9abd3;
-  background: #a9abd3;
+.primary:disabled,
+.danger:disabled {
+  border-color: transparent;
+  opacity: 0.55;
   color: #fff;
 }
 
+.primary:disabled {
+  background: var(--fm-accent);
+}
+
 .danger:disabled {
-  border-color: #e1a79e;
-  background: #e1a79e;
-  color: #fff;
+  background: var(--danger);
 }
 
 .spinner {
@@ -104,72 +148,78 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
 }
 
 .label {
   font: 600 14px/1.3 var(--font);
-  color: var(--text);
+  color: var(--fm-ink);
 }
 
 .optional {
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--fm-muted);
 }
 
 .helper {
-  font: 400 13px/1.4 var(--font);
-  color: var(--text-muted);
+  font: 400 13px/1.45 var(--font);
+  color: var(--fm-muted);
 }
 
 .error {
   font: 500 13px/1.4 var(--font);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .input {
   box-sizing: border-box;
   width: 100%;
-  height: 40px;
+  height: 46px;
   min-height: 0;
-  padding: 0 12px;
-  border: 1px solid #a0a0a0;
-  border-radius: 0;
-  background: var(--bg);
-  color: var(--text);
+  padding: 0 14px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: var(--radius-control);
+  background: var(--fm-card);
+  color: var(--fm-ink);
   font: 400 15px/1 var(--font);
 }
 
 textarea.input {
   height: auto;
-  min-height: 96px;
-  padding: 9px 12px;
+  min-height: 104px;
+  padding: 11px 14px;
   line-height: 1.5;
   resize: vertical;
 }
 
+.input:hover:not(:disabled) {
+  border-color: var(--fm-faint);
+}
+
 .input:focus {
-  padding: 0 11px;
-  border: 2px solid var(--accent);
+  border-color: var(--fm-accent);
+  box-shadow: 0 0 0 3px var(--fm-accent-tint);
   outline: none;
 }
 
-textarea.input:focus {
-  padding: 8px 11px;
-}
-
 .input::placeholder {
-  color: var(--text-muted);
+  color: var(--fm-faint);
 }
 
 .input:disabled {
-  border-color: var(--border);
-  background: var(--surface-2);
-  color: var(--text-secondary);
+  border-color: var(--fm-line-card);
+  background: var(--fm-note);
+  color: var(--fm-secondary);
 }
 
 .mono {
@@ -178,8 +228,8 @@ textarea.input:focus {
 
 .invalid,
 .invalid:focus {
-  padding: 0 11px;
-  border: 2px solid var(--danger);
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-tint);
 }
 
 .checkbox {
@@ -202,64 +252,73 @@ textarea.input:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
-  border: 1px solid var(--text);
-  background: var(--bg);
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1.5px solid var(--fm-line-control);
+  border-radius: 6px;
+  background: var(--fm-card);
+}
+
+.checkbox:hover .box {
+  border-color: var(--fm-accent);
 }
 
 .checkbox input:checked + .box {
-  border-color: var(--accent);
-  background: var(--accent);
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
 }
 
 .boxInvalid {
   border: 2px solid var(--danger);
 }
 
+/* A state, as the family pages show one: a small pill with letter-spaced capitals. */
 .tag {
   display: inline-block;
   align-self: flex-start;
-  padding: 4px 7px;
+  padding: 5px 10px;
   border: 1px solid;
-  background: var(--bg);
-  font: 500 11px/1 var(--font-mono);
-  letter-spacing: 0.08em;
+  border-radius: 999px;
+  background: var(--fm-card);
+  font: 600 11px/1 var(--font);
+  letter-spacing: 0.1em;
   white-space: nowrap;
 }
 
 .tag_new {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--fm-accent);
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
 }
 
 .tag_accepted {
-  border-color: var(--text);
-  background: var(--text);
+  border-color: var(--fm-accent);
+  background: var(--fm-accent);
   color: #fff;
 }
 
 .tag_good {
-  border-color: var(--success);
-  color: var(--success);
+  border-color: var(--fm-line-control);
+  color: var(--fm-accent);
 }
 
 .tag_bad {
-  border-color: var(--danger);
-  background: var(--danger);
-  color: #fff;
+  border-color: var(--fm-urgent-line, #f0d6d1);
+  background: var(--danger-tint);
+  color: var(--danger-text);
 }
 
 .tag_pending {
-  border-color: var(--warning);
-  color: var(--text);
+  border-color: #ead9ad;
+  background: #fbf6e8;
+  color: var(--warning-text);
 }
 
 .sectionLabel {
-  font: 500 11px/1 var(--font-mono);
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
+  font: 600 11px/1 var(--font);
+  letter-spacing: 0.12em;
+  color: var(--fm-accent);
   text-transform: uppercase;
 }
 
@@ -268,29 +327,34 @@ textarea.input:focus {
   justify-content: space-between;
   align-items: center;
   gap: 20px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid;
+  border-radius: 16px;
 }
 
 .banner_danger {
-  border-color: var(--danger);
+  border-color: #f0d6d1;
   background: var(--danger-tint);
 }
 
+.banner_danger .bannerTitle {
+  color: var(--danger-text);
+}
+
 .banner_warning {
-  border-color: var(--warning);
-  background: var(--bg);
+  border-color: #ead9ad;
+  background: #fbf6e8;
 }
 
 .banner_success {
-  border-color: var(--success);
-  background: var(--bg);
+  border-color: var(--fm-line-control);
+  background: var(--fm-accent-tint);
 }
 
 .bannerText {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -300,7 +364,7 @@ textarea.input:focus {
 
 .bannerBody {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--fm-secondary);
 }
 
 .bannerAction {
@@ -309,17 +373,18 @@ textarea.input:focus {
 
 .bannerAction a {
   font-size: 14px;
-  color: var(--link);
+  font-weight: 600;
+  color: var(--fm-accent);
   text-decoration: none;
 }
 
 .bannerAction a:hover {
-  color: var(--text);
   text-decoration: underline;
 }
 
 .copyField {
   display: flex;
+  gap: 8px;
 }
 
 .copyValue {
@@ -327,24 +392,24 @@ textarea.input:focus {
   min-width: 0;
   display: flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 46px;
   padding: 0 14px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  border: 1px solid var(--fm-line-card);
+  border-radius: var(--radius-control);
+  background: var(--fm-note);
   font: 500 14px/1.3 var(--font-mono);
   overflow-wrap: anywhere;
 }
 
 .copyField .button {
   height: auto;
-  min-height: 44px;
+  min-height: 46px;
   padding: 0 16px;
-  border-left: 0;
   font-size: 14px;
 }
 
 .copyField .success {
-  border-color: var(--success);
+  border-color: var(--fm-accent);
 }
 
 /* Gap, weight and alignment are set outright: a family stylesheet styles every dl/dt/dd. */
@@ -358,17 +423,17 @@ textarea.input:focus {
 .facts dt,
 .facts dd {
   margin: 0;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-light);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--fm-line-row);
 }
 
 .facts dt {
   font-size: 14px;
-  color: var(--text-muted);
+  color: var(--fm-muted);
 }
 
 .facts dd {
-  font-weight: 400;
+  font-weight: 500;
   text-align: left;
   overflow-wrap: anywhere;
 }
@@ -382,13 +447,13 @@ textarea.input:focus {
   min-height: 0;
   border: 0;
   background: none;
-  color: var(--link);
+  color: var(--fm-accent);
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .link:hover {
-  color: var(--text);
   text-decoration: underline;
 }
 
@@ -400,7 +465,7 @@ textarea.input:focus {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(17, 17, 17, 0.45);
+  background: rgba(20, 40, 34, 0.45);
 }
 
 .dialog {
@@ -410,10 +475,12 @@ textarea.input:focus {
   width: 480px;
   max-width: 100%;
   max-height: calc(100vh - 32px);
-  background: var(--bg);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border-radius: 20px;
+  background: var(--fm-card);
+  box-shadow: 0 18px 48px rgba(20, 40, 34, 0.2);
   font: 400 15px/1.5 var(--font);
-  color: var(--text);
+  color: var(--fm-ink);
+  overflow: hidden;
 }
 
 .dialog:focus {
@@ -425,23 +492,35 @@ textarea.input:focus {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--fm-line-row);
 }
 
 .dialogTitle {
   margin: 0;
-  font: 600 18px/1.2 var(--font);
+  font: 700 19px/1.2 var(--font);
+  letter-spacing: -0.01em;
 }
 
 .close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
   min-height: 0;
-  padding: 0 4px;
+  padding: 0;
   border: 0;
+  border-radius: 10px;
   background: none;
-  color: var(--text-muted);
+  color: var(--fm-muted);
   font-size: 22px;
   line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--fm-page);
+  color: var(--fm-ink);
 }
 
 .dialogBody {
@@ -456,6 +535,6 @@ textarea.input:focus {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding: 16px 24px;
-  border-top: 1px solid var(--border);
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--fm-line-row);
 }

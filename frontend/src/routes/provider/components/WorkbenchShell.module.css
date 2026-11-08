@@ -1,21 +1,28 @@
-/* Desktop from 900px: bar + 168px rail. Below 900px: bar + wrapping nav row; 600–899px centres it. */
+/*
+ * The landing and family pages' frame: a white header band, a white side rail with rounded items
+ * (the current one on the green tint), and the content on the mint page. Desktop from 900px: bar +
+ * 220px rail. Below 900px: bar + a wrapping row of nav pills; 600–899px centres the content.
+ */
 
 .shell {
   min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--fm-page);
+  color: var(--fm-ink);
   font: 400 15px/1.5 var(--font);
 }
 
 .bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  height: 52px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--text);
-  background: var(--bg);
+  height: 64px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--fm-line-card);
+  background: var(--fm-card);
 }
 
 .brand {
@@ -26,13 +33,19 @@
 }
 
 .wordmark {
-  font: 700 15px/1 var(--font);
+  color: var(--fm-accent);
+  font: 700 19px/1 var(--font);
   letter-spacing: -0.02em;
 }
 
 .product {
-  font: 400 12px/1 var(--font-mono);
-  color: var(--text-muted);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
+  font: 600 11px/1 var(--font);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .productShort {
@@ -49,77 +62,98 @@
 .org {
   display: flex;
   align-items: center;
-  gap: 14px;
-  font: 500 13px/1 var(--font);
+  gap: 12px;
+  font: 600 14px/1 var(--font);
 }
 
 .providerTag {
-  padding: 3px 6px;
-  border: 1px solid var(--text);
-  font: 500 10px/1 var(--font-mono);
-  letter-spacing: 0.08em;
+  padding: 5px 9px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 999px;
+  color: var(--fm-muted);
+  font: 600 10.5px/1 var(--font);
+  letter-spacing: 0.12em;
 }
 
 .divider {
   width: 1px;
-  height: 18px;
-  background: var(--border);
+  height: 20px;
+  background: var(--fm-line-card);
 }
 
 .signOut {
-  font: 500 13px/1 var(--font);
-  color: var(--link);
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--fm-line-control);
+  border-radius: 999px;
+  color: var(--fm-ink);
+  font: 500 14px/1 var(--font);
+}
+
+.signOut:hover {
+  border-color: var(--fm-accent);
+  background: var(--fm-page);
+  text-decoration: none;
 }
 
 .back {
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 500 13px/1 var(--font);
-  color: var(--link);
+  height: 36px;
+  padding: 0 12px 0 8px;
+  border-radius: 10px;
+  color: var(--fm-muted);
+  font: 500 14px/1 var(--font);
   text-decoration: none;
 }
 
 .back:hover {
-  color: var(--text);
-  text-decoration: underline;
+  background: var(--fm-page);
+  color: var(--fm-ink);
 }
 
 .back:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--fm-accent);
   outline-offset: 2px;
 }
 
 .backDivider {
   width: 1px;
-  height: 18px;
-  background: var(--border);
+  height: 20px;
+  background: var(--fm-line-card);
 }
 
 .indicator {
   display: flex;
   align-items: center;
   gap: 7px;
-  font: 500 11px/1 var(--font-mono);
-  letter-spacing: 0.06em;
+  padding: 6px 11px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 999px;
+  font: 600 11px/1 var(--font);
+  letter-spacing: 0.1em;
 }
 
 .dot {
   box-sizing: border-box;
   width: 7px;
   height: 7px;
+  border-radius: 50%;
 }
 
 .connected {
-  color: var(--success);
+  color: var(--fm-accent);
 }
 
 .connected .dot {
-  background: var(--success);
+  background: var(--fm-accent);
 }
 
 .failed {
-  color: var(--danger);
+  border-color: #f0d6d1;
+  background: var(--danger-tint);
+  color: var(--danger-text);
 }
 
 .failed .dot {
@@ -131,16 +165,18 @@
 }
 
 .warning {
+  border-color: #ead9ad;
+  background: #fbf6e8;
   color: var(--warning-text);
 }
 
 /* Nothing sent in the last seven days: nothing to judge by yet */
 .idle {
-  color: var(--text-muted);
+  color: var(--fm-muted);
 }
 
 .idle .dot {
-  box-shadow: inset 0 0 0 1px var(--text-muted);
+  box-shadow: inset 0 0 0 1.5px var(--fm-faint);
 }
 
 .warning .dot {
@@ -149,42 +185,44 @@
 
 .body {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  min-height: calc(100vh - 53px);
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: calc(100vh - 65px);
 }
 
 .rail {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 18px 0;
-  border-right: 1px solid var(--border);
+  padding: 22px 14px;
+  border-right: 1px solid var(--fm-line-card);
+  background: var(--fm-card);
 }
 
 .item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
-  color: var(--text-secondary);
-  font: 400 14px/1 var(--font);
+  padding: 11px 14px;
+  border-radius: 12px;
+  color: var(--fm-muted);
+  font: 500 14.5px/1 var(--font);
   text-decoration: none;
 }
 
 a.item:hover {
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--fm-page);
+  color: var(--fm-ink);
 }
 
 .item.active,
 a.item.active:hover {
-  background: var(--text);
-  color: #fff;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent);
   font-weight: 600;
 }
 
 .locked {
-  color: var(--text-muted);
+  color: var(--fm-disabled);
   cursor: not-allowed;
 }
 
@@ -193,20 +231,34 @@ a.item.active:hover {
 }
 
 .railNote {
-  margin: 14px 20px 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+  margin: 14px 4px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--fm-note);
   font: 400 12.5px/1.45 var(--font);
-  color: var(--text-muted);
+  color: var(--fm-muted);
 }
 
 .main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-width: 0;
-  padding: 36px 40px 64px;
+  padding: 40px 48px 72px;
+}
+
+/*
+ * Each page centred in the space beside the rail, as the family pages sit, up to 1180px wide.
+ * :where() keeps this at no specificity, so a page that sets its own narrower width keeps it.
+ */
+:where(.main > *) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1180px;
 }
 
 .dense {
-  padding-top: 28px;
+  padding-top: 32px;
 }
 
 .dialogText {
@@ -215,11 +267,8 @@ a.item.active:hover {
 
 @media (max-width: 899px) {
   .bar {
+    height: 56px;
     padding: 0 16px;
-  }
-
-  .product {
-    font-size: 11px;
   }
 
   .productLong,
@@ -243,14 +292,15 @@ a.item.active:hover {
   .rail {
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 4px;
-    padding: 8px 16px;
+    gap: 6px;
+    padding: 10px 16px;
     border-right: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--fm-line-card);
   }
 
   .rail .item {
-    padding: 8px 10px;
+    padding: 8px 12px;
+    border-radius: 999px;
     font-size: 13.5px;
   }
 

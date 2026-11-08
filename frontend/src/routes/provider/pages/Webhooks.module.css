@@ -13,7 +13,8 @@
 
 .title {
   margin: 0;
-  font: 600 22px/1.25 var(--font);
+  font: 700 28px/1.15 var(--font);
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
@@ -33,7 +34,10 @@
 
 .card {
   max-width: 760px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  overflow: hidden;
 }
 
 .cardHead {
@@ -135,23 +139,38 @@
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--fm-card);
   table-layout: fixed;
+  overflow: hidden;
+}
+
+/* The card's own padding: 20px in from its rounded edge, and no rule under the last row. */
+.table th:first-child,
+.table td:first-child {
+  padding-left: 20px;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 20px;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .table th {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--text);
-  font: 500 11px/1 var(--font-mono);
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
+  padding: 16px 0 14px;
+  border-bottom: 1px solid var(--fm-line-row);
+  font: 600 11px/1 var(--font);
+  letter-spacing: 0.12em;
+  color: var(--fm-faint);
   text-align: left;
   text-transform: uppercase;
-}
-
-.table th:first-child,
-.table td:first-child {
-  padding-left: 10px;
 }
 
 .table th:nth-child(1) {
@@ -228,7 +247,10 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  overflow: hidden;
 }
 
 .panelHead {
@@ -311,6 +333,7 @@
   padding-top: 12px;
   padding-bottom: 16px;
   background: var(--surface-2);
+  border-radius: 12px;
 }
 
 @media (max-width: 1279px) {

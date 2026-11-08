@@ -3,7 +3,10 @@
   flex-direction: column;
   gap: 16px;
   padding: 18px 20px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  overflow: hidden;
 }
 
 .steps {
@@ -47,6 +50,7 @@
   width: 10px;
   height: 10px;
   margin-top: 6px;
+  border-radius: 50%;
   background: var(--text);
 }
 
@@ -59,7 +63,7 @@
 }
 
 .pending .marker {
-  border: 1px solid #a0a0a0;
+  border: 1.5px solid var(--fm-faint);
   background: transparent;
 }
 
@@ -83,7 +87,8 @@
 
 .atLong,
 .atShort {
-  font: 400 12.5px/1.4 var(--font-mono);
+  font: 400 12.5px/1.4 var(--font);
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
 
