@@ -13,7 +13,8 @@
 
 .title {
   margin: 0;
-  font: 600 22px/1.25 var(--font);
+  font: 700 28px/1.15 var(--font);
+  letter-spacing: -0.02em;
 }
 
 .sub {
@@ -24,9 +25,12 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
+  gap: 14px;
+  padding: 26px 28px 28px;
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  color: var(--fm-ink);
 }
 
 .section p {
@@ -34,21 +38,29 @@
 }
 
 .section code {
-  font: 400 13.5px/1 var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--fm-accent-tint);
+  color: var(--fm-accent-strong);
+  font: 500 13px/1.4 var(--font-mono);
 }
 
 .heading {
   margin: 0;
-  font: 600 18px/1.25 var(--font);
+  font: 700 20px/1.25 var(--font);
+  letter-spacing: -0.01em;
 }
 
+/* Code on the palette's ink, so it stands apart from the prose around it. */
 .code {
   margin: 0;
-  padding: 14px 16px;
-  background: var(--surface-2);
-  font: 400 12.5px/1.6 var(--font-mono);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--fm-ink);
+  color: #e6f0ec;
+  font: 400 13px/1.65 var(--font-mono);
+  white-space: pre;
+  overflow-x: auto;
 }
 
 /* Weight and alignment set outright: a family stylesheet styles every dl/dt/dd. */
@@ -62,14 +74,15 @@
 .headersList dt,
 .headersList dd {
   margin: 0;
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border-light);
   font-weight: 400;
   text-align: left;
 }
 
 .headersList dt {
-  font: 500 13px/1.5 var(--font-mono);
+  color: var(--fm-ink);
+  font: 600 13px/1.5 var(--font-mono);
 }
 
 .table {
@@ -87,16 +100,21 @@
 
 .method {
   width: 56px;
-  font: 500 12.5px/1.5 var(--font-mono);
-  color: var(--accent);
+  font: 700 12.5px/1.5 var(--font-mono);
+  color: var(--fm-accent);
 }
 
 .path {
   width: 42%;
-  font: 400 13px/1.5 var(--font-mono);
+  color: var(--fm-ink);
+  font: 500 13px/1.5 var(--font-mono);
 }
 
 @media (max-width: 599px) {
+  .section {
+    padding: 20px 18px 22px;
+  }
+
   .headersList {
     grid-template-columns: minmax(0, 1fr);
   }

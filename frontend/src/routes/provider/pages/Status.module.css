@@ -7,7 +7,8 @@
 
 .title {
   margin: 0;
-  font: 600 22px/1.25 var(--font);
+  font: 700 28px/1.15 var(--font);
+  letter-spacing: -0.02em;
 }
 
 .sub {
@@ -38,13 +39,16 @@
   text-decoration: underline;
 }
 
+/* The news a provider waits for, on the solid green so it stands out from the cards below. */
 .approved {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  padding: 20px;
-  border: 1px solid var(--success);
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: var(--fm-accent);
+  color: #fff;
 }
 
 .approvedText {
@@ -54,16 +58,37 @@
 }
 
 .approvedTitle {
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .approvedBody {
-  font-size: 14px;
-  color: var(--text-secondary);
+  font-size: 14.5px;
+  color: #e6f0ec;
+}
+
+/* The button turns white on the green; the selector outranks the shared .primary. */
+.approved button {
+  border-color: #fff;
+  background: #fff;
+  color: var(--fm-accent-strong);
+}
+
+.approved button:hover:not(:disabled) {
+  border-color: var(--fm-accent-tint);
+  background: var(--fm-accent-tint);
+}
+
+.approved button:focus-visible {
+  outline-color: #fff;
 }
 
 .card {
-  border: 1px solid var(--border);
+  border: 1px solid var(--fm-line-card);
+  border-radius: 18px;
+  background: var(--fm-card);
+  overflow: hidden;
 }
 
 .services {

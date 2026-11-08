@@ -8,6 +8,7 @@ import type { IntegrationHealth } from '../../../features/provider-platform/type
 import { useWorkbench } from '../workbenchContext'
 import { Button, Dialog, LinkButton, LockIcon } from './ui'
 import styles from './WorkbenchShell.module.css'
+import uiStyles from './ui.module.css'
 
 const NAV = [
   { label: 'Apply', to: '/provider/apply', open: true },
@@ -67,7 +68,7 @@ export function WorkbenchShell({ children, dense = false }: { children: ReactNod
   )
 
   return (
-    <div className={styles.shell}>
+    <div className={cx(uiStyles.theme, styles.shell)}>
       <header className={styles.bar}>
         <div className={styles.brand}>
           <Link className={styles.back} to="/" onClick={(e) => guard(e, '/')} aria-label="Back to the CareLink home page">
