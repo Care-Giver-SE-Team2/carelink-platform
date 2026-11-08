@@ -7,7 +7,7 @@ import { Button, Field, LinkButton, TextInput } from './ui'
 import styles from './SandboxConnect.module.css'
 
 /**
- * The Sandbox's token step: client ID and secret in, access token out (OAuth2 client
+ * The Job console's token step: client ID and secret in, access token out (OAuth2 client
  * credentials), as the provider's server would do it. Connected, it shrinks to one line with
  * Refresh token and Disconnect. Starts filled in from the credentials just collected, if any.
  */
@@ -34,7 +34,7 @@ export function SandboxConnect() {
 
   if (connection === 'connected' && token) {
     return (
-      <section className={styles.bar} aria-label="Sandbox connection">
+      <section className={styles.bar} aria-label="Job console connection">
         <span className={styles.state}>
           <span className={styles.on} aria-hidden="true" />
           Connected
@@ -58,7 +58,7 @@ export function SandboxConnect() {
   const suspended = failure instanceof ApiError && failure.status === 403
 
   return (
-    <section className={styles.connect} aria-label="Sandbox connection">
+    <section className={styles.connect} aria-label="Job console connection">
       <div className={styles.head}>
         <div className={styles.title}>{expired ? 'Access token expired' : 'Get an access token'}</div>
         <div className={styles.sub}>

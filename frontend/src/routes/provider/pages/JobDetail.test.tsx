@@ -24,7 +24,7 @@ function newJobs() {
 }
 
 async function open(jobId: string) {
-  renderWorkbench(`/provider/sandbox/jobs/${jobId}`)
+  renderWorkbench(`/provider/console/jobs/${jobId}`)
   return screen.findByRole('heading', { level: 1 })
 }
 
@@ -34,7 +34,7 @@ it('accepts a new job, which reveals the address', async () => {
   expect(title.parentElement).toHaveTextContent('NEW')
   expect(screen.getByText(/Full address is revealed after you accept\./)).toBeInTheDocument()
   expect(screen.getByText(`${job.id} · received`, { exact: false })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Sandbox' })).toHaveAttribute('href', '/provider/sandbox')
+  expect(screen.getByRole('link', { name: 'Job console' })).toHaveAttribute('href', '/provider/console')
 
   await userEvent.click(screen.getByRole('button', { name: 'Accept job' }))
 
@@ -145,7 +145,7 @@ it('asks to reconnect when the token is refused', async () => {
   const banner = await screen.findByRole('alert')
   expect(banner).toHaveTextContent('Access token expired')
   await userEvent.click(within(banner).getByRole('button', { name: 'Reconnect' }))
-  expect(screen.getByTestId('location')).toHaveTextContent('/provider/sandbox')
+  expect(screen.getByTestId('location')).toHaveTextContent('/provider/console')
 })
 
 it('disables the actions while offline', async () => {
@@ -164,6 +164,6 @@ it('disables the actions while offline', async () => {
 })
 
 it('says when the job is not this provider’s', async () => {
-  renderWorkbench('/provider/sandbox/jobs/JOB-1')
+  renderWorkbench('/provider/console/jobs/JOB-1')
   expect(await screen.findByRole('alert')).toHaveTextContent('No such job')
 })

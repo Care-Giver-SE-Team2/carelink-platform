@@ -22,7 +22,7 @@ function rows() {
 
 it('lists new jobs five to a page, with every tab’s count', async () => {
   connectSeeded()
-  renderWorkbench('/provider/sandbox')
+  renderWorkbench('/provider/console')
 
   await screen.findByRole('table')
   const tabs = screen.getByRole('tablist', { name: 'Job states' })
@@ -38,18 +38,18 @@ it('lists new jobs five to a page, with every tab’s count', async () => {
   expect(rows()[0]).toHaveTextContent(/D1[689] · (Bedok|Tampines|Hougang)/)
   expect(screen.getByText(/Showing/).parentElement).toHaveTextContent('Showing 1–5 of 7')
   expect(screen.getByText(/^Last refreshed \d\d:\d\d:\d\d$/)).toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Sandbox connection' })).toHaveTextContent('Connected')
+  expect(screen.getByRole('region', { name: 'Job console connection' })).toHaveTextContent('Connected')
 
   expect(screen.getByRole('button', { name: '← Previous' })).toBeDisabled()
   await userEvent.click(screen.getByRole('button', { name: 'Next →' }))
   expect(rows()).toHaveLength(2)
-  expect(screen.getByTestId('location')).toHaveTextContent('/provider/sandbox?tab=new&page=2')
+  expect(screen.getByTestId('location')).toHaveTextContent('/provider/console?tab=new&page=2')
   expect(screen.getByRole('button', { name: 'Next →' })).toBeDisabled()
 })
 
 it('switches tabs and opens a job from its row', async () => {
   connectSeeded()
-  renderWorkbench('/provider/sandbox')
+  renderWorkbench('/provider/console')
   await screen.findByRole('table')
 
   await userEvent.click(screen.getByRole('tab', { name: /Completed/ }))
@@ -58,12 +58,12 @@ it('switches tabs and opens a job from its row', async () => {
 
   const id = within(rows()[0]).getByRole('link').textContent!
   await userEvent.click(rows()[0])
-  expect(screen.getByTestId('location')).toHaveTextContent(`/provider/sandbox/jobs/${id}`)
+  expect(screen.getByTestId('location')).toHaveTextContent(`/provider/console/jobs/${id}`)
 })
 
 it('shows skeleton rows while refreshing', async () => {
   connectSeeded()
-  renderWorkbench('/provider/sandbox')
+  renderWorkbench('/provider/console')
   await screen.findByRole('table')
 
   await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
@@ -88,7 +88,7 @@ it('says when a tab has nothing in it, and where new jobs will arrive', async ()
   }
   sessionStorage.setItem('carelink.workbench.token', JSON.stringify(token))
   signInAs('rachel@kinetic.sg', 'kinetic-password')
-  renderWorkbench('/provider/sandbox')
+  renderWorkbench('/provider/console')
 
   expect(await screen.findByText('No new jobs.')).toBeInTheDocument()
   expect(screen.getByText("You'll be notified by webhook when one is dispatched.")).toBeInTheDocument()
@@ -102,25 +102,39 @@ it('asks for a token first, and for a new one when it ran out', async () => {
   signInAs()
   renderWorkbench('/provider/status')
   await screen.findByText("You're approved")
-  await userEvent.click(within(screen.getByRole('navigation', { name: 'Partner Portal' })).getByRole('link', { name: 'Sandbox' }))
+  await userEvent.click(within(screen.getByRole('navigation', { name: 'Partner Portal' })).getByRole('link', { name: 'Job console' }))
 
-  const connect = await screen.findByRole('region', { name: 'Sandbox connection' })
+  const connect = await screen.findByRole('region', { name: 'Job console connection' })
   expect(connect).toHaveTextContent('Get an access token')
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   cleanup()
 
   const token = connectSeeded()
   sessionStorage.setItem('carelink.workbench.token', JSON.stringify({ ...token, expiresAt: Date.now() - 1000 }))
-  renderWorkbench('/provider/sandbox')
-  const expired = await screen.findByRole('region', { name: 'Sandbox connection' })
+  renderWorkbench('/provider/console')
+  const expired = await screen.findByRole('region', { name: 'Job console connection' })
   expect(expired).toHaveTextContent('Access token expired')
   expect(within(expired).getByLabelText('Client ID')).toHaveValue('cl_prov_BrightHome9')
   expect(within(expired).getByRole('button', { name: 'Get access token' })).toBeInTheDocument()
 })
 
-it('sends old job links to the Sandbox', async () => {
+it('sends old job and Sandbox links to the Job console', async () => {
   connectSeeded()
   renderWorkbench('/provider/jobs')
-  expect(await screen.findByRole('heading', { name: 'Sandbox' })).toBeInTheDocument()
-  expect(screen.getByTestId('location')).toHaveTextContent('/provider/sandbox')
+  expect(await screen.findByRole('heading', { name: 'Job console' })).toBeInTheDocument()
+  expect(screen.getByTestId('location')).toHaveTextContent('/provider/console')
+})
+
+it('still opens from the old Sandbox address', async () => {
+  connectSeeded()
+  renderWorkbench('/provider/sandbox')
+  expect(await screen.findByRole('heading', { name: 'Job console' })).toBeInTheDocument()
+  expect(screen.getByTestId('location')).toHaveTextContent('/provider/console')
+})
+
+it('says the jobs are real, not a test environment', async () => {
+  connectSeeded()
+  renderWorkbench('/provider/console')
+  expect(await screen.findByText('These are your real jobs')).toBeInTheDocument()
+  expect(screen.getByText(/does it for real/)).toBeInTheDocument()
 })

@@ -117,8 +117,8 @@ export default function JobDetail() {
     <WorkbenchShell dense>
       <div className={styles.page}>
         <nav className={styles.crumbs} aria-label="Breadcrumb">
-          <Link to="/provider/sandbox" className={styles.crumbLink}>
-            <span className={styles.crumbBack}>← </span>Sandbox
+          <Link to="/provider/console" className={styles.crumbLink}>
+            <span className={styles.crumbBack}>← </span>Job console
           </Link>
           <span className={styles.crumbSep}> / </span>
           <span className={styles.crumbId}>{jobId}</span>
@@ -130,17 +130,17 @@ export default function JobDetail() {
             title={expired || failure?.kind === 'expired' ? 'Access token expired' : 'Not connected'}
             role="alert"
             action={
-              <Button size="small" onClick={() => navigate('/provider/sandbox')}>
+              <Button size="small" onClick={() => navigate('/provider/console')}>
                 Reconnect
               </Button>
             }
           >
-            Get a new token in the Sandbox, then retry the action.
+            Get a new token in the Job console, then retry the action.
           </Banner>
         ) : null}
 
         {failure?.kind === 'cancelled' && (
-          <Banner tone="danger" title="Job was cancelled by CareLink" role="alert" action={<Link to="/provider/sandbox">Back to jobs</Link>}>
+          <Banner tone="danger" title="Job was cancelled by CareLink" role="alert" action={<Link to="/provider/console">Back to jobs</Link>}>
             {data?.cancelReason ?? failure.message}
           </Banner>
         )}
@@ -170,7 +170,7 @@ export default function JobDetail() {
             tone="danger"
             title={job.error instanceof ApiError && job.error.status === 404 ? 'No such job' : "Couldn't reach CareLink"}
             role="alert"
-            action={<Link to="/provider/sandbox">Back to jobs</Link>}
+            action={<Link to="/provider/console">Back to jobs</Link>}
           >
             {job.error.message}
           </Banner>

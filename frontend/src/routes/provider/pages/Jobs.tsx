@@ -22,7 +22,8 @@ const TABS: { tab: JobTab; label: string; short: string }[] = [
 const POLL_MS = 30_000
 
 /**
- * Sandbox (PT04): the job API as the provider's server uses it, tried by hand. Get a token with
+ * Job console (PT04): the job API as the provider's server uses it, by hand, on the provider's
+ * real jobs - not a test environment, so the page says so. Get a token with
  * the client credentials, then see every job CareLink dispatched, by state, newest first, and
  * open one to accept or complete it. A real integration does this from its own server, with
  * jobs arriving by webhook; here the list polls every 30 seconds and Refresh asks at once. The
@@ -72,10 +73,9 @@ export default function Jobs() {
       <div className={styles.page}>
         <div className={styles.head}>
           <div className={styles.intro}>
-            <h1 className={styles.title}>Sandbox</h1>
+            <h1 className={styles.title}>Job console</h1>
             <p className={styles.sub}>
-              Try the job API the way your server will. In production your server makes these calls, with jobs arriving by webhook:
-              never a browser.
+              The job API by hand, the way your server uses it: see the jobs CareLink sent you, and accept, decline or complete them.
             </p>
           </div>
           {token && (
@@ -88,6 +88,11 @@ export default function Jobs() {
             </div>
           )}
         </div>
+
+        <Banner tone="warning" title="These are your real jobs">
+          Accepting, declining or completing a job here does it for real, as your server would. Day to day, let your server make
+          these calls, with jobs arriving by webhook: it keeps your client secret out of the browser.
+        </Banner>
 
         <SandboxConnect />
 
@@ -163,9 +168,9 @@ export default function Jobs() {
                       </thead>
                       <tbody>
                         {data.items.map((job) => (
-                          <tr key={job.id} onClick={() => navigate(`/provider/sandbox/jobs/${job.id}`)}>
+                          <tr key={job.id} onClick={() => navigate(`/provider/console/jobs/${job.id}`)}>
                             <td className={styles.id}>
-                              <Link to={`/provider/sandbox/jobs/${job.id}`} onClick={(e) => e.stopPropagation()}>
+                              <Link to={`/provider/console/jobs/${job.id}`} onClick={(e) => e.stopPropagation()}>
                                 {job.id}
                               </Link>
                             </td>
