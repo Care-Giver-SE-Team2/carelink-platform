@@ -68,6 +68,8 @@ export type ManagedValueAddedServiceRequest = {
   status: ValueAddedServiceRequestStatus
   decidedAt: string | null
   createdAt: string
+  /** A family member asked on the elder's behalf; false when the elder asked. */
+  requestedByFamily: boolean
   visitId: number | null
   /** The visit's state, e.g. SCHEDULED or EXCEPTION; null before dispatch. */
   visitStatus: string | null

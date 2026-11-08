@@ -4,8 +4,9 @@ import sg.nus.carelink.report.domain.model.ValueAddedServiceRequest;
 import sg.nus.carelink.report.infrastructure.persistence.entity.ValueAddedServiceRequestJpaEntity;
 
 /**
- * JPA entity <-> domain model for value_added_service_request, both directions, column by column. Database-managed
- * columns (created_at, updated_at) are read but never written back. Covered by ValueAddedServiceRequestMapperTest.
+ * JPA entity <-> domain model for value_added_service_request, both directions, column by column. created_at (stamped
+ * by the entity on insert) and updated_at (the database's) are read but never written back. Covered by
+ * ValueAddedServiceRequestMapperTest.
  */
 final class ValueAddedServiceRequestMapper {
 

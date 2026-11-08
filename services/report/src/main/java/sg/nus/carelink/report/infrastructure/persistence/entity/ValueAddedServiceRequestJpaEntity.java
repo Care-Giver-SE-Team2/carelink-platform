@@ -7,12 +7,15 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+
+import sg.nus.carelink.eventtypes.SingaporeTime;
 
 /**
  * JPA entity for table value_added_service_request.
@@ -80,7 +83,13 @@ public class ValueAddedServiceRequestJpaEntity {
 	@Column(name = "decided_at")
 	private LocalDateTime decidedAt;
 
-	@Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+	/**
+	 * Written here, on Singapore's clock, like every other time this service writes - not left to
+	 * the column's DEFAULT CURRENT_TIMESTAMP. MySQL's default is UTC and skips the driver's shift
+	 * (connectionTimeZone=Asia/Singapore), so it read back eight hours early: a request made at
+	 * 16:24 showed as asked at 00:24. V10 moved the rows written that way.
+	 */
+	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
 	@Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
@@ -171,6 +180,13 @@ public class ValueAddedServiceRequestJpaEntity {
 
 	public LocalDateTime getCreatedAt() {
 		return createdAt;
+	}
+
+	@PrePersist
+	void stampCreatedAt() {
+		if (createdAt == null) {
+			createdAt = LocalDateTime.now(SingaporeTime.ZONE).withNano(0);
+		}
 	}
 
 	public LocalDateTime getUpdatedAt() {

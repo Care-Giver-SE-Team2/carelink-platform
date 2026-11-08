@@ -72,7 +72,7 @@ export function ExtraServicePanel({
       <section className={styles.section} aria-label="Request">
         <Eyebrow wide>Request</Eyebrow>
         <dl className={styles.fields}>
-          <Detail label="Asked">{formatWhen(request.createdAt)} by the elder</Detail>
+          <Detail label="Asked">{formatWhen(request.createdAt)} by {request.requestedByFamily ? 'a family member' : 'the elder'}</Detail>
           <Detail label="Wanted">{when}</Detail>
           <Detail label="Instructions">{request.specialInstructions ?? <NotGiven />}</Detail>
           <Detail label="Family">{familyAnswer(request)}</Detail>

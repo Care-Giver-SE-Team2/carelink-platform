@@ -26,6 +26,7 @@ function request(overrides: Partial<ManagedValueAddedServiceRequest>): ManagedVa
     status: 'DISPATCHED',
     decidedAt: '2026-10-08T09:00:00',
     createdAt: '2026-10-07T17:00:00',
+    requestedByFamily: false,
     visitId: 40,
     visitStatus: 'SCHEDULED',
     caregiverId: null,
@@ -87,6 +88,15 @@ it('opens on the visits needing a caregiver, with names instead of ids', async (
   expect(await screen.findByText(/for Tan Bee Choo · Sat 10 Oct, 10:00/)).toBeTruthy()
   const panel = screen.getByRole('complementary', { name: 'Extra service detail' })
   expect(within(panel).getByText('Bring the wheelchair')).toBeTruthy()
+  expect(within(panel).getByText(/Wed 7 Oct, 17:00 by the elder/)).toBeTruthy()
+})
+
+it('says when a family member asked on the elder’s behalf', async () => {
+  requests = [request({ requestedByFamily: true })]
+  renderPage()
+
+  expect(await screen.findByText(/by a family member/)).toBeTruthy()
+  expect(screen.queryByText(/by the elder/)).toBeNull()
 })
 
 it('assigns a caregiver from the ranked options and refreshes the list', async () => {

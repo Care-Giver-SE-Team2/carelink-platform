@@ -13,6 +13,7 @@ function row(overrides: Partial<ManagedValueAddedServiceRequest>): ManagedValueA
     status: 'DISPATCHED',
     decidedAt: '2026-10-08T09:00:00',
     createdAt: '2026-10-07T17:00:00',
+    requestedByFamily: false,
     visitId: 40,
     visitStatus: 'SCHEDULED',
     caregiverId: 9,
