@@ -1,0 +1,33 @@
+# REVIEW ONLY. Not loaded by CI/CD. Not a deployment command.
+# First fixed-one-worker trial only; KEDA stage requires the chart/CD changes in ../keda-integration-plan.md.
+# Use the report image digest from the reviewed release manifest; no separate worker image build.
+# Do not activate before the business contract, IAM, runtime Secret and test window are approved.
+replicaCount: 1
+autoscaling:
+  enabled: false
+image:
+  repository: REVIEWED_REPORT_IMAGE_REPOSITORY
+  digest: REVIEWED_REPORT_IMAGE_DIGEST
+envFromSecret: report-worker-runtime
+rdsTruststoreConfigMap: rds-ca
+env:
+  SPRING_PROFILES_ACTIVE: worker
+  CARELINK_EVENTS_SERVICE: report-worker
+  CARELINK_EVENTS_REGION: ap-southeast-1
+  REPORT_LEGACY_SCHEDULER_ENABLED: "false"
+  REPORT_WORKER_TEST_PREPARE_DELAY: "0s"
+  CARELINK_REPORT_AI_ENABLED: "false"
+  CARELINK_COREAPI_BASEURL: http://core
+  CARELINK_VISITAPI_BASEURL: http://visit
+  SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: "240s"
+# Secret must contain the dedicated worker queue URL and existing approved DB/TLS/Redis keys.
+# No LocalStack endpoints, static AWS credentials, topic ARN or real password in this example.
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 768Mi
+shutdown:
+  preStopSeconds: 10
+  terminationGracePeriodSeconds: 270

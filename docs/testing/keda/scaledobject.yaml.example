@@ -1,0 +1,29 @@
+# REVIEW ONLY. No TriggerAuthentication or operator identity is provisioned by this file.
+# Do not apply before the chart omits replicas without creating a CPU HPA, and CD supports Worker.
+# All numbers are trial candidates, not approved capacity or performance guarantees.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: report-worker
+  namespace: staging
+  annotations:
+    autoscaling.keda.sh/paused: "true"
+spec:
+  scaleTargetRef:
+    name: report-worker
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 0
+  # Initial wake-up test only. Raise after capacity review and meaningful task partitioning.
+  maxReplicaCount: 1
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: reviewed-report-worker-sqs-auth
+      metadata:
+        queueURL: REVIEWED_DEDICATED_WORKER_QUEUE_URL
+        awsRegion: ap-southeast-1
+        queueLength: "1"
+        activationQueueLength: "0"
+        scaleOnInFlight: "true"
+        scaleOnDelayed: "false"
