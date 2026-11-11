@@ -1,0 +1,8 @@
+# Offline preparation only. No workflow/deploy script loads this file.
+# Review live capacity before using it in a future Helm release.
+# Keep service, environment, public HTTPS, runtime Secret and image digest values.
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
